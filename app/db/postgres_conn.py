@@ -30,6 +30,29 @@ def ensure_table():
         );
         CREATE INDEX IF NOT EXISTS idx_agent_performance_date
             ON agent_performance (report_date);
+
+        CREATE TABLE IF NOT EXISTS users (
+            id               VARCHAR(100) PRIMARY KEY,
+            email            VARCHAR(255),
+            full_name        VARCHAR(255),
+            status           VARCHAR(20),
+            first_name       VARCHAR(100),
+            last_name        VARCHAR(100),
+            role_id          VARCHAR(100),
+            desk_id          VARCHAR(100),
+            language         VARCHAR(20),
+            last_logon_time  TIMESTAMP,
+            last_update_time TIMESTAMP,
+            desk_name        VARCHAR(255),
+            team             VARCHAR(255),
+            department       VARCHAR(255),
+            desk             VARCHAR(255),
+            type             VARCHAR(50),
+            office_id        VARCHAR(100),
+            office           VARCHAR(255),
+            position         VARCHAR(100),
+            synced_at        TIMESTAMP DEFAULT NOW()
+        );
     """
     conn = get_connection()
     try:
@@ -40,15 +63,72 @@ def ensure_table():
         conn.close()
 
 
-def delete_current_month():
-    sql = """
-        DELETE FROM agent_performance
-        WHERE DATE_TRUNC('month', report_date) = DATE_TRUNC('month', CURRENT_DATE)
-    """
+def delete_all_performance():
+    sql = "TRUNCATE TABLE agent_performance"
     conn = get_connection()
     try:
         with conn.cursor() as cur:
             cur.execute(sql)
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def upsert_users(df: pd.DataFrame):
+    rows = [
+        (
+            str(row["id"]),
+            row.get("email"),
+            row.get("full_name"),
+            row.get("status"),
+            row.get("first_name"),
+            row.get("last_name"),
+            str(row["role_id"]) if row.get("role_id") is not None else None,
+            str(row["desk_id"]) if row.get("desk_id") is not None else None,
+            row.get("language"),
+            row.get("last_logon_time"),
+            row.get("last_update_time"),
+            row.get("desk_name"),
+            row.get("team"),
+            row.get("department"),
+            row.get("desk"),
+            row.get("type"),
+            str(row["office_id"]) if row.get("office_id") is not None else None,
+            row.get("office"),
+            row.get("position"),
+        )
+        for _, row in df.iterrows()
+    ]
+    sql = """
+        INSERT INTO users (id, email, full_name, status, first_name, last_name,
+            role_id, desk_id, language, last_logon_time, last_update_time,
+            desk_name, team, department, desk, type, office_id, office, position)
+        VALUES %s
+        ON CONFLICT (id) DO UPDATE SET
+            email            = EXCLUDED.email,
+            full_name        = EXCLUDED.full_name,
+            status           = EXCLUDED.status,
+            first_name       = EXCLUDED.first_name,
+            last_name        = EXCLUDED.last_name,
+            role_id          = EXCLUDED.role_id,
+            desk_id          = EXCLUDED.desk_id,
+            language         = EXCLUDED.language,
+            last_logon_time  = EXCLUDED.last_logon_time,
+            last_update_time = EXCLUDED.last_update_time,
+            desk_name        = EXCLUDED.desk_name,
+            team             = EXCLUDED.team,
+            department       = EXCLUDED.department,
+            desk             = EXCLUDED.desk,
+            type             = EXCLUDED.type,
+            office_id        = EXCLUDED.office_id,
+            office           = EXCLUDED.office,
+            position         = EXCLUDED.position,
+            synced_at        = NOW()
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            execute_values(cur, sql, rows)
         conn.commit()
     finally:
         conn.close()

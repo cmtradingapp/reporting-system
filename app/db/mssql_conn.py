@@ -17,8 +17,6 @@ def get_targets() -> pd.DataFrame:
         query = """
             SELECT date, agent_id, ftc, net
             FROM report.target
-            WHERE YEAR(date) = YEAR(GETDATE())
-              AND MONTH(date) = MONTH(GETDATE())
         """
         df = pd.read_sql(query, conn)
         return df
