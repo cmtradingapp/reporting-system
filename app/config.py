@@ -1,0 +1,25 @@
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# MySQL
+MYSQL_HOST = os.getenv("MYSQL_HOST", "cmtrading-replica-db.cllx9icdmhvp.eu-west-1.rds.amazonaws.com")
+MYSQL_PORT = int(os.getenv("MYSQL_PORT", 3306))
+MYSQL_USER = os.getenv("MYSQL_USER", "db_readonly")
+MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD", "")
+MYSQL_DB = os.getenv("MYSQL_DB", "")
+
+# MSSQL
+MSSQL_HOST = os.getenv("MSSQL_HOST", "cmtmainserver.database.windows.net")
+MSSQL_PORT = int(os.getenv("MSSQL_PORT", 1433))
+MSSQL_USER = os.getenv("MSSQL_USER", "clawreadonly")
+MSSQL_PASSWORD = os.getenv("MSSQL_PASSWORD", "")
+MSSQL_DB = os.getenv("MSSQL_DB", "master")
+
+# PostgreSQL (local)
+POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")
+POSTGRES_PORT = int(os.getenv("POSTGRES_PORT", 5432))
+POSTGRES_USER = os.getenv("POSTGRES_USER", "postgres")
+POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "")
+POSTGRES_DB = os.getenv("POSTGRES_DB", "datawarehouse")

@@ -1,0 +1,58 @@
+name: Deploy to Server
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+
+            # Create app directory if it doesn't exist
+            mkdir -p /opt/reporting-system
+
+            # Clone or pull the repo
+            if [ -d "/opt/reporting-system/.git" ]; then
+              cd /opt/reporting-system
+              git pull origin main
+            else
+              git clone https://github.com/cmtradingapp/reporting-system.git /opt/reporting-system
+              cd /opt/reporting-system
+            fi
+
+            # Write .env file from GitHub secrets
+            cat > /opt/reporting-system/.env << 'ENVEOF'
+            MYSQL_HOST=${{ secrets.MYSQL_HOST }}
+            MYSQL_PORT=${{ secrets.MYSQL_PORT }}
+            MYSQL_USER=${{ secrets.MYSQL_USER }}
+            MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }}
+            MYSQL_DB=${{ secrets.MYSQL_DB }}
+            MSSQL_HOST=${{ secrets.MSSQL_HOST }}
+            MSSQL_PORT=${{ secrets.MSSQL_PORT }}
+            MSSQL_USER=${{ secrets.MSSQL_USER }}
+            MSSQL_PASSWORD=${{ secrets.MSSQL_PASSWORD }}
+            MSSQL_DB=${{ secrets.MSSQL_DB }}
+            POSTGRES_HOST=${{ secrets.POSTGRES_HOST }}
+            POSTGRES_PORT=${{ secrets.POSTGRES_PORT }}
+            POSTGRES_USER=${{ secrets.POSTGRES_USER }}
+            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+            POSTGRES_DB=${{ secrets.POSTGRES_DB }}
+            ENVEOF
+
+            # Build and restart
+            cd /opt/reporting-system
+            docker compose down || true
+            docker compose up --build -d
+
+            echo "Deployment complete."
