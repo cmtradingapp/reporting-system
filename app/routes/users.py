@@ -15,9 +15,12 @@ async def users_page(request: Request):
     last_sync = fetch_last_sync()
     current_month = datetime.now().strftime("%B %Y")
 
-    # Replace all NaT/NaN with None so Jinja2 renders them safely
-    df = df.where(pd.notnull(df), None)
+    # Format datetime columns as strings to avoid NaT issues in Jinja2
+    for col in ["last_logon_time", "last_update_time"]:
+        if col in df.columns:
+            df[col] = df[col].apply(lambda x: x.strftime("%Y-%m-%d") if pd.notnull(x) else None)
 
+    df = df.where(pd.notnull(df), None)
     users = df.to_dict(orient="records")
     total_active = len(df)
     total_ftc = float(df["total_ftc"].sum()) if not df.empty else 0

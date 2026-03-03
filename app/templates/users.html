@@ -154,9 +154,7 @@
             <td class="text-end text-muted small">
               {% if user.trading_days > 0 %}{{ user.trading_days }}{% else %}<span class="text-muted">—</span>{% endif %}
             </td>
-            <td class="small text-muted">
-              {% if user.last_logon_time %}{{ user.last_logon_time.strftime('%Y-%m-%d') if user.last_logon_time else '—' }}{% else %}—{% endif %}
-            </td>
+            <td class="small text-muted">{{ user.last_logon_time or '—' }}</td>
           </tr>
           {% endfor %}
         </tbody>
