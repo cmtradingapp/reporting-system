@@ -8,14 +8,14 @@ MYSQL_HOST = os.getenv("MYSQL_HOST", "cmtrading-replica-db.cllx9icdmhvp.eu-west-
 MYSQL_PORT = int(os.getenv("MYSQL_PORT", 3306))
 MYSQL_USER = os.getenv("MYSQL_USER", "db_readonly")
 MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD", "")
-MYSQL_DB = os.getenv("MYSQL_DB", "")
+MYSQL_DB = os.getenv("MYSQL_DB", "crmdb")
 
 # MSSQL
 MSSQL_HOST = os.getenv("MSSQL_HOST", "cmtmainserver.database.windows.net")
 MSSQL_PORT = int(os.getenv("MSSQL_PORT", 1433))
 MSSQL_USER = os.getenv("MSSQL_USER", "clawreadonly")
 MSSQL_PASSWORD = os.getenv("MSSQL_PASSWORD", "")
-MSSQL_DB = os.getenv("MSSQL_DB", "master")
+MSSQL_DB = os.getenv("MSSQL_DB", "cmt_main")
 
 # PostgreSQL (local)
 POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")
