@@ -188,3 +188,40 @@ def fetch_last_sync() -> str:
             return result.strftime("%Y-%m-%d %H:%M:%S") if result else "Never"
     finally:
         conn.close()
+
+
+def fetch_users_with_targets() -> pd.DataFrame:
+    sql = """
+        SELECT
+            u.id,
+            u.full_name,
+            u.email,
+            u.position,
+            u.office,
+            u.team,
+            u.department,
+            u.desk_name,
+            u.status,
+            u.last_logon_time,
+            COALESCE(ap.total_ftc, 0) AS total_ftc,
+            COALESCE(ap.total_net, 0) AS total_net,
+            COALESCE(ap.trading_days, 0) AS trading_days
+        FROM users u
+        LEFT JOIN (
+            SELECT
+                agent_id,
+                SUM(ftc)  AS total_ftc,
+                SUM(net)  AS total_net,
+                COUNT(*)  AS trading_days
+            FROM agent_performance
+            WHERE DATE_TRUNC('month', report_date) = DATE_TRUNC('month', CURRENT_DATE)
+            GROUP BY agent_id
+        ) ap ON u.id = ap.agent_id
+        WHERE u.status = 'Active'
+        ORDER BY total_net DESC
+    """
+    conn = get_connection()
+    try:
+        return pd.read_sql(sql, conn)
+    finally:
+        conn.close()
