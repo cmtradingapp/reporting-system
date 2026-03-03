@@ -19,39 +19,21 @@ jobs:
           script: |
             set -e
 
-            # Create app directory if it doesn't exist
-            mkdir -p /opt/reporting-system
+            APP_DIR=/opt/reporting-system/reporting-system
 
             # Clone or pull the repo
-            if [ -d "/opt/reporting-system/.git" ]; then
-              cd /opt/reporting-system
+            if [ -d "$APP_DIR/.git" ]; then
+              cd $APP_DIR
               git pull origin main
             else
-              git clone https://github.com/cmtradingapp/reporting-system.git /opt/reporting-system
-              cd /opt/reporting-system
+              mkdir -p /opt/reporting-system
+              git clone https://github.com/cmtradingapp/reporting-system.git $APP_DIR
+              cd $APP_DIR
             fi
 
-            # Write .env file from GitHub secrets
-            cat > /opt/reporting-system/.env << 'ENVEOF'
-            MYSQL_HOST=${{ secrets.MYSQL_HOST }}
-            MYSQL_PORT=${{ secrets.MYSQL_PORT }}
-            MYSQL_USER=${{ secrets.MYSQL_USER }}
-            MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }}
-            MYSQL_DB=${{ secrets.MYSQL_DB }}
-            MSSQL_HOST=${{ secrets.MSSQL_HOST }}
-            MSSQL_PORT=${{ secrets.MSSQL_PORT }}
-            MSSQL_USER=${{ secrets.MSSQL_USER }}
-            MSSQL_PASSWORD=${{ secrets.MSSQL_PASSWORD }}
-            MSSQL_DB=${{ secrets.MSSQL_DB }}
-            POSTGRES_HOST=${{ secrets.POSTGRES_HOST }}
-            POSTGRES_PORT=${{ secrets.POSTGRES_PORT }}
-            POSTGRES_USER=${{ secrets.POSTGRES_USER }}
-            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
-            POSTGRES_DB=${{ secrets.POSTGRES_DB }}
-            ENVEOF
-
+            # Preserve existing .env file (already created manually on server)
             # Build and restart
-            cd /opt/reporting-system
+            cd $APP_DIR
             docker compose down || true
             docker compose up --build -d
 
