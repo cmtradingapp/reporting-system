@@ -74,28 +74,40 @@ def delete_all_performance():
         conn.close()
 
 
+def _clean(val):
+    """Convert pandas NaT/NaN to None for PostgreSQL compatibility."""
+    if val is None:
+        return None
+    try:
+        if pd.isnull(val):
+            return None
+    except (TypeError, ValueError):
+        pass
+    return val
+
+
 def upsert_users(df: pd.DataFrame):
     rows = [
         (
             str(row["id"]),
-            row.get("email"),
-            row.get("full_name"),
-            row.get("status"),
-            row.get("first_name"),
-            row.get("last_name"),
-            str(row["role_id"]) if row.get("role_id") is not None else None,
-            str(row["desk_id"]) if row.get("desk_id") is not None else None,
-            row.get("language"),
-            row.get("last_logon_time"),
-            row.get("last_update_time"),
-            row.get("desk_name"),
-            row.get("team"),
-            row.get("department"),
-            row.get("desk"),
-            row.get("type"),
-            str(row["office_id"]) if row.get("office_id") is not None else None,
-            row.get("office"),
-            row.get("position"),
+            _clean(row.get("email")),
+            _clean(row.get("full_name")),
+            _clean(row.get("status")),
+            _clean(row.get("first_name")),
+            _clean(row.get("last_name")),
+            _clean(str(row["role_id"])) if _clean(row.get("role_id")) is not None else None,
+            _clean(str(row["desk_id"])) if _clean(row.get("desk_id")) is not None else None,
+            _clean(row.get("language")),
+            _clean(row.get("last_logon_time")),
+            _clean(row.get("last_update_time")),
+            _clean(row.get("desk_name")),
+            _clean(row.get("team")),
+            _clean(row.get("department")),
+            _clean(row.get("desk")),
+            _clean(row.get("type")),
+            _clean(str(row["office_id"])) if _clean(row.get("office_id")) is not None else None,
+            _clean(row.get("office")),
+            _clean(row.get("position")),
         )
         for _, row in df.iterrows()
     ]
