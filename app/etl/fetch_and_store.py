@@ -1,8 +1,11 @@
+import time
 import pandas as pd
+from datetime import datetime, timedelta, timezone
 from app.db.mysql_conn import get_operators, get_users, get_accounts
 from app.db.mssql_conn import get_targets
 from app.db.postgres_conn import (
-    ensure_table, delete_all_performance, insert_records, upsert_users, upsert_accounts
+    ensure_table, delete_all_performance, insert_records,
+    upsert_users, upsert_accounts, log_sync
 )
 
 
@@ -38,10 +41,24 @@ def run_etl() -> dict:
 
 def run_accounts_etl(hours: int = 24) -> dict:
     ensure_table()
-    accounts_df = get_accounts(hours=hours)
-    upsert_accounts(accounts_df)
+    start = time.time()
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    status = "success"
+    error_msg = None
+    rows = 0
+    try:
+        accounts_df = get_accounts(hours=hours)
+        rows = len(accounts_df)
+        upsert_accounts(accounts_df)
+    except Exception as e:
+        status = "error"
+        error_msg = str(e)
+        raise
+    finally:
+        duration_ms = int((time.time() - start) * 1000)
+        log_sync("crm_accounts", cutoff, rows, duration_ms, status, error_msg)
     return {
-        "status": "success",
-        "accounts_synced": len(accounts_df),
+        "status": status,
+        "accounts_synced": rows,
         "lookback_hours": hours,
     }

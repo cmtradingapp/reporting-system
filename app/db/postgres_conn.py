@@ -96,6 +96,19 @@ def ensure_table():
         CREATE INDEX IF NOT EXISTS idx_accounts_modifiedtime
             ON accounts (modifiedtime);
 
+        CREATE TABLE IF NOT EXISTS sync_log (
+            id            SERIAL PRIMARY KEY,
+            table_name    VARCHAR(100)  NOT NULL,
+            cutoff_used   TIMESTAMP     NOT NULL,
+            rows_affected INT           DEFAULT 0,
+            duration_ms   INT           DEFAULT 0,
+            status        VARCHAR(20)   DEFAULT 'success',
+            error_message TEXT,
+            ran_at        TIMESTAMP     NOT NULL DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_sync_log_table_name ON sync_log (table_name);
+        CREATE INDEX IF NOT EXISTS idx_sync_log_ran_at ON sync_log (ran_at);
+
         CREATE TABLE IF NOT EXISTS users (
             id               VARCHAR(100) PRIMARY KEY,
             email            VARCHAR(255),
@@ -304,6 +317,74 @@ def fetch_last_sync() -> str:
             cur.execute(sql)
             result = cur.fetchone()[0]
             return result.strftime("%Y-%m-%d %H:%M:%S") if result else "Never"
+    finally:
+        conn.close()
+
+
+def log_sync(table_name: str, cutoff_used, rows_affected: int, duration_ms: int, status: str, error_message: str = None):
+    sql = """
+        INSERT INTO sync_log (table_name, cutoff_used, rows_affected, duration_ms, status, error_message)
+        VALUES (%s, %s, %s, %s, %s, %s)
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql, (table_name, cutoff_used, rows_affected, duration_ms, status, error_message))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def fetch_accounts_stats() -> dict:
+    sql = """
+        SELECT
+            COUNT(*) AS total_records,
+            MAX(synced_at) AS last_synced_at,
+            COUNT(*) FILTER (WHERE funded = 1) AS funded_accounts,
+            COUNT(*) FILTER (WHERE accountstatus = 'Sales') AS sales_accounts,
+            COUNT(*) FILTER (WHERE accountstatus = 'Retention') AS retention_accounts
+        FROM accounts
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+            row = cur.fetchone()
+            return {
+                "total_records": row[0] or 0,
+                "last_synced_at": row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else "Never",
+                "funded_accounts": row[2] or 0,
+                "sales_accounts": row[3] or 0,
+                "retention_accounts": row[4] or 0,
+            }
+    finally:
+        conn.close()
+
+
+def fetch_sync_log(table_name: str, limit: int = 50) -> list:
+    sql = """
+        SELECT ran_at, cutoff_used, rows_affected, duration_ms, status, error_message
+        FROM sync_log
+        WHERE table_name = %s
+        ORDER BY ran_at DESC
+        LIMIT %s
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql, (table_name, limit))
+            rows = cur.fetchall()
+            return [
+                {
+                    "ran_at": r[0].strftime("%Y-%m-%d %H:%M:%S") if r[0] else "",
+                    "cutoff_used": r[1].strftime("%Y-%m-%d %H:%M:%S") if r[1] else "",
+                    "rows_affected": r[2] or 0,
+                    "duration_ms": r[3] or 0,
+                    "status": r[4] or "unknown",
+                    "error_message": r[5] or "",
+                }
+                for r in rows
+            ]
     finally:
         conn.close()
 

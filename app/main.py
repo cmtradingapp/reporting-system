@@ -4,6 +4,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from app.routes.report import router
 from app.routes.users import router as users_router
 from app.routes.accounts import router as accounts_router
+from app.routes.data_sync import router as data_sync_router
 from app.db.postgres_conn import ensure_table
 from app.etl.fetch_and_store import run_accounts_etl
 import os
@@ -35,3 +36,4 @@ app = FastAPI(title="Agent Performance Report", lifespan=lifespan)
 app.include_router(router)
 app.include_router(users_router)
 app.include_router(accounts_router)
+app.include_router(data_sync_router)
