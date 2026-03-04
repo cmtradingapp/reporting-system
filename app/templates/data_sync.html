@@ -139,9 +139,15 @@
     <div class="card p-4 mb-4">
       <div class="d-flex justify-content-between align-items-center mb-3">
         <div class="section-title">Sync Log</div>
-        <button class="btn btn-sm sync-btn text-white px-3" onclick="runSync('{{ t.key }}')">
-          <i class="bi bi-play-fill me-1"></i>Run Sync Now
-        </button>
+        <div class="d-flex gap-2">
+          <button class="btn btn-sm sync-btn text-white px-3" onclick="runSync('{{ t.key }}')">
+            <i class="bi bi-play-fill me-1"></i>Run Sync Now
+          </button>
+          <button class="btn btn-sm btn-outline-warning px-3" onclick="runFullSync('{{ t.key }}')"
+                  title="Pull all records with no time filter">
+            <i class="bi bi-arrow-clockwise me-1"></i>Full Sync
+          </button>
+        </div>
       </div>
 
       {% if t.sync_log %}
@@ -230,6 +236,28 @@
         setTimeout(() => location.reload(), 1500);
       } else {
         showToast('Sync failed: ' + (data.detail || 'Unknown error'), 'error');
+      }
+    } catch (e) {
+      showToast('Network error: ' + e.message, 'error');
+    } finally {
+      document.getElementById('spinner').classList.remove('active');
+    }
+  }
+
+  async function runFullSync(tableKey) {
+    if (!confirm('This will pull ALL records with no time filter. It may take several minutes. Continue?')) return;
+    document.getElementById('spinner').classList.add('active');
+    document.querySelector('#spinner div div:last-child').textContent = 'Running full sync — this may take a few minutes...';
+    try {
+      const urlMap = { 'crm_accounts': '/sync/accounts/full' };
+      const url = urlMap[tableKey] || '/sync/accounts/full';
+      const res = await fetch(url, { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(`Full sync complete — ${data.accounts_synced?.toLocaleString() || 0} rows upserted.`, 'success');
+        setTimeout(() => location.reload(), 1500);
+      } else {
+        showToast('Full sync failed: ' + (data.detail || 'Unknown error'), 'error');
       }
     } catch (e) {
       showToast('Network error: ' + e.message, 'error');
