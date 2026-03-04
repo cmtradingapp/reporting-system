@@ -187,6 +187,144 @@ def get_accounts_full() -> pd.DataFrame:
         conn.close()
 
 
+def get_crm_users(hours: int = 24) -> pd.DataFrame:
+    conn = _get_connection()
+    try:
+        query = f"""
+            SELECT
+                o.id,
+                MAX(email)                                                                        AS email,
+                MAX(o.full_name)                                                                  AS full_name,
+                MAX(IF(o.is_active, 'Active', 'Inactive'))                                        AS status,
+                MAX(SUBSTRING_INDEX(REPLACE(o.full_name, '.', ' '), ' ', 1))                     AS first_name,
+                MAX(SUBSTRING_INDEX(REPLACE(o.full_name, '.', ' '), ' ', -1))                    AS last_name,
+                MAX(o.role_id)                                                                    AS role_id,
+                MAX(od.desk_id)                                                                   AS desk_id,
+                MAX(o.language_iso)                                                               AS language,
+                MAX(o.last_logon_time)                                                            AS last_logon_time,
+                MAX(o.last_update_time)                                                           AS last_update_time,
+                MAX(d.name)                                                                       AS desk_name,
+                MAX(IF(opr.display_name NOT LIKE '%Agent%' AND opr.display_name != 'BDM', '',
+                    TRIM(SUBSTRING_INDEX(d.name, '-', 1))))                                       AS team,
+                MAX(IF(opr.display_name NOT LIKE '%Agent%' AND opr.display_name != 'BDM', '',
+                    TRIM(SUBSTRING_INDEX(d.name, '-', -1))))                                      AS department,
+                MAX(SUBSTRING_INDEX(SUBSTRING_INDEX(d.name, '-', 2), '-', -1))                   AS desk,
+                MAX(d.type)                                                                       AS type,
+                MAX(d.office_id)                                                                  AS office_id,
+                MAX(IF(opr.display_name NOT LIKE '%Agent%' AND opr.display_name != 'BDM',
+                    'General', ofc.name))                                                         AS office,
+                MAX(IF(opr.display_name LIKE '%Agent%' OR opr.display_name = 'BDM',
+                    'Agent', opr.display_name))                                                   AS position
+            FROM v_ant_operators o
+            LEFT JOIN operator_desk_rel od ON o.id = od.operator_id
+            LEFT JOIN desk d ON od.desk_id = d.id
+            LEFT JOIN office ofc ON d.office_id = ofc.id
+            LEFT JOIN operator_role opr ON o.role_id = opr.id
+            WHERE opr.display_name != 'Affiliate'
+              AND opr.display_name NOT LIKE '%Admin'
+              AND opr.display_name != 'Dialer'
+              AND o.last_update_time >= DATE_ADD(UTC_TIMESTAMP(), INTERVAL -{hours} HOUR)
+            GROUP BY o.id
+
+            UNION
+
+            SELECT
+                d.id,
+                NULL                                                                              AS email,
+                d.name                                                                            AS full_name,
+                'Active'                                                                          AS status,
+                d.name                                                                            AS first_name,
+                NULL                                                                              AS last_name,
+                NULL                                                                              AS role_id,
+                d.id                                                                              AS desk_id,
+                NULL                                                                              AS language,
+                CURRENT_TIMESTAMP()                                                               AS last_logon_time,
+                d.last_update_time,
+                d.name                                                                            AS desk_name,
+                TRIM(SUBSTRING_INDEX(d.name, '-', -1))                                           AS team,
+                TRIM(SUBSTRING_INDEX(d.name, '-', 1))                                            AS department,
+                SUBSTRING_INDEX(SUBSTRING_INDEX(d.name, '-', 2), '-', -1)                       AS desk,
+                d.type,
+                d.office_id,
+                ofc.name                                                                          AS office,
+                'Agent'                                                                           AS position
+            FROM desk d
+            JOIN office ofc ON d.office_id = ofc.id
+            WHERE d.last_update_time >= DATE_ADD(UTC_TIMESTAMP(), INTERVAL -{hours} HOUR)
+        """
+        return pd.read_sql(query, conn)
+    finally:
+        conn.close()
+
+
+def get_crm_users_full() -> pd.DataFrame:
+    conn = _get_connection()
+    try:
+        query = """
+            SELECT
+                o.id,
+                MAX(email)                                                                        AS email,
+                MAX(o.full_name)                                                                  AS full_name,
+                MAX(IF(o.is_active, 'Active', 'Inactive'))                                        AS status,
+                MAX(SUBSTRING_INDEX(REPLACE(o.full_name, '.', ' '), ' ', 1))                     AS first_name,
+                MAX(SUBSTRING_INDEX(REPLACE(o.full_name, '.', ' '), ' ', -1))                    AS last_name,
+                MAX(o.role_id)                                                                    AS role_id,
+                MAX(od.desk_id)                                                                   AS desk_id,
+                MAX(o.language_iso)                                                               AS language,
+                MAX(o.last_logon_time)                                                            AS last_logon_time,
+                MAX(o.last_update_time)                                                           AS last_update_time,
+                MAX(d.name)                                                                       AS desk_name,
+                MAX(IF(opr.display_name NOT LIKE '%Agent%' AND opr.display_name != 'BDM', '',
+                    TRIM(SUBSTRING_INDEX(d.name, '-', 1))))                                       AS team,
+                MAX(IF(opr.display_name NOT LIKE '%Agent%' AND opr.display_name != 'BDM', '',
+                    TRIM(SUBSTRING_INDEX(d.name, '-', -1))))                                      AS department,
+                MAX(SUBSTRING_INDEX(SUBSTRING_INDEX(d.name, '-', 2), '-', -1))                   AS desk,
+                MAX(d.type)                                                                       AS type,
+                MAX(d.office_id)                                                                  AS office_id,
+                MAX(IF(opr.display_name NOT LIKE '%Agent%' AND opr.display_name != 'BDM',
+                    'General', ofc.name))                                                         AS office,
+                MAX(IF(opr.display_name LIKE '%Agent%' OR opr.display_name = 'BDM',
+                    'Agent', opr.display_name))                                                   AS position
+            FROM v_ant_operators o
+            LEFT JOIN operator_desk_rel od ON o.id = od.operator_id
+            LEFT JOIN desk d ON od.desk_id = d.id
+            LEFT JOIN office ofc ON d.office_id = ofc.id
+            LEFT JOIN operator_role opr ON o.role_id = opr.id
+            WHERE opr.display_name != 'Affiliate'
+              AND opr.display_name NOT LIKE '%Admin'
+              AND opr.display_name != 'Dialer'
+            GROUP BY o.id
+
+            UNION
+
+            SELECT
+                d.id,
+                NULL                                                                              AS email,
+                d.name                                                                            AS full_name,
+                'Active'                                                                          AS status,
+                d.name                                                                            AS first_name,
+                NULL                                                                              AS last_name,
+                NULL                                                                              AS role_id,
+                d.id                                                                              AS desk_id,
+                NULL                                                                              AS language,
+                CURRENT_TIMESTAMP()                                                               AS last_logon_time,
+                d.last_update_time,
+                d.name                                                                            AS desk_name,
+                TRIM(SUBSTRING_INDEX(d.name, '-', -1))                                           AS team,
+                TRIM(SUBSTRING_INDEX(d.name, '-', 1))                                            AS department,
+                SUBSTRING_INDEX(SUBSTRING_INDEX(d.name, '-', 2), '-', -1)                       AS desk,
+                d.type,
+                d.office_id,
+                ofc.name                                                                          AS office,
+                'Agent'                                                                           AS position
+            FROM desk d
+            JOIN office ofc ON d.office_id = ofc.id
+        """
+        return pd.read_sql(query, conn)
+    finally:
+        conn.close()
+
+
 def get_users() -> pd.DataFrame:
     conn = _get_connection()
     try:

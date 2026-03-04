@@ -109,6 +109,34 @@ def ensure_table():
         CREATE INDEX IF NOT EXISTS idx_sync_log_table_name ON sync_log (table_name);
         CREATE INDEX IF NOT EXISTS idx_sync_log_ran_at ON sync_log (ran_at);
 
+        CREATE TABLE IF NOT EXISTS crm_users (
+            id                  BIGINT          PRIMARY KEY,
+            email               VARCHAR(255),
+            full_name           VARCHAR(255),
+            status              VARCHAR(20),
+            first_name          VARCHAR(100),
+            last_name           VARCHAR(100),
+            role_id             BIGINT,
+            desk_id             BIGINT,
+            desk_name           VARCHAR(255),
+            team                VARCHAR(255),
+            department          VARCHAR(255),
+            desk                VARCHAR(255),
+            type                VARCHAR(50),
+            office_id           BIGINT,
+            office              VARCHAR(255),
+            position            VARCHAR(100),
+            language            VARCHAR(10),
+            last_logon_time     TIMESTAMP,
+            last_update_time    TIMESTAMP,
+            synced_at           TIMESTAMP DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_crm_users_desk_id ON crm_users (desk_id);
+        CREATE INDEX IF NOT EXISTS idx_crm_users_office_id ON crm_users (office_id);
+        CREATE INDEX IF NOT EXISTS idx_crm_users_status ON crm_users (status);
+        CREATE INDEX IF NOT EXISTS idx_crm_users_position ON crm_users (position);
+        CREATE INDEX IF NOT EXISTS idx_crm_users_last_update_time ON crm_users (last_update_time);
+
         CREATE TABLE IF NOT EXISTS users (
             id               VARCHAR(100) PRIMARY KEY,
             email            VARCHAR(255),
@@ -356,6 +384,58 @@ def fetch_accounts_stats() -> dict:
                 "funded_accounts": row[2] or 0,
                 "sales_accounts": row[3] or 0,
                 "retention_accounts": row[4] or 0,
+            }
+    finally:
+        conn.close()
+
+
+def upsert_crm_users(df: pd.DataFrame):
+    cols = [
+        "id", "email", "full_name", "status", "first_name", "last_name",
+        "role_id", "desk_id", "language", "last_logon_time", "last_update_time",
+        "desk_name", "team", "department", "desk", "type", "office_id", "office", "position",
+    ]
+    rows = [tuple(_clean(row.get(c)) for c in cols) for _, row in df.iterrows()]
+    update_cols = [c for c in cols if c != "id"]
+    update_set = ", ".join(f"{c} = EXCLUDED.{c}" for c in update_cols)
+    col_list = ", ".join(cols)
+    sql = f"""
+        INSERT INTO crm_users ({col_list})
+        VALUES %s
+        ON CONFLICT (id) DO UPDATE SET
+            {update_set},
+            synced_at = NOW()
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            execute_values(cur, sql, rows)
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def fetch_crm_users_stats() -> dict:
+    sql = """
+        SELECT
+            COUNT(*) AS total_records,
+            MAX(synced_at) AS last_synced_at,
+            COUNT(*) FILTER (WHERE status = 'Active') AS active_users,
+            COUNT(DISTINCT desk_id) FILTER (WHERE position = 'Agent') AS unique_desks,
+            COUNT(DISTINCT office_id) AS unique_offices
+        FROM crm_users
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+            row = cur.fetchone()
+            return {
+                "total_records": row[0] or 0,
+                "last_synced_at": row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else "Never",
+                "active_users": row[2] or 0,
+                "unique_desks": row[3] or 0,
+                "unique_offices": row[4] or 0,
             }
     finally:
         conn.close()

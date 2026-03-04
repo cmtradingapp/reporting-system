@@ -4,13 +4,16 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from app.routes.report import router
 from app.routes.users import router as users_router
 from app.routes.accounts import router as accounts_router
+from app.routes.users_sync import router as users_sync_router
 from app.routes.data_sync import router as data_sync_router
 from app.db.postgres_conn import ensure_table
-from app.etl.fetch_and_store import run_accounts_etl
+from app.etl.fetch_and_store import run_accounts_etl, run_users_etl
 import os
 
 ACCOUNTS_SYNC_HOURS = int(os.getenv("ACCOUNTS_SYNC_HOURS", "24"))
 ACCOUNTS_SYNC_INTERVAL_HOURS = int(os.getenv("ACCOUNTS_SYNC_INTERVAL_HOURS", "1"))
+USERS_SYNC_HOURS = int(os.getenv("USERS_SYNC_HOURS", "24"))
+USERS_SYNC_INTERVAL_HOURS = int(os.getenv("USERS_SYNC_INTERVAL_HOURS", "1"))
 
 scheduler = BackgroundScheduler()
 
@@ -26,6 +29,14 @@ async def lifespan(app: FastAPI):
         id="accounts_sync",
         replace_existing=True,
     )
+    scheduler.add_job(
+        run_users_etl,
+        "interval",
+        hours=USERS_SYNC_INTERVAL_HOURS,
+        kwargs={"hours": USERS_SYNC_HOURS},
+        id="users_sync",
+        replace_existing=True,
+    )
     scheduler.start()
     yield
     scheduler.shutdown()
@@ -36,4 +47,5 @@ app = FastAPI(title="Agent Performance Report", lifespan=lifespan)
 app.include_router(router)
 app.include_router(users_router)
 app.include_router(accounts_router)
+app.include_router(users_sync_router)
 app.include_router(data_sync_router)
