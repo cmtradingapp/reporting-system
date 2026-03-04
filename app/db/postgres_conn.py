@@ -31,6 +31,71 @@ def ensure_table():
         CREATE INDEX IF NOT EXISTS idx_agent_performance_date
             ON agent_performance (report_date);
 
+        CREATE TABLE IF NOT EXISTS accounts (
+            accountid                   INTEGER PRIMARY KEY,
+            is_test_account             SMALLINT,
+            first_name                  VARCHAR(100),
+            last_name                   VARCHAR(100),
+            full_name                   VARCHAR(255),
+            email                       VARCHAR(255),
+            gender                      VARCHAR(10),
+            customer_language           VARCHAR(20),
+            country_iso                 VARCHAR(10),
+            campaign                    VARCHAR(100),
+            campaign_code_legacy        VARCHAR(255),
+            client_source               VARCHAR(255),
+            original_affiliate          VARCHAR(255),
+            is_trading_active           SMALLINT,
+            is_demo                     SMALLINT,
+            compliance_status           VARCHAR(100),
+            accountstatus               VARCHAR(50),
+            sales_status                VARCHAR(100),
+            retention_status            VARCHAR(100),
+            kyc_workflow_status         VARCHAR(100),
+            assigned_to                 INTEGER,
+            sales_rep_id                INTEGER,
+            sales_desk_id               INTEGER,
+            retention_rep_id            INTEGER,
+            retention_desk_id           INTEGER,
+            first_sales_desk_id         INTEGER,
+            first_retention_rep_id      INTEGER,
+            compliance_agent            INTEGER,
+            last_agent_assignment_time  TIMESTAMP,
+            last_trade_opened_time      TIMESTAMP,
+            has_notes                   SMALLINT,
+            last_action_time            TIMESTAMP,
+            source                      VARCHAR(255),
+            has_frd                     SMALLINT,
+            frd_time                    TIMESTAMP,
+            last_trade_date             TIMESTAMP,
+            first_deposit_date          TIMESTAMP,
+            countdeposits               INTEGER,
+            last_deposit_date           TIMESTAMP,
+            last_interaction_date       TIMESTAMP,
+            balance                     NUMERIC(20,4),
+            net_deposit                 NUMERIC(20,4),
+            first_trade_date            TIMESTAMP,
+            ftd_amount                  NUMERIC(20,4),
+            funded                      SMALLINT,
+            login_date                  TIMESTAMP,
+            total_deposit               NUMERIC(20,4),
+            total_withdrawal            NUMERIC(20,4),
+            createdtime                 TIMESTAMP,
+            modifiedtime                TIMESTAMP,
+            questionnaire_completed     VARCHAR(100),
+            client_category             VARCHAR(100),
+            client_qualification_date   TIMESTAMP,
+            segmentation                VARCHAR(100),
+            google_uid                  VARCHAR(255),
+            birth_date                  DATE,
+            customer_id                 INTEGER,
+            regulation                  VARCHAR(100),
+            sales_client_potential      VARCHAR(100),
+            synced_at                   TIMESTAMP DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_accounts_modifiedtime
+            ON accounts (modifiedtime);
+
         CREATE TABLE IF NOT EXISTS users (
             id               VARCHAR(100) PRIMARY KEY,
             email            VARCHAR(255),
@@ -136,6 +201,47 @@ def upsert_users(df: pd.DataFrame):
             office           = EXCLUDED.office,
             position         = EXCLUDED.position,
             synced_at        = NOW()
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            execute_values(cur, sql, rows)
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def upsert_accounts(df: pd.DataFrame):
+    cols = [
+        "accountid", "is_test_account", "first_name", "last_name", "full_name",
+        "email", "gender", "customer_language", "country_iso", "campaign",
+        "campaign_code_legacy", "client_source", "original_affiliate",
+        "is_trading_active", "is_demo", "compliance_status", "accountstatus",
+        "sales_status", "retention_status", "kyc_workflow_status", "assigned_to",
+        "sales_rep_id", "sales_desk_id", "retention_rep_id", "retention_desk_id",
+        "first_sales_desk_id", "first_retention_rep_id", "compliance_agent",
+        "last_agent_assignment_time", "last_trade_opened_time", "has_notes",
+        "last_action_time", "source", "has_frd", "frd_time", "last_trade_date",
+        "first_deposit_date", "countdeposits", "last_deposit_date",
+        "last_interaction_date", "balance", "net_deposit", "first_trade_date",
+        "ftd_amount", "funded", "login_date", "total_deposit", "total_withdrawal",
+        "createdtime", "modifiedtime", "questionnaire_completed", "client_category",
+        "client_qualification_date", "segmentation", "google_uid", "birth_date",
+        "customer_id", "regulation", "sales_client_potential",
+    ]
+    rows = [
+        tuple(_clean(row.get(c)) for c in cols)
+        for _, row in df.iterrows()
+    ]
+    update_cols = [c for c in cols if c != "accountid"]
+    update_set = ", ".join(f"{c} = EXCLUDED.{c}" for c in update_cols)
+    col_list = ", ".join(cols)
+    sql = f"""
+        INSERT INTO accounts ({col_list})
+        VALUES %s
+        ON CONFLICT (accountid) DO UPDATE SET
+            {update_set},
+            synced_at = NOW()
     """
     conn = get_connection()
     try:
