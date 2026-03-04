@@ -1,8 +1,8 @@
 import pandas as pd
-from app.db.mysql_conn import get_operators, get_users
+from app.db.mysql_conn import get_operators, get_users, get_accounts
 from app.db.mssql_conn import get_targets
 from app.db.postgres_conn import (
-    ensure_table, delete_all_performance, insert_records, upsert_users
+    ensure_table, delete_all_performance, insert_records, upsert_users, upsert_accounts
 )
 
 
@@ -33,4 +33,15 @@ def run_etl() -> dict:
         "operators_fetched": len(operators_df),
         "target_rows_fetched": len(targets_df),
         "rows_stored": len(merged_df),
+    }
+
+
+def run_accounts_etl(hours: int = 24) -> dict:
+    ensure_table()
+    accounts_df = get_accounts(hours=hours)
+    upsert_accounts(accounts_df)
+    return {
+        "status": "success",
+        "accounts_synced": len(accounts_df),
+        "lookback_hours": hours,
     }
