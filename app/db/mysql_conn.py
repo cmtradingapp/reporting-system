@@ -1,9 +1,12 @@
 import pymysql
+import pymysql.cursors
 import pandas as pd
 from app.config import MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DB
 
+CHUNK_SIZE = 50_000
 
-def _get_connection():
+
+def _get_connection(streaming: bool = False):
     return pymysql.connect(
         host=MYSQL_HOST,
         port=MYSQL_PORT,
@@ -11,7 +14,9 @@ def _get_connection():
         password=MYSQL_PASSWORD,
         database=MYSQL_DB if MYSQL_DB else None,
         connect_timeout=10,
+        read_timeout=3600,
         ssl={"ssl": True},
+        cursorclass=pymysql.cursors.SSDictCursor if streaming else pymysql.cursors.DictCursor,
     )
 
 
@@ -107,8 +112,9 @@ def get_accounts(hours: int = 24) -> pd.DataFrame:
         conn.close()
 
 
-def get_accounts_full() -> pd.DataFrame:
-    conn = _get_connection()
+def get_accounts_full():
+    """Yields DataFrames in chunks to avoid loading 3M+ rows into memory at once."""
+    conn = _get_connection(streaming=True)
     try:
         query = """
             SELECT
@@ -181,8 +187,13 @@ def get_accounts_full() -> pd.DataFrame:
             LEFT JOIN crmdb.aggregated_user_data aud ON (u.id = aud.user_id AND 0 <> aud.latest)
             LEFT JOIN crmdb.app ON u.registration_app = crmdb.app.id
         """
-        df = pd.read_sql(query, conn)
-        return df
+        with conn.cursor() as cur:
+            cur.execute(query)
+            while True:
+                rows = cur.fetchmany(CHUNK_SIZE)
+                if not rows:
+                    break
+                yield pd.DataFrame(rows)
     finally:
         conn.close()
 
@@ -296,8 +307,9 @@ def get_transactions(hours: int = 24) -> pd.DataFrame:
         conn.close()
 
 
-def get_transactions_full() -> pd.DataFrame:
-    conn = _get_connection()
+def get_transactions_full():
+    """Yields DataFrames in chunks to avoid loading all transactions into memory at once."""
+    conn = _get_connection(streaming=True)
     try:
         query = """
             SELECT * FROM (
@@ -398,7 +410,13 @@ def get_transactions_full() -> pd.DataFrame:
             WHERE usdamount < 10000000
               AND server_id = 2
         """
-        return pd.read_sql(query, conn)
+        with conn.cursor() as cur:
+            cur.execute(query)
+            while True:
+                rows = cur.fetchmany(CHUNK_SIZE)
+                if not rows:
+                    break
+                yield pd.DataFrame(rows)
     finally:
         conn.close()
 

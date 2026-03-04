@@ -67,14 +67,14 @@ def run_accounts_etl(hours: int = 24) -> dict:
 def run_accounts_full_etl() -> dict:
     ensure_table()
     start = time.time()
-    cutoff = datetime(1970, 1, 1)  # epoch — indicates full sync in log
+    cutoff = datetime(1970, 1, 1)
     status = "success"
     error_msg = None
     rows = 0
     try:
-        accounts_df = get_accounts_full()
-        rows = len(accounts_df)
-        upsert_accounts(accounts_df)
+        for chunk in get_accounts_full():
+            upsert_accounts(chunk)
+            rows += len(chunk)
     except Exception as e:
         status = "error"
         error_msg = str(e)
@@ -82,11 +82,7 @@ def run_accounts_full_etl() -> dict:
     finally:
         duration_ms = int((time.time() - start) * 1000)
         log_sync("crm_accounts", cutoff, rows, duration_ms, status, error_msg)
-    return {
-        "status": status,
-        "accounts_synced": rows,
-        "type": "full",
-    }
+    return {"status": status, "accounts_synced": rows, "type": "full"}
 
 
 def run_users_etl(hours: int = 24) -> dict:
@@ -160,9 +156,9 @@ def run_transactions_full_etl() -> dict:
     error_msg = None
     rows = 0
     try:
-        df = get_transactions_full()
-        rows = len(df)
-        upsert_transactions(df)
+        for chunk in get_transactions_full():
+            upsert_transactions(chunk)
+            rows += len(chunk)
     except Exception as e:
         status = "error"
         error_msg = str(e)
