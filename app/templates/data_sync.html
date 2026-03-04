@@ -35,9 +35,6 @@
     .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
     .dot-green { background-color: #3fb950; box-shadow: 0 0 6px #3fb950; }
     .dot-red { background-color: #f85149; box-shadow: 0 0 6px #f85149; }
-    .table-tab { cursor: pointer; background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 12px 20px; display: flex; align-items: center; gap: 10px; transition: border-color 0.15s; }
-    .table-tab.active { border-color: #3fb950; }
-    .table-tab:hover { border-color: #58a6ff; }
     .config-badge { background-color: #21262d; border: 1px solid #30363d; border-radius: 6px; padding: 4px 12px; font-size: 0.8rem; color: #8b949e; display: inline-block; }
     .config-badge span { color: #c9d1d9; }
   </style>
@@ -77,19 +74,15 @@
     <p class="text-muted small mb-0">Monitor synced tables, sync status, and incremental sync details</p>
   </div>
 
-  <!-- Table Tabs -->
-  <div class="d-flex gap-3 mb-4 flex-wrap">
-    {% for t in tables %}
-    <div class="table-tab {% if loop.first %}active{% endif %}" onclick="showTable('{{ t.key }}', this)">
-      <span class="status-dot {% if t.healthy %}dot-green{% else %}dot-red{% endif %}"></span>
-      <span class="fw-semibold" style="font-size:0.95rem;">{{ t.label }}</span>
-    </div>
-    {% endfor %}
-  </div>
-
   <!-- Table Sections -->
   {% for t in tables %}
-  <div id="section-{{ t.key }}" class="table-section" {% if not loop.first %}style="display:none"{% endif %}>
+  <div id="section-{{ t.key }}" class="table-section">
+
+    <!-- Table Header -->
+    <div class="d-flex align-items-center gap-2 mb-4 {% if not loop.first %}mt-5{% endif %}">
+      <span class="status-dot {% if t.healthy %}dot-green{% else %}dot-red{% endif %}"></span>
+      <h5 class="fw-bold text-white mb-0">{{ t.label }}</h5>
+    </div>
 
     <!-- Section 1: Stats -->
     <div class="row g-3 mb-4">
@@ -189,13 +182,6 @@
 </div>
 
 <script>
-  function showTable(key, el) {
-    document.querySelectorAll('.table-section').forEach(s => s.style.display = 'none');
-    document.querySelectorAll('.table-tab').forEach(t => t.classList.remove('active'));
-    document.getElementById('section-' + key).style.display = '';
-    el.classList.add('active');
-  }
-
   function showToast(msg, type = 'success') {
     const id = 'toast-' + Date.now();
     const color = type === 'success' ? 'bg-success' : 'bg-danger';
