@@ -2,7 +2,7 @@ import os
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from app.db.postgres_conn import fetch_accounts_stats, fetch_crm_users_stats, fetch_sync_log
+from app.db.postgres_conn import fetch_accounts_stats, fetch_crm_users_stats, fetch_transactions_stats, fetch_sync_log
 from datetime import datetime, timezone, timedelta
 
 router = APIRouter()
@@ -12,6 +12,8 @@ ACCOUNTS_SYNC_INTERVAL_HOURS = int(os.getenv("ACCOUNTS_SYNC_INTERVAL_HOURS", "1"
 ACCOUNTS_SYNC_HOURS = int(os.getenv("ACCOUNTS_SYNC_HOURS", "24"))
 USERS_SYNC_INTERVAL_HOURS = int(os.getenv("USERS_SYNC_INTERVAL_HOURS", "1"))
 USERS_SYNC_HOURS = int(os.getenv("USERS_SYNC_HOURS", "24"))
+TRANSACTIONS_SYNC_INTERVAL_HOURS = int(os.getenv("TRANSACTIONS_SYNC_INTERVAL_HOURS", "1"))
+TRANSACTIONS_SYNC_HOURS = int(os.getenv("TRANSACTIONS_SYNC_HOURS", "24"))
 
 
 def _is_healthy(sync_log: list, interval_hours: int) -> bool:
@@ -29,6 +31,9 @@ async def data_sync_page(request: Request):
 
     users_stats = fetch_crm_users_stats()
     users_log = fetch_sync_log("crm_users", limit=50)
+
+    tx_stats = fetch_transactions_stats()
+    tx_log = fetch_sync_log("transactions", limit=50)
 
     tables = [
         {
@@ -66,6 +71,24 @@ async def data_sync_page(request: Request):
             "primary_key": "id",
             "incremental_columns": "o.last_update_time, d.last_update_time",
             "source": "UNION of v_ant_operators + desk",
+        },
+        {
+            "key": "transactions",
+            "label": "transactions",
+            "last_synced_at": tx_stats["last_synced_at"],
+            "stat_cards": [
+                {"label": "Total Records",           "value": tx_stats["total_records"], "color": "text-info",    "icon": "bi-database"},
+                {"label": "Approved",                "value": tx_stats["approved"],      "color": "text-success", "icon": "bi-check-circle"},
+                {"label": "FTDs",                    "value": tx_stats["ftd_count"],     "color": "text-warning", "icon": "bi-star"},
+                {"label": "Total USD Volume",        "value": tx_stats["total_usd"],     "color": "text-primary", "icon": "bi-currency-dollar"},
+            ],
+            "sync_log": tx_log,
+            "healthy": _is_healthy(tx_log, TRANSACTIONS_SYNC_INTERVAL_HOURS),
+            "sync_interval_hours": TRANSACTIONS_SYNC_INTERVAL_HOURS,
+            "lookback_hours": TRANSACTIONS_SYNC_HOURS,
+            "primary_key": "mttransactionsid",
+            "incremental_columns": "modifiedtime, confirmation_time",
+            "source": "crmdb.broker_banking + v_ant_broker_user + autolut",
         },
     ]
 

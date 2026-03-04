@@ -187,6 +187,222 @@ def get_accounts_full() -> pd.DataFrame:
         conn.close()
 
 
+def get_transactions(hours: int = 24) -> pd.DataFrame:
+    conn = _get_connection()
+    try:
+        query = f"""
+            SELECT * FROM (
+                SELECT
+                    bb.id                                                           AS mttransactionsid,
+                    bb.broker_user_id                                               AS tradingaccountsid,
+                    NULL                                                            AS transaction_no,
+                    bb.user_id                                                      AS vtigeraccountid,
+                    bb.is_manual                                                    AS manualorauto,
+                    NULL                                                            AS paymenttype,
+                    IF(l1.value = 'Success', 'Approved', l1.value)                 AS transactionapproval,
+                    (bb.amount / 100)                                               AS amount,
+                    bb.card_number                                                  AS creditcardlast,
+                    l2.value                                                        AS transactiontype,
+                    bu.external_id                                                  AS login,
+                    NULL                                                            AS platform,
+                    bb.card_type                                                    AS cardtype,
+                    NULL                                                            AS cvv2pin,
+                    bb.card_expiry                                                  AS expmon,
+                    bb.card_expiry                                                  AS expyear,
+                    NULL                                                            AS server,
+                    bb.comment                                                      AS comment,
+                    bb.psp_transaction_id                                           AS transactionid,
+                    NULL                                                            AS receipt,
+                    bb.bank_name                                                    AS bank_name,
+                    bb.bank_account_name                                            AS bank_acccount_holder,
+                    bb.bank_account_number                                          AS bank_acccount_number,
+                    NULL                                                            AS referencenum,
+                    NULL                                                            AS expiration,
+                    NULL                                                            AS actionok,
+                    NULL                                                            AS cleared_by,
+                    bb.broker_external_id                                           AS mtorder_id,
+                    bb.decision_by_id                                               AS approved_by,
+                    bb.user_withdrawal_wallet                                       AS ewalletid,
+                    NULL                                                            AS transaction_source,
+                    bb.currency                                                     AS currency_id,
+                    bb.bank_country                                                 AS bank_country_id,
+                    NULL                                                            AS bank_state,
+                    NULL                                                            AS bank_city,
+                    bb.bank_address                                                 AS bank_address,
+                    NULL                                                            AS swift,
+                    NULL                                                            AS need_revise,
+                    CASE
+                        WHEN bb.acquisition_status = 1 OR bb.sales_rep_id = 0 THEN bb.retention_rep_id
+                        WHEN bb.acquisition_status = 0 OR bb.sales_rep_id != 0 THEN bb.sales_rep_id
+                    END                                                             AS original_deposit_owner,
+                    bb.decline_reason                                               AS decline_reason,
+                    bb.is_ftd                                                       AS ftd,
+                    (bb.normalized_amount / 100)                                    AS usdamount,
+                    NULL                                                            AS chb_type,
+                    NULL                                                            AS chb_status,
+                    NULL                                                            AS chb_date,
+                    NULL                                                            AS cellexpert,
+                    NULL                                                            AS client_source,
+                    NULL                                                            AS iban,
+                    bb.ip                                                           AS deposifromip,
+                    bb.card_holder_name                                             AS cardownername,
+                    IF(bu.is_demo, 1, 2)                                            AS server_id,
+                    NULL                                                            AS ticket,
+                    bb.transaction_method                                           AS payment_method_id,
+                    bb.decision_time                                                AS confirmation_time,
+                    bb.sub_psp_name                                                 AS payment_processor,
+                    bb.withdrawal_reason                                            AS withdrawal_reason,
+                    bb.ip                                                           AS deposit_ip,
+                    bb.card_expiry                                                  AS expiration_card,
+                    bb.acquisition_status                                           AS original_owner_department,
+                    NULL                                                            AS dod,
+                    NULL                                                            AS granted_by,
+                    bb.user_withdrawal_wallet                                       AS destination_wallet,
+                    l.value                                                         AS payment_method,
+                    bb.kyc_status                                                   AS compliance_status,
+                    NULL                                                            AS ftd_owner,
+                    bb.registered_email                                             AS email,
+                    bb.creation_time                                                AS created_time,
+                    bb.last_update_time                                             AS modifiedtime,
+                    bb.sub_psp_transaction_id                                       AS psp_transaction_id,
+                    NULL                                                            AS finance_status,
+                    NULL                                                            AS session_id,
+                    NULL                                                            AS gateway_name,
+                    NULL                                                            AS payment_subtype,
+                    NULL                                                            AS legacy_mtt,
+                    NULL                                                            AS fee_type,
+                    bb.fee                                                          AS fee,
+                    NULL                                                            AS fee_included,
+                    NULL                                                            AS transaction_promo,
+                    NULL                                                            AS assisted_by,
+                    NULL                                                            AS deleted,
+                    bb.is_frd
+                FROM crmdb.broker_banking bb
+                JOIN crmdb.v_ant_broker_user bu ON bb.broker_user_id = bu.id
+                LEFT JOIN (SELECT * FROM crmdb.autolut WHERE type = 'TransactionMethod') l
+                    ON l.`key` = bb.transaction_method
+                LEFT JOIN (SELECT * FROM crmdb.autolut WHERE type = 'TransactionStatus') l1
+                    ON l1.`key` = bb.status
+                LEFT JOIN (SELECT * FROM crmdb.autolut WHERE type = 'BrokerBankingType') l2
+                    ON l2.`key` = bb.type
+            ) t
+            WHERE usdamount < 10000000
+              AND server_id = 2
+              AND (t.modifiedtime       >= DATE_ADD(UTC_TIMESTAMP(), INTERVAL -{hours} HOUR)
+                OR t.confirmation_time  >= DATE_ADD(UTC_TIMESTAMP(), INTERVAL -{hours} HOUR))
+        """
+        return pd.read_sql(query, conn)
+    finally:
+        conn.close()
+
+
+def get_transactions_full() -> pd.DataFrame:
+    conn = _get_connection()
+    try:
+        query = """
+            SELECT * FROM (
+                SELECT
+                    bb.id                                                           AS mttransactionsid,
+                    bb.broker_user_id                                               AS tradingaccountsid,
+                    NULL                                                            AS transaction_no,
+                    bb.user_id                                                      AS vtigeraccountid,
+                    bb.is_manual                                                    AS manualorauto,
+                    NULL                                                            AS paymenttype,
+                    IF(l1.value = 'Success', 'Approved', l1.value)                 AS transactionapproval,
+                    (bb.amount / 100)                                               AS amount,
+                    bb.card_number                                                  AS creditcardlast,
+                    l2.value                                                        AS transactiontype,
+                    bu.external_id                                                  AS login,
+                    NULL                                                            AS platform,
+                    bb.card_type                                                    AS cardtype,
+                    NULL                                                            AS cvv2pin,
+                    bb.card_expiry                                                  AS expmon,
+                    bb.card_expiry                                                  AS expyear,
+                    NULL                                                            AS server,
+                    bb.comment                                                      AS comment,
+                    bb.psp_transaction_id                                           AS transactionid,
+                    NULL                                                            AS receipt,
+                    bb.bank_name                                                    AS bank_name,
+                    bb.bank_account_name                                            AS bank_acccount_holder,
+                    bb.bank_account_number                                          AS bank_acccount_number,
+                    NULL                                                            AS referencenum,
+                    NULL                                                            AS expiration,
+                    NULL                                                            AS actionok,
+                    NULL                                                            AS cleared_by,
+                    bb.broker_external_id                                           AS mtorder_id,
+                    bb.decision_by_id                                               AS approved_by,
+                    bb.user_withdrawal_wallet                                       AS ewalletid,
+                    NULL                                                            AS transaction_source,
+                    bb.currency                                                     AS currency_id,
+                    bb.bank_country                                                 AS bank_country_id,
+                    NULL                                                            AS bank_state,
+                    NULL                                                            AS bank_city,
+                    bb.bank_address                                                 AS bank_address,
+                    NULL                                                            AS swift,
+                    NULL                                                            AS need_revise,
+                    CASE
+                        WHEN bb.acquisition_status = 1 OR bb.sales_rep_id = 0 THEN bb.retention_rep_id
+                        WHEN bb.acquisition_status = 0 OR bb.sales_rep_id != 0 THEN bb.sales_rep_id
+                    END                                                             AS original_deposit_owner,
+                    bb.decline_reason                                               AS decline_reason,
+                    bb.is_ftd                                                       AS ftd,
+                    (bb.normalized_amount / 100)                                    AS usdamount,
+                    NULL                                                            AS chb_type,
+                    NULL                                                            AS chb_status,
+                    NULL                                                            AS chb_date,
+                    NULL                                                            AS cellexpert,
+                    NULL                                                            AS client_source,
+                    NULL                                                            AS iban,
+                    bb.ip                                                           AS deposifromip,
+                    bb.card_holder_name                                             AS cardownername,
+                    IF(bu.is_demo, 1, 2)                                            AS server_id,
+                    NULL                                                            AS ticket,
+                    bb.transaction_method                                           AS payment_method_id,
+                    bb.decision_time                                                AS confirmation_time,
+                    bb.sub_psp_name                                                 AS payment_processor,
+                    bb.withdrawal_reason                                            AS withdrawal_reason,
+                    bb.ip                                                           AS deposit_ip,
+                    bb.card_expiry                                                  AS expiration_card,
+                    bb.acquisition_status                                           AS original_owner_department,
+                    NULL                                                            AS dod,
+                    NULL                                                            AS granted_by,
+                    bb.user_withdrawal_wallet                                       AS destination_wallet,
+                    l.value                                                         AS payment_method,
+                    bb.kyc_status                                                   AS compliance_status,
+                    NULL                                                            AS ftd_owner,
+                    bb.registered_email                                             AS email,
+                    bb.creation_time                                                AS created_time,
+                    bb.last_update_time                                             AS modifiedtime,
+                    bb.sub_psp_transaction_id                                       AS psp_transaction_id,
+                    NULL                                                            AS finance_status,
+                    NULL                                                            AS session_id,
+                    NULL                                                            AS gateway_name,
+                    NULL                                                            AS payment_subtype,
+                    NULL                                                            AS legacy_mtt,
+                    NULL                                                            AS fee_type,
+                    bb.fee                                                          AS fee,
+                    NULL                                                            AS fee_included,
+                    NULL                                                            AS transaction_promo,
+                    NULL                                                            AS assisted_by,
+                    NULL                                                            AS deleted,
+                    bb.is_frd
+                FROM crmdb.broker_banking bb
+                JOIN crmdb.v_ant_broker_user bu ON bb.broker_user_id = bu.id
+                LEFT JOIN (SELECT * FROM crmdb.autolut WHERE type = 'TransactionMethod') l
+                    ON l.`key` = bb.transaction_method
+                LEFT JOIN (SELECT * FROM crmdb.autolut WHERE type = 'TransactionStatus') l1
+                    ON l1.`key` = bb.status
+                LEFT JOIN (SELECT * FROM crmdb.autolut WHERE type = 'BrokerBankingType') l2
+                    ON l2.`key` = bb.type
+            ) t
+            WHERE usdamount < 10000000
+              AND server_id = 2
+        """
+        return pd.read_sql(query, conn)
+    finally:
+        conn.close()
+
+
 def get_crm_users(hours: int = 24) -> pd.DataFrame:
     conn = _get_connection()
     try:

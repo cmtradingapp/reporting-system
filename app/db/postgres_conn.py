@@ -137,6 +137,96 @@ def ensure_table():
         CREATE INDEX IF NOT EXISTS idx_crm_users_position ON crm_users (position);
         CREATE INDEX IF NOT EXISTS idx_crm_users_last_update_time ON crm_users (last_update_time);
 
+        CREATE TABLE IF NOT EXISTS transactions (
+            mttransactionsid            BIGINT          PRIMARY KEY,
+            tradingaccountsid           BIGINT,
+            transaction_no              VARCHAR(100),
+            vtigeraccountid             BIGINT,
+            manualorauto                SMALLINT,
+            paymenttype                 VARCHAR(100),
+            transactionapproval         VARCHAR(100),
+            amount                      NUMERIC(20,4),
+            creditcardlast              VARCHAR(50),
+            transactiontype             VARCHAR(100),
+            login                       VARCHAR(100),
+            platform                    VARCHAR(100),
+            cardtype                    VARCHAR(100),
+            cvv2pin                     VARCHAR(100),
+            expmon                      VARCHAR(20),
+            expyear                     VARCHAR(20),
+            server                      VARCHAR(100),
+            comment                     TEXT,
+            transactionid               VARCHAR(255),
+            receipt                     VARCHAR(255),
+            bank_name                   VARCHAR(255),
+            bank_acccount_holder        VARCHAR(255),
+            bank_acccount_number        VARCHAR(255),
+            referencenum                VARCHAR(255),
+            expiration                  VARCHAR(100),
+            actionok                    VARCHAR(100),
+            cleared_by                  VARCHAR(100),
+            mtorder_id                  VARCHAR(255),
+            approved_by                 BIGINT,
+            ewalletid                   VARCHAR(255),
+            transaction_source          VARCHAR(100),
+            currency_id                 VARCHAR(20),
+            bank_country_id             VARCHAR(20),
+            bank_state                  VARCHAR(100),
+            bank_city                   VARCHAR(100),
+            bank_address                TEXT,
+            swift                       VARCHAR(100),
+            need_revise                 VARCHAR(100),
+            original_deposit_owner      BIGINT,
+            decline_reason              TEXT,
+            ftd                         SMALLINT,
+            usdamount                   NUMERIC(20,4),
+            chb_type                    VARCHAR(100),
+            chb_status                  VARCHAR(100),
+            chb_date                    DATE,
+            cellexpert                  VARCHAR(100),
+            client_source               VARCHAR(100),
+            iban                        VARCHAR(100),
+            deposifromip                VARCHAR(50),
+            cardownername               VARCHAR(255),
+            server_id                   SMALLINT,
+            ticket                      VARCHAR(100),
+            payment_method_id           VARCHAR(100),
+            confirmation_time           TIMESTAMP,
+            payment_processor           VARCHAR(255),
+            withdrawal_reason           TEXT,
+            deposit_ip                  VARCHAR(50),
+            expiration_card             VARCHAR(20),
+            original_owner_department   SMALLINT,
+            dod                         TIMESTAMP,
+            granted_by                  VARCHAR(100),
+            destination_wallet          VARCHAR(255),
+            payment_method              VARCHAR(255),
+            compliance_status           VARCHAR(100),
+            ftd_owner                   VARCHAR(100),
+            email                       VARCHAR(255),
+            created_time                TIMESTAMP,
+            modifiedtime                TIMESTAMP,
+            psp_transaction_id          VARCHAR(255),
+            finance_status              VARCHAR(100),
+            session_id                  VARCHAR(100),
+            gateway_name                VARCHAR(100),
+            payment_subtype             VARCHAR(100),
+            legacy_mtt                  VARCHAR(100),
+            fee_type                    VARCHAR(100),
+            fee                         NUMERIC(20,4),
+            fee_included                SMALLINT,
+            transaction_promo           VARCHAR(100),
+            assisted_by                 VARCHAR(100),
+            deleted                     SMALLINT,
+            is_frd                      SMALLINT,
+            synced_at                   TIMESTAMP DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_transactions_modifiedtime    ON transactions (modifiedtime);
+        CREATE INDEX IF NOT EXISTS idx_transactions_confirmation     ON transactions (confirmation_time);
+        CREATE INDEX IF NOT EXISTS idx_transactions_vtigeraccountid ON transactions (vtigeraccountid);
+        CREATE INDEX IF NOT EXISTS idx_transactions_approval        ON transactions (transactionapproval);
+        CREATE INDEX IF NOT EXISTS idx_transactions_ftd             ON transactions (ftd);
+
         CREATE TABLE IF NOT EXISTS users (
             id               VARCHAR(100) PRIMARY KEY,
             email            VARCHAR(255),
@@ -436,6 +526,71 @@ def fetch_crm_users_stats() -> dict:
                 "active_users": row[2] or 0,
                 "unique_desks": row[3] or 0,
                 "unique_offices": row[4] or 0,
+            }
+    finally:
+        conn.close()
+
+
+def upsert_transactions(df: pd.DataFrame):
+    cols = [
+        "mttransactionsid", "tradingaccountsid", "transaction_no", "vtigeraccountid",
+        "manualorauto", "paymenttype", "transactionapproval", "amount", "creditcardlast",
+        "transactiontype", "login", "platform", "cardtype", "cvv2pin", "expmon", "expyear",
+        "server", "comment", "transactionid", "receipt", "bank_name", "bank_acccount_holder",
+        "bank_acccount_number", "referencenum", "expiration", "actionok", "cleared_by",
+        "mtorder_id", "approved_by", "ewalletid", "transaction_source", "currency_id",
+        "bank_country_id", "bank_state", "bank_city", "bank_address", "swift", "need_revise",
+        "original_deposit_owner", "decline_reason", "ftd", "usdamount", "chb_type",
+        "chb_status", "chb_date", "cellexpert", "client_source", "iban", "deposifromip",
+        "cardownername", "server_id", "ticket", "payment_method_id", "confirmation_time",
+        "payment_processor", "withdrawal_reason", "deposit_ip", "expiration_card",
+        "original_owner_department", "dod", "granted_by", "destination_wallet",
+        "payment_method", "compliance_status", "ftd_owner", "email", "created_time",
+        "modifiedtime", "psp_transaction_id", "finance_status", "session_id", "gateway_name",
+        "payment_subtype", "legacy_mtt", "fee_type", "fee", "fee_included",
+        "transaction_promo", "assisted_by", "deleted", "is_frd",
+    ]
+    rows = [tuple(_clean(row.get(c)) for c in cols) for _, row in df.iterrows()]
+    update_cols = [c for c in cols if c != "mttransactionsid"]
+    update_set = ", ".join(f"{c} = EXCLUDED.{c}" for c in update_cols)
+    col_list = ", ".join(cols)
+    sql = f"""
+        INSERT INTO transactions ({col_list})
+        VALUES %s
+        ON CONFLICT (mttransactionsid) DO UPDATE SET
+            {update_set},
+            synced_at = NOW()
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            execute_values(cur, sql, rows)
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def fetch_transactions_stats() -> dict:
+    sql = """
+        SELECT
+            COUNT(*)                                            AS total_records,
+            MAX(synced_at)                                      AS last_synced_at,
+            COUNT(*) FILTER (WHERE transactionapproval = 'Approved') AS approved,
+            COUNT(*) FILTER (WHERE ftd = 1)                    AS ftd_count,
+            COALESCE(SUM(usdamount), 0)                        AS total_usd
+        FROM transactions
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+            row = cur.fetchone()
+            return {
+                "total_records": row[0] or 0,
+                "last_synced_at": row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else "Never",
+                "approved": row[2] or 0,
+                "ftd_count": row[3] or 0,
+                "total_usd": int(row[4] or 0),
             }
     finally:
         conn.close()

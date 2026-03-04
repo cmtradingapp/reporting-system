@@ -198,7 +198,7 @@
   async function runSync(tableKey) {
     document.getElementById('spinner').classList.add('active');
     try {
-      const urlMap = { 'crm_accounts': '/sync/accounts', 'crm_users': '/sync/users' };
+      const urlMap = { 'crm_accounts': '/sync/accounts', 'crm_users': '/sync/users', 'transactions': '/sync/transactions' };
       const url = urlMap[tableKey] || '/sync/accounts';
       const res = await fetch(url, { method: 'POST' });
       const data = await res.json();
@@ -221,7 +221,7 @@
     document.getElementById('spinner').classList.add('active');
     document.querySelector('#spinner div div:last-child').textContent = 'Running full sync — this may take a few minutes...';
     try {
-      const urlMap = { 'crm_accounts': '/sync/accounts/full', 'crm_users': '/sync/users/full' };
+      const urlMap = { 'crm_accounts': '/sync/accounts/full', 'crm_users': '/sync/users/full', 'transactions': '/sync/transactions/full' };
       const url = urlMap[tableKey] || '/sync/accounts/full';
       const res = await fetch(url, { method: 'POST' });
       const data = await res.json();
