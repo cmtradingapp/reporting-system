@@ -271,7 +271,7 @@ def delete_all_performance():
 
 
 def _clean(val):
-    """Convert pandas NaT/NaN to None for PostgreSQL compatibility."""
+    """Convert pandas NaT/NaN to None and strip NUL bytes for PostgreSQL compatibility."""
     if val is None:
         return None
     try:
@@ -279,6 +279,8 @@ def _clean(val):
             return None
     except (TypeError, ValueError):
         pass
+    if isinstance(val, str):
+        val = val.replace('\x00', '')
     return val
 
 
