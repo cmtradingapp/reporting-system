@@ -231,6 +231,50 @@ def ensure_table():
         CREATE INDEX IF NOT EXISTS idx_transactions_approval        ON transactions (transactionapproval);
         CREATE INDEX IF NOT EXISTS idx_transactions_ftd             ON transactions (ftd);
 
+        CREATE TABLE IF NOT EXISTS dealio_mt4trades (
+            ticket                    BIGINT           PRIMARY KEY,
+            cmd                       SMALLINT,
+            volume                    DOUBLE PRECISION,
+            open_time                 TIMESTAMP,
+            close_time                TIMESTAMP,
+            last_modified             TIMESTAMP,
+            profit                    DOUBLE PRECISION,
+            computed_profit           DOUBLE PRECISION,
+            login                     BIGINT,
+            core_symbol               VARCHAR(32),
+            symbol                    VARCHAR(255),
+            book                      VARCHAR(32),
+            open_price                DOUBLE PRECISION,
+            commissions               DOUBLE PRECISION,
+            swaps                     DOUBLE PRECISION,
+            close_price               DOUBLE PRECISION,
+            comment                   VARCHAR(400),
+            computed_swap             DOUBLE PRECISION,
+            computed_commission       DOUBLE PRECISION,
+            calculation_currency      VARCHAR(32),
+            notional_value            DOUBLE PRECISION,
+            source_name               VARCHAR(32),
+            source_type               VARCHAR(32),
+            source_id                 VARCHAR(32),
+            reason                    INTEGER,
+            agent_commission          DOUBLE PRECISION,
+            computed_agent_commission DOUBLE PRECISION,
+            spread                    VARCHAR(255),
+            credit_expiration         TIMESTAMP,
+            assigned_to               INTEGER,
+            group_name                VARCHAR(64),
+            updated_at                TIMESTAMP,
+            creation_time_key         INTEGER,
+            synced_at                 TIMESTAMP DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_dealio_assigned_to    ON dealio_mt4trades (assigned_to);
+        CREATE INDEX IF NOT EXISTS idx_dealio_close_time     ON dealio_mt4trades (close_time);
+        CREATE INDEX IF NOT EXISTS idx_dealio_last_modified  ON dealio_mt4trades (last_modified);
+        CREATE INDEX IF NOT EXISTS idx_dealio_login          ON dealio_mt4trades (login);
+        CREATE INDEX IF NOT EXISTS idx_dealio_open_time      ON dealio_mt4trades (open_time);
+        CREATE INDEX IF NOT EXISTS idx_dealio_symbol         ON dealio_mt4trades (symbol);
+        CREATE INDEX IF NOT EXISTS idx_dealio_updated_at     ON dealio_mt4trades (updated_at);
+
         CREATE TABLE IF NOT EXISTS targets (
             date       DATE    NOT NULL,
             agent_id   VARCHAR(100) NOT NULL,
@@ -608,6 +652,63 @@ def fetch_transactions_stats() -> dict:
                 "approved": row[2] or 0,
                 "ftd_count": row[3] or 0,
                 "total_usd": int(row[4] or 0),
+            }
+    finally:
+        conn.close()
+
+
+def upsert_dealio_mt4trades(df: pd.DataFrame):
+    cols = [
+        "ticket", "cmd", "volume", "open_time", "close_time", "last_modified",
+        "profit", "computed_profit", "login", "core_symbol", "symbol", "book",
+        "open_price", "commissions", "swaps", "close_price", "comment",
+        "computed_swap", "computed_commission", "calculation_currency",
+        "notional_value", "source_name", "source_type", "source_id", "reason",
+        "agent_commission", "computed_agent_commission", "spread",
+        "credit_expiration", "assigned_to", "group_name", "updated_at",
+        "creation_time_key",
+    ]
+    rows = [tuple(_clean(row.get(c)) for c in cols) for _, row in df.iterrows()]
+    update_cols = [c for c in cols if c != "ticket"]
+    update_set = ", ".join(f"{c} = EXCLUDED.{c}" for c in update_cols)
+    col_list = ", ".join(cols)
+    sql = f"""
+        INSERT INTO dealio_mt4trades ({col_list})
+        VALUES %s
+        ON CONFLICT (ticket) DO UPDATE SET
+            {update_set},
+            synced_at = NOW()
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            execute_values(cur, sql, rows)
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def fetch_dealio_mt4trades_stats() -> dict:
+    sql = """
+        SELECT
+            COUNT(*)                  AS total_records,
+            MAX(synced_at)            AS last_synced_at,
+            COUNT(DISTINCT login)     AS unique_logins,
+            COALESCE(SUM(volume), 0)  AS total_volume,
+            COALESCE(SUM(profit), 0)  AS total_profit
+        FROM dealio_mt4trades
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+            row = cur.fetchone()
+            return {
+                "total_records":  row[0] or 0,
+                "last_synced_at": row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else "Never",
+                "unique_logins":  row[2] or 0,
+                "total_volume":   int(row[3] or 0),
+                "total_profit":   int(row[4] or 0),
             }
     finally:
         conn.close()

@@ -2,7 +2,7 @@ import os
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from app.db.postgres_conn import fetch_accounts_stats, fetch_crm_users_stats, fetch_transactions_stats, fetch_targets_stats, fetch_sync_log
+from app.db.postgres_conn import fetch_accounts_stats, fetch_crm_users_stats, fetch_transactions_stats, fetch_targets_stats, fetch_dealio_mt4trades_stats, fetch_sync_log
 from datetime import datetime, timezone, timedelta
 
 router = APIRouter()
@@ -15,6 +15,8 @@ USERS_SYNC_HOURS = int(os.getenv("USERS_SYNC_HOURS", "24"))
 TRANSACTIONS_SYNC_INTERVAL_HOURS = int(os.getenv("TRANSACTIONS_SYNC_INTERVAL_HOURS", "1"))
 TRANSACTIONS_SYNC_HOURS = int(os.getenv("TRANSACTIONS_SYNC_HOURS", "24"))
 TARGETS_SYNC_INTERVAL_HOURS = int(os.getenv("TARGETS_SYNC_INTERVAL_HOURS", "1"))
+DEALIO_SYNC_INTERVAL_HOURS = int(os.getenv("DEALIO_SYNC_INTERVAL_HOURS", "1"))
+DEALIO_SYNC_HOURS = int(os.getenv("DEALIO_SYNC_HOURS", "24"))
 
 
 def _is_healthy(sync_log: list, interval_hours: int) -> bool:
@@ -38,6 +40,9 @@ async def data_sync_page(request: Request):
 
     targets_stats = fetch_targets_stats()
     targets_log = fetch_sync_log("targets", limit=50)
+
+    dealio_stats = fetch_dealio_mt4trades_stats()
+    dealio_log = fetch_sync_log("dealio_mt4trades", limit=50)
 
     tables = [
         {
@@ -93,6 +98,24 @@ async def data_sync_page(request: Request):
             "primary_key": "mttransactionsid",
             "incremental_columns": "modifiedtime, confirmation_time",
             "source": "crmdb.broker_banking + v_ant_broker_user + autolut",
+        },
+        {
+            "key": "dealio_mt4trades",
+            "label": "dealio_mt4trades",
+            "last_synced_at": dealio_stats["last_synced_at"],
+            "stat_cards": [
+                {"label": "Total Records",   "value": dealio_stats["total_records"],  "color": "text-info",    "icon": "bi-database"},
+                {"label": "Unique Logins",   "value": dealio_stats["unique_logins"],  "color": "text-success", "icon": "bi-person-badge"},
+                {"label": "Total Volume",    "value": dealio_stats["total_volume"],   "color": "text-warning", "icon": "bi-graph-up"},
+                {"label": "Total Profit",    "value": dealio_stats["total_profit"],   "color": "text-primary", "icon": "bi-currency-dollar"},
+            ],
+            "sync_log": dealio_log,
+            "healthy": _is_healthy(dealio_log, DEALIO_SYNC_INTERVAL_HOURS),
+            "sync_interval_hours": DEALIO_SYNC_INTERVAL_HOURS,
+            "lookback_hours": DEALIO_SYNC_HOURS,
+            "primary_key": "ticket",
+            "incremental_columns": "last_modified, updated_at",
+            "source": "MSSQL → report.dealio_mt4trades",
         },
         {
             "key": "targets",
