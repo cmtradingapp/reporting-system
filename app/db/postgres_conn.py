@@ -141,8 +141,9 @@ def ensure_table():
         CREATE INDEX IF NOT EXISTS idx_crm_users_position ON crm_users (position);
         CREATE INDEX IF NOT EXISTS idx_crm_users_last_update_time ON crm_users (last_update_time);
 
-        ALTER TABLE crm_users ADD COLUMN IF NOT EXISTS office_name VARCHAR(255);
-        ALTER TABLE crm_users ADD COLUMN IF NOT EXISTS agent_name  VARCHAR(255);
+        ALTER TABLE crm_users ADD COLUMN IF NOT EXISTS office_name  VARCHAR(255);
+        ALTER TABLE crm_users ADD COLUMN IF NOT EXISTS agent_name   VARCHAR(255);
+        ALTER TABLE crm_users ADD COLUMN IF NOT EXISTS department_  VARCHAR(20);
 
         CREATE TABLE IF NOT EXISTS transactions (
             mttransactionsid            BIGINT          PRIMARY KEY,
@@ -583,7 +584,7 @@ def upsert_crm_users(df: pd.DataFrame):
         "id", "email", "full_name", "status", "first_name", "last_name",
         "role_id", "desk_id", "language", "last_logon_time", "last_update_time",
         "desk_name", "team", "department", "desk", "type", "office_id", "office", "position",
-        "office_name", "agent_name",
+        "office_name", "agent_name", "department_",
     ]
     rows = [tuple(_clean(row.get(c)) for c in cols) for _, row in df.iterrows()]
     update_cols = [c for c in cols if c != "id"]

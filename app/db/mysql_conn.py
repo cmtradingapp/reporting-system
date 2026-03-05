@@ -456,7 +456,9 @@ def get_crm_users(hours: int = 24) -> pd.DataFrame:
                     WHEN d.name = 'Laila Desk'         THEN 'Laila'
                     ELSE ofc.name
                 END)                                                                              AS office_name,
-                MAX(o.full_name)                                                                  AS agent_name
+                MAX(o.full_name)                                                                  AS agent_name,
+                MAX(IF(LOWER(TRIM(SUBSTRING_INDEX(d.name, '-', 1))) LIKE '%conversion%',
+                    'Sales', 'Retention'))                                                        AS department_
             FROM v_ant_operators o
             LEFT JOIN operator_desk_rel od ON o.id = od.operator_id
             LEFT JOIN desk d ON od.desk_id = d.id
@@ -495,7 +497,9 @@ def get_crm_users(hours: int = 24) -> pd.DataFrame:
                     WHEN ofc.name IS NULL      THEN 'General'
                     ELSE ofc.name
                 END                                                                               AS office_name,
-                d.name                                                                            AS agent_name
+                d.name                                                                            AS agent_name,
+                IF(LOWER(TRIM(SUBSTRING_INDEX(d.name, '-', 1))) LIKE '%conversion%',
+                    'Sales', 'Retention')                                                         AS department_
             FROM desk d
             JOIN office ofc ON d.office_id = ofc.id
             WHERE d.last_update_time >= DATE_ADD(UTC_TIMESTAMP(), INTERVAL -{hours} HOUR)
@@ -538,7 +542,9 @@ def get_crm_users_full() -> pd.DataFrame:
                     WHEN d.name = 'Laila Desk'         THEN 'Laila'
                     ELSE ofc.name
                 END)                                                                              AS office_name,
-                MAX(o.full_name)                                                                  AS agent_name
+                MAX(o.full_name)                                                                  AS agent_name,
+                MAX(IF(LOWER(TRIM(SUBSTRING_INDEX(d.name, '-', 1))) LIKE '%conversion%',
+                    'Sales', 'Retention'))                                                        AS department_
             FROM v_ant_operators o
             LEFT JOIN operator_desk_rel od ON o.id = od.operator_id
             LEFT JOIN desk d ON od.desk_id = d.id
@@ -576,7 +582,9 @@ def get_crm_users_full() -> pd.DataFrame:
                     WHEN ofc.name IS NULL      THEN 'General'
                     ELSE ofc.name
                 END                                                                               AS office_name,
-                d.name                                                                            AS agent_name
+                d.name                                                                            AS agent_name,
+                IF(LOWER(TRIM(SUBSTRING_INDEX(d.name, '-', 1))) LIKE '%conversion%',
+                    'Sales', 'Retention')                                                         AS department_
             FROM desk d
             JOIN office ofc ON d.office_id = ofc.id
         """
