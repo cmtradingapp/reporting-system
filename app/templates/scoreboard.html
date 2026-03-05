@@ -82,19 +82,35 @@
       white-space: nowrap;
     }
     .scoreboard-table td { padding: 9px 14px; border-bottom: 1px solid #21262d; font-size: 0.88rem; vertical-align: middle; }
-    .scoreboard-table tr:hover td { background-color: #1c2128; }
-    .office-header td {
-      background-color: #0d1117;
-      color: #8b949e;
-      font-size: 0.75rem;
+    .scoreboard-table td { color: #e0e0e0; }
+    .scoreboard-table tr.agent-row:hover td { background-color: #1c2128; }
+
+    /* Office group row */
+    .office-row td {
+      background-color: #12171f;
+      color: #c9d1d9;
+      font-size: 0.8rem;
       font-weight: 700;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      padding: 8px 14px;
-      border-bottom: 1px solid #30363d;
+      letter-spacing: 0.5px;
+      padding: 9px 14px;
       border-top: 1px solid #30363d;
+      border-bottom: 1px solid #21262d;
     }
-    .rank-num { color: #484f58; font-size: 0.78rem; font-weight: 600; min-width: 28px; display: inline-block; text-align: right; }
+    .office-total { font-size: 1rem; font-weight: 700; color: #c9d1d9; }
+
+    /* Agent sub-row */
+    .agent-row td { padding: 8px 14px 8px 36px; border-bottom: 1px solid #1a1f27; }
+    .agent-row td:first-child { color: #e0e0e0; font-size: 0.88rem; }
+
+    /* Grand total row */
+    .total-row td {
+      background-color: #1c2128;
+      border-top: 2px solid #30363d;
+      padding: 11px 14px;
+      font-weight: 700;
+      color: #c9d1d9;
+      font-size: 0.9rem;
+    }
     .dept-badge {
       font-size: 0.7rem;
       padding: 2px 7px;
@@ -235,9 +251,8 @@
       <table class="scoreboard-table" id="scoreboard-table">
         <thead>
           <tr>
-            <th style="width:40px;">#</th>
-            <th>Agent</th>
-            <th>Department</th>
+            <th>Office / Agent</th>
+            <th style="width:120px;">Department</th>
             <th class="text-end" style="min-width:80px;">FTC</th>
           </tr>
         </thead>
@@ -343,47 +358,78 @@
 
   function renderTable() {
     const showZeros = document.getElementById('show-zeros').checked;
-    const rows = showZeros ? allRows : allRows.filter(r => r.ftc > 0);
+    const filtered  = showZeros ? allRows : allRows.filter(r => r.ftc > 0);
 
-    // Sort: already sorted by office then FTC desc from server
     const tbody = document.getElementById('table-body');
     tbody.innerHTML = '';
 
-    let rank = 0;
-    let lastOffice = null;
-
-    rows.forEach(r => {
-      // Office group header
-      if (r.office_name !== lastOffice) {
-        lastOffice = r.office_name;
-        const tr = document.createElement('tr');
-        tr.className = 'office-header';
-        tr.innerHTML = `<td colspan="4"><i class="bi bi-building me-2"></i>${escHtml(r.office_name)}</td>`;
-        tbody.appendChild(tr);
-      }
-
-      rank++;
-      const deptClass = r.department === 'Sales' ? 'dept-sales' : r.department === 'Retention' ? 'dept-retention' : 'dept-other';
-      const deptLabel = r.department || '—';
-      const ftcClass  = r.ftc >= 10 ? 'ftc-high' : r.ftc >= 5 ? 'ftc-mid' : r.ftc >= 1 ? 'ftc-low' : 'ftc-zero';
-
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td><span class="rank-num">${rank}</span></td>
-        <td class="fw-medium">${escHtml(r.agent_name)}</td>
-        <td><span class="dept-badge ${deptClass}">${escHtml(deptLabel)}</span></td>
-        <td class="text-end"><span class="ftc-val ${ftcClass}">${r.ftc > 0 ? r.ftc.toLocaleString() : '<span style="color:#484f58">0</span>'}</span></td>
-      `;
-      tbody.appendChild(tr);
+    // Group rows by office, preserving server sort order (office by FTC desc, agents by FTC desc)
+    const officeMap = new Map();
+    filtered.forEach(r => {
+      if (!officeMap.has(r.office_name)) officeMap.set(r.office_name, []);
+      officeMap.get(r.office_name).push(r);
     });
 
-    if (rows.length === 0) {
+    // Sort offices by their total FTC descending
+    const offices = [...officeMap.entries()].map(([name, agents]) => ({
+      name,
+      agents,
+      total: agents.reduce((s, a) => s + a.ftc, 0),
+    })).sort((a, b) => b.total - a.total);
+
+    let grandTotal = 0;
+    let agentCount = 0;
+
+    offices.forEach(office => {
+      grandTotal += office.total;
+
+      // Office row
+      const offTr = document.createElement('tr');
+      offTr.className = 'office-row';
+      const ftcOffClass = office.total >= 50 ? 'ftc-high' : office.total >= 20 ? 'ftc-mid' : 'ftc-low';
+      offTr.innerHTML = `
+        <td colspan="2"><i class="bi bi-building me-2" style="color:#484f58;font-size:0.75rem;"></i><strong>${escHtml(office.name)}</strong></td>
+        <td class="text-end"><span class="office-total ${ftcOffClass}">${office.total.toLocaleString()}</span></td>
+      `;
+      tbody.appendChild(offTr);
+
+      // Agent sub-rows
+      office.agents.forEach(r => {
+        agentCount++;
+        const deptClass = r.department === 'Sales' ? 'dept-sales' : r.department === 'Retention' ? 'dept-retention' : 'dept-other';
+        const deptLabel = r.department || '—';
+        const ftcClass  = r.ftc >= 10 ? 'ftc-high' : r.ftc >= 5 ? 'ftc-mid' : r.ftc >= 1 ? 'ftc-low' : 'ftc-zero';
+        const ftcHtml   = r.ftc > 0
+          ? `<span class="ftc-val ${ftcClass}">${r.ftc.toLocaleString()}</span>`
+          : `<span style="color:#484f58;font-weight:600;">0</span>`;
+
+        const tr = document.createElement('tr');
+        tr.className = 'agent-row';
+        tr.innerHTML = `
+          <td>${escHtml(r.agent_name)}</td>
+          <td><span class="dept-badge ${deptClass}">${escHtml(deptLabel)}</span></td>
+          <td class="text-end">${ftcHtml}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    });
+
+    if (offices.length === 0) {
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td colspan="4" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No data for this period</td>`;
+      tr.innerHTML = `<td colspan="3" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No data for this period</td>`;
       tbody.appendChild(tr);
+    } else {
+      // Grand total row
+      const totalTr = document.createElement('tr');
+      totalTr.className = 'total-row';
+      totalTr.innerHTML = `
+        <td colspan="2">Total</td>
+        <td class="text-end"><span class="ftc-val ftc-high">${grandTotal.toLocaleString()}</span></td>
+      `;
+      tbody.appendChild(totalTr);
     }
 
-    document.getElementById('row-count').textContent = `${rows.length} agents`;
+    document.getElementById('row-count').textContent = `${offices.length} offices · ${agentCount} agents`;
   }
 
   function escHtml(str) {
