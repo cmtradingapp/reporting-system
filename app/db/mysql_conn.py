@@ -452,9 +452,32 @@ def get_crm_users(hours: int = 24) -> pd.DataFrame:
                 MAX(IF(opr.display_name LIKE '%Agent%' OR opr.display_name = 'BDM',
                     'Agent', opr.display_name))                                                   AS position,
                 MAX(CASE
-                    WHEN o.id = 61 OR ofc.name IS NULL THEN 'General'
-                    WHEN d.name = 'Laila Desk'         THEN 'Laila'
-                    ELSE ofc.name
+                    WHEN o.id = 61 OR ofc.name IS NULL OR ofc.name = '' THEN 'General'
+                    WHEN d.name = 'Laila Desk' THEN 'Laila'
+                    ELSE CASE ofc.name
+                        WHEN 'IN'          THEN 'India'
+                        WHEN 'UY'          THEN 'Uruguay'
+                        WHEN 'SA'          THEN 'South Africa'
+                        WHEN 'LAG-NG'      THEN 'LAG Nigeria'
+                        WHEN 'IL'          THEN 'Israel'
+                        WHEN 'GMT'         THEN 'GMT'
+                        WHEN 'General'     THEN 'General'
+                        WHEN 'Global'      THEN 'General'
+                        WHEN 'DU'          THEN 'Dubai'
+                        WHEN 'CO'          THEN 'Columbia'
+                        WHEN 'CY'          THEN 'Cyprus'
+                        WHEN 'BG'          THEN 'Bulgaria'
+                        WHEN 'ABJ-NG'      THEN 'ABJ Nigeria'
+                        WHEN 'WL-BG'       THEN 'WL Bulgaria'
+                        WHEN 'WL-PK'       THEN 'WL Pakistan'
+                        WHEN 'WL-SL'       THEN 'WL Sri Lanka'
+                        WHEN 'WL-IL'       THEN 'WL IL'
+                        WHEN 'VN'          THEN 'Vietnam'
+                        WHEN 'WL-Belgrad'  THEN 'WL Belgrad'
+                        WHEN 'WL-SNS-UAW'  THEN 'WL UAE'
+                        WHEN 'WL-ABUKING'  THEN 'WL ABUKING'
+                        ELSE ofc.name
+                    END
                 END)                                                                              AS office_name,
                 MAX(o.full_name)                                                                  AS agent_name,
                 MAX(IF(LOWER(TRIM(SUBSTRING_INDEX(d.name, '-', 1))) LIKE '%conversion%',
@@ -493,9 +516,32 @@ def get_crm_users(hours: int = 24) -> pd.DataFrame:
                 ofc.name                                                                          AS office,
                 'Agent'                                                                           AS position,
                 CASE
-                    WHEN d.name = 'Laila Desk' THEN 'Laila'
-                    WHEN ofc.name IS NULL      THEN 'General'
-                    ELSE ofc.name
+                    WHEN d.name = 'Laila Desk'              THEN 'Laila'
+                    WHEN ofc.name IS NULL OR ofc.name = ''  THEN 'General'
+                    ELSE CASE ofc.name
+                        WHEN 'IN'          THEN 'India'
+                        WHEN 'UY'          THEN 'Uruguay'
+                        WHEN 'SA'          THEN 'South Africa'
+                        WHEN 'LAG-NG'      THEN 'LAG Nigeria'
+                        WHEN 'IL'          THEN 'Israel'
+                        WHEN 'GMT'         THEN 'GMT'
+                        WHEN 'General'     THEN 'General'
+                        WHEN 'Global'      THEN 'General'
+                        WHEN 'DU'          THEN 'Dubai'
+                        WHEN 'CO'          THEN 'Columbia'
+                        WHEN 'CY'          THEN 'Cyprus'
+                        WHEN 'BG'          THEN 'Bulgaria'
+                        WHEN 'ABJ-NG'      THEN 'ABJ Nigeria'
+                        WHEN 'WL-BG'       THEN 'WL Bulgaria'
+                        WHEN 'WL-PK'       THEN 'WL Pakistan'
+                        WHEN 'WL-SL'       THEN 'WL Sri Lanka'
+                        WHEN 'WL-IL'       THEN 'WL IL'
+                        WHEN 'VN'          THEN 'Vietnam'
+                        WHEN 'WL-Belgrad'  THEN 'WL Belgrad'
+                        WHEN 'WL-SNS-UAW'  THEN 'WL UAE'
+                        WHEN 'WL-ABUKING'  THEN 'WL ABUKING'
+                        ELSE ofc.name
+                    END
                 END                                                                               AS office_name,
                 d.name                                                                            AS agent_name,
                 IF(LOWER(TRIM(SUBSTRING_INDEX(d.name, '-', 1))) LIKE '%conversion%',
@@ -538,9 +584,32 @@ def get_crm_users_full() -> pd.DataFrame:
                 MAX(IF(opr.display_name LIKE '%Agent%' OR opr.display_name = 'BDM',
                     'Agent', opr.display_name))                                                   AS position,
                 MAX(CASE
-                    WHEN o.id = 61 OR ofc.name IS NULL THEN 'General'
-                    WHEN d.name = 'Laila Desk'         THEN 'Laila'
-                    ELSE ofc.name
+                    WHEN o.id = 61 OR ofc.name IS NULL OR ofc.name = '' THEN 'General'
+                    WHEN d.name = 'Laila Desk' THEN 'Laila'
+                    ELSE CASE ofc.name
+                        WHEN 'IN'          THEN 'India'
+                        WHEN 'UY'          THEN 'Uruguay'
+                        WHEN 'SA'          THEN 'South Africa'
+                        WHEN 'LAG-NG'      THEN 'LAG Nigeria'
+                        WHEN 'IL'          THEN 'Israel'
+                        WHEN 'GMT'         THEN 'GMT'
+                        WHEN 'General'     THEN 'General'
+                        WHEN 'Global'      THEN 'General'
+                        WHEN 'DU'          THEN 'Dubai'
+                        WHEN 'CO'          THEN 'Columbia'
+                        WHEN 'CY'          THEN 'Cyprus'
+                        WHEN 'BG'          THEN 'Bulgaria'
+                        WHEN 'ABJ-NG'      THEN 'ABJ Nigeria'
+                        WHEN 'WL-BG'       THEN 'WL Bulgaria'
+                        WHEN 'WL-PK'       THEN 'WL Pakistan'
+                        WHEN 'WL-SL'       THEN 'WL Sri Lanka'
+                        WHEN 'WL-IL'       THEN 'WL IL'
+                        WHEN 'VN'          THEN 'Vietnam'
+                        WHEN 'WL-Belgrad'  THEN 'WL Belgrad'
+                        WHEN 'WL-SNS-UAW'  THEN 'WL UAE'
+                        WHEN 'WL-ABUKING'  THEN 'WL ABUKING'
+                        ELSE ofc.name
+                    END
                 END)                                                                              AS office_name,
                 MAX(o.full_name)                                                                  AS agent_name,
                 MAX(IF(LOWER(TRIM(SUBSTRING_INDEX(d.name, '-', 1))) LIKE '%conversion%',
@@ -578,9 +647,32 @@ def get_crm_users_full() -> pd.DataFrame:
                 ofc.name                                                                          AS office,
                 'Agent'                                                                           AS position,
                 CASE
-                    WHEN d.name = 'Laila Desk' THEN 'Laila'
-                    WHEN ofc.name IS NULL      THEN 'General'
-                    ELSE ofc.name
+                    WHEN d.name = 'Laila Desk'              THEN 'Laila'
+                    WHEN ofc.name IS NULL OR ofc.name = ''  THEN 'General'
+                    ELSE CASE ofc.name
+                        WHEN 'IN'          THEN 'India'
+                        WHEN 'UY'          THEN 'Uruguay'
+                        WHEN 'SA'          THEN 'South Africa'
+                        WHEN 'LAG-NG'      THEN 'LAG Nigeria'
+                        WHEN 'IL'          THEN 'Israel'
+                        WHEN 'GMT'         THEN 'GMT'
+                        WHEN 'General'     THEN 'General'
+                        WHEN 'Global'      THEN 'General'
+                        WHEN 'DU'          THEN 'Dubai'
+                        WHEN 'CO'          THEN 'Columbia'
+                        WHEN 'CY'          THEN 'Cyprus'
+                        WHEN 'BG'          THEN 'Bulgaria'
+                        WHEN 'ABJ-NG'      THEN 'ABJ Nigeria'
+                        WHEN 'WL-BG'       THEN 'WL Bulgaria'
+                        WHEN 'WL-PK'       THEN 'WL Pakistan'
+                        WHEN 'WL-SL'       THEN 'WL Sri Lanka'
+                        WHEN 'WL-IL'       THEN 'WL IL'
+                        WHEN 'VN'          THEN 'Vietnam'
+                        WHEN 'WL-Belgrad'  THEN 'WL Belgrad'
+                        WHEN 'WL-SNS-UAW'  THEN 'WL UAE'
+                        WHEN 'WL-ABUKING'  THEN 'WL ABUKING'
+                        ELSE ofc.name
+                    END
                 END                                                                               AS office_name,
                 d.name                                                                            AS agent_name,
                 IF(LOWER(TRIM(SUBSTRING_INDEX(d.name, '-', 1))) LIKE '%conversion%',

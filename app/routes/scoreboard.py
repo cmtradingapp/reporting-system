@@ -2,7 +2,6 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from app.db.postgres_conn import get_connection
-from app.db.mysql_conn import _get_connection as mysql_conn
 from datetime import datetime, timedelta
 
 router = APIRouter()
@@ -10,19 +9,6 @@ templates = Jinja2Templates(directory="app/templates")
 
 
 
-
-@router.get("/api/scoreboard/debug-office-table")
-def debug_office_table():
-    conn = mysql_conn()
-    try:
-        with conn.cursor() as cur:
-            cur.execute("DESCRIBE office")
-            cols = cur.fetchall()
-            cur.execute("SELECT * FROM office LIMIT 5")
-            rows = cur.fetchall()
-        return JSONResponse(content={"columns": cols, "sample": rows})
-    finally:
-        conn.close()
 
 
 @router.get("/scoreboard", response_class=HTMLResponse)
