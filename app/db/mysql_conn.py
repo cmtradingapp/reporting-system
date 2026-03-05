@@ -454,7 +454,7 @@ def get_crm_users(hours: int = 24) -> pd.DataFrame:
                 MAX(CASE
                     WHEN o.id = 61 OR ofc.name IS NULL THEN 'General'
                     WHEN d.name = 'Laila Desk'         THEN 'Laila'
-                    ELSE ofc.name
+                    ELSE COALESCE(ofc.office_name, ofc.name)
                 END)                                                                              AS office_name,
                 MAX(o.full_name)                                                                  AS agent_name,
                 MAX(IF(LOWER(TRIM(SUBSTRING_INDEX(d.name, '-', 1))) LIKE '%conversion%',
@@ -495,7 +495,7 @@ def get_crm_users(hours: int = 24) -> pd.DataFrame:
                 CASE
                     WHEN d.name = 'Laila Desk' THEN 'Laila'
                     WHEN ofc.name IS NULL      THEN 'General'
-                    ELSE ofc.name
+                    ELSE COALESCE(ofc.office_name, ofc.name)
                 END                                                                               AS office_name,
                 d.name                                                                            AS agent_name,
                 IF(LOWER(TRIM(SUBSTRING_INDEX(d.name, '-', 1))) LIKE '%conversion%',
@@ -540,7 +540,7 @@ def get_crm_users_full() -> pd.DataFrame:
                 MAX(CASE
                     WHEN o.id = 61 OR ofc.name IS NULL THEN 'General'
                     WHEN d.name = 'Laila Desk'         THEN 'Laila'
-                    ELSE ofc.name
+                    ELSE COALESCE(ofc.office_name, ofc.name)
                 END)                                                                              AS office_name,
                 MAX(o.full_name)                                                                  AS agent_name,
                 MAX(IF(LOWER(TRIM(SUBSTRING_INDEX(d.name, '-', 1))) LIKE '%conversion%',
@@ -580,7 +580,7 @@ def get_crm_users_full() -> pd.DataFrame:
                 CASE
                     WHEN d.name = 'Laila Desk' THEN 'Laila'
                     WHEN ofc.name IS NULL      THEN 'General'
-                    ELSE ofc.name
+                    ELSE COALESCE(ofc.office_name, ofc.name)
                 END                                                                               AS office_name,
                 d.name                                                                            AS agent_name,
                 IF(LOWER(TRIM(SUBSTRING_INDEX(d.name, '-', 1))) LIKE '%conversion%',
