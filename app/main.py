@@ -10,6 +10,7 @@ from app.routes.targets_sync import router as targets_sync_router
 from app.routes.dealio_mt4trades_sync import router as dealio_mt4trades_sync_router
 from app.routes.trading_accounts_sync import router as trading_accounts_sync_router
 from app.routes.ftd100_sync import router as ftd100_sync_router
+from app.routes.scoreboard import router as scoreboard_router
 from app.routes.data_sync import router as data_sync_router
 from app.db.postgres_conn import ensure_table
 from app.etl.fetch_and_store import run_accounts_etl, run_users_etl, run_transactions_etl, run_targets_etl, run_dealio_mt4trades_etl, run_trading_accounts_etl, run_ftd100_etl
@@ -104,4 +105,5 @@ app.include_router(targets_sync_router)
 app.include_router(dealio_mt4trades_sync_router)
 app.include_router(trading_accounts_sync_router)
 app.include_router(ftd100_sync_router)
+app.include_router(scoreboard_router)
 app.include_router(data_sync_router)

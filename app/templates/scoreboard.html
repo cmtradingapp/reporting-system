@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Scoreboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet"/>
+  <style>
+    body { background-color: #0f1117; color: #e0e0e0; font-family: 'Segoe UI', sans-serif; display: flex; min-height: 100vh; }
+    .sidebar { width: 220px; min-height: 100vh; background-color: #161b22; border-right: 1px solid #30363d; display: flex; flex-direction: column; position: fixed; top: 0; left: 0; bottom: 0; z-index: 100; }
+    .sidebar-brand { padding: 20px 20px 16px; border-bottom: 1px solid #30363d; font-weight: 700; font-size: 1rem; color: #e0e0e0; }
+    .sidebar-nav { padding: 12px 0; flex: 1; }
+    .sidebar-link { display: flex; align-items: center; gap: 10px; padding: 10px 20px; color: #8b949e; text-decoration: none; font-size: 0.9rem; transition: background 0.15s, color 0.15s; border-left: 3px solid transparent; }
+    .sidebar-link:hover { background-color: #21262d; color: #e0e0e0; }
+    .sidebar-link.active { color: #3fb950; border-left-color: #3fb950; background-color: rgba(63,185,80,0.08); }
+    .main-content { margin-left: 220px; flex: 1; min-width: 0; }
+    .card { background-color: #161b22; border: 1px solid #30363d; border-radius: 12px; }
+
+    /* Period buttons */
+    .period-btn {
+      background-color: #21262d;
+      border: 1px solid #30363d;
+      color: #8b949e;
+      font-size: 0.82rem;
+      padding: 5px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .period-btn:hover { background-color: #2d333a; color: #c9d1d9; border-color: #484f58; }
+    .period-btn.active { background-color: rgba(35,134,54,0.25); border-color: #238636; color: #3fb950; font-weight: 600; }
+
+    /* Date inputs */
+    .date-input {
+      background-color: #21262d;
+      border: 1px solid #30363d;
+      color: #e0e0e0;
+      border-radius: 6px;
+      padding: 5px 10px;
+      font-size: 0.82rem;
+      width: 140px;
+    }
+    .date-input:focus { outline: none; border-color: #238636; box-shadow: 0 0 0 2px rgba(35,134,54,0.2); }
+    .date-input::-webkit-calendar-picker-indicator { filter: invert(0.7); cursor: pointer; }
+
+    /* Quick buttons */
+    .quick-btn {
+      background-color: #21262d;
+      border: 1px solid #30363d;
+      color: #8b949e;
+      font-size: 0.78rem;
+      padding: 5px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      transition: all 0.15s;
+    }
+    .quick-btn:hover { background-color: #2d333a; color: #c9d1d9; border-color: #484f58; }
+    .quick-btn.active-quick { border-color: #388bfd; color: #388bfd; background-color: rgba(56,139,253,0.1); }
+
+    /* Filter separator */
+    .filter-sep { width: 1px; height: 28px; background-color: #30363d; margin: 0 6px; }
+
+    /* Stat card */
+    .stat-card { background-color: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 16px 24px; }
+    .stat-value { font-size: 2rem; font-weight: 700; }
+    .stat-label { font-size: 0.8rem; color: #8b949e; text-transform: uppercase; letter-spacing: 1px; }
+
+    /* Table */
+    .scoreboard-table { width: 100%; border-collapse: collapse; }
+    .scoreboard-table th {
+      background-color: #21262d;
+      color: #8b949e;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      padding: 10px 14px;
+      border-bottom: 1px solid #30363d;
+      white-space: nowrap;
+    }
+    .scoreboard-table td { padding: 9px 14px; border-bottom: 1px solid #21262d; font-size: 0.88rem; vertical-align: middle; }
+    .scoreboard-table tr:hover td { background-color: #1c2128; }
+    .office-header td {
+      background-color: #0d1117;
+      color: #8b949e;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      padding: 8px 14px;
+      border-bottom: 1px solid #30363d;
+      border-top: 1px solid #30363d;
+    }
+    .rank-num { color: #484f58; font-size: 0.78rem; font-weight: 600; min-width: 28px; display: inline-block; text-align: right; }
+    .dept-badge {
+      font-size: 0.7rem;
+      padding: 2px 7px;
+      border-radius: 10px;
+      font-weight: 600;
+    }
+    .dept-sales { background: rgba(63,185,80,0.12); color: #3fb950; border: 1px solid rgba(63,185,80,0.3); }
+    .dept-retention { background: rgba(56,139,253,0.12); color: #388bfd; border: 1px solid rgba(56,139,253,0.3); }
+    .dept-other { background: rgba(139,148,158,0.12); color: #8b949e; border: 1px solid rgba(139,148,158,0.3); }
+    .ftc-val { font-weight: 700; font-size: 1rem; }
+    .ftc-high { color: #3fb950; }
+    .ftc-mid  { color: #d29922; }
+    .ftc-low  { color: #8b949e; }
+    .ftc-zero { color: #484f58; }
+
+    /* Spinner */
+    #loading { display: none; text-align: center; padding: 60px; color: #8b949e; }
+    #error-msg { display: none; }
+
+    /* Section title */
+    .section-title { font-size: 1rem; font-weight: 600; color: #c9d1d9; border-left: 3px solid #238636; padding-left: 10px; }
+  </style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="sidebar-brand">
+    <i class="bi bi-bar-chart-fill text-success me-2"></i>Reporting System
+  </div>
+  <nav class="sidebar-nav">
+    <a href="/" class="sidebar-link"><i class="bi bi-graph-up"></i>Performance</a>
+    <a href="/users" class="sidebar-link"><i class="bi bi-people"></i>Users</a>
+    <a href="/scoreboard" class="sidebar-link active"><i class="bi bi-trophy"></i>Scoreboard</a>
+    <a href="/data-sync" class="sidebar-link"><i class="bi bi-database"></i>Data Sync</a>
+  </nav>
+</div>
+
+<div class="main-content">
+<div class="container-fluid px-4 py-4">
+
+  <!-- Header -->
+  <div class="mb-4">
+    <h4 class="fw-bold text-white mb-0">Scoreboard</h4>
+    <p class="text-muted small mb-0">FTC (First Time Client) performance by agent and office</p>
+  </div>
+
+  <!-- Filter Bar -->
+  <div class="card p-3 mb-4">
+
+    <!-- Row 1: Year + Month -->
+    <div class="d-flex flex-wrap align-items-center gap-1 mb-3">
+      <span class="text-muted small me-1" style="min-width:40px">Year</span>
+      <button class="period-btn year-btn" data-year="2024">2024</button>
+      <button class="period-btn year-btn" data-year="2025">2025</button>
+      <button class="period-btn year-btn" data-year="2026">2026</button>
+      <div class="filter-sep"></div>
+      <span class="text-muted small me-1">Month</span>
+      <button class="period-btn month-btn" data-month="1">Jan</button>
+      <button class="period-btn month-btn" data-month="2">Feb</button>
+      <button class="period-btn month-btn" data-month="3">Mar</button>
+      <button class="period-btn month-btn" data-month="4">Apr</button>
+      <button class="period-btn month-btn" data-month="5">May</button>
+      <button class="period-btn month-btn" data-month="6">Jun</button>
+      <button class="period-btn month-btn" data-month="7">Jul</button>
+      <button class="period-btn month-btn" data-month="8">Aug</button>
+      <button class="period-btn month-btn" data-month="9">Sep</button>
+      <button class="period-btn month-btn" data-month="10">Oct</button>
+      <button class="period-btn month-btn" data-month="11">Nov</button>
+      <button class="period-btn month-btn" data-month="12">Dec</button>
+    </div>
+
+    <!-- Row 2: Date range -->
+    <div class="d-flex flex-wrap align-items-center gap-2">
+      <span class="text-muted small">From</span>
+      <input type="date" id="date-from" class="date-input" />
+      <span class="text-muted small">To</span>
+      <input type="date" id="date-to" class="date-input" />
+      <div class="filter-sep"></div>
+      <button class="quick-btn" id="btn-today">TODAY</button>
+      <button class="quick-btn" id="btn-ystrd">YSTRD</button>
+      <div class="filter-sep"></div>
+      <button class="btn btn-sm text-white px-3" style="background:linear-gradient(135deg,#238636,#2ea043);border:none;border-radius:6px;" id="btn-apply">
+        <i class="bi bi-arrow-clockwise me-1"></i>Apply
+      </button>
+    </div>
+
+  </div>
+
+  <!-- Stats Row -->
+  <div class="row g-3 mb-4" id="stats-row">
+    <div class="col-sm-6 col-lg-3">
+      <div class="stat-card text-center">
+        <div class="stat-value text-success" id="stat-total-ftc">—</div>
+        <div class="stat-label mt-1"><i class="bi bi-trophy me-1"></i>Total FTC</div>
+      </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+      <div class="stat-card text-center">
+        <div class="stat-value text-info" id="stat-agents-with-ftc">—</div>
+        <div class="stat-label mt-1"><i class="bi bi-person-check me-1"></i>Agents w/ FTC</div>
+      </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+      <div class="stat-card text-center">
+        <div class="stat-value text-warning" id="stat-top-ftc">—</div>
+        <div class="stat-label mt-1"><i class="bi bi-star me-1"></i>Top Agent FTC</div>
+      </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+      <div class="stat-card text-center">
+        <div class="stat-value text-primary" id="stat-period">—</div>
+        <div class="stat-label mt-1"><i class="bi bi-calendar-range me-1"></i>Period</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Table Card -->
+  <div class="card p-0" style="overflow:hidden;">
+    <div class="d-flex justify-content-between align-items-center px-4 py-3" style="border-bottom:1px solid #30363d;">
+      <div class="section-title">FTC Matrix</div>
+      <div class="d-flex align-items-center gap-3">
+        <label class="d-flex align-items-center gap-2 text-muted small mb-0" style="cursor:pointer;">
+          <input type="checkbox" id="show-zeros" class="form-check-input m-0" style="background-color:#21262d;border-color:#484f58;" />
+          Show 0 FTC
+        </label>
+        <span class="text-muted small" id="row-count"></span>
+      </div>
+    </div>
+
+    <div id="loading" style="display:none;text-align:center;padding:60px;color:#8b949e;">
+      <div class="spinner-border text-success mb-3" style="width:2rem;height:2rem;"></div>
+      <div class="small">Loading...</div>
+    </div>
+
+    <div id="error-msg" style="display:none;" class="text-danger text-center p-4 small"></div>
+
+    <div id="table-wrapper" style="overflow-x:auto;">
+      <table class="scoreboard-table" id="scoreboard-table">
+        <thead>
+          <tr>
+            <th style="width:40px;">#</th>
+            <th>Agent</th>
+            <th>Department</th>
+            <th class="text-end" style="min-width:80px;">FTC</th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<script>
+  // ── State ──────────────────────────────────────────────────────────────
+  const now = new Date();
+  let state = {
+    year:  now.getFullYear(),
+    month: now.getMonth() + 1,
+    dateFrom: '',
+    dateTo: '',
+  };
+  let allRows = [];
+
+  // ── Helpers ────────────────────────────────────────────────────────────
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function todayStr() {
+    return `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+  }
+  function yesterdayStr() {
+    const d = new Date(now); d.setDate(d.getDate() - 1);
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  }
+  function firstOfMonth(year, month) {
+    return `${year}-${pad(month)}-01`;
+  }
+
+  // ── Button highlight helpers ───────────────────────────────────────────
+  function activateYear(year) {
+    document.querySelectorAll('.year-btn').forEach(b => {
+      b.classList.toggle('active', parseInt(b.dataset.year) === year);
+    });
+  }
+  function activateMonth(month) {
+    document.querySelectorAll('.month-btn').forEach(b => {
+      b.classList.toggle('active', parseInt(b.dataset.month) === month);
+    });
+  }
+  function setQuickActive(id) {
+    ['btn-today','btn-ystrd'].forEach(i => {
+      document.getElementById(i).classList.toggle('active-quick', i === id);
+    });
+  }
+
+  // ── Date input sync ────────────────────────────────────────────────────
+  function syncDateFrom() {
+    document.getElementById('date-from').value = state.dateFrom;
+  }
+  function syncDateTo() {
+    document.getElementById('date-to').value = state.dateTo;
+  }
+
+  // ── API fetch + render ─────────────────────────────────────────────────
+  async function loadData() {
+    const df = document.getElementById('date-from').value;
+    const dt = document.getElementById('date-to').value;
+    if (!df || !dt) return;
+
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('table-wrapper').style.display = 'none';
+    document.getElementById('error-msg').style.display = 'none';
+
+    try {
+      const res = await fetch(`/api/scoreboard?date_from=${df}&date_to=${dt}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Server error');
+
+      allRows = data.rows;
+      updateStats(data);
+      renderTable();
+    } catch(e) {
+      document.getElementById('error-msg').textContent = 'Error: ' + e.message;
+      document.getElementById('error-msg').style.display = 'block';
+    } finally {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('table-wrapper').style.display = '';
+    }
+  }
+
+  function updateStats(data) {
+    const withFtc = data.rows.filter(r => r.ftc > 0).length;
+    const topFtc  = data.rows.length ? Math.max(...data.rows.map(r => r.ftc)) : 0;
+    document.getElementById('stat-total-ftc').textContent    = data.total_ftc.toLocaleString();
+    document.getElementById('stat-agents-with-ftc').textContent = withFtc.toLocaleString();
+    document.getElementById('stat-top-ftc').textContent      = topFtc.toLocaleString();
+
+    // Period label: abbreviated (e.g. "Mar 25")
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const fromDate = new Date(data.date_from + 'T00:00:00');
+    const toDate   = new Date(data.date_to   + 'T00:00:00');
+    const fromLbl  = `${months[fromDate.getMonth()]} ${String(fromDate.getFullYear()).slice(2)}`;
+    const toLbl    = `${months[toDate.getMonth()]} ${toDate.getDate()}`;
+    document.getElementById('stat-period').textContent = `${fromLbl} → ${toLbl}`;
+  }
+
+  function renderTable() {
+    const showZeros = document.getElementById('show-zeros').checked;
+    const rows = showZeros ? allRows : allRows.filter(r => r.ftc > 0);
+
+    // Sort: already sorted by office then FTC desc from server
+    const tbody = document.getElementById('table-body');
+    tbody.innerHTML = '';
+
+    let rank = 0;
+    let lastOffice = null;
+
+    rows.forEach(r => {
+      // Office group header
+      if (r.office_name !== lastOffice) {
+        lastOffice = r.office_name;
+        const tr = document.createElement('tr');
+        tr.className = 'office-header';
+        tr.innerHTML = `<td colspan="4"><i class="bi bi-building me-2"></i>${escHtml(r.office_name)}</td>`;
+        tbody.appendChild(tr);
+      }
+
+      rank++;
+      const deptClass = r.department === 'Sales' ? 'dept-sales' : r.department === 'Retention' ? 'dept-retention' : 'dept-other';
+      const deptLabel = r.department || '—';
+      const ftcClass  = r.ftc >= 10 ? 'ftc-high' : r.ftc >= 5 ? 'ftc-mid' : r.ftc >= 1 ? 'ftc-low' : 'ftc-zero';
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><span class="rank-num">${rank}</span></td>
+        <td class="fw-medium">${escHtml(r.agent_name)}</td>
+        <td><span class="dept-badge ${deptClass}">${escHtml(deptLabel)}</span></td>
+        <td class="text-end"><span class="ftc-val ${ftcClass}">${r.ftc > 0 ? r.ftc.toLocaleString() : '<span style="color:#484f58">0</span>'}</span></td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    if (rows.length === 0) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td colspan="4" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No data for this period</td>`;
+      tbody.appendChild(tr);
+    }
+
+    document.getElementById('row-count').textContent = `${rows.length} agents`;
+  }
+
+  function escHtml(str) {
+    return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ── Event: year buttons ────────────────────────────────────────────────
+  document.querySelectorAll('.year-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.year = parseInt(btn.dataset.year);
+      activateYear(state.year);
+      // Reset date_from to first of selected month in new year
+      document.getElementById('date-from').value = firstOfMonth(state.year, state.month);
+      loadData();
+    });
+  });
+
+  // ── Event: month buttons ───────────────────────────────────────────────
+  document.querySelectorAll('.month-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.month = parseInt(btn.dataset.month);
+      activateMonth(state.month);
+      document.getElementById('date-from').value = firstOfMonth(state.year, state.month);
+      loadData();
+    });
+  });
+
+  // ── Event: TODAY / YSTRD ───────────────────────────────────────────────
+  document.getElementById('btn-today').addEventListener('click', () => {
+    document.getElementById('date-to').value = todayStr();
+    setQuickActive('btn-today');
+    loadData();
+  });
+  document.getElementById('btn-ystrd').addEventListener('click', () => {
+    document.getElementById('date-to').value = yesterdayStr();
+    setQuickActive('btn-ystrd');
+    loadData();
+  });
+
+  // ── Event: Apply button ────────────────────────────────────────────────
+  document.getElementById('btn-apply').addEventListener('click', () => {
+    setQuickActive(null);
+    loadData();
+  });
+
+  // ── Event: show zeros checkbox ─────────────────────────────────────────
+  document.getElementById('show-zeros').addEventListener('change', () => {
+    if (allRows.length) renderTable();
+  });
+
+  // ── Event: date-from manual change → clear month/year highlight ────────
+  document.getElementById('date-from').addEventListener('change', () => {
+    // Try to sync year/month highlight from the new date
+    const val = document.getElementById('date-from').value;
+    if (val) {
+      const d = new Date(val + 'T00:00:00');
+      state.year  = d.getFullYear();
+      state.month = d.getMonth() + 1;
+      activateYear(state.year);
+      activateMonth(state.month);
+    }
+  });
+
+  // ── Init ───────────────────────────────────────────────────────────────
+  document.getElementById('date-from').value = firstOfMonth(state.year, state.month);
+  document.getElementById('date-to').value   = todayStr();
+  activateYear(state.year);
+  activateMonth(state.month);
+  setQuickActive('btn-today');
+  loadData();
+</script>
+
+</body>
+</html>
