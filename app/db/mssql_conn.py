@@ -50,17 +50,28 @@ def get_dealio_mt4trades(hours: int = 24) -> pd.DataFrame:
 
 
 def get_dealio_mt4trades_full():
-    """Generator yielding chunks of all rows — avoids OOM for large tables."""
-    conn = _get_mssql_connection()
-    try:
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM report.dealio_mt4trades")
-        cols = [d[0] for d in cursor.description]
-        while True:
-            rows = cursor.fetchmany(CHUNK_SIZE)
-            if not rows:
-                break
-            df = pd.DataFrame(rows, columns=cols)
-            yield _normalize_dealio_cols(df)
-    finally:
-        conn.close()
+    """
+    Generator using keyset pagination on ticket (clustered PK).
+    Opens a fresh connection per chunk — safe for 10M+ rows regardless
+    of pymssql client-side buffering behaviour.
+    """
+    last_ticket = 0
+    while True:
+        conn = _get_mssql_connection()
+        try:
+            query = f"""
+                SELECT TOP {CHUNK_SIZE} *
+                FROM report.dealio_mt4trades
+                WHERE ticket > {last_ticket}
+                ORDER BY ticket
+            """
+            df = pd.read_sql(query, conn)
+        finally:
+            conn.close()
+
+        if df.empty:
+            break
+
+        df = _normalize_dealio_cols(df)
+        last_ticket = int(df["ticket"].max())
+        yield df
