@@ -561,6 +561,73 @@ def get_crm_users_full() -> pd.DataFrame:
         conn.close()
 
 
+_TRADING_ACCOUNTS_SELECT = """
+    SELECT
+        bu.id                                       AS trading_account_id,
+        CONCAT(bu.first_name, ' ', bu.last_name)   AS trading_account_name,
+        bu.user_id                                  AS vtigeraccountid,
+        bu.trade_group_string                       AS trade_group,
+        bu.last_update_time                         AS last_update,
+        (bu.equity / 100)                           AS equity,
+        bu.open_pnl                                 AS open_pnl,
+        bu.close_pnl                                AS total_pnl,
+        bu.total_commission                         AS commission,
+        (0 = bu.is_deleted)                         AS enable,
+        (0 = bu.is_trading_active)                  AS enable_read_only,
+        bu.external_id                              AS login,
+        bu.currency                                 AS currency,
+        IF(bu.is_demo, 1, 2)                        AS serverid,
+        CASE
+            WHEN u.acquisition_status = 0 AND u.sales_rep != 0     THEN u.sales_rep
+            WHEN u.acquisition_status = 0 AND u.sales_rep = 0      THEN u.sales_desk_id
+            WHEN u.acquisition_status = 1 AND u.retention_rep != 0 THEN u.retention_rep
+            ELSE u.retention_desk_id
+        END                                         AS assigned_to,
+        (bu.balance / 100)                          AS balance,
+        NULL                                        AS credit,
+        bu.total_swap                               AS swaps,
+        NULL                                        AS total_taxes,
+        bu.leverage                                 AS leverage,
+        bu.margin                                   AS margin,
+        NULL                                        AS margin_level,
+        bu.free_margin                              AS margin_free,
+        bu.creation_time                            AS created_time,
+        NULL                                        AS trading_server_created_timestamp,
+        NULL                                        AS platform,
+        bu.is_deleted                               AS deleted
+    FROM v_ant_broker_user bu
+    LEFT JOIN v_ant_users u ON u.id = bu.user_id
+    WHERE bu.trade_group_string NOT LIKE '%test%'
+      AND bu.is_demo != 1
+"""
+
+
+def get_trading_accounts(hours: int = 24) -> pd.DataFrame:
+    conn = _get_connection()
+    try:
+        query = _TRADING_ACCOUNTS_SELECT + f"""
+          AND bu.last_update_time >= DATE_ADD(UTC_TIMESTAMP(), INTERVAL -{hours} HOUR)
+        """
+        return pd.read_sql(query, conn)
+    finally:
+        conn.close()
+
+
+def get_trading_accounts_full():
+    """Yields DataFrames in chunks — safe for large broker_user tables."""
+    conn = _get_connection(streaming=True)
+    try:
+        with conn.cursor() as cur:
+            cur.execute(_TRADING_ACCOUNTS_SELECT)
+            while True:
+                rows = cur.fetchmany(CHUNK_SIZE)
+                if not rows:
+                    break
+                yield pd.DataFrame(rows)
+    finally:
+        conn.close()
+
+
 def get_users() -> pd.DataFrame:
     conn = _get_connection()
     try:

@@ -2,7 +2,7 @@ import os
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from app.db.postgres_conn import fetch_accounts_stats, fetch_crm_users_stats, fetch_transactions_stats, fetch_targets_stats, fetch_dealio_mt4trades_stats, fetch_sync_log
+from app.db.postgres_conn import fetch_accounts_stats, fetch_crm_users_stats, fetch_transactions_stats, fetch_targets_stats, fetch_dealio_mt4trades_stats, fetch_trading_accounts_stats, fetch_sync_log
 from datetime import datetime, timezone, timedelta
 
 router = APIRouter()
@@ -17,6 +17,8 @@ TRANSACTIONS_SYNC_HOURS = int(os.getenv("TRANSACTIONS_SYNC_HOURS", "24"))
 TARGETS_SYNC_INTERVAL_HOURS = int(os.getenv("TARGETS_SYNC_INTERVAL_HOURS", "1"))
 DEALIO_SYNC_INTERVAL_HOURS = int(os.getenv("DEALIO_SYNC_INTERVAL_HOURS", "1"))
 DEALIO_SYNC_HOURS = int(os.getenv("DEALIO_SYNC_HOURS", "24"))
+TRADING_ACCOUNTS_SYNC_INTERVAL_HOURS = int(os.getenv("TRADING_ACCOUNTS_SYNC_INTERVAL_HOURS", "1"))
+TRADING_ACCOUNTS_SYNC_HOURS = int(os.getenv("TRADING_ACCOUNTS_SYNC_HOURS", "24"))
 
 
 def _is_healthy(sync_log: list, interval_hours: int) -> bool:
@@ -43,6 +45,9 @@ async def data_sync_page(request: Request):
 
     dealio_stats = fetch_dealio_mt4trades_stats()
     dealio_log = fetch_sync_log("dealio_mt4trades", limit=50)
+
+    ta_stats = fetch_trading_accounts_stats()
+    ta_log = fetch_sync_log("trading_accounts", limit=50)
 
     tables = [
         {
@@ -98,6 +103,24 @@ async def data_sync_page(request: Request):
             "primary_key": "mttransactionsid",
             "incremental_columns": "modifiedtime, confirmation_time",
             "source": "crmdb.broker_banking + v_ant_broker_user + autolut",
+        },
+        {
+            "key": "trading_accounts",
+            "label": "trading_accounts",
+            "last_synced_at": ta_stats["last_synced_at"],
+            "stat_cards": [
+                {"label": "Total Accounts",    "value": ta_stats["total_records"],    "color": "text-info",    "icon": "bi-database"},
+                {"label": "Enabled Accounts",  "value": ta_stats["enabled_accounts"], "color": "text-success", "icon": "bi-person-check"},
+                {"label": "Total Balance",     "value": ta_stats["total_balance"],    "color": "text-warning", "icon": "bi-wallet2"},
+                {"label": "Total Equity",      "value": ta_stats["total_equity"],     "color": "text-primary", "icon": "bi-graph-up"},
+            ],
+            "sync_log": ta_log,
+            "healthy": _is_healthy(ta_log, TRADING_ACCOUNTS_SYNC_INTERVAL_HOURS),
+            "sync_interval_hours": TRADING_ACCOUNTS_SYNC_INTERVAL_HOURS,
+            "lookback_hours": TRADING_ACCOUNTS_SYNC_HOURS,
+            "primary_key": "trading_account_id",
+            "incremental_columns": "last_update_time",
+            "source": "MySQL → v_ant_broker_user + v_ant_users",
         },
         {
             "key": "dealio_mt4trades",
