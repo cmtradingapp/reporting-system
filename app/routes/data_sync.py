@@ -2,7 +2,7 @@ import os
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from app.db.postgres_conn import fetch_accounts_stats, fetch_crm_users_stats, fetch_transactions_stats, fetch_sync_log
+from app.db.postgres_conn import fetch_accounts_stats, fetch_crm_users_stats, fetch_transactions_stats, fetch_targets_stats, fetch_sync_log
 from datetime import datetime, timezone, timedelta
 
 router = APIRouter()
@@ -14,6 +14,7 @@ USERS_SYNC_INTERVAL_HOURS = int(os.getenv("USERS_SYNC_INTERVAL_HOURS", "1"))
 USERS_SYNC_HOURS = int(os.getenv("USERS_SYNC_HOURS", "24"))
 TRANSACTIONS_SYNC_INTERVAL_HOURS = int(os.getenv("TRANSACTIONS_SYNC_INTERVAL_HOURS", "1"))
 TRANSACTIONS_SYNC_HOURS = int(os.getenv("TRANSACTIONS_SYNC_HOURS", "24"))
+TARGETS_SYNC_INTERVAL_HOURS = int(os.getenv("TARGETS_SYNC_INTERVAL_HOURS", "1"))
 
 
 def _is_healthy(sync_log: list, interval_hours: int) -> bool:
@@ -34,6 +35,9 @@ async def data_sync_page(request: Request):
 
     tx_stats = fetch_transactions_stats()
     tx_log = fetch_sync_log("transactions", limit=50)
+
+    targets_stats = fetch_targets_stats()
+    targets_log = fetch_sync_log("targets", limit=50)
 
     tables = [
         {
@@ -89,6 +93,24 @@ async def data_sync_page(request: Request):
             "primary_key": "mttransactionsid",
             "incremental_columns": "modifiedtime, confirmation_time",
             "source": "crmdb.broker_banking + v_ant_broker_user + autolut",
+        },
+        {
+            "key": "targets",
+            "label": "targets",
+            "last_synced_at": targets_stats["last_synced_at"],
+            "stat_cards": [
+                {"label": "Total Records",  "value": targets_stats["total_records"],  "color": "text-info",    "icon": "bi-database"},
+                {"label": "Unique Agents",  "value": targets_stats["unique_agents"],  "color": "text-success", "icon": "bi-person-badge"},
+                {"label": "Total FTC",      "value": targets_stats["total_ftc"],      "color": "text-warning", "icon": "bi-bullseye"},
+                {"label": "Total NET",      "value": targets_stats["total_net"],      "color": "text-primary", "icon": "bi-currency-dollar"},
+            ],
+            "sync_log": targets_log,
+            "healthy": _is_healthy(targets_log, TARGETS_SYNC_INTERVAL_HOURS),
+            "sync_interval_hours": TARGETS_SYNC_INTERVAL_HOURS,
+            "lookback_hours": "All",
+            "primary_key": "(date, agent_id)",
+            "incremental_columns": "N/A — full refresh (no timestamp column)",
+            "source": "MSSQL → report.target",
         },
     ]
 

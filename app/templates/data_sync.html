@@ -106,7 +106,7 @@
       <div class="section-title mb-3">Sync Configuration</div>
       <div class="d-flex flex-wrap gap-2">
         <div class="config-badge"><i class="bi bi-clock me-1"></i>Interval: <span>Every {{ t.sync_interval_hours }}h</span></div>
-        <div class="config-badge"><i class="bi bi-calendar-range me-1"></i>Lookback: <span>{{ t.lookback_hours }}h</span></div>
+        <div class="config-badge"><i class="bi bi-calendar-range me-1"></i>Lookback: <span>{{ t.lookback_hours }}{% if t.lookback_hours != "All" %}h{% endif %}</span></div>
         <div class="config-badge"><i class="bi bi-key me-1"></i>Primary Key: <span>{{ t.primary_key }}</span></div>
         <div class="config-badge"><i class="bi bi-filter me-1"></i>Incremental Columns: <span>{{ t.incremental_columns }}</span></div>
         {% if t.source %}<div class="config-badge"><i class="bi bi-database me-1"></i>Source: <span>{{ t.source }}</span></div>{% endif %}
@@ -198,7 +198,7 @@
   async function runSync(tableKey) {
     document.getElementById('spinner').classList.add('active');
     try {
-      const urlMap = { 'crm_accounts': '/sync/accounts', 'crm_users': '/sync/users', 'transactions': '/sync/transactions' };
+      const urlMap = { 'crm_accounts': '/sync/accounts', 'crm_users': '/sync/users', 'transactions': '/sync/transactions', 'targets': '/sync/targets' };
       const url = urlMap[tableKey] || '/sync/accounts';
       const res = await fetch(url, { method: 'POST' });
       const data = await res.json();
@@ -221,7 +221,7 @@
     document.getElementById('spinner').classList.add('active');
     document.querySelector('#spinner div div:last-child').textContent = 'Running full sync — this may take a few minutes...';
     try {
-      const urlMap = { 'crm_accounts': '/sync/accounts/full', 'crm_users': '/sync/users/full', 'transactions': '/sync/transactions/full' };
+      const urlMap = { 'crm_accounts': '/sync/accounts/full', 'crm_users': '/sync/users/full', 'transactions': '/sync/transactions/full', 'targets': '/sync/targets/full' };
       const url = urlMap[tableKey] || '/sync/accounts/full';
       const res = await fetch(url, { method: 'POST' });
       const data = await res.json();

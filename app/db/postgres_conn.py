@@ -231,6 +231,17 @@ def ensure_table():
         CREATE INDEX IF NOT EXISTS idx_transactions_approval        ON transactions (transactionapproval);
         CREATE INDEX IF NOT EXISTS idx_transactions_ftd             ON transactions (ftd);
 
+        CREATE TABLE IF NOT EXISTS targets (
+            date       DATE    NOT NULL,
+            agent_id   VARCHAR(100) NOT NULL,
+            ftc        NUMERIC(20,4),
+            net        NUMERIC(20,4),
+            synced_at  TIMESTAMP DEFAULT NOW(),
+            PRIMARY KEY (date, agent_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_targets_date     ON targets (date);
+        CREATE INDEX IF NOT EXISTS idx_targets_agent_id ON targets (agent_id);
+
         CREATE TABLE IF NOT EXISTS users (
             id               VARCHAR(100) PRIMARY KEY,
             email            VARCHAR(255),
@@ -597,6 +608,52 @@ def fetch_transactions_stats() -> dict:
                 "approved": row[2] or 0,
                 "ftd_count": row[3] or 0,
                 "total_usd": int(row[4] or 0),
+            }
+    finally:
+        conn.close()
+
+
+def upsert_targets(df: pd.DataFrame):
+    cols = ["date", "agent_id", "ftc", "net"]
+    rows = [tuple(_clean(row.get(c)) for c in cols) for _, row in df.iterrows()]
+    sql = """
+        INSERT INTO targets (date, agent_id, ftc, net)
+        VALUES %s
+        ON CONFLICT (date, agent_id) DO UPDATE SET
+            ftc       = EXCLUDED.ftc,
+            net       = EXCLUDED.net,
+            synced_at = NOW()
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            execute_values(cur, sql, rows)
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def fetch_targets_stats() -> dict:
+    sql = """
+        SELECT
+            COUNT(*)                 AS total_records,
+            MAX(synced_at)           AS last_synced_at,
+            COUNT(DISTINCT agent_id) AS unique_agents,
+            COALESCE(SUM(ftc), 0)    AS total_ftc,
+            COALESCE(SUM(net), 0)    AS total_net
+        FROM targets
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+            row = cur.fetchone()
+            return {
+                "total_records":  row[0] or 0,
+                "last_synced_at": row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else "Never",
+                "unique_agents":  row[2] or 0,
+                "total_ftc":      int(row[3] or 0),
+                "total_net":      int(row[4] or 0),
             }
     finally:
         conn.close()
