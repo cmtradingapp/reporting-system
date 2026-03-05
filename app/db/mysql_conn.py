@@ -450,7 +450,13 @@ def get_crm_users(hours: int = 24) -> pd.DataFrame:
                 MAX(IF(opr.display_name NOT LIKE '%Agent%' AND opr.display_name != 'BDM',
                     'General', ofc.name))                                                         AS office,
                 MAX(IF(opr.display_name LIKE '%Agent%' OR opr.display_name = 'BDM',
-                    'Agent', opr.display_name))                                                   AS position
+                    'Agent', opr.display_name))                                                   AS position,
+                MAX(CASE
+                    WHEN o.id = 61 OR ofc.name IS NULL THEN 'General'
+                    WHEN d.name = 'Laila Desk'         THEN 'Laila'
+                    ELSE ofc.name
+                END)                                                                              AS office_name,
+                MAX(o.full_name)                                                                  AS agent_name
             FROM v_ant_operators o
             LEFT JOIN operator_desk_rel od ON o.id = od.operator_id
             LEFT JOIN desk d ON od.desk_id = d.id
@@ -483,7 +489,13 @@ def get_crm_users(hours: int = 24) -> pd.DataFrame:
                 d.type,
                 d.office_id,
                 ofc.name                                                                          AS office,
-                'Agent'                                                                           AS position
+                'Agent'                                                                           AS position,
+                CASE
+                    WHEN d.name = 'Laila Desk' THEN 'Laila'
+                    WHEN ofc.name IS NULL      THEN 'General'
+                    ELSE ofc.name
+                END                                                                               AS office_name,
+                d.name                                                                            AS agent_name
             FROM desk d
             JOIN office ofc ON d.office_id = ofc.id
             WHERE d.last_update_time >= DATE_ADD(UTC_TIMESTAMP(), INTERVAL -{hours} HOUR)
@@ -520,7 +532,13 @@ def get_crm_users_full() -> pd.DataFrame:
                 MAX(IF(opr.display_name NOT LIKE '%Agent%' AND opr.display_name != 'BDM',
                     'General', ofc.name))                                                         AS office,
                 MAX(IF(opr.display_name LIKE '%Agent%' OR opr.display_name = 'BDM',
-                    'Agent', opr.display_name))                                                   AS position
+                    'Agent', opr.display_name))                                                   AS position,
+                MAX(CASE
+                    WHEN o.id = 61 OR ofc.name IS NULL THEN 'General'
+                    WHEN d.name = 'Laila Desk'         THEN 'Laila'
+                    ELSE ofc.name
+                END)                                                                              AS office_name,
+                MAX(o.full_name)                                                                  AS agent_name
             FROM v_ant_operators o
             LEFT JOIN operator_desk_rel od ON o.id = od.operator_id
             LEFT JOIN desk d ON od.desk_id = d.id
@@ -552,7 +570,13 @@ def get_crm_users_full() -> pd.DataFrame:
                 d.type,
                 d.office_id,
                 ofc.name                                                                          AS office,
-                'Agent'                                                                           AS position
+                'Agent'                                                                           AS position,
+                CASE
+                    WHEN d.name = 'Laila Desk' THEN 'Laila'
+                    WHEN ofc.name IS NULL      THEN 'General'
+                    ELSE ofc.name
+                END                                                                               AS office_name,
+                d.name                                                                            AS agent_name
             FROM desk d
             JOIN office ofc ON d.office_id = ofc.id
         """
