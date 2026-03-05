@@ -35,13 +35,20 @@ def get_targets() -> pd.DataFrame:
         conn.close()
 
 
+_DEALIO_EXCLUDED_SYMBOLS = (
+    "'ZeroingZAR','ZeroingUSD','ZeroingNGN','ZeroingKES',"
+    "'ZeroingJPY','ZeroingGBP','ZeroingEUR'"
+)
+
+
 def get_dealio_mt4trades(hours: int = 24) -> pd.DataFrame:
     conn = _get_mssql_connection()
     try:
         query = f"""
             SELECT * FROM report.dealio_mt4trades
-            WHERE last_modified >= DATEADD(hour, -{hours}, GETUTCDATE())
-               OR updated_at    >= DATEADD(hour, -{hours}, GETUTCDATE())
+            WHERE symbol NOT IN ({_DEALIO_EXCLUDED_SYMBOLS})
+              AND (last_modified >= DATEADD(hour, -{hours}, GETUTCDATE())
+               OR  updated_at    >= DATEADD(hour, -{hours}, GETUTCDATE()))
         """
         df = pd.read_sql(query, conn)
         return _normalize_dealio_cols(df)
@@ -63,6 +70,7 @@ def get_dealio_mt4trades_full():
                 SELECT TOP {CHUNK_SIZE} *
                 FROM report.dealio_mt4trades
                 WHERE ticket > {last_ticket}
+                  AND symbol NOT IN ({_DEALIO_EXCLUDED_SYMBOLS})
                 ORDER BY ticket
             """
             df = pd.read_sql(query, conn)
