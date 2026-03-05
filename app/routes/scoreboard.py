@@ -46,7 +46,8 @@ def scoreboard_api(date_from: str, date_to: str):
             GROUP BY t.original_deposit_owner
         ) ftc ON ftc.agent_id = u.id
         WHERE u.status = 'Active'
-          AND u.team ILIKE '%conversion%'
+          AND u.department_ = 'Sales'
+          AND u.team = 'Conversion'
         ORDER BY u.office_name NULLS LAST, COALESCE(ftc.cnt, 0) DESC, u.agent_name
     """
 
