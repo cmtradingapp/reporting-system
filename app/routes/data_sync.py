@@ -110,7 +110,7 @@ async def data_sync_page(request: Request):
             "last_synced_at": ta_stats["last_synced_at"],
             "stat_cards": [
                 {"label": "Total Accounts",    "value": ta_stats["total_records"],    "color": "text-info",    "icon": "bi-database"},
-                {"label": "Enabled Accounts",  "value": ta_stats["enabled_accounts"], "color": "text-success", "icon": "bi-person-check"},
+                {"label": "Unique Logins",      "value": ta_stats["unique_logins"],    "color": "text-success", "icon": "bi-person-badge"},
                 {"label": "Total Balance",     "value": ta_stats["total_balance"],    "color": "text-warning", "icon": "bi-wallet2"},
                 {"label": "Total Equity",      "value": ta_stats["total_equity"],     "color": "text-primary", "icon": "bi-graph-up"},
             ],

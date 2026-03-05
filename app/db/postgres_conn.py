@@ -724,11 +724,11 @@ def upsert_trading_accounts(df: pd.DataFrame):
 def fetch_trading_accounts_stats() -> dict:
     sql = """
         SELECT
-            COUNT(*)                        AS total_records,
-            MAX(synced_at)                  AS last_synced_at,
-            COUNT(*) FILTER (WHERE enable = 1)  AS enabled_accounts,
-            COALESCE(SUM(balance), 0)       AS total_balance,
-            COALESCE(SUM(equity), 0)        AS total_equity
+            COUNT(*)                            AS total_records,
+            MAX(synced_at)                      AS last_synced_at,
+            COUNT(DISTINCT login)               AS unique_logins,
+            COALESCE(SUM(balance), 0)           AS total_balance,
+            COALESCE(SUM(equity), 0)            AS total_equity
         FROM trading_accounts
     """
     conn = get_connection()
@@ -737,11 +737,11 @@ def fetch_trading_accounts_stats() -> dict:
             cur.execute(sql)
             row = cur.fetchone()
             return {
-                "total_records":     row[0] or 0,
-                "last_synced_at":    row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else "Never",
-                "enabled_accounts":  row[2] or 0,
-                "total_balance":     int(row[3] or 0),
-                "total_equity":      int(row[4] or 0),
+                "total_records":  row[0] or 0,
+                "last_synced_at": row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else "Never",
+                "unique_logins":  row[2] or 0,
+                "total_balance":  int(row[3] or 0),
+                "total_equity":   int(row[4] or 0),
             }
     finally:
         conn.close()
