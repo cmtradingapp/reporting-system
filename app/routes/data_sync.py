@@ -2,7 +2,7 @@ import os
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from app.db.postgres_conn import fetch_accounts_stats, fetch_crm_users_stats, fetch_transactions_stats, fetch_targets_stats, fetch_dealio_mt4trades_stats, fetch_trading_accounts_stats, fetch_sync_log
+from app.db.postgres_conn import fetch_accounts_stats, fetch_crm_users_stats, fetch_transactions_stats, fetch_targets_stats, fetch_dealio_mt4trades_stats, fetch_trading_accounts_stats, fetch_ftd100_stats, fetch_sync_log
 from datetime import datetime, timezone, timedelta
 
 router = APIRouter()
@@ -19,6 +19,7 @@ DEALIO_SYNC_INTERVAL_HOURS = int(os.getenv("DEALIO_SYNC_INTERVAL_HOURS", "1"))
 DEALIO_SYNC_HOURS = int(os.getenv("DEALIO_SYNC_HOURS", "24"))
 TRADING_ACCOUNTS_SYNC_INTERVAL_HOURS = int(os.getenv("TRADING_ACCOUNTS_SYNC_INTERVAL_HOURS", "1"))
 TRADING_ACCOUNTS_SYNC_HOURS = int(os.getenv("TRADING_ACCOUNTS_SYNC_HOURS", "24"))
+FTD100_SYNC_INTERVAL_HOURS = int(os.getenv("FTD100_SYNC_INTERVAL_HOURS", "1"))
 
 
 def _is_healthy(sync_log: list, interval_hours: int) -> bool:
@@ -48,6 +49,9 @@ async def data_sync_page(request: Request):
 
     ta_stats = fetch_trading_accounts_stats()
     ta_log = fetch_sync_log("trading_accounts", limit=50)
+
+    ftd100_stats = fetch_ftd100_stats()
+    ftd100_log = fetch_sync_log("ftd100_clients", limit=50)
 
     tables = [
         {
@@ -139,6 +143,24 @@ async def data_sync_page(request: Request):
             "primary_key": "ticket",
             "incremental_columns": "last_modified, updated_at",
             "source": "MSSQL → report.dealio_mt4trades",
+        },
+        {
+            "key": "ftd100_clients",
+            "label": "ftd100_clients",
+            "last_synced_at": ftd100_stats["last_synced_at"],
+            "stat_cards": [
+                {"label": "Total Clients",      "value": ftd100_stats["total_records"],      "color": "text-info",    "icon": "bi-database"},
+                {"label": "Sales",              "value": ftd100_stats["sales_count"],         "color": "text-success", "icon": "bi-graph-up"},
+                {"label": "Retention",          "value": ftd100_stats["retention_count"],     "color": "text-warning", "icon": "bi-arrow-repeat"},
+                {"label": "Total Net Deposits", "value": ftd100_stats["total_net_deposits"],  "color": "text-primary", "icon": "bi-currency-dollar"},
+            ],
+            "sync_log": ftd100_log,
+            "healthy": _is_healthy(ftd100_log, FTD100_SYNC_INTERVAL_HOURS),
+            "sync_interval_hours": FTD100_SYNC_INTERVAL_HOURS,
+            "lookback_hours": "All",
+            "primary_key": "accountid",
+            "incremental_columns": "N/A — full refresh (running total requires full recalc)",
+            "source": "PostgreSQL → transactions + accounts (CTE)",
         },
         {
             "key": "targets",

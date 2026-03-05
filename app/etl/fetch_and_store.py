@@ -6,7 +6,8 @@ from app.db.mssql_conn import get_targets, get_dealio_mt4trades, get_dealio_mt4t
 from app.db.postgres_conn import (
     ensure_table, delete_all_performance, insert_records,
     upsert_users, upsert_accounts, upsert_crm_users, upsert_transactions,
-    upsert_targets, upsert_dealio_mt4trades, upsert_trading_accounts, log_sync
+    upsert_targets, upsert_dealio_mt4trades, upsert_trading_accounts, log_sync,
+    truncate_and_insert_ftd100,
 )
 
 
@@ -253,6 +254,26 @@ def run_targets_etl() -> dict:
     finally:
         duration_ms = int((time.time() - start) * 1000)
         log_sync("targets", cutoff, rows, duration_ms, status, error_msg)
+    return {"status": status, "rows_synced": rows}
+
+
+def run_ftd100_etl() -> dict:
+    """Full refresh — TRUNCATE + INSERT computed from transactions + accounts CTEs."""
+    ensure_table()
+    start = time.time()
+    cutoff = datetime(1970, 1, 1)  # full refresh marker
+    status = "success"
+    error_msg = None
+    rows = 0
+    try:
+        rows = truncate_and_insert_ftd100()
+    except Exception as e:
+        status = "error"
+        error_msg = str(e)
+        raise
+    finally:
+        duration_ms = int((time.time() - start) * 1000)
+        log_sync("ftd100_clients", cutoff, rows, duration_ms, status, error_msg)
     return {"status": status, "rows_synced": rows}
 
 

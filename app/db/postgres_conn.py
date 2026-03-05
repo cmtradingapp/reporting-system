@@ -325,6 +325,22 @@ def ensure_table():
         CREATE INDEX IF NOT EXISTS idx_targets_date     ON targets (date);
         CREATE INDEX IF NOT EXISTS idx_targets_agent_id ON targets (agent_id);
 
+        CREATE TABLE IF NOT EXISTS ftd100_clients (
+            accountid                   BIGINT          PRIMARY KEY,
+            accountstatus               VARCHAR(20),
+            client_qualification_date   TIMESTAMP,
+            assigned_to                 BIGINT,
+            ftd_100_date                TIMESTAMP,
+            ftd_100_amount              NUMERIC(18,2),
+            original_deposit_owner      BIGINT,
+            net_deposits_current        NUMERIC(18,2),
+            net_until_qualification     NUMERIC(18,2),
+            synced_at                   TIMESTAMP DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_ftd100_original_deposit_owner ON ftd100_clients (original_deposit_owner);
+        CREATE INDEX IF NOT EXISTS idx_ftd100_ftd_100_date           ON ftd100_clients (ftd_100_date);
+        CREATE INDEX IF NOT EXISTS idx_ftd100_accountstatus          ON ftd100_clients (accountstatus);
+
         CREATE TABLE IF NOT EXISTS users (
             id               VARCHAR(100) PRIMARY KEY,
             email            VARCHAR(255),
@@ -879,6 +895,145 @@ def fetch_sync_log(table_name: str, limit: int = 50) -> list:
                 }
                 for r in rows
             ]
+    finally:
+        conn.close()
+
+
+def truncate_and_insert_ftd100() -> int:
+    """Full refresh: TRUNCATE ftd100_clients then INSERT from CTE computed entirely within PostgreSQL."""
+    cte_sql = """
+        WITH ordered_tx AS (
+            SELECT
+                t.vtigeraccountid AS accountid,
+                t.confirmation_time,
+                t.original_deposit_owner,
+                a.assigned_to,
+                a.accountstatus,
+                a.client_qualification_date,
+                SUM(
+                    CASE
+                        WHEN t.transactiontype IN ('Deposit', 'Withdrawal Cancelled') THEN t.usdamount
+                        WHEN t.transactiontype IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
+                        ELSE 0
+                    END
+                ) OVER (
+                    PARTITION BY t.vtigeraccountid
+                    ORDER BY t.confirmation_time
+                    ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+                ) AS running_total,
+                ROW_NUMBER() OVER (
+                    PARTITION BY t.vtigeraccountid
+                    ORDER BY t.confirmation_time DESC
+                ) AS rn_desc
+            FROM transactions t
+            JOIN accounts a ON a.accountid = t.vtigeraccountid
+            WHERE t.transactionapproval = 'Approved'
+              AND t.transactiontype IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
+              AND (t.deleted = 0 OR t.deleted IS NULL)
+              AND a.is_test_account = 0
+        ),
+        agg AS (
+            SELECT
+                accountid,
+                MAX(CASE WHEN rn_desc = 1 THEN confirmation_time END) AS latest_time,
+                MAX(CASE WHEN rn_desc = 1 THEN running_total END)     AS latest_running_total,
+                MIN(CASE WHEN running_total >= 95 THEN confirmation_time END) AS ftd_time
+            FROM ordered_tx
+            GROUP BY accountid
+        ),
+        net_latest AS (
+            SELECT DISTINCT ON (o.accountid)
+                o.accountid,
+                o.confirmation_time      AS latest_tx_time,
+                o.running_total          AS net_deposits_current,
+                o.original_deposit_owner AS latest_original_deposit_owner
+            FROM ordered_tx o
+            JOIN agg a ON a.accountid = o.accountid AND a.latest_time = o.confirmation_time
+            ORDER BY o.accountid, o.confirmation_time DESC
+        ),
+        cutoff AS (
+            SELECT
+                acc.accountid, acc.accountstatus, acc.client_qualification_date,
+                acc.assigned_to, a.latest_running_total, a.ftd_time,
+                CASE
+                    WHEN acc.client_qualification_date IS NULL THEN NULL
+                    WHEN a.ftd_time IS NULL THEN acc.client_qualification_date
+                    ELSE GREATEST(acc.client_qualification_date, a.ftd_time)
+                END AS effective_cutoff_time
+            FROM accounts acc
+            JOIN agg a ON a.accountid = acc.accountid
+            WHERE acc.is_test_account = 0
+        ),
+        net_at_effective_cutoff AS (
+            SELECT accountid, confirmation_time AS cutoff_tx_time,
+                   running_total AS net_at_cutoff, original_deposit_owner
+            FROM (
+                SELECT o.accountid, o.confirmation_time, o.running_total, o.original_deposit_owner,
+                       ROW_NUMBER() OVER (PARTITION BY o.accountid ORDER BY o.confirmation_time DESC) AS rn
+                FROM ordered_tx o
+                JOIN cutoff c ON c.accountid = o.accountid
+                WHERE c.effective_cutoff_time IS NOT NULL
+                  AND o.confirmation_time <= c.effective_cutoff_time
+            ) x
+            WHERE rn = 1
+        )
+        INSERT INTO ftd100_clients (
+            accountid, accountstatus, client_qualification_date, assigned_to,
+            ftd_100_date, ftd_100_amount, original_deposit_owner,
+            net_deposits_current, net_until_qualification, synced_at
+        )
+        SELECT
+            c.accountid, c.accountstatus, c.client_qualification_date, c.assigned_to,
+            CASE WHEN c.accountstatus = 'Sales' THEN nl.latest_tx_time   ELSE ne.cutoff_tx_time  END AS ftd_100_date,
+            CASE WHEN c.accountstatus = 'Sales' THEN nl.net_deposits_current ELSE ne.net_at_cutoff END AS ftd_100_amount,
+            CASE WHEN c.accountstatus = 'Sales' THEN nl.latest_original_deposit_owner ELSE ne.original_deposit_owner END AS original_deposit_owner,
+            nl.net_deposits_current,
+            CASE
+                WHEN c.accountstatus = 'Sales' OR c.client_qualification_date IS NULL THEN nl.net_deposits_current
+                ELSE ne.net_at_cutoff
+            END AS net_until_qualification,
+            NOW()
+        FROM cutoff c
+        LEFT JOIN net_latest nl              ON nl.accountid = c.accountid
+        LEFT JOIN net_at_effective_cutoff ne ON ne.accountid = c.accountid
+        WHERE
+            (c.accountstatus = 'Sales'  AND nl.net_deposits_current >= 95)
+         OR (c.accountstatus <> 'Sales' AND ne.net_at_cutoff >= 95)
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("TRUNCATE TABLE ftd100_clients")
+            cur.execute(cte_sql)
+            rows = cur.rowcount
+        conn.commit()
+        return rows
+    finally:
+        conn.close()
+
+
+def fetch_ftd100_stats() -> dict:
+    sql = """
+        SELECT
+            COUNT(*)                                                    AS total_records,
+            MAX(synced_at)                                              AS last_synced_at,
+            COUNT(*) FILTER (WHERE accountstatus = 'Sales')            AS sales_count,
+            COUNT(*) FILTER (WHERE accountstatus <> 'Sales')           AS retention_count,
+            COALESCE(SUM(net_deposits_current), 0)                     AS total_net_deposits
+        FROM ftd100_clients
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+            row = cur.fetchone()
+            return {
+                "total_records":      row[0] or 0,
+                "last_synced_at":     row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else "Never",
+                "sales_count":        row[2] or 0,
+                "retention_count":    row[3] or 0,
+                "total_net_deposits": int(row[4] or 0),
+            }
     finally:
         conn.close()
 
