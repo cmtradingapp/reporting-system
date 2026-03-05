@@ -9,6 +9,28 @@ templates = Jinja2Templates(directory="app/templates")
 
 
 
+@router.get("/api/scoreboard/debug-offices")
+def scoreboard_debug_offices():
+    sql = """
+        SELECT office, office_name, COUNT(*) AS cnt
+        FROM crm_users
+        WHERE status = 'Active'
+          AND department_ = 'Sales'
+          AND team = 'Conversion'
+        GROUP BY office, office_name
+        ORDER BY cnt DESC
+        LIMIT 30
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+            rows = cur.fetchall()
+        return JSONResponse(content=[{"office": r[0], "office_name": r[1], "count": r[2]} for r in rows])
+    finally:
+        conn.close()
+
+
 @router.get("/scoreboard", response_class=HTMLResponse)
 def scoreboard_page(request: Request):
     return templates.TemplateResponse("scoreboard.html", {"request": request})
