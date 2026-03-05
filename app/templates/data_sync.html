@@ -217,20 +217,18 @@
   }
 
   async function runFullSync(tableKey) {
-    if (!confirm('This will pull ALL records with no time filter. It may take several minutes. Continue?')) return;
+    if (!confirm('This will pull ALL records with no time filter. It runs in the background — reload the page in a few minutes to see progress in the sync log. Continue?')) return;
     document.getElementById('spinner').classList.add('active');
-    document.querySelector('#spinner div div:last-child').textContent = 'Running full sync — this may take a few minutes...';
+    document.querySelector('#spinner div div:last-child').textContent = 'Starting full sync...';
     try {
       const urlMap = { 'crm_accounts': '/sync/accounts/full', 'crm_users': '/sync/users/full', 'transactions': '/sync/transactions/full', 'targets': '/sync/targets/full', 'dealio_mt4trades': '/sync/dealio-mt4trades/full', 'trading_accounts': '/sync/trading-accounts/full' };
       const url = urlMap[tableKey] || '/sync/accounts/full';
       const res = await fetch(url, { method: 'POST' });
       const data = await res.json();
       if (res.ok) {
-        const rows = (data.accounts_synced ?? data.rows_synced ?? 0).toLocaleString();
-        showToast(`Full sync complete — ${rows} rows upserted.`, 'success');
-        setTimeout(() => location.reload(), 1500);
+        showToast('Full sync started in background. Reload the page in a few minutes to check the sync log.', 'success');
       } else {
-        showToast('Full sync failed: ' + (data.detail || 'Unknown error'), 'error');
+        showToast('Full sync failed to start: ' + (data.detail || 'Unknown error'), 'error');
       }
     } catch (e) {
       showToast('Network error: ' + e.message, 'error');
