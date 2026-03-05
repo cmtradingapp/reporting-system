@@ -95,8 +95,13 @@
       padding: 9px 14px;
       border-top: 1px solid #30363d;
       border-bottom: 1px solid #21262d;
+      cursor: pointer;
+      user-select: none;
     }
+    .office-row:hover td { background-color: #161b22; }
     .office-total { font-size: 1rem; font-weight: 700; color: #c9d1d9; }
+    .chevron { transition: transform 0.2s; display: inline-block; color: #484f58; font-size: 0.7rem; margin-right: 8px; }
+    .chevron.open { transform: rotate(90deg); }
 
     /* Agent sub-row */
     .agent-row td { padding: 8px 14px 8px 36px; border-bottom: 1px solid #1a1f27; }
@@ -252,7 +257,6 @@
         <thead>
           <tr>
             <th>Office / Agent</th>
-            <th style="width:120px;">Department</th>
             <th class="text-end" style="min-width:80px;">FTC</th>
           </tr>
         </thead>
@@ -363,14 +367,14 @@
     const tbody = document.getElementById('table-body');
     tbody.innerHTML = '';
 
-    // Group rows by office, preserving server sort order (office by FTC desc, agents by FTC desc)
+    // Group by office
     const officeMap = new Map();
     filtered.forEach(r => {
       if (!officeMap.has(r.office_name)) officeMap.set(r.office_name, []);
       officeMap.get(r.office_name).push(r);
     });
 
-    // Sort offices by their total FTC descending
+    // Sort offices by total FTC desc
     const offices = [...officeMap.entries()].map(([name, agents]) => ({
       name,
       agents,
@@ -380,50 +384,64 @@
     let grandTotal = 0;
     let agentCount = 0;
 
-    offices.forEach(office => {
+    offices.forEach((office, oi) => {
       grandTotal += office.total;
+      const officeId = 'office-' + oi;
+      const ftcOffClass = office.total >= 50 ? 'ftc-high' : office.total >= 20 ? 'ftc-mid' : 'ftc-low';
 
-      // Office row
+      // Office row (collapsed by default)
       const offTr = document.createElement('tr');
       offTr.className = 'office-row';
-      const ftcOffClass = office.total >= 50 ? 'ftc-high' : office.total >= 20 ? 'ftc-mid' : 'ftc-low';
+      offTr.dataset.officeId = officeId;
       offTr.innerHTML = `
-        <td colspan="2"><i class="bi bi-building me-2" style="color:#484f58;font-size:0.75rem;"></i><strong>${escHtml(office.name)}</strong></td>
+        <td>
+          <span class="chevron">&#9654;</span>
+          <i class="bi bi-building me-2" style="color:#484f58;font-size:0.75rem;"></i>
+          <strong>${escHtml(office.name)}</strong>
+          <span class="text-muted ms-2" style="font-size:0.72rem;font-weight:400;">${office.agents.length} agents</span>
+        </td>
         <td class="text-end"><span class="office-total ${ftcOffClass}">${office.total.toLocaleString()}</span></td>
       `;
       tbody.appendChild(offTr);
 
-      // Agent sub-rows
+      // Agent sub-rows (hidden by default)
       office.agents.forEach(r => {
         agentCount++;
-        const deptClass = r.department === 'Sales' ? 'dept-sales' : r.department === 'Retention' ? 'dept-retention' : 'dept-other';
-        const deptLabel = r.department || '—';
-        const ftcClass  = r.ftc >= 10 ? 'ftc-high' : r.ftc >= 5 ? 'ftc-mid' : r.ftc >= 1 ? 'ftc-low' : 'ftc-zero';
-        const ftcHtml   = r.ftc > 0
+        const ftcClass = r.ftc >= 10 ? 'ftc-high' : r.ftc >= 5 ? 'ftc-mid' : r.ftc >= 1 ? 'ftc-low' : 'ftc-zero';
+        const ftcHtml  = r.ftc > 0
           ? `<span class="ftc-val ${ftcClass}">${r.ftc.toLocaleString()}</span>`
           : `<span style="color:#484f58;font-weight:600;">0</span>`;
 
         const tr = document.createElement('tr');
         tr.className = 'agent-row';
+        tr.dataset.parentOffice = officeId;
+        tr.style.display = 'none';
         tr.innerHTML = `
           <td>${escHtml(r.agent_name)}</td>
-          <td><span class="dept-badge ${deptClass}">${escHtml(deptLabel)}</span></td>
           <td class="text-end">${ftcHtml}</td>
         `;
         tbody.appendChild(tr);
+      });
+
+      // Click to expand/collapse
+      offTr.addEventListener('click', () => {
+        const chevron  = offTr.querySelector('.chevron');
+        const isOpen   = chevron.classList.contains('open');
+        const agentRows = tbody.querySelectorAll(`tr[data-parent-office="${officeId}"]`);
+        chevron.classList.toggle('open', !isOpen);
+        agentRows.forEach(r => r.style.display = isOpen ? 'none' : '');
       });
     });
 
     if (offices.length === 0) {
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td colspan="3" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No data for this period</td>`;
+      tr.innerHTML = `<td colspan="2" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No data for this period</td>`;
       tbody.appendChild(tr);
     } else {
-      // Grand total row
       const totalTr = document.createElement('tr');
       totalTr.className = 'total-row';
       totalTr.innerHTML = `
-        <td colspan="2">Total</td>
+        <td>Total</td>
         <td class="text-end"><span class="ftc-val ftc-high">${grandTotal.toLocaleString()}</span></td>
       `;
       tbody.appendChild(totalTr);
