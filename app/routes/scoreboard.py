@@ -50,6 +50,7 @@ def scoreboard_api(date_from: str, date_to: str):
         WHERE u.status = 'Active'
           AND u.department_ = 'Sales'
           AND u.team = 'Conversion'
+          AND u.agent_name NOT ILIKE 'test%'
         ORDER BY u.office_name NULLS LAST, COALESCE(ftc.cnt, 0) DESC, u.agent_name
     """
 
