@@ -7,7 +7,7 @@ CHUNK_SIZE = 50_000
 
 
 def _get_connection(streaming: bool = False):
-    return pymysql.connect(
+    kwargs = dict(
         host=MYSQL_HOST,
         port=MYSQL_PORT,
         user=MYSQL_USER,
@@ -16,8 +16,10 @@ def _get_connection(streaming: bool = False):
         connect_timeout=10,
         read_timeout=3600,
         ssl={"ssl": True},
-        cursorclass=pymysql.cursors.SSDictCursor if streaming else pymysql.cursors.DictCursor,
     )
+    if streaming:
+        kwargs["cursorclass"] = pymysql.cursors.SSDictCursor
+    return pymysql.connect(**kwargs)
 
 
 def get_operators() -> pd.DataFrame:
