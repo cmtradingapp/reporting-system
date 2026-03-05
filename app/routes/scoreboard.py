@@ -8,25 +8,6 @@ router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
 
-@router.get("/api/scoreboard/debug-teams")
-def scoreboard_debug():
-    sql = """
-        SELECT department, team, COUNT(*) AS cnt
-        FROM crm_users
-        WHERE status = 'Active'
-        GROUP BY department, team
-        ORDER BY cnt DESC
-        LIMIT 50
-    """
-    conn = get_connection()
-    try:
-        with conn.cursor() as cur:
-            cur.execute(sql)
-            rows = cur.fetchall()
-        return JSONResponse(content=[{"department": r[0], "team": r[1], "count": r[2]} for r in rows])
-    finally:
-        conn.close()
-
 
 @router.get("/scoreboard", response_class=HTMLResponse)
 def scoreboard_page(request: Request):
@@ -65,8 +46,7 @@ def scoreboard_api(date_from: str, date_to: str):
             GROUP BY t.original_deposit_owner
         ) ftc ON ftc.agent_id = u.id
         WHERE u.status = 'Active'
-          AND u.department = 'Sales'
-          AND u.team = 'Conversion'
+          AND u.team ILIKE '%conversion%'
         ORDER BY u.office_name NULLS LAST, COALESCE(ftc.cnt, 0) DESC, u.agent_name
     """
 
