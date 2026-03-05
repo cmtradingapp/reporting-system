@@ -96,6 +96,10 @@ def ensure_table():
         CREATE INDEX IF NOT EXISTS idx_accounts_modifiedtime
             ON accounts (modifiedtime);
 
+        ALTER TABLE accounts ALTER COLUMN gender            TYPE VARCHAR(100);
+        ALTER TABLE accounts ALTER COLUMN customer_language TYPE VARCHAR(100);
+        ALTER TABLE accounts ALTER COLUMN country_iso       TYPE VARCHAR(100);
+
         CREATE TABLE IF NOT EXISTS sync_log (
             id            SERIAL PRIMARY KEY,
             table_name    VARCHAR(100)  NOT NULL,
