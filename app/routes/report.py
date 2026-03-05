@@ -39,6 +39,6 @@ async def dashboard(request: Request):
 
 
 @router.post("/sync")
-async def sync_data():
+def sync_data():
     result = run_etl()
     return result

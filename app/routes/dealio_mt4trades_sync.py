@@ -6,7 +6,7 @@ router = APIRouter()
 
 
 @router.post("/sync/dealio-mt4trades")
-async def sync_dealio_mt4trades():
+def sync_dealio_mt4trades():
     try:
         result = run_dealio_mt4trades_etl()
         return JSONResponse(content=result)
@@ -15,7 +15,7 @@ async def sync_dealio_mt4trades():
 
 
 @router.post("/sync/dealio-mt4trades/full")
-async def sync_dealio_mt4trades_full():
+def sync_dealio_mt4trades_full():
     try:
         result = run_dealio_mt4trades_full_etl()
         return JSONResponse(content=result)

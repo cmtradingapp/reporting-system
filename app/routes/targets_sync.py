@@ -6,7 +6,7 @@ router = APIRouter()
 
 
 @router.post("/sync/targets")
-async def sync_targets():
+def sync_targets():
     try:
         result = run_targets_etl()
         return JSONResponse(content=result)
@@ -15,8 +15,7 @@ async def sync_targets():
 
 
 @router.post("/sync/targets/full")
-async def sync_targets_full():
-    """Same as incremental — full refresh since source has no timestamp column."""
+def sync_targets_full():
     try:
         result = run_targets_etl()
         return JSONResponse(content=result)
