@@ -295,6 +295,11 @@
             <th class="text-center" style="min-width:100px;" data-sort="ftd100RrTotal">FTD100 RR <i class="bi sort-icon" id="sort-icon-ftd100RrTotal"></i></th>
             <th class="text-center" style="min-width:105px;" data-sort="ftd100RrPctTotal">FTD100 RR % <i class="bi sort-icon" id="sort-icon-ftd100RrPctTotal"></i></th>
             <th class="text-center" style="min-width:120px;" data-sort="netDepositsTotal">Net Deposits <i class="bi sort-icon" id="sort-icon-netDepositsTotal"></i></th>
+            <th class="text-center" style="min-width:90px;"  data-sort="ftdCountTotal">FTD Count <i class="bi sort-icon" id="sort-icon-ftdCountTotal"></i></th>
+            <th class="text-center" style="min-width:110px;" data-sort="needOnTargetTotal">Need on Target <i class="bi sort-icon" id="sort-icon-needOnTargetTotal"></i></th>
+            <th class="text-center" style="min-width:110px;" data-sort="missingTo100Total">Missing to 100 <i class="bi sort-icon" id="sort-icon-missingTo100Total"></i></th>
+            <th class="text-center" style="min-width:115px;" data-sort="missingTo100RrTotal">Missing to 100 RR <i class="bi sort-icon" id="sort-icon-missingTo100RrTotal"></i></th>
+            <th class="text-center" style="min-width:110px;" data-sort="perWdTotal">Per Working Day <i class="bi sort-icon" id="sort-icon-perWdTotal"></i></th>
           </tr>
         </thead>
         <tbody id="table-body"></tbody>
@@ -384,7 +389,13 @@
         const ftc_rr_pct      = r.target_ftc > 0 ? Math.round(ftc_rr    / r.target_ftc * 100) : null;
         const ftd100_tgt_pct  = r.target_ftc > 0 ? Math.round(r.ftd100  / r.target_ftc * 100) : null;
         const ftd100_rr_pct   = r.target_ftc > 0 ? Math.round(ftd100_rr / r.target_ftc * 100) : null;
-        return { ...r, ftc_rr, ftc_tgt_pct, ftc_rr_pct, ftd100_rr, ftd100_tgt_pct, ftd100_rr_pct, net_deposits: r.net_deposits ?? 0 };
+        const need_on_target   = workingDays > 0 ? r.target_ftc * workingDaysPassed / workingDays : 0;
+        const missing_to_100   = r.target_ftc - r.ftc;
+        const missing_to_100rr = need_on_target - r.ftc;
+        const per_wd           = workingDaysLeft > 0 ? missing_to_100 / workingDaysLeft : 0;
+        return { ...r, ftc_rr, ftc_tgt_pct, ftc_rr_pct, ftd100_rr, ftd100_tgt_pct, ftd100_rr_pct,
+                 net_deposits: r.net_deposits ?? 0, ftd_count: r.ftd_count ?? 0,
+                 need_on_target, missing_to_100, missing_to_100rr, per_wd };
       });
       document.getElementById('stat-wd').textContent        = workingDays;
       document.getElementById('stat-wd-passed').textContent = workingDaysPassed;
@@ -443,7 +454,12 @@
       ftd100RrTotal:   agents.reduce((s, a) => s + a.ftd100_rr, 0),
       get ftd100TgtPctTotal() { return this.targetTotal > 0 ? Math.round(this.ftd100Total  / this.targetTotal * 100) : null; },
       get ftd100RrPctTotal()  { return this.targetTotal > 0 ? Math.round(this.ftd100RrTotal / this.targetTotal * 100) : null; },
-      netDepositsTotal: agents.reduce((s, a) => s + a.net_deposits, 0),
+      netDepositsTotal:    agents.reduce((s, a) => s + a.net_deposits,    0),
+      ftdCountTotal:       agents.reduce((s, a) => s + a.ftd_count,       0),
+      needOnTargetTotal:   agents.reduce((s, a) => s + a.need_on_target,  0),
+      missingTo100Total:   agents.reduce((s, a) => s + a.missing_to_100,  0),
+      missingTo100RrTotal: agents.reduce((s, a) => s + a.missing_to_100rr,0),
+      perWdTotal:          agents.reduce((s, a) => s + a.per_wd,          0),
     })).sort((a, b) => {
       const av = a[sortState.col] ?? 0;
       const bv = b[sortState.col] ?? 0;
@@ -456,7 +472,12 @@
     let grandFtcRrPct    = null;
     let grandFtd100      = 0;
     let grandFtd100Rr    = 0;
-    let grandNetDeposits = 0;
+    let grandNetDeposits   = 0;
+    let grandFtdCount      = 0;
+    let grandNeedOnTarget  = 0;
+    let grandMissing100    = 0;
+    let grandMissing100Rr  = 0;
+    let grandPerWd         = 0;
     let agentCount = 0;
 
     offices.forEach((office, oi) => {
@@ -465,7 +486,12 @@
       grandFtcRr       += office.ftcRrTotal;
       grandFtd100      += office.ftd100Total;
       grandFtd100Rr    += office.ftd100RrTotal;
-      grandNetDeposits += office.netDepositsTotal;
+      grandNetDeposits   += office.netDepositsTotal;
+      grandFtdCount      += office.ftdCountTotal;
+      grandNeedOnTarget  += office.needOnTargetTotal;
+      grandMissing100    += office.missingTo100Total;
+      grandMissing100Rr  += office.missingTo100RrTotal;
+      grandPerWd         += office.perWdTotal;
       const officeId = 'office-' + oi;
       // Office row (collapsed by default)
       const offTr = document.createElement('tr');
@@ -488,6 +514,11 @@
         <td class="text-center"><span class="office-total" style="color:#d29922;">${office.ftd100RrTotal.toLocaleString()}</span></td>
         <td class="text-center">${pctHtml(office.ftd100RrPctTotal, true)}</td>
         <td class="text-center">${netHtml(office.netDepositsTotal, true)}</td>
+        <td class="text-center"><span class="office-total" style="color:#388bfd;">${office.ftdCountTotal.toLocaleString()}</span></td>
+        <td class="text-center">${diffHtml(office.needOnTargetTotal, true)}</td>
+        <td class="text-center">${diffHtml(office.missingTo100Total, true)}</td>
+        <td class="text-center">${diffHtml(office.missingTo100RrTotal, true)}</td>
+        <td class="text-center">${perWdHtml(office.perWdTotal, true)}</td>
       `;
       tbody.appendChild(offTr);
 
@@ -498,6 +529,9 @@
         ftd100Total: 'ftd100', ftd100TgtPctTotal: 'ftd100_tgt_pct',
         ftd100RrTotal: 'ftd100_rr', ftd100RrPctTotal: 'ftd100_rr_pct',
         netDepositsTotal: 'net_deposits',
+        ftdCountTotal: 'ftd_count',
+        needOnTargetTotal: 'need_on_target', missingTo100Total: 'missing_to_100',
+        missingTo100RrTotal: 'missing_to_100rr', perWdTotal: 'per_wd',
       }[sortState.col] || 'ftc';
       const sortedAgents = [...office.agents].sort((a, b) => {
         const av = a[agentSortKey] ?? 0;
@@ -525,7 +559,12 @@
           ? `<span style="color:#d29922;font-weight:600;">${r.ftd100_rr.toLocaleString()}</span>`
           : `<span style="color:#484f58;">—</span>`;
         const f100RrPct    = pctHtml(r.ftd100_rr_pct);
-        const netDepHtml   = netHtml(r.net_deposits);
+        const netDepHtml      = netHtml(r.net_deposits);
+        const ftdCountHtml    = r.ftd_count > 0 ? `<span style="color:#388bfd;font-weight:600;">${r.ftd_count}</span>` : `<span style="color:#484f58;">—</span>`;
+        const needOnTgtHtml   = diffHtml(r.need_on_target);
+        const missing100Html  = diffHtml(r.missing_to_100);
+        const missing100RrHtml= diffHtml(r.missing_to_100rr);
+        const perWdAgentHtml  = perWdHtml(r.per_wd);
 
         const tr = document.createElement('tr');
         tr.className = 'agent-row';
@@ -543,6 +582,11 @@
           <td class="text-center">${f100RrHtml}</td>
           <td class="text-center">${f100RrPct}</td>
           <td class="text-center">${netDepHtml}</td>
+          <td class="text-center">${ftdCountHtml}</td>
+          <td class="text-center">${needOnTgtHtml}</td>
+          <td class="text-center">${missing100Html}</td>
+          <td class="text-center">${missing100RrHtml}</td>
+          <td class="text-center">${perWdAgentHtml}</td>
         `;
         tbody.appendChild(tr);
       });
@@ -559,7 +603,7 @@
 
     if (offices.length === 0) {
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td colspan="11" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No data for this period</td>`;
+      tr.innerHTML = `<td colspan="17" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No data for this period</td>`;
       tbody.appendChild(tr);
     } else {
       const totalTr = document.createElement('tr');
@@ -576,6 +620,11 @@
         <td class="text-center"><span style="color:#d29922;font-weight:700;">${grandFtd100Rr.toLocaleString()}</span></td>
         <td class="text-center">${pctHtml(grandTargetTotal > 0 ? Math.round(grandFtd100Rr / grandTargetTotal * 100) : null, true)}</td>
         <td class="text-center">${netHtml(grandNetDeposits, true)}</td>
+        <td class="text-center"><span style="color:#388bfd;font-weight:700;">${grandFtdCount.toLocaleString()}</span></td>
+        <td class="text-center">${diffHtml(grandNeedOnTarget, true)}</td>
+        <td class="text-center">${diffHtml(grandMissing100, true)}</td>
+        <td class="text-center">${diffHtml(grandMissing100Rr, true)}</td>
+        <td class="text-center">${perWdHtml(grandPerWd, true)}</td>
       `;
       tbody.appendChild(totalTr);
     }
@@ -595,6 +644,22 @@
       ? (val < 0 ? '-' : '') + '$' + Math.abs(val).toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})
       : (val < 0 ? '-$' : '$') + Math.abs(val).toFixed(2);
     return `<span style="color:${color};font-weight:${fw};">${fmt}</span>`;
+  }
+
+  function diffHtml(val, bold = false) {
+    if (val === null || val === undefined) return `<span style="color:#484f58;">—</span>`;
+    const rounded = Math.round(val);
+    if (rounded === 0) return `<span style="color:#3fb950;font-weight:${bold?700:600};">0</span>`;
+    const color = rounded <= 0 ? '#3fb950' : '#f85149';
+    const fw = bold ? '700' : '600';
+    return `<span style="color:${color};font-weight:${fw};">${rounded.toLocaleString()}</span>`;
+  }
+
+  function perWdHtml(val, bold = false) {
+    if (val === null || val === undefined) return `<span style="color:#484f58;">—</span>`;
+    const fw = bold ? '700' : '600';
+    const color = val <= 0 ? '#3fb950' : '#d29922';
+    return `<span style="color:${color};font-weight:${fw};">${val.toFixed(1)}</span>`;
   }
 
   function pctHtml(pct, bold = false) {

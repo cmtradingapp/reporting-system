@@ -49,7 +49,8 @@ def scoreboard_api(date_from: str, date_to: str):
             COALESCE(ftc.cnt, 0)                         AS ftc,
             COALESCE(tgt.target_ftc, 0)                  AS target_ftc,
             COALESCE(f100.ftd100_cnt, 0)                 AS ftd100,
-            COALESCE(net.net_usd, 0)::float              AS net_deposits
+            COALESCE(net.net_usd, 0)::float              AS net_deposits,
+            COALESCE(ftd_cnt.cnt, 0)                     AS ftd_count
         FROM crm_users u
         LEFT JOIN (
             SELECT
@@ -97,6 +98,19 @@ def scoreboard_api(date_from: str, date_to: str):
               AND t.confirmation_time <  %(date_to_excl)s
             GROUP BY t.original_deposit_owner
         ) net ON net.agent_id = u.id
+        LEFT JOIN (
+            SELECT
+                t.original_deposit_owner          AS agent_id,
+                COUNT(t.mttransactionsid)         AS cnt
+            FROM transactions t
+            WHERE t.transactionapproval = 'Approved'
+              AND (t.deleted = 0 OR t.deleted IS NULL)
+              AND t.transactiontype = 'Deposit'
+              AND t.ftd = 1
+              AND t.confirmation_time >= %(date_from)s
+              AND t.confirmation_time <  %(date_to_excl)s
+            GROUP BY t.original_deposit_owner
+        ) ftd_cnt ON ftd_cnt.agent_id = u.id
         WHERE u.status = 'Active'
           AND u.department_ = 'Sales'
           AND u.team = 'Conversion'
@@ -134,6 +148,7 @@ def scoreboard_api(date_from: str, date_to: str):
                 "target_ftc":   r[4],
                 "ftd100":       r[5],
                 "net_deposits": round(r[6], 2),
+                "ftd_count":    r[7],
             }
             for r in rows
         ]
@@ -143,6 +158,7 @@ def scoreboard_api(date_from: str, date_to: str):
             "total_target_ftc":     sum(r["target_ftc"] for r in data),
             "total_ftd100":         sum(r["ftd100"] for r in data),
             "total_net_deposits":   round(sum(r["net_deposits"] for r in data), 2),
+            "total_ftd_count":      sum(r["ftd_count"] for r in data),
             "working_days":         working_days,
             "working_days_passed":  working_days_passed,
             "working_days_left":    working_days_left,
