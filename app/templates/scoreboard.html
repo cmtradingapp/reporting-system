@@ -288,6 +288,7 @@
             <th class="text-center" style="min-width:100px;" data-sort="targetTotal">Target FTC <i class="bi sort-icon" id="sort-icon-targetTotal"></i></th>
             <th class="text-center" style="min-width:80px;" data-sort="total">FTC <i class="bi sort-icon" id="sort-icon-total"></i></th>
             <th class="text-center" style="min-width:90px;" data-sort="ftcRrTotal">FTC RR <i class="bi sort-icon" id="sort-icon-ftcRrTotal"></i></th>
+            <th class="text-center" style="min-width:90px;" data-sort="ftcRrPctTotal">FTC RR % <i class="bi sort-icon" id="sort-icon-ftcRrPctTotal"></i></th>
             <th class="text-center" style="min-width:90px;" data-sort="ftd100Total">FTD100 <i class="bi sort-icon" id="sort-icon-ftd100Total"></i></th>
           </tr>
         </thead>
@@ -371,10 +372,11 @@
       workingDaysPassed = data.working_days_passed;
       workingDaysLeft   = data.working_days_left;
       const safeWdPassed = workingDaysPassed > 0 ? workingDaysPassed : 1;
-      allRows = data.rows.map(r => ({
-        ...r,
-        ftc_rr: Math.floor(r.ftc / safeWdPassed * workingDays),
-      }));
+      allRows = data.rows.map(r => {
+        const ftc_rr = Math.floor(r.ftc / safeWdPassed * workingDays);
+        const ftc_rr_pct = r.target_ftc > 0 ? Math.round(ftc_rr / r.target_ftc * 100) : null;
+        return { ...r, ftc_rr, ftc_rr_pct };
+      });
       document.getElementById('stat-wd').textContent        = workingDays;
       document.getElementById('stat-wd-passed').textContent = workingDaysPassed;
       document.getElementById('stat-wd-left').textContent   = workingDaysLeft;
@@ -426,6 +428,7 @@
       total:       agents.reduce((s, a) => s + a.ftc, 0),
       targetTotal: agents.reduce((s, a) => s + a.target_ftc, 0),
       ftcRrTotal:  agents.reduce((s, a) => s + a.ftc_rr, 0),
+      get ftcRrPctTotal() { return this.targetTotal > 0 ? Math.round(this.ftcRrTotal / this.targetTotal * 100) : null; },
       ftd100Total: agents.reduce((s, a) => s + a.ftd100, 0),
     })).sort((a, b) => {
       const av = a[sortState.col] ?? 0;
@@ -436,6 +439,7 @@
     let grandTotal       = 0;
     let grandTargetTotal = 0;
     let grandFtcRr       = 0;
+    let grandFtcRrPct    = null;
     let grandFtd100      = 0;
     let agentCount = 0;
 
@@ -459,12 +463,13 @@
         <td class="text-center"><span class="office-total" style="color:#388bfd;">${office.targetTotal.toLocaleString()}</span></td>
         <td class="text-center"><span class="office-total" style="color:#388bfd;">${office.total.toLocaleString()}</span></td>
         <td class="text-center"><span class="office-total" style="color:#d29922;">${office.ftcRrTotal.toLocaleString()}</span></td>
+        <td class="text-center">${pctHtml(office.ftcRrPctTotal, true)}</td>
         <td class="text-center"><span class="office-total" style="color:#388bfd;">${office.ftd100Total.toLocaleString()}</span></td>
       `;
       tbody.appendChild(offTr);
 
       // Agent sub-rows (hidden by default, sorted by active column)
-      const agentSortKey = { total: 'ftc', targetTotal: 'target_ftc', ftcRrTotal: 'ftc_rr', ftd100Total: 'ftd100' }[sortState.col] || 'ftc';
+      const agentSortKey = { total: 'ftc', targetTotal: 'target_ftc', ftcRrTotal: 'ftc_rr', ftcRrPctTotal: 'ftc_rr_pct', ftd100Total: 'ftd100' }[sortState.col] || 'ftc';
       const sortedAgents = [...office.agents].sort((a, b) => {
         const av = a[agentSortKey] ?? 0;
         const bv = b[agentSortKey] ?? 0;
@@ -481,6 +486,7 @@
         const rrHtml   = r.ftc_rr > 0
           ? `<span style="color:#d29922;font-weight:600;">${r.ftc_rr.toLocaleString()}</span>`
           : `<span style="color:#484f58;">—</span>`;
+        const rrPctHtml = pctHtml(r.ftc_rr_pct);
         const f100Html = r.ftd100 > 0
           ? `<span style="color:#388bfd;font-weight:600;">${r.ftd100.toLocaleString()}</span>`
           : `<span style="color:#484f58;">—</span>`;
@@ -494,6 +500,7 @@
           <td class="text-center">${tgtHtml}</td>
           <td class="text-center">${ftcHtml}</td>
           <td class="text-center">${rrHtml}</td>
+          <td class="text-center">${rrPctHtml}</td>
           <td class="text-center">${f100Html}</td>
         `;
         tbody.appendChild(tr);
@@ -511,7 +518,7 @@
 
     if (offices.length === 0) {
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td colspan="5" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No data for this period</td>`;
+      tr.innerHTML = `<td colspan="6" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No data for this period</td>`;
       tbody.appendChild(tr);
     } else {
       const totalTr = document.createElement('tr');
@@ -521,6 +528,7 @@
         <td class="text-center"><span style="color:#388bfd;font-weight:700;">${grandTargetTotal.toLocaleString()}</span></td>
         <td class="text-center"><span style="color:#388bfd;font-weight:700;">${grandTotal.toLocaleString()}</span></td>
         <td class="text-center"><span style="color:#d29922;font-weight:700;">${grandFtcRr.toLocaleString()}</span></td>
+        <td class="text-center">${pctHtml(grandTargetTotal > 0 ? Math.round(grandFtcRr / grandTargetTotal * 100) : null, true)}</td>
         <td class="text-center"><span style="color:#388bfd;font-weight:700;">${grandFtd100.toLocaleString()}</span></td>
       `;
       tbody.appendChild(totalTr);
@@ -531,6 +539,13 @@
 
   function escHtml(str) {
     return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function pctHtml(pct, bold = false) {
+    if (pct === null || pct === undefined) return `<span style="color:#484f58;">—</span>`;
+    const color = pct >= 100 ? '#3fb950' : pct >= 75 ? '#d29922' : '#f85149';
+    const fw = bold ? '700' : '600';
+    return `<span style="color:${color};font-weight:${fw};">${pct}%</span>`;
   }
 
   // ── Event: year buttons ────────────────────────────────────────────────
