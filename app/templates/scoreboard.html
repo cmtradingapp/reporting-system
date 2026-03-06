@@ -290,6 +290,9 @@
             <th class="text-center" style="min-width:90px;" data-sort="ftcRrTotal">FTC RR <i class="bi sort-icon" id="sort-icon-ftcRrTotal"></i></th>
             <th class="text-center" style="min-width:90px;" data-sort="ftcRrPctTotal">FTC RR % <i class="bi sort-icon" id="sort-icon-ftcRrPctTotal"></i></th>
             <th class="text-center" style="min-width:90px;" data-sort="ftd100Total">FTD100 <i class="bi sort-icon" id="sort-icon-ftd100Total"></i></th>
+            <th class="text-center" style="min-width:105px;" data-sort="ftd100TgtPctTotal">Target FTD100 % <i class="bi sort-icon" id="sort-icon-ftd100TgtPctTotal"></i></th>
+            <th class="text-center" style="min-width:100px;" data-sort="ftd100RrTotal">FTD100 RR <i class="bi sort-icon" id="sort-icon-ftd100RrTotal"></i></th>
+            <th class="text-center" style="min-width:105px;" data-sort="ftd100RrPctTotal">FTD100 RR % <i class="bi sort-icon" id="sort-icon-ftd100RrPctTotal"></i></th>
           </tr>
         </thead>
         <tbody id="table-body"></tbody>
@@ -373,9 +376,12 @@
       workingDaysLeft   = data.working_days_left;
       const safeWdPassed = workingDaysPassed > 0 ? workingDaysPassed : 1;
       allRows = data.rows.map(r => {
-        const ftc_rr = Math.floor(r.ftc / safeWdPassed * workingDays);
-        const ftc_rr_pct = r.target_ftc > 0 ? Math.round(ftc_rr / r.target_ftc * 100) : null;
-        return { ...r, ftc_rr, ftc_rr_pct };
+        const ftc_rr          = Math.floor(r.ftc   / safeWdPassed * workingDays);
+        const ftd100_rr       = Math.floor(r.ftd100 / safeWdPassed * workingDays);
+        const ftc_rr_pct      = r.target_ftc > 0 ? Math.round(ftc_rr    / r.target_ftc * 100) : null;
+        const ftd100_tgt_pct  = r.target_ftc > 0 ? Math.round(r.ftd100  / r.target_ftc * 100) : null;
+        const ftd100_rr_pct   = r.target_ftc > 0 ? Math.round(ftd100_rr / r.target_ftc * 100) : null;
+        return { ...r, ftc_rr, ftc_rr_pct, ftd100_rr, ftd100_tgt_pct, ftd100_rr_pct };
       });
       document.getElementById('stat-wd').textContent        = workingDays;
       document.getElementById('stat-wd-passed').textContent = workingDaysPassed;
@@ -429,7 +435,10 @@
       targetTotal: agents.reduce((s, a) => s + a.target_ftc, 0),
       ftcRrTotal:  agents.reduce((s, a) => s + a.ftc_rr, 0),
       get ftcRrPctTotal() { return this.targetTotal > 0 ? Math.round(this.ftcRrTotal / this.targetTotal * 100) : null; },
-      ftd100Total: agents.reduce((s, a) => s + a.ftd100, 0),
+      ftd100Total:     agents.reduce((s, a) => s + a.ftd100,    0),
+      ftd100RrTotal:   agents.reduce((s, a) => s + a.ftd100_rr, 0),
+      get ftd100TgtPctTotal() { return this.targetTotal > 0 ? Math.round(this.ftd100Total  / this.targetTotal * 100) : null; },
+      get ftd100RrPctTotal()  { return this.targetTotal > 0 ? Math.round(this.ftd100RrTotal / this.targetTotal * 100) : null; },
     })).sort((a, b) => {
       const av = a[sortState.col] ?? 0;
       const bv = b[sortState.col] ?? 0;
@@ -441,6 +450,7 @@
     let grandFtcRr       = 0;
     let grandFtcRrPct    = null;
     let grandFtd100      = 0;
+    let grandFtd100Rr    = 0;
     let agentCount = 0;
 
     offices.forEach((office, oi) => {
@@ -448,6 +458,7 @@
       grandTargetTotal += office.targetTotal;
       grandFtcRr       += office.ftcRrTotal;
       grandFtd100      += office.ftd100Total;
+      grandFtd100Rr    += office.ftd100RrTotal;
       const officeId = 'office-' + oi;
       // Office row (collapsed by default)
       const offTr = document.createElement('tr');
@@ -465,11 +476,19 @@
         <td class="text-center"><span class="office-total" style="color:#d29922;">${office.ftcRrTotal.toLocaleString()}</span></td>
         <td class="text-center">${pctHtml(office.ftcRrPctTotal, true)}</td>
         <td class="text-center"><span class="office-total" style="color:#388bfd;">${office.ftd100Total.toLocaleString()}</span></td>
+        <td class="text-center">${pctHtml(office.ftd100TgtPctTotal, true)}</td>
+        <td class="text-center"><span class="office-total" style="color:#d29922;">${office.ftd100RrTotal.toLocaleString()}</span></td>
+        <td class="text-center">${pctHtml(office.ftd100RrPctTotal, true)}</td>
       `;
       tbody.appendChild(offTr);
 
       // Agent sub-rows (hidden by default, sorted by active column)
-      const agentSortKey = { total: 'ftc', targetTotal: 'target_ftc', ftcRrTotal: 'ftc_rr', ftcRrPctTotal: 'ftc_rr_pct', ftd100Total: 'ftd100' }[sortState.col] || 'ftc';
+      const agentSortKey = {
+        total: 'ftc', targetTotal: 'target_ftc',
+        ftcRrTotal: 'ftc_rr', ftcRrPctTotal: 'ftc_rr_pct',
+        ftd100Total: 'ftd100', ftd100TgtPctTotal: 'ftd100_tgt_pct',
+        ftd100RrTotal: 'ftd100_rr', ftd100RrPctTotal: 'ftd100_rr_pct',
+      }[sortState.col] || 'ftc';
       const sortedAgents = [...office.agents].sort((a, b) => {
         const av = a[agentSortKey] ?? 0;
         const bv = b[agentSortKey] ?? 0;
@@ -487,9 +506,14 @@
           ? `<span style="color:#d29922;font-weight:600;">${r.ftc_rr.toLocaleString()}</span>`
           : `<span style="color:#484f58;">—</span>`;
         const rrPctHtml = pctHtml(r.ftc_rr_pct);
-        const f100Html = r.ftd100 > 0
+        const f100Html     = r.ftd100 > 0
           ? `<span style="color:#388bfd;font-weight:600;">${r.ftd100.toLocaleString()}</span>`
           : `<span style="color:#484f58;">—</span>`;
+        const f100TgtPct   = pctHtml(r.ftd100_tgt_pct);
+        const f100RrHtml   = r.ftd100_rr > 0
+          ? `<span style="color:#d29922;font-weight:600;">${r.ftd100_rr.toLocaleString()}</span>`
+          : `<span style="color:#484f58;">—</span>`;
+        const f100RrPct    = pctHtml(r.ftd100_rr_pct);
 
         const tr = document.createElement('tr');
         tr.className = 'agent-row';
@@ -502,6 +526,9 @@
           <td class="text-center">${rrHtml}</td>
           <td class="text-center">${rrPctHtml}</td>
           <td class="text-center">${f100Html}</td>
+          <td class="text-center">${f100TgtPct}</td>
+          <td class="text-center">${f100RrHtml}</td>
+          <td class="text-center">${f100RrPct}</td>
         `;
         tbody.appendChild(tr);
       });
@@ -518,7 +545,7 @@
 
     if (offices.length === 0) {
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td colspan="6" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No data for this period</td>`;
+      tr.innerHTML = `<td colspan="9" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No data for this period</td>`;
       tbody.appendChild(tr);
     } else {
       const totalTr = document.createElement('tr');
@@ -530,6 +557,9 @@
         <td class="text-center"><span style="color:#d29922;font-weight:700;">${grandFtcRr.toLocaleString()}</span></td>
         <td class="text-center">${pctHtml(grandTargetTotal > 0 ? Math.round(grandFtcRr / grandTargetTotal * 100) : null, true)}</td>
         <td class="text-center"><span style="color:#388bfd;font-weight:700;">${grandFtd100.toLocaleString()}</span></td>
+        <td class="text-center">${pctHtml(grandTargetTotal > 0 ? Math.round(grandFtd100   / grandTargetTotal * 100) : null, true)}</td>
+        <td class="text-center"><span style="color:#d29922;font-weight:700;">${grandFtd100Rr.toLocaleString()}</span></td>
+        <td class="text-center">${pctHtml(grandTargetTotal > 0 ? Math.round(grandFtd100Rr / grandTargetTotal * 100) : null, true)}</td>
       `;
       tbody.appendChild(totalTr);
     }
