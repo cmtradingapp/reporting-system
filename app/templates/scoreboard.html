@@ -81,6 +81,11 @@
       border-bottom: 1px solid #30363d;
       white-space: nowrap;
     }
+    .scoreboard-table th[data-sort] { cursor: pointer; user-select: none; }
+    .scoreboard-table th[data-sort]:hover { color: #c9d1d9; }
+    .scoreboard-table th[data-sort].sort-active { color: #388bfd; }
+    .sort-icon { margin-left: 4px; font-size: 0.7rem; opacity: 0.4; }
+    th[data-sort].sort-active .sort-icon { opacity: 1; }
     .scoreboard-table td { padding: 9px 14px; border-bottom: 1px solid #21262d; font-size: 0.88rem; vertical-align: middle; }
     .scoreboard-table td { color: #e0e0e0; }
     .scoreboard-table tr.agent-row:hover td { background-color: #1c2128; }
@@ -257,8 +262,8 @@
         <thead>
           <tr>
             <th>Office / Agent</th>
-            <th class="text-end" style="min-width:100px;">Target FTC</th>
-            <th class="text-end" style="min-width:80px;">FTC</th>
+            <th class="text-end" style="min-width:100px;" data-sort="targetTotal">Target FTC <i class="bi sort-icon" id="sort-icon-targetTotal"></i></th>
+            <th class="text-end" style="min-width:80px;" data-sort="total">FTC <i class="bi sort-icon" id="sort-icon-total"></i></th>
           </tr>
         </thead>
         <tbody id="table-body"></tbody>
@@ -279,6 +284,7 @@
     dateTo: '',
   };
   let allRows = [];
+  let sortState = { col: 'total', dir: 'desc' };
 
   // ── Helpers ────────────────────────────────────────────────────────────
   function pad(n) { return String(n).padStart(2, '0'); }
@@ -375,13 +381,17 @@
       officeMap.get(r.office_name).push(r);
     });
 
-    // Sort offices by total FTC desc
+    // Sort offices by selected column
     const offices = [...officeMap.entries()].map(([name, agents]) => ({
       name,
       agents,
       total:       agents.reduce((s, a) => s + a.ftc, 0),
       targetTotal: agents.reduce((s, a) => s + a.target_ftc, 0),
-    })).sort((a, b) => b.total - a.total);
+    })).sort((a, b) => {
+      const av = a[sortState.col] ?? 0;
+      const bv = b[sortState.col] ?? 0;
+      return sortState.dir === 'desc' ? bv - av : av - bv;
+    });
 
     let grandTotal       = 0;
     let grandTargetTotal = 0;
@@ -505,6 +515,35 @@
     if (allRows.length) renderTable();
   });
 
+  // ── Sort icons ─────────────────────────────────────────────────────────
+  function updateSortIcons() {
+    document.querySelectorAll('th[data-sort]').forEach(th => {
+      const col  = th.dataset.sort;
+      const icon = document.getElementById('sort-icon-' + col);
+      th.classList.toggle('sort-active', col === sortState.col);
+      if (icon) {
+        icon.className = 'bi sort-icon ' + (col !== sortState.col
+          ? 'bi-arrow-down-up'
+          : sortState.dir === 'desc' ? 'bi-sort-down' : 'bi-sort-up');
+      }
+    });
+  }
+
+  // ── Event: column sort ─────────────────────────────────────────────────
+  document.querySelectorAll('th[data-sort]').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.sort;
+      if (sortState.col === col) {
+        sortState.dir = sortState.dir === 'desc' ? 'asc' : 'desc';
+      } else {
+        sortState.col = col;
+        sortState.dir = 'desc';
+      }
+      updateSortIcons();
+      if (allRows.length) renderTable();
+    });
+  });
+
   // ── Event: date-from manual change → clear month/year highlight ────────
   document.getElementById('date-from').addEventListener('change', () => {
     // Try to sync year/month highlight from the new date
@@ -524,6 +563,7 @@
   activateYear(state.year);
   activateMonth(state.month);
   setQuickActive('btn-today');
+  updateSortIcons();
   loadData();
 </script>
 
