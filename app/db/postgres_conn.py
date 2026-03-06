@@ -369,6 +369,24 @@ def ensure_table():
             description   VARCHAR(255),
             CONSTRAINT pk_public_holidays PRIMARY KEY (holiday_date)
         );
+
+        INSERT INTO public_holidays (holiday_date, description) VALUES
+            ('2024-01-01', 'New Year''s Day'),
+            ('2024-12-24', 'Christmas Eve'),
+            ('2024-12-25', 'Christmas Day'),
+            ('2024-12-26', 'Boxing Day'),
+            ('2024-12-31', 'New Year''s Eve'),
+            ('2025-01-01', 'New Year''s Day'),
+            ('2025-12-24', 'Christmas Eve'),
+            ('2025-12-25', 'Christmas Day'),
+            ('2025-12-26', 'Boxing Day'),
+            ('2025-12-31', 'New Year''s Eve'),
+            ('2026-01-01', 'New Year''s Day'),
+            ('2026-12-24', 'Christmas Eve'),
+            ('2026-12-25', 'Christmas Day'),
+            ('2026-12-26', 'Boxing Day'),
+            ('2026-12-31', 'New Year''s Eve')
+        ON CONFLICT (holiday_date) DO NOTHING;
     """
     conn = get_connection()
     try:
