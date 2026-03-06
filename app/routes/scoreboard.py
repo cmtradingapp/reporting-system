@@ -266,6 +266,7 @@ def scoreboard_retention_api(date_from: str, date_to: str):
             WHERE t.transactionapproval = 'Approved' AND (t.deleted = 0 OR t.deleted IS NULL)
               AND t.transactiontype IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
               AND t.confirmation_time >= %(date_from)s AND t.confirmation_time < %(date_to_excl)s
+              AND COALESCE(t.comment, '') NOT ILIKE '%%bonus%%'
             GROUP BY a.assigned_to
         ) net ON net.agent_id = u.id
         LEFT JOIN (
@@ -274,6 +275,7 @@ def scoreboard_retention_api(date_from: str, date_to: str):
             WHERE t.transactionapproval = 'Approved' AND (t.deleted = 0 OR t.deleted IS NULL)
               AND t.transactiontype IN ('Deposit','Withdrawal Cancelled')
               AND t.confirmation_time >= %(date_from)s AND t.confirmation_time < %(date_to_excl)s
+              AND COALESCE(t.comment, '') NOT ILIKE '%%bonus%%'
             GROUP BY a.assigned_to
         ) dep ON dep.agent_id = u.id
         LEFT JOIN (
