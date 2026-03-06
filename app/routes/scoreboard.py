@@ -49,12 +49,12 @@ def scoreboard_api(date_from: str, date_to: str):
             GROUP BY t.original_deposit_owner
         ) ftc ON ftc.agent_id = u.id
         LEFT JOIN (
-            SELECT agent_id, SUM(ftc) AS target_ftc
+            SELECT agent_id::bigint, SUM(ftc)::int AS target_ftc
             FROM targets
             WHERE date >= %(date_from)s
               AND date <  %(date_to_excl)s
             GROUP BY agent_id
-        ) tgt ON tgt.agent_id = u.id::text
+        ) tgt ON tgt.agent_id = u.id
         WHERE u.status = 'Active'
           AND u.department_ = 'Sales'
           AND u.team = 'Conversion'
