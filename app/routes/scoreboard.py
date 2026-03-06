@@ -84,19 +84,18 @@ def scoreboard_api(date_from: str, date_to: str):
         ) f100 ON f100.agent_id = u.id
         LEFT JOIN (
             SELECT
-                a.assigned_to                                    AS agent_id,
+                t.original_deposit_owner                         AS agent_id,
                 SUM(CASE
                     WHEN t.transactiontype IN ('Deposit', 'Withdrawal Cancelled') THEN  t.usdamount
                     WHEN t.transactiontype IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
                 END)                                             AS net_usd
             FROM transactions t
-            JOIN accounts a ON a.accountid = t.vtigeraccountid
             WHERE t.transactionapproval = 'Approved'
               AND (t.deleted = 0 OR t.deleted IS NULL)
               AND t.transactiontype IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
               AND t.confirmation_time >= %(date_from)s
               AND t.confirmation_time <  %(date_to_excl)s
-            GROUP BY a.assigned_to
+            GROUP BY t.original_deposit_owner
         ) net ON net.agent_id = u.id
         WHERE u.status = 'Active'
           AND u.department_ = 'Sales'
