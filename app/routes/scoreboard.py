@@ -48,7 +48,8 @@ def scoreboard_api(date_from: str, date_to: str):
             COALESCE(u.department_, '')                  AS department_,
             COALESCE(ftc.cnt, 0)                         AS ftc,
             COALESCE(tgt.target_ftc, 0)                  AS target_ftc,
-            COALESCE(f100.ftd100_cnt, 0)                 AS ftd100
+            COALESCE(f100.ftd100_cnt, 0)                 AS ftd100,
+            COALESCE(net.net_usd, 0)::float              AS net_deposits
         FROM crm_users u
         LEFT JOIN (
             SELECT
@@ -81,6 +82,22 @@ def scoreboard_api(date_from: str, date_to: str):
               AND f.ftd_100_date <  %(date_to_excl)s
             GROUP BY f.original_deposit_owner
         ) f100 ON f100.agent_id = u.id
+        LEFT JOIN (
+            SELECT
+                a.assigned_to                                    AS agent_id,
+                SUM(CASE
+                    WHEN t.transactiontype IN ('Deposit', 'Withdrawal Cancelled') THEN  t.usdamount
+                    WHEN t.transactiontype IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
+                END)                                             AS net_usd
+            FROM transactions t
+            JOIN accounts a ON a.accountid = t.vtigeraccountid
+            WHERE t.transactionapproval = 'Approved'
+              AND (t.deleted = 0 OR t.deleted IS NULL)
+              AND t.transactiontype IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
+              AND t.confirmation_time >= %(date_from)s
+              AND t.confirmation_time <  %(date_to_excl)s
+            GROUP BY a.assigned_to
+        ) net ON net.agent_id = u.id
         WHERE u.status = 'Active'
           AND u.department_ = 'Sales'
           AND u.team = 'Conversion'
@@ -114,9 +131,10 @@ def scoreboard_api(date_from: str, date_to: str):
                 "office_name": r[0],
                 "agent_name":  r[1],
                 "department":  r[2],
-                "ftc":         r[3],
-                "target_ftc":  r[4],
-                "ftd100":      r[5],
+                "ftc":          r[3],
+                "target_ftc":   r[4],
+                "ftd100":       r[5],
+                "net_deposits": round(r[6], 2),
             }
             for r in rows
         ]
@@ -125,6 +143,7 @@ def scoreboard_api(date_from: str, date_to: str):
             "total_ftc":            sum(r["ftc"] for r in data),
             "total_target_ftc":     sum(r["target_ftc"] for r in data),
             "total_ftd100":         sum(r["ftd100"] for r in data),
+            "total_net_deposits":   round(sum(r["net_deposits"] for r in data), 2),
             "working_days":         working_days,
             "working_days_passed":  working_days_passed,
             "working_days_left":    working_days_left,
