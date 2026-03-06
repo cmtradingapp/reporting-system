@@ -379,7 +379,7 @@ def ensure_table():
             from datetime import date
             current_year = date.today().year
             holiday_rows = []
-            for y in range(2024, current_year + 6):
+            for y in range(2024, current_year + 11):
                 holiday_rows += [
                     (f"{y}-01-01", "New Year's Day"),
                     (f"{y}-12-24", "Christmas Eve"),
