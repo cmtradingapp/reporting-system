@@ -244,7 +244,7 @@ def scoreboard_retention_api(date_from: str, date_to: str):
     sql = """
         SELECT
             COALESCE(u.office_name, 'N/A')                   AS office_name,
-            COALESCE(u.department_, 'N/A')                    AS dept_name,
+            COALESCE(u.department, 'N/A')                     AS dept_name,
             COALESCE(u.agent_name, u.full_name, 'N/A')        AS agent_name,
             COALESCE(tgt.monthly_target_net, 0)::float        AS target_net,
             COALESCE(net.net_usd, 0)::float                   AS net_usd,
