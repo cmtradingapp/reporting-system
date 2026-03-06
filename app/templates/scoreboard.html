@@ -543,7 +543,7 @@
 
   function pctHtml(pct, bold = false) {
     if (pct === null || pct === undefined) return `<span style="color:#484f58;">—</span>`;
-    const color = pct >= 100 ? '#3fb950' : pct >= 75 ? '#d29922' : '#f85149';
+    const color = pct > 50 ? '#3fb950' : '#f85149';
     const fw = bold ? '700' : '600';
     return `<span style="color:${color};font-weight:${fw};">${pct}%</span>`;
   }
