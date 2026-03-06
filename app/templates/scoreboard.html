@@ -892,8 +892,7 @@
       const safe_wdp  = Math.max(wd_passed, 1);
 
       retAllRows = data.rows.map(r => {
-        const is_full_month       = wd_passed >= wd;
-        const target_net_prorated = is_full_month ? r.target_net : (wd > 0 ? Math.ceil(r.target_net / wd) * safe_wdp : 0);
+        const target_net_prorated = r.target_net;
         const net_rr              = r.net_usd > 0 ? Math.floor(r.net_usd / safe_wdp * wd) : r.net_usd;
         const net_rr_pct          = r.target_net > 0 ? net_rr / r.target_net : null;
         const need_on_target      = wd > 0 ? r.target_net * (wd_passed / wd) : 0;
@@ -993,7 +992,7 @@
           <strong>${escHtml(officeName)}</strong>
           <span class="text-muted ms-2" style="font-size:0.72rem;font-weight:400;">${officeAgents.length} agents</span>
         </td>
-        <td class="text-center"><span class="office-total" style="color:#388bfd;">${netHtml(offTgtPro, true)}</span></td>
+        <td class="text-center"><span class="office-total" style="color:#388bfd;">${netHtml(offTgtNet, true)}</span></td>
         <td class="text-center">${retPctHtml(offNetRrPct, true)}</td>
         <td class="text-center">${netDiffHtml(offMiss100Rr, true)}</td>
         <td class="text-center">${netHtml(offDepUsd, true)}</td>
@@ -1044,7 +1043,7 @@
             ${escHtml(deptName)}
             <span class="text-muted ms-2" style="font-size:0.68rem;font-weight:400;">${agents.length} agents</span>
           </td>
-          <td class="text-center">${netHtml(dTgtPro)}</td>
+          <td class="text-center">${netHtml(dTgtNet)}</td>
           <td class="text-center">${retPctHtml(dNetRrPct)}</td>
           <td class="text-center">${netDiffHtml(dMiss100Rr)}</td>
           <td class="text-center">${netHtml(dDepUsd)}</td>
@@ -1143,7 +1142,7 @@
       totalTr.className = 'total-row';
       totalTr.innerHTML = `
         <td>Total</td>
-        <td class="text-center">${netHtml(gTgtPro, true)}</td>
+        <td class="text-center">${netHtml(gTargetNet, true)}</td>
         <td class="text-center">${retPctHtml(gNetRrPct, true)}</td>
         <td class="text-center">${netDiffHtml(gMiss100Rr, true)}</td>
         <td class="text-center">${netHtml(gDepositUsd, true)}</td>
