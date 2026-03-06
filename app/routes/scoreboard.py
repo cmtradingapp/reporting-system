@@ -161,7 +161,7 @@ def scoreboard_api(date_from: str, date_to: str):
                   AND t.transactiontype IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
                   AND t.confirmation_time >= %(date_from)s
                   AND t.confirmation_time <  %(date_to_excl)s
-                  AND EXTRACT(YEAR FROM t.confirmation_time) > 2024
+                  AND EXTRACT(YEAR FROM t.confirmation_time) >= 2024
                   AND t.vtigeraccountid IS NOT NULL
                   AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
             """, {"date_from": date_from, "date_to_excl": date_to_exclusive})
@@ -176,7 +176,7 @@ def scoreboard_api(date_from: str, date_to: str):
                 LEFT JOIN crm_users u    ON u.id = a.assigned_to
                 WHERE d.open_time::date >= %(date_from)s
                   AND d.open_time::date <= %(date_to)s
-                  AND EXTRACT(YEAR FROM d.open_time) > 2024
+                  AND EXTRACT(YEAR FROM d.open_time) >= 2024
                   AND ta.vtigeraccountid IS NOT NULL
                   AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
             """, {"date_from": date_from, "date_to": date_to})
