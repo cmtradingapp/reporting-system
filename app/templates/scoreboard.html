@@ -417,8 +417,14 @@
       `;
       tbody.appendChild(offTr);
 
-      // Agent sub-rows (hidden by default)
-      office.agents.forEach(r => {
+      // Agent sub-rows (hidden by default, sorted by active column)
+      const agentSortKey = { total: 'ftc', targetTotal: 'target_ftc' }[sortState.col] || 'ftc';
+      const sortedAgents = [...office.agents].sort((a, b) => {
+        const av = a[agentSortKey] ?? 0;
+        const bv = b[agentSortKey] ?? 0;
+        return sortState.dir === 'desc' ? bv - av : av - bv;
+      });
+      sortedAgents.forEach(r => {
         agentCount++;
         const ftcHtml  = r.ftc > 0
           ? `<span style="color:#388bfd;font-weight:600;">${r.ftc.toLocaleString()}</span>`
