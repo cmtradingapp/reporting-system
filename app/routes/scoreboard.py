@@ -290,7 +290,6 @@ def scoreboard_retention_api(date_from: str, date_to: str):
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'
-          AND TRIM(COALESCE(u.department, '')) != ''
           AND TRIM(COALESCE(u.department, '')) NOT ILIKE '%%Retention%%'
           AND TRIM(COALESCE(u.department, '')) NOT ILIKE '%%Conversion%%'
           AND TRIM(COALESCE(u.department, '')) NOT ILIKE '%%Support%%'
