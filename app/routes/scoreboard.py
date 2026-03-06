@@ -2,7 +2,20 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from app.db.postgres_conn import get_connection
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date as date_type
+
+
+def count_working_days(start: date_type, end: date_type) -> int:
+    """Count Mon–Fri days between start and end (inclusive)."""
+    if end < start:
+        return 0
+    count = 0
+    current = start
+    while current <= end:
+        if current.weekday() < 5:
+            count += 1
+        current += timedelta(days=1)
+    return count
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -19,11 +32,15 @@ def scoreboard_page(request: Request):
 @router.get("/api/scoreboard")
 def scoreboard_api(date_from: str, date_to: str):
     try:
-        date_to_exclusive = (
-            datetime.strptime(date_to, "%Y-%m-%d") + timedelta(days=1)
-        ).strftime("%Y-%m-%d")
+        dt_from = datetime.strptime(date_from, "%Y-%m-%d").date()
+        dt_to   = datetime.strptime(date_to,   "%Y-%m-%d").date()
+        date_to_exclusive = (dt_to + timedelta(days=1)).strftime("%Y-%m-%d")
     except ValueError:
         return JSONResponse(status_code=400, content={"detail": "Invalid date format"})
+
+    today = datetime.utcnow().date()
+    working_days        = count_working_days(dt_from, dt_to)
+    working_days_passed = count_working_days(dt_from, min(dt_to, today))
 
     sql = """
         SELECT
@@ -90,12 +107,14 @@ def scoreboard_api(date_from: str, date_to: str):
             for r in rows
         ]
         return JSONResponse(content={
-            "rows":             data,
-            "total_ftc":        sum(r["ftc"] for r in data),
-            "total_target_ftc": sum(r["target_ftc"] for r in data),
-            "total_ftd100":     sum(r["ftd100"] for r in data),
-            "date_from":        date_from,
-            "date_to":          date_to,
+            "rows":                 data,
+            "total_ftc":            sum(r["ftc"] for r in data),
+            "total_target_ftc":     sum(r["target_ftc"] for r in data),
+            "total_ftd100":         sum(r["ftd100"] for r in data),
+            "working_days":         working_days,
+            "working_days_passed":  working_days_passed,
+            "date_from":            date_from,
+            "date_to":              date_to,
         })
     except Exception as e:
         return JSONResponse(status_code=500, content={"detail": str(e)})
