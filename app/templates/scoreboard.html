@@ -638,7 +638,7 @@
     if (val === null || val === undefined) return `<span style="color:#484f58;">—</span>`;
     const fw = bold ? '700' : '600';
     const color = val <= 0 ? '#3fb950' : '#d29922';
-    return `<span style="color:${color};font-weight:${fw};">${val.toFixed(1)}</span>`;
+    return `<span style="color:${color};font-weight:${fw};">${Math.round(val).toLocaleString()}</span>`;
   }
 
   function pctHtml(pct, bold = false) {
