@@ -264,6 +264,7 @@
             <th>Office / Agent</th>
             <th class="text-end" style="min-width:100px;" data-sort="targetTotal">Target FTC <i class="bi sort-icon" id="sort-icon-targetTotal"></i></th>
             <th class="text-end" style="min-width:80px;" data-sort="total">FTC <i class="bi sort-icon" id="sort-icon-total"></i></th>
+            <th class="text-end" style="min-width:90px;" data-sort="ftd100Total">FTD100 <i class="bi sort-icon" id="sort-icon-ftd100Total"></i></th>
           </tr>
         </thead>
         <tbody id="table-body"></tbody>
@@ -387,6 +388,7 @@
       agents,
       total:       agents.reduce((s, a) => s + a.ftc, 0),
       targetTotal: agents.reduce((s, a) => s + a.target_ftc, 0),
+      ftd100Total: agents.reduce((s, a) => s + a.ftd100, 0),
     })).sort((a, b) => {
       const av = a[sortState.col] ?? 0;
       const bv = b[sortState.col] ?? 0;
@@ -395,11 +397,13 @@
 
     let grandTotal       = 0;
     let grandTargetTotal = 0;
+    let grandFtd100      = 0;
     let agentCount = 0;
 
     offices.forEach((office, oi) => {
       grandTotal       += office.total;
       grandTargetTotal += office.targetTotal;
+      grandFtd100      += office.ftd100Total;
       const officeId = 'office-' + oi;
       // Office row (collapsed by default)
       const offTr = document.createElement('tr');
@@ -414,11 +418,12 @@
         </td>
         <td class="text-end"><span class="office-total" style="color:#388bfd;">${office.targetTotal.toLocaleString()}</span></td>
         <td class="text-end"><span class="office-total" style="color:#388bfd;">${office.total.toLocaleString()}</span></td>
+        <td class="text-end"><span class="office-total" style="color:#388bfd;">${office.ftd100Total.toLocaleString()}</span></td>
       `;
       tbody.appendChild(offTr);
 
       // Agent sub-rows (hidden by default, sorted by active column)
-      const agentSortKey = { total: 'ftc', targetTotal: 'target_ftc' }[sortState.col] || 'ftc';
+      const agentSortKey = { total: 'ftc', targetTotal: 'target_ftc', ftd100Total: 'ftd100' }[sortState.col] || 'ftc';
       const sortedAgents = [...office.agents].sort((a, b) => {
         const av = a[agentSortKey] ?? 0;
         const bv = b[agentSortKey] ?? 0;
@@ -432,6 +437,9 @@
         const tgtHtml  = r.target_ftc > 0
           ? `<span style="color:#388bfd;font-weight:600;">${r.target_ftc.toLocaleString()}</span>`
           : `<span style="color:#484f58;">—</span>`;
+        const f100Html = r.ftd100 > 0
+          ? `<span style="color:#388bfd;font-weight:600;">${r.ftd100.toLocaleString()}</span>`
+          : `<span style="color:#484f58;">—</span>`;
 
         const tr = document.createElement('tr');
         tr.className = 'agent-row';
@@ -441,6 +449,7 @@
           <td>${escHtml(r.agent_name)}</td>
           <td class="text-end">${tgtHtml}</td>
           <td class="text-end">${ftcHtml}</td>
+          <td class="text-end">${f100Html}</td>
         `;
         tbody.appendChild(tr);
       });
@@ -457,7 +466,7 @@
 
     if (offices.length === 0) {
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td colspan="3" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No data for this period</td>`;
+      tr.innerHTML = `<td colspan="4" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No data for this period</td>`;
       tbody.appendChild(tr);
     } else {
       const totalTr = document.createElement('tr');
@@ -466,6 +475,7 @@
         <td>Total</td>
         <td class="text-end"><span style="color:#388bfd;font-weight:700;">${grandTargetTotal.toLocaleString()}</span></td>
         <td class="text-end"><span style="color:#388bfd;font-weight:700;">${grandTotal.toLocaleString()}</span></td>
+        <td class="text-end"><span style="color:#388bfd;font-weight:700;">${grandFtd100.toLocaleString()}</span></td>
       `;
       tbody.appendChild(totalTr);
     }
