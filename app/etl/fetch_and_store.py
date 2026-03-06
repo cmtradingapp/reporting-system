@@ -223,10 +223,15 @@ def run_dealio_mt4trades_full_etl() -> dict:
     status = "success"
     error_msg = None
     rows = 0
+    chunk_num = 0
     try:
         for chunk in get_dealio_mt4trades_full():
             upsert_dealio_mt4trades(chunk)
             rows += len(chunk)
+            chunk_num += 1
+            if chunk_num % 10 == 0:
+                elapsed = int((time.time() - start) * 1000)
+                log_sync("dealio_mt4trades", cutoff, rows, elapsed, "running", f"chunk {chunk_num}, {rows} rows so far")
     except Exception as e:
         status = "error"
         error_msg = str(e)
