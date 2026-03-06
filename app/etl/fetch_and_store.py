@@ -5,7 +5,7 @@ from app.db.mysql_conn import get_operators, get_users, get_accounts, get_accoun
 from app.db.mssql_conn import get_targets, get_dealio_mt4trades, get_dealio_mt4trades_full
 from app.db.postgres_conn import (
     ensure_table, delete_all_performance, insert_records,
-    upsert_users, upsert_accounts, upsert_crm_users, upsert_transactions,
+    upsert_users, upsert_accounts, cleanup_accounts, upsert_crm_users, upsert_transactions,
     upsert_targets, upsert_dealio_mt4trades, upsert_trading_accounts, log_sync,
     truncate_and_insert_ftd100,
 )
@@ -52,6 +52,7 @@ def run_accounts_etl(hours: int = 24) -> dict:
         accounts_df = get_accounts(hours=hours)
         rows = len(accounts_df)
         upsert_accounts(accounts_df)
+        cleanup_accounts()
     except Exception as e:
         status = "error"
         error_msg = str(e)
@@ -77,6 +78,7 @@ def run_accounts_full_etl() -> dict:
         for chunk in get_accounts_full():
             upsert_accounts(chunk)
             rows += len(chunk)
+        cleanup_accounts()
     except Exception as e:
         status = "error"
         error_msg = str(e)

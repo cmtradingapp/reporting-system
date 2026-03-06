@@ -105,8 +105,11 @@ def get_accounts(hours: int = 24) -> pd.DataFrame:
             LEFT JOIN crmdb.user_additional_info_rel uair ON (u.id = uair.user_id)
             LEFT JOIN crmdb.aggregated_user_data aud ON (u.id = aud.user_id AND 0 <> aud.latest)
             LEFT JOIN crmdb.app ON u.registration_app = crmdb.app.id
-            WHERE uair.last_communication_time >= DATE_ADD(UTC_TIMESTAMP(), INTERVAL -{hours} HOUR)
-               OR u.last_update_time           >= DATE_ADD(UTC_TIMESTAMP(), INTERVAL -{hours} HOUR)
+            WHERE (uair.last_communication_time >= DATE_ADD(UTC_TIMESTAMP(), INTERVAL -{hours} HOUR)
+               OR u.last_update_time           >= DATE_ADD(UTC_TIMESTAMP(), INTERVAL -{hours} HOUR))
+              AND u.id IS NOT NULL
+              AND u.id != ''
+              AND u.is_test = 0
         """
         df = pd.read_sql(query, conn)
         return df
@@ -188,6 +191,9 @@ def get_accounts_full():
             LEFT JOIN crmdb.user_additional_info_rel uair ON (u.id = uair.user_id)
             LEFT JOIN crmdb.aggregated_user_data aud ON (u.id = aud.user_id AND 0 <> aud.latest)
             LEFT JOIN crmdb.app ON u.registration_app = crmdb.app.id
+            WHERE u.id IS NOT NULL
+              AND u.id != ''
+              AND u.is_test = 0
         """
         with conn.cursor() as cur:
             cur.execute(query)

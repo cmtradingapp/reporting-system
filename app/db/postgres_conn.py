@@ -482,6 +482,17 @@ def upsert_users(df: pd.DataFrame):
         conn.close()
 
 
+def cleanup_accounts():
+    """Delete test accounts and null/blank accountid rows from accounts table."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM accounts WHERE is_test_account != 0 OR accountid IS NULL")
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def upsert_accounts(df: pd.DataFrame):
     cols = [
         "accountid", "is_test_account", "first_name", "last_name", "full_name",
