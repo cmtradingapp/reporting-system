@@ -171,7 +171,7 @@ def scoreboard_api(date_from: str, date_to: str):
             cur.execute("""
                 SELECT COALESCE(SUM(d.notional_value), 0)
                 FROM dealio_mt4trades d
-                JOIN trading_accounts ta ON ta.login = d.login
+                JOIN trading_accounts ta ON ta.login::bigint = d.login
                 JOIN accounts a          ON a.accountid = ta.vtigeraccountid
                 LEFT JOIN crm_users u    ON u.id = a.assigned_to
                 WHERE d.open_time::date >= %(date_from)s
