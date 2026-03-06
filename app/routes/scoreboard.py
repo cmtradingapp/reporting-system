@@ -3,25 +3,28 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from app.db.postgres_conn import get_connection
 from datetime import datetime, timedelta, date as date_type
+import calendar
 
 
-def count_working_days(start: date_type, end: date_type) -> int:
-    """Count Mon–Fri days between start and end (inclusive)."""
+def last_day_of_month(d: date_type) -> date_type:
+    return d.replace(day=calendar.monthrange(d.year, d.month)[1])
+
+
+def count_working_days(start: date_type, end: date_type, holidays: set) -> int:
+    """Count Mon–Fri non-holiday days between start and end (inclusive)."""
     if end < start:
         return 0
     count = 0
     current = start
     while current <= end:
-        if current.weekday() < 5:
+        if current.weekday() < 5 and current not in holidays:
             count += 1
         current += timedelta(days=1)
     return count
 
+
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
-
-
-
 
 
 @router.get("/scoreboard", response_class=HTMLResponse)
@@ -37,10 +40,6 @@ def scoreboard_api(date_from: str, date_to: str):
         date_to_exclusive = (dt_to + timedelta(days=1)).strftime("%Y-%m-%d")
     except ValueError:
         return JSONResponse(status_code=400, content={"detail": "Invalid date format"})
-
-    today = datetime.utcnow().date()
-    working_days        = count_working_days(dt_from, dt_to)
-    working_days_passed = count_working_days(dt_from, min(dt_to, today))
 
     sql = """
         SELECT
@@ -93,8 +92,23 @@ def scoreboard_api(date_from: str, date_to: str):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
+            # Fetch public holidays (graceful fallback if table missing)
+            try:
+                cur.execute("SELECT holiday_date FROM public_holidays")
+                holidays = {row[0] for row in cur.fetchall()}
+            except Exception:
+                conn.rollback()
+                holidays = set()
+
             cur.execute(sql, {"date_from": date_from, "date_to_excl": date_to_exclusive})
             rows = cur.fetchall()
+
+        today = datetime.utcnow().date()
+        month_end           = last_day_of_month(dt_from)
+        working_days        = count_working_days(dt_from, month_end, holidays)
+        working_days_passed = count_working_days(dt_from, min(dt_to, today), holidays)
+        working_days_left   = working_days - working_days_passed
+
         data = [
             {
                 "office_name": r[0],
@@ -113,6 +127,7 @@ def scoreboard_api(date_from: str, date_to: str):
             "total_ftd100":         sum(r["ftd100"] for r in data),
             "working_days":         working_days,
             "working_days_passed":  working_days_passed,
+            "working_days_left":    working_days_left,
             "date_from":            date_from,
             "date_to":              date_to,
         })

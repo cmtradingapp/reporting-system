@@ -237,6 +237,28 @@
     </div>
   </div>
 
+  <!-- Working Days Cards -->
+  <div class="row g-3 mb-3">
+    <div class="col-4">
+      <div class="stat-card text-center">
+        <div class="stat-value" style="color:#8b949e;" id="stat-wd">—</div>
+        <div class="stat-label mt-1"><i class="bi bi-calendar-check me-1"></i>Working Days</div>
+      </div>
+    </div>
+    <div class="col-4">
+      <div class="stat-card text-center">
+        <div class="stat-value" style="color:#3fb950;" id="stat-wd-passed">—</div>
+        <div class="stat-label mt-1"><i class="bi bi-calendar2-check me-1"></i>Days Passed</div>
+      </div>
+    </div>
+    <div class="col-4">
+      <div class="stat-card text-center">
+        <div class="stat-value" style="color:#d29922;" id="stat-wd-left">—</div>
+        <div class="stat-label mt-1"><i class="bi bi-calendar2-x me-1"></i>Days Left</div>
+      </div>
+    </div>
+  </div>
+
   <!-- Table Card -->
   <div class="card p-0" style="overflow:hidden;">
     <div class="d-flex justify-content-between align-items-center px-4 py-3" style="border-bottom:1px solid #30363d;">
@@ -289,6 +311,7 @@
   let sortState = { col: 'total', dir: 'desc' };
   let workingDays = 0;
   let workingDaysPassed = 0;
+  let workingDaysLeft = 0;
 
   // ── Helpers ────────────────────────────────────────────────────────────
   function pad(n) { return String(n).padStart(2, '0'); }
@@ -345,10 +368,15 @@
 
       workingDays       = data.working_days;
       workingDaysPassed = data.working_days_passed;
+      workingDaysLeft   = data.working_days_left;
+      const safeWdPassed = workingDaysPassed > 0 ? workingDaysPassed : 1;
       allRows = data.rows.map(r => ({
         ...r,
-        ftc_rr: workingDaysPassed > 0 ? Math.floor(r.ftc / workingDaysPassed * workingDays) : 0,
+        ftc_rr: Math.floor(r.ftc / safeWdPassed * workingDays),
       }));
+      document.getElementById('stat-wd').textContent        = workingDays;
+      document.getElementById('stat-wd-passed').textContent = workingDaysPassed;
+      document.getElementById('stat-wd-left').textContent   = workingDaysLeft;
       updateStats(data);
       renderTable();
     } catch(e) {
