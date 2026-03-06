@@ -269,19 +269,19 @@
           <tr>
             <th>Office / Agent</th>
             <th class="text-center" style="min-width:100px;" data-sort="targetTotal">Target FTC <i class="bi sort-icon" id="sort-icon-targetTotal"></i></th>
-            <th class="text-center" style="min-width:80px;" data-sort="total">FTC <i class="bi sort-icon" id="sort-icon-total"></i></th>
-            <th class="text-center" style="min-width:105px;" data-sort="ftcTgtPctTotal">Target FTC % <i class="bi sort-icon" id="sort-icon-ftcTgtPctTotal"></i></th>
-            <th class="text-center" style="min-width:90px;" data-sort="ftcRrTotal">FTC RR <i class="bi sort-icon" id="sort-icon-ftcRrTotal"></i></th>
             <th class="text-center" style="min-width:90px;" data-sort="ftcRrPctTotal">FTC RR % <i class="bi sort-icon" id="sort-icon-ftcRrPctTotal"></i></th>
+            <th class="text-center" style="min-width:130px;" data-sort="missingTo100RrTotal">Missing to 100% RR <i class="bi sort-icon" id="sort-icon-missingTo100RrTotal"></i></th>
+            <th class="text-center" style="min-width:70px;" data-sort="ftdCountTotal">FTD <i class="bi sort-icon" id="sort-icon-ftdCountTotal"></i></th>
             <th class="text-center" style="min-width:90px;" data-sort="ftd100Total">FTD100 <i class="bi sort-icon" id="sort-icon-ftd100Total"></i></th>
-            <th class="text-center" style="min-width:105px;" data-sort="ftd100TgtPctTotal">Target FTD100 % <i class="bi sort-icon" id="sort-icon-ftd100TgtPctTotal"></i></th>
-            <th class="text-center" style="min-width:100px;" data-sort="ftd100RrTotal">FTD100 RR <i class="bi sort-icon" id="sort-icon-ftd100RrTotal"></i></th>
+            <th class="text-center" style="min-width:80px;" data-sort="total">FTC <i class="bi sort-icon" id="sort-icon-total"></i></th>
             <th class="text-center" style="min-width:105px;" data-sort="ftd100RrPctTotal">FTD100 RR % <i class="bi sort-icon" id="sort-icon-ftd100RrPctTotal"></i></th>
-            <th class="text-center" style="min-width:120px;" data-sort="netDepositsTotal">Net Deposits <i class="bi sort-icon" id="sort-icon-netDepositsTotal"></i></th>
-            <th class="text-center" style="min-width:90px;"  data-sort="ftdCountTotal">FTD Count <i class="bi sort-icon" id="sort-icon-ftdCountTotal"></i></th>
-            <th class="text-center" style="min-width:110px;" data-sort="needOnTargetTotal">Need on Target <i class="bi sort-icon" id="sort-icon-needOnTargetTotal"></i></th>
-            <th class="text-center" style="min-width:110px;" data-sort="missingTo100Total">Missing to 100 <i class="bi sort-icon" id="sort-icon-missingTo100Total"></i></th>
-            <th class="text-center" style="min-width:115px;" data-sort="missingTo100RrTotal">Missing to 100 RR <i class="bi sort-icon" id="sort-icon-missingTo100RrTotal"></i></th>
+            <th class="text-center" style="min-width:90px;" data-sort="ftcRrTotal">FTC RR <i class="bi sort-icon" id="sort-icon-ftcRrTotal"></i></th>
+            <th class="text-center" style="min-width:100px;" data-sort="ftd100RrTotal">FTD100 RR <i class="bi sort-icon" id="sort-icon-ftd100RrTotal"></i></th>
+            <th class="text-center" style="min-width:115px;" data-sort="ftd100TgtPctTotal">Target FTD100 % <i class="bi sort-icon" id="sort-icon-ftd100TgtPctTotal"></i></th>
+            <th class="text-center" style="min-width:105px;" data-sort="ftcTgtPctTotal">Target FTC % <i class="bi sort-icon" id="sort-icon-ftcTgtPctTotal"></i></th>
+            <th class="text-center" style="min-width:100px;" data-sort="netDepositsTotal">NET $ <i class="bi sort-icon" id="sort-icon-netDepositsTotal"></i></th>
+            <th class="text-center" style="min-width:160px;" data-sort="needOnTargetTotal">Need to be on target (100% RR) <i class="bi sort-icon" id="sort-icon-needOnTargetTotal"></i></th>
+            <th class="text-center" style="min-width:140px;" data-sort="missingTo100Total">Missing to reach 100% <i class="bi sort-icon" id="sort-icon-missingTo100Total"></i></th>
             <th class="text-center" style="min-width:110px;" data-sort="perWdTotal">Per Working Day <i class="bi sort-icon" id="sort-icon-perWdTotal"></i></th>
           </tr>
         </thead>
@@ -484,19 +484,19 @@
           <span class="text-muted ms-2" style="font-size:0.72rem;font-weight:400;">${office.agents.length} agents</span>
         </td>
         <td class="text-center"><span class="office-total" style="color:#388bfd;">${office.targetTotal.toLocaleString()}</span></td>
-        <td class="text-center"><span class="office-total" style="color:#388bfd;">${office.total.toLocaleString()}</span></td>
-        <td class="text-center">${pctHtml(office.ftcTgtPctTotal, true)}</td>
-        <td class="text-center"><span class="office-total" style="color:#d29922;">${office.ftcRrTotal.toLocaleString()}</span></td>
         <td class="text-center">${pctHtml(office.ftcRrPctTotal, true)}</td>
-        <td class="text-center"><span class="office-total" style="color:#388bfd;">${office.ftd100Total.toLocaleString()}</span></td>
-        <td class="text-center">${pctHtml(office.ftd100TgtPctTotal, true)}</td>
-        <td class="text-center"><span class="office-total" style="color:#d29922;">${office.ftd100RrTotal.toLocaleString()}</span></td>
-        <td class="text-center">${pctHtml(office.ftd100RrPctTotal, true)}</td>
-        <td class="text-center">${netHtml(office.netDepositsTotal, true)}</td>
+        <td class="text-center">${diffHtml(office.missingTo100RrTotal, true)}</td>
         <td class="text-center"><span class="office-total" style="color:#388bfd;">${office.ftdCountTotal.toLocaleString()}</span></td>
+        <td class="text-center"><span class="office-total" style="color:#388bfd;">${office.ftd100Total.toLocaleString()}</span></td>
+        <td class="text-center"><span class="office-total" style="color:#388bfd;">${office.total.toLocaleString()}</span></td>
+        <td class="text-center">${pctHtml(office.ftd100RrPctTotal, true)}</td>
+        <td class="text-center"><span class="office-total" style="color:#d29922;">${office.ftcRrTotal.toLocaleString()}</span></td>
+        <td class="text-center"><span class="office-total" style="color:#d29922;">${office.ftd100RrTotal.toLocaleString()}</span></td>
+        <td class="text-center">${pctHtml(office.ftd100TgtPctTotal, true)}</td>
+        <td class="text-center">${pctHtml(office.ftcTgtPctTotal, true)}</td>
+        <td class="text-center">${netHtml(office.netDepositsTotal, true)}</td>
         <td class="text-center">${diffHtml(office.needOnTargetTotal, true)}</td>
         <td class="text-center">${diffHtml(office.missingTo100Total, true)}</td>
-        <td class="text-center">${diffHtml(office.missingTo100RrTotal, true)}</td>
         <td class="text-center">${perWdHtml(office.perWdTotal, true)}</td>
       `;
       tbody.appendChild(offTr);
@@ -552,19 +552,19 @@
         tr.innerHTML = `
           <td>${escHtml(r.agent_name)}</td>
           <td class="text-center">${tgtHtml}</td>
-          <td class="text-center">${ftcHtml}</td>
-          <td class="text-center">${ftcTgtPctHtml}</td>
-          <td class="text-center">${rrHtml}</td>
           <td class="text-center">${rrPctHtml}</td>
-          <td class="text-center">${f100Html}</td>
-          <td class="text-center">${f100TgtPct}</td>
-          <td class="text-center">${f100RrHtml}</td>
-          <td class="text-center">${f100RrPct}</td>
-          <td class="text-center">${netDepHtml}</td>
+          <td class="text-center">${missing100RrHtml}</td>
           <td class="text-center">${ftdCountHtml}</td>
+          <td class="text-center">${f100Html}</td>
+          <td class="text-center">${ftcHtml}</td>
+          <td class="text-center">${f100RrPct}</td>
+          <td class="text-center">${rrHtml}</td>
+          <td class="text-center">${f100RrHtml}</td>
+          <td class="text-center">${f100TgtPct}</td>
+          <td class="text-center">${ftcTgtPctHtml}</td>
+          <td class="text-center">${netDepHtml}</td>
           <td class="text-center">${needOnTgtHtml}</td>
           <td class="text-center">${missing100Html}</td>
-          <td class="text-center">${missing100RrHtml}</td>
           <td class="text-center">${perWdAgentHtml}</td>
         `;
         tbody.appendChild(tr);
@@ -590,19 +590,19 @@
       totalTr.innerHTML = `
         <td>Total</td>
         <td class="text-center"><span style="color:#388bfd;font-weight:700;">${grandTargetTotal.toLocaleString()}</span></td>
-        <td class="text-center"><span style="color:#388bfd;font-weight:700;">${grandTotal.toLocaleString()}</span></td>
-        <td class="text-center">${pctHtml(grandTargetTotal > 0 ? Math.round(grandTotal / grandTargetTotal * 100) : null, true)}</td>
-        <td class="text-center"><span style="color:#d29922;font-weight:700;">${grandFtcRr.toLocaleString()}</span></td>
         <td class="text-center">${pctHtml(grandTargetTotal > 0 ? Math.round(grandFtcRr / grandTargetTotal * 100) : null, true)}</td>
-        <td class="text-center"><span style="color:#388bfd;font-weight:700;">${grandFtd100.toLocaleString()}</span></td>
-        <td class="text-center">${pctHtml(grandTargetTotal > 0 ? Math.round(grandFtd100   / grandTargetTotal * 100) : null, true)}</td>
-        <td class="text-center"><span style="color:#d29922;font-weight:700;">${grandFtd100Rr.toLocaleString()}</span></td>
-        <td class="text-center">${pctHtml(grandTargetTotal > 0 ? Math.round(grandFtd100Rr / grandTargetTotal * 100) : null, true)}</td>
-        <td class="text-center">${netHtml(grandNetDeposits, true)}</td>
+        <td class="text-center">${diffHtml(grandMissing100Rr, true)}</td>
         <td class="text-center"><span style="color:#388bfd;font-weight:700;">${grandFtdCount.toLocaleString()}</span></td>
+        <td class="text-center"><span style="color:#388bfd;font-weight:700;">${grandFtd100.toLocaleString()}</span></td>
+        <td class="text-center"><span style="color:#388bfd;font-weight:700;">${grandTotal.toLocaleString()}</span></td>
+        <td class="text-center">${pctHtml(grandTargetTotal > 0 ? Math.round(grandFtd100Rr / grandTargetTotal * 100) : null, true)}</td>
+        <td class="text-center"><span style="color:#d29922;font-weight:700;">${grandFtcRr.toLocaleString()}</span></td>
+        <td class="text-center"><span style="color:#d29922;font-weight:700;">${grandFtd100Rr.toLocaleString()}</span></td>
+        <td class="text-center">${pctHtml(grandTargetTotal > 0 ? Math.round(grandFtd100   / grandTargetTotal * 100) : null, true)}</td>
+        <td class="text-center">${pctHtml(grandTargetTotal > 0 ? Math.round(grandTotal / grandTargetTotal * 100) : null, true)}</td>
+        <td class="text-center">${netHtml(grandNetDeposits, true)}</td>
         <td class="text-center">${diffHtml(grandNeedOnTarget, true)}</td>
         <td class="text-center">${diffHtml(grandMissing100, true)}</td>
-        <td class="text-center">${diffHtml(grandMissing100Rr, true)}</td>
         <td class="text-center">${perWdHtml(grandPerWd, true)}</td>
       `;
       tbody.appendChild(totalTr);
