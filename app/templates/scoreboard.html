@@ -892,7 +892,8 @@
       const safe_wdp  = Math.max(wd_passed, 1);
 
       retAllRows = data.rows.map(r => {
-        const target_net_prorated = wd > 0 ? Math.ceil(r.target_net / wd * safe_wdp) : 0;
+        const is_full_month       = wd_passed >= wd;
+        const target_net_prorated = is_full_month ? r.target_net : (wd > 0 ? Math.ceil(r.target_net / wd) * safe_wdp : 0);
         const net_rr              = r.net_usd > 0 ? Math.floor(r.net_usd / safe_wdp * wd) : r.net_usd;
         const net_rr_pct          = r.target_net > 0 ? net_rr / r.target_net : null;
         const need_on_target      = wd > 0 ? r.target_net * (wd_passed / wd) : 0;
