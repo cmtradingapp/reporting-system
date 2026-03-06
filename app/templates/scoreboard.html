@@ -258,6 +258,7 @@
           <tr>
             <th>Office / Agent</th>
             <th class="text-end" style="min-width:80px;">FTC</th>
+            <th class="text-end" style="min-width:100px;">Target FTC</th>
           </tr>
         </thead>
         <tbody id="table-body"></tbody>
@@ -378,14 +379,17 @@
     const offices = [...officeMap.entries()].map(([name, agents]) => ({
       name,
       agents,
-      total: agents.reduce((s, a) => s + a.ftc, 0),
+      total:       agents.reduce((s, a) => s + a.ftc, 0),
+      targetTotal: agents.reduce((s, a) => s + a.target_ftc, 0),
     })).sort((a, b) => b.total - a.total);
 
-    let grandTotal = 0;
+    let grandTotal       = 0;
+    let grandTargetTotal = 0;
     let agentCount = 0;
 
     offices.forEach((office, oi) => {
-      grandTotal += office.total;
+      grandTotal       += office.total;
+      grandTargetTotal += office.targetTotal;
       const officeId = 'office-' + oi;
       const ftcOffClass = office.total >= 50 ? 'ftc-high' : office.total >= 20 ? 'ftc-mid' : 'ftc-low';
 
@@ -401,6 +405,7 @@
           <span class="text-muted ms-2" style="font-size:0.72rem;font-weight:400;">${office.agents.length} agents</span>
         </td>
         <td class="text-end"><span class="office-total ${ftcOffClass}">${office.total.toLocaleString()}</span></td>
+        <td class="text-end"><span class="office-total" style="color:#388bfd;">${office.targetTotal.toLocaleString()}</span></td>
       `;
       tbody.appendChild(offTr);
 
@@ -411,6 +416,9 @@
         const ftcHtml  = r.ftc > 0
           ? `<span class="ftc-val ${ftcClass}">${r.ftc.toLocaleString()}</span>`
           : `<span style="color:#484f58;font-weight:600;">0</span>`;
+        const tgtHtml  = r.target_ftc > 0
+          ? `<span style="color:#388bfd;font-weight:600;">${r.target_ftc.toLocaleString()}</span>`
+          : `<span style="color:#484f58;">—</span>`;
 
         const tr = document.createElement('tr');
         tr.className = 'agent-row';
@@ -419,6 +427,7 @@
         tr.innerHTML = `
           <td>${escHtml(r.agent_name)}</td>
           <td class="text-end">${ftcHtml}</td>
+          <td class="text-end">${tgtHtml}</td>
         `;
         tbody.appendChild(tr);
       });
@@ -435,7 +444,7 @@
 
     if (offices.length === 0) {
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td colspan="2" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No data for this period</td>`;
+      tr.innerHTML = `<td colspan="3" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No data for this period</td>`;
       tbody.appendChild(tr);
     } else {
       const totalTr = document.createElement('tr');
@@ -443,6 +452,7 @@
       totalTr.innerHTML = `
         <td>Total</td>
         <td class="text-end"><span class="ftc-val ftc-high">${grandTotal.toLocaleString()}</span></td>
+        <td class="text-end"><span style="color:#388bfd;font-weight:700;">${grandTargetTotal.toLocaleString()}</span></td>
       `;
       tbody.appendChild(totalTr);
     }
