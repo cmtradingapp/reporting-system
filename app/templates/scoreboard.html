@@ -257,8 +257,8 @@
         <thead>
           <tr>
             <th>Office / Agent</th>
-            <th class="text-end" style="min-width:80px;">FTC</th>
             <th class="text-end" style="min-width:100px;">Target FTC</th>
+            <th class="text-end" style="min-width:80px;">FTC</th>
           </tr>
         </thead>
         <tbody id="table-body"></tbody>
@@ -404,8 +404,8 @@
           <strong>${escHtml(office.name)}</strong>
           <span class="text-muted ms-2" style="font-size:0.72rem;font-weight:400;">${office.agents.length} agents</span>
         </td>
-        <td class="text-end"><span class="office-total ${ftcOffClass}">${office.total.toLocaleString()}</span></td>
         <td class="text-end"><span class="office-total" style="color:#388bfd;">${office.targetTotal.toLocaleString()}</span></td>
+        <td class="text-end"><span class="office-total ${ftcOffClass}">${office.total.toLocaleString()}</span></td>
       `;
       tbody.appendChild(offTr);
 
@@ -426,8 +426,8 @@
         tr.style.display = 'none';
         tr.innerHTML = `
           <td>${escHtml(r.agent_name)}</td>
-          <td class="text-end">${ftcHtml}</td>
           <td class="text-end">${tgtHtml}</td>
+          <td class="text-end">${ftcHtml}</td>
         `;
         tbody.appendChild(tr);
       });
@@ -451,8 +451,8 @@
       totalTr.className = 'total-row';
       totalTr.innerHTML = `
         <td>Total</td>
-        <td class="text-end"><span class="ftc-val ftc-high">${grandTotal.toLocaleString()}</span></td>
         <td class="text-end"><span style="color:#388bfd;font-weight:700;">${grandTargetTotal.toLocaleString()}</span></td>
+        <td class="text-end"><span class="ftc-val ftc-high">${grandTotal.toLocaleString()}</span></td>
       `;
       tbody.appendChild(totalTr);
     }
