@@ -54,7 +54,7 @@ def scoreboard_api(date_from: str, date_to: str):
             WHERE date >= %(date_from)s
               AND date <  %(date_to_excl)s
             GROUP BY agent_id
-        ) tgt ON tgt.agent_id = u.id
+        ) tgt ON tgt.agent_id::text = u.id
         WHERE u.status = 'Active'
           AND u.department_ = 'Sales'
           AND u.team = 'Conversion'
