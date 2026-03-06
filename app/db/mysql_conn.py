@@ -493,9 +493,10 @@ def get_crm_users(hours: int = 24) -> pd.DataFrame:
             LEFT JOIN desk d ON od.desk_id = d.id
             LEFT JOIN office ofc ON d.office_id = ofc.id
             LEFT JOIN operator_role opr ON o.role_id = opr.id
-            WHERE opr.display_name != 'Affiliate'
-              AND opr.display_name NOT LIKE '%Admin'
-              AND opr.display_name != 'Dialer'
+            WHERE (opr.display_name IS NULL
+               OR (opr.display_name != 'Affiliate'
+                   AND opr.display_name NOT LIKE '%Admin'
+                   AND opr.display_name != 'Dialer'))
               AND o.last_update_time >= DATE_ADD(UTC_TIMESTAMP(), INTERVAL -{hours} HOUR)
             GROUP BY o.id
 
@@ -625,9 +626,10 @@ def get_crm_users_full() -> pd.DataFrame:
             LEFT JOIN desk d ON od.desk_id = d.id
             LEFT JOIN office ofc ON d.office_id = ofc.id
             LEFT JOIN operator_role opr ON o.role_id = opr.id
-            WHERE opr.display_name != 'Affiliate'
-              AND opr.display_name NOT LIKE '%Admin'
-              AND opr.display_name != 'Dialer'
+            WHERE (opr.display_name IS NULL
+               OR (opr.display_name != 'Affiliate'
+                   AND opr.display_name NOT LIKE '%Admin'
+                   AND opr.display_name != 'Dialer'))
             GROUP BY o.id
 
             UNION
