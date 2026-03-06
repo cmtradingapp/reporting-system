@@ -133,11 +133,55 @@ def scoreboard_api(date_from: str, date_to: str):
             cur.execute(sql, {"date_from": date_from, "date_to_excl": date_to_exclusive})
             rows = cur.fetchall()
 
+            # Grand FTC — all departments/teams
+            cur.execute("""
+                SELECT COUNT(DISTINCT t.vtigeraccountid)
+                FROM transactions t
+                JOIN accounts a ON a.accountid = t.vtigeraccountid
+                WHERE t.transactionapproval = 'Approved'
+                  AND (t.deleted = 0 OR t.deleted IS NULL)
+                  AND t.transactiontype = 'Deposit'
+                  AND t.ftd = 1
+                  AND a.client_qualification_date IS NOT NULL
+                  AND a.client_qualification_date >= %(date_from)s
+                  AND a.client_qualification_date <  %(date_to_excl)s
+            """, {"date_from": date_from, "date_to_excl": date_to_exclusive})
+            grand_ftc = int(cur.fetchone()[0] or 0)
+
+            # Grand NET $ — all departments/teams
+            cur.execute("""
+                SELECT COALESCE(SUM(CASE
+                    WHEN t.transactiontype IN ('Deposit', 'Withdrawal Cancelled') THEN  t.usdamount
+                    WHEN t.transactiontype IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
+                END), 0)
+                FROM transactions t
+                WHERE t.transactionapproval = 'Approved'
+                  AND (t.deleted = 0 OR t.deleted IS NULL)
+                  AND t.transactiontype IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
+                  AND t.confirmation_time >= %(date_from)s
+                  AND t.confirmation_time <  %(date_to_excl)s
+            """, {"date_from": date_from, "date_to_excl": date_to_exclusive})
+            grand_net = float(cur.fetchone()[0] or 0)
+
+            # Open Volume
+            cur.execute("""
+                SELECT COALESCE(SUM(notional_value), 0)
+                FROM dealio_mt4trades
+                WHERE open_time::date >= %(date_from)s
+                  AND open_time::date <= %(date_to)s
+            """, {"date_from": date_from, "date_to": date_to})
+            open_volume = float(cur.fetchone()[0] or 0)
+
         today = datetime.utcnow().date()
         month_end           = last_day_of_month(dt_from)
         working_days        = count_working_days(dt_from, month_end, holidays)
         working_days_passed = count_working_days(dt_from, min(dt_to, today), holidays)
         working_days_left   = working_days - working_days_passed
+
+        safe_wdp        = working_days_passed if working_days_passed > 0 else 1
+        grand_ftc_rr    = round(grand_ftc  / safe_wdp * working_days)
+        grand_net_rr    = round(grand_net  / safe_wdp * working_days, 2)
+        open_volume_rr  = round(open_volume / safe_wdp * working_days) if open_volume > 0 else round(open_volume)
 
         data = [
             {
@@ -159,6 +203,12 @@ def scoreboard_api(date_from: str, date_to: str):
             "total_ftd100":         sum(r["ftd100"] for r in data),
             "total_net_deposits":   round(sum(r["net_deposits"] for r in data), 2),
             "total_ftd_count":      sum(r["ftd_count"] for r in data),
+            "grand_ftc":            grand_ftc,
+            "grand_ftc_rr":         grand_ftc_rr,
+            "grand_net":            round(grand_net, 2),
+            "grand_net_rr":         grand_net_rr,
+            "open_volume":          round(open_volume, 2),
+            "open_volume_rr":       open_volume_rr,
             "working_days":         working_days,
             "working_days_passed":  working_days_passed,
             "working_days_left":    working_days_left,

@@ -64,10 +64,10 @@
     /* Filter separator */
     .filter-sep { width: 1px; height: 28px; background-color: #30363d; margin: 0 6px; }
 
-    /* Stat card */
-    .stat-card { background-color: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 16px 24px; }
-    .stat-value { font-size: 2rem; font-weight: 700; }
-    .stat-label { font-size: 0.8rem; color: #8b949e; text-transform: uppercase; letter-spacing: 1px; }
+    /* KPI cards */
+    .kpi-card { background-color: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 10px 14px; }
+    .kpi-value { font-size: 1.3rem; font-weight: 700; line-height: 1.2; }
+    .kpi-label { font-size: 0.68rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.8px; margin-top: 3px; }
 
     /* Table */
     .scoreboard-table { width: 100%; border-collapse: collapse; }
@@ -211,34 +211,65 @@
 
   </div>
 
-  <!-- Stats Row -->
-  <div class="row g-3 mb-4" id="stats-row">
-    <div class="col-sm-6 col-lg-3">
-      <div class="stat-card text-center">
-        <div class="stat-value text-success" id="stat-total-ftc">—</div>
-        <div class="stat-label mt-1"><i class="bi bi-trophy me-1"></i>Total FTC</div>
+  <!-- KPI Cards Row 1 -->
+  <div class="row g-2 mb-1">
+    <div class="col-2">
+      <div class="kpi-card text-center">
+        <div class="kpi-value" style="color:#8b949e;" id="stat-wd">—</div>
+        <div class="kpi-label">Working Days</div>
+      </div>
+    </div>
+    <div class="col-2">
+      <div class="kpi-card text-center">
+        <div class="kpi-value" style="color:#3fb950;" id="stat-wd-passed">—</div>
+        <div class="kpi-label">Days Passed</div>
+      </div>
+    </div>
+    <div class="col-2">
+      <div class="kpi-card text-center">
+        <div class="kpi-value" style="color:#d29922;" id="stat-wd-left">—</div>
+        <div class="kpi-label">Days Left</div>
+      </div>
+    </div>
+    <div class="col-2">
+      <div class="kpi-card text-center">
+        <div class="kpi-value" style="color:#388bfd;" id="stat-grand-ftc">—</div>
+        <div class="kpi-label">FTC</div>
+      </div>
+    </div>
+    <div class="col-2">
+      <div class="kpi-card text-center">
+        <div class="kpi-value" style="color:#3fb950;" id="stat-grand-net">—</div>
+        <div class="kpi-label">NET $</div>
+      </div>
+    </div>
+    <div class="col-2">
+      <div class="kpi-card text-center">
+        <div class="kpi-value" style="color:#c9d1d9;" id="stat-open-volume">—</div>
+        <div class="kpi-label">Open Volume</div>
       </div>
     </div>
   </div>
 
-  <!-- Working Days Cards -->
-  <div class="row g-3 mb-3">
-    <div class="col-4">
-      <div class="stat-card text-center">
-        <div class="stat-value" style="color:#8b949e;" id="stat-wd">—</div>
-        <div class="stat-label mt-1"><i class="bi bi-calendar-check me-1"></i>Working Days</div>
+  <!-- KPI Cards Row 2 (RR values) -->
+  <div class="row g-2 mb-4">
+    <div class="col-6"></div>
+    <div class="col-2">
+      <div class="kpi-card text-center">
+        <div class="kpi-value" style="color:#d29922;" id="stat-grand-ftc-rr">—</div>
+        <div class="kpi-label">FTC RR</div>
       </div>
     </div>
-    <div class="col-4">
-      <div class="stat-card text-center">
-        <div class="stat-value" style="color:#3fb950;" id="stat-wd-passed">—</div>
-        <div class="stat-label mt-1"><i class="bi bi-calendar2-check me-1"></i>Days Passed</div>
+    <div class="col-2">
+      <div class="kpi-card text-center">
+        <div class="kpi-value" style="color:#d29922;" id="stat-grand-net-rr">—</div>
+        <div class="kpi-label">NET RR</div>
       </div>
     </div>
-    <div class="col-4">
-      <div class="stat-card text-center">
-        <div class="stat-value" style="color:#d29922;" id="stat-wd-left">—</div>
-        <div class="stat-label mt-1"><i class="bi bi-calendar2-x me-1"></i>Days Left</div>
+    <div class="col-2">
+      <div class="kpi-card text-center">
+        <div class="kpi-value" style="color:#d29922;" id="stat-open-volume-rr">—</div>
+        <div class="kpi-label">Open Volume RR</div>
       </div>
     </div>
   </div>
@@ -403,7 +434,14 @@
   }
 
   function updateStats(data) {
-    document.getElementById('stat-total-ftc').textContent = data.total_ftc.toLocaleString();
+    document.getElementById('stat-grand-ftc').textContent     = data.grand_ftc.toLocaleString();
+    document.getElementById('stat-grand-ftc-rr').textContent  = data.grand_ftc_rr.toLocaleString();
+    const netFmt = v => (v < 0 ? '-$' : '$') + Math.round(Math.abs(v)).toLocaleString();
+    document.getElementById('stat-grand-net').textContent     = netFmt(data.grand_net);
+    document.getElementById('stat-grand-net-rr').textContent  = netFmt(data.grand_net_rr);
+    const volFmt = v => Math.round(v).toLocaleString();
+    document.getElementById('stat-open-volume').textContent   = volFmt(data.open_volume);
+    document.getElementById('stat-open-volume-rr').textContent = volFmt(data.open_volume_rr);
   }
 
   function renderTable() {
