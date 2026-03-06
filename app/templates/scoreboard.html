@@ -391,8 +391,6 @@
       grandTotal       += office.total;
       grandTargetTotal += office.targetTotal;
       const officeId = 'office-' + oi;
-      const ftcOffClass = office.total >= 50 ? 'ftc-high' : office.total >= 20 ? 'ftc-mid' : 'ftc-low';
-
       // Office row (collapsed by default)
       const offTr = document.createElement('tr');
       offTr.className = 'office-row';
@@ -405,16 +403,15 @@
           <span class="text-muted ms-2" style="font-size:0.72rem;font-weight:400;">${office.agents.length} agents</span>
         </td>
         <td class="text-end"><span class="office-total" style="color:#388bfd;">${office.targetTotal.toLocaleString()}</span></td>
-        <td class="text-end"><span class="office-total ${ftcOffClass}">${office.total.toLocaleString()}</span></td>
+        <td class="text-end"><span class="office-total" style="color:#388bfd;">${office.total.toLocaleString()}</span></td>
       `;
       tbody.appendChild(offTr);
 
       // Agent sub-rows (hidden by default)
       office.agents.forEach(r => {
         agentCount++;
-        const ftcClass = r.ftc >= 10 ? 'ftc-high' : r.ftc >= 5 ? 'ftc-mid' : r.ftc >= 1 ? 'ftc-low' : 'ftc-zero';
         const ftcHtml  = r.ftc > 0
-          ? `<span class="ftc-val ${ftcClass}">${r.ftc.toLocaleString()}</span>`
+          ? `<span style="color:#388bfd;font-weight:600;">${r.ftc.toLocaleString()}</span>`
           : `<span style="color:#484f58;font-weight:600;">0</span>`;
         const tgtHtml  = r.target_ftc > 0
           ? `<span style="color:#388bfd;font-weight:600;">${r.target_ftc.toLocaleString()}</span>`
@@ -452,7 +449,7 @@
       totalTr.innerHTML = `
         <td>Total</td>
         <td class="text-end"><span style="color:#388bfd;font-weight:700;">${grandTargetTotal.toLocaleString()}</span></td>
-        <td class="text-end"><span class="ftc-val ftc-high">${grandTotal.toLocaleString()}</span></td>
+        <td class="text-end"><span style="color:#388bfd;font-weight:700;">${grandTotal.toLocaleString()}</span></td>
       `;
       tbody.appendChild(totalTr);
     }
