@@ -110,7 +110,8 @@
 
     /* Agent sub-row */
     .agent-row td { padding: 8px 14px 8px 36px; border-bottom: 1px solid #1a1f27; }
-    .agent-row td:first-child { color: #e0e0e0; font-size: 0.88rem; }
+    .agent-row td:first-child { color: #e0e0e0; font-size: 0.88rem; white-space: nowrap; }
+    .office-row td:first-child { white-space: nowrap; }
 
     /* Grand total row */
     .total-row td {
@@ -218,24 +219,6 @@
         <div class="stat-label mt-1"><i class="bi bi-trophy me-1"></i>Total FTC</div>
       </div>
     </div>
-    <div class="col-sm-6 col-lg-3">
-      <div class="stat-card text-center">
-        <div class="stat-value text-info" id="stat-agents-with-ftc">—</div>
-        <div class="stat-label mt-1"><i class="bi bi-person-check me-1"></i>Agents w/ FTC</div>
-      </div>
-    </div>
-    <div class="col-sm-6 col-lg-3">
-      <div class="stat-card text-center">
-        <div class="stat-value text-warning" id="stat-top-ftc">—</div>
-        <div class="stat-label mt-1"><i class="bi bi-star me-1"></i>Top Agent FTC</div>
-      </div>
-    </div>
-    <div class="col-sm-6 col-lg-3">
-      <div class="stat-card text-center">
-        <div class="stat-value text-primary" id="stat-period">—</div>
-        <div class="stat-label mt-1"><i class="bi bi-calendar-range me-1"></i>Period</div>
-      </div>
-    </div>
   </div>
 
   <!-- Working Days Cards -->
@@ -337,6 +320,14 @@
   function firstOfMonth(year, month) {
     return `${year}-${pad(month)}-01`;
   }
+  function lastOfMonth(year, month) {
+    const d = new Date(year, month, 0); // day 0 of next month = last day of this month
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  }
+  function dateToForMonth(year, month) {
+    const isCurrentMonth = year === now.getFullYear() && month === now.getMonth() + 1;
+    return isCurrentMonth ? todayStr() : lastOfMonth(year, month);
+  }
 
   // ── Button highlight helpers ───────────────────────────────────────────
   function activateYear(year) {
@@ -412,19 +403,7 @@
   }
 
   function updateStats(data) {
-    const withFtc = data.rows.filter(r => r.ftc > 0).length;
-    const topFtc  = data.rows.length ? Math.max(...data.rows.map(r => r.ftc)) : 0;
-    document.getElementById('stat-total-ftc').textContent    = data.total_ftc.toLocaleString();
-    document.getElementById('stat-agents-with-ftc').textContent = withFtc.toLocaleString();
-    document.getElementById('stat-top-ftc').textContent      = topFtc.toLocaleString();
-
-    // Period label: abbreviated (e.g. "Mar 25")
-    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    const fromDate = new Date(data.date_from + 'T00:00:00');
-    const toDate   = new Date(data.date_to   + 'T00:00:00');
-    const fromLbl  = `${months[fromDate.getMonth()]} ${String(fromDate.getFullYear()).slice(2)}`;
-    const toLbl    = `${months[toDate.getMonth()]} ${toDate.getDate()}`;
-    document.getElementById('stat-period').textContent = `${fromLbl} → ${toLbl}`;
+    document.getElementById('stat-total-ftc').textContent = data.total_ftc.toLocaleString();
   }
 
   function renderTable() {
@@ -674,8 +653,8 @@
     btn.addEventListener('click', () => {
       state.year = parseInt(btn.dataset.year);
       activateYear(state.year);
-      // Reset date_from to first of selected month in new year
       document.getElementById('date-from').value = firstOfMonth(state.year, state.month);
+      document.getElementById('date-to').value   = dateToForMonth(state.year, state.month);
       loadData();
     });
   });
@@ -686,6 +665,7 @@
       state.month = parseInt(btn.dataset.month);
       activateMonth(state.month);
       document.getElementById('date-from').value = firstOfMonth(state.year, state.month);
+      document.getElementById('date-to').value   = dateToForMonth(state.year, state.month);
       loadData();
     });
   });
