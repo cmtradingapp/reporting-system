@@ -2,7 +2,7 @@ import time
 import pandas as pd
 from datetime import datetime, timedelta, timezone
 from app.db.mysql_conn import get_operators, get_users, get_accounts, get_accounts_full, get_crm_users, get_crm_users_full, get_transactions, get_transactions_full, get_trading_accounts, get_trading_accounts_full
-from app.db.mssql_conn import get_targets, get_dealio_mt4trades, get_dealio_mt4trades_full
+from app.db.mssql_conn import get_targets, get_dealio_mt4trades, get_dealio_mt4trades_full, get_vtiger_users
 from app.db.postgres_conn import (
     ensure_table, delete_all_performance, insert_records,
     upsert_users, upsert_accounts, cleanup_accounts, upsert_crm_users, upsert_transactions,
@@ -97,7 +97,7 @@ def run_users_etl(hours: int = 24) -> dict:
     error_msg = None
     rows = 0
     try:
-        df = get_crm_users(hours=hours)
+        df = get_vtiger_users()
         rows = len(df)
         upsert_crm_users(df)
     except Exception as e:
@@ -118,7 +118,7 @@ def run_users_full_etl() -> dict:
     error_msg = None
     rows = 0
     try:
-        df = get_crm_users_full()
+        df = get_vtiger_users()
         rows = len(df)
         upsert_crm_users(df)
     except Exception as e:
