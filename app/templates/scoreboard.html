@@ -108,10 +108,27 @@
     .chevron { transition: transform 0.2s; display: inline-block; color: #484f58; font-size: 0.7rem; margin-right: 8px; }
     .chevron.open { transform: rotate(90deg); }
 
+    /* Dept group row (level 1) */
+    .dept-row td {
+      background-color: #161b22;
+      color: #c9d1d9;
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 7px 14px 7px 28px;
+      border-bottom: 1px solid #21262d;
+      cursor: pointer;
+      user-select: none;
+    }
+    .dept-row:hover td { background-color: #1c2128; }
+
     /* Agent sub-row */
     .agent-row td { padding: 8px 14px 8px 36px; border-bottom: 1px solid #1a1f27; }
     .agent-row td:first-child { color: #e0e0e0; font-size: 0.88rem; white-space: nowrap; }
     .office-row td:first-child { white-space: nowrap; }
+
+    /* Retention agent row (deeper indent, level 2) */
+    .retention-agent-row td { padding: 8px 14px 8px 52px; border-bottom: 1px solid #1a1f27; }
+    .retention-agent-row td:first-child { color: #e0e0e0; font-size: 0.88rem; white-space: nowrap; }
 
     /* Grand total row */
     .total-row td {
@@ -274,46 +291,91 @@
     </div>
   </div>
 
-  <!-- Table Card -->
-  <div class="card p-0" style="overflow:hidden;">
-    <div class="d-flex justify-content-between align-items-center px-4 py-3" style="border-bottom:1px solid #30363d;">
-      <div class="section-title">Sales</div>
-      <span class="text-muted small" id="row-count"></span>
+  <!-- Sales Table -->
+  <div>
+      <div class="card p-0" style="overflow:hidden;">
+        <div class="d-flex justify-content-between align-items-center px-4 py-3" style="border-bottom:1px solid #30363d;">
+          <div class="section-title">Sales</div>
+          <span class="text-muted small" id="row-count"></span>
+        </div>
+
+        <div id="loading" style="display:none;text-align:center;padding:60px;color:#8b949e;">
+          <div class="spinner-border text-success mb-3" style="width:2rem;height:2rem;"></div>
+          <div class="small">Loading...</div>
+        </div>
+
+        <div id="error-msg" style="display:none;" class="text-danger text-center p-4 small"></div>
+
+        <div id="table-wrapper" style="overflow-x:auto;">
+          <table class="scoreboard-table" id="scoreboard-table">
+            <thead>
+              <tr>
+                <th>Office / Agent</th>
+                <th class="text-center" style="min-width:100px;" data-sort="targetTotal">Target FTC <i class="bi sort-icon" id="sort-icon-targetTotal"></i></th>
+                <th class="text-center" style="min-width:90px;" data-sort="ftcRrPctTotal">FTC RR % <i class="bi sort-icon" id="sort-icon-ftcRrPctTotal"></i></th>
+                <th class="text-center" style="min-width:130px;" data-sort="missingTo100RrTotal">Missing to 100% RR <i class="bi sort-icon" id="sort-icon-missingTo100RrTotal"></i></th>
+                <th class="text-center" style="min-width:70px;" data-sort="ftdCountTotal">FTD <i class="bi sort-icon" id="sort-icon-ftdCountTotal"></i></th>
+                <th class="text-center" style="min-width:90px;" data-sort="ftd100Total">FTD100 <i class="bi sort-icon" id="sort-icon-ftd100Total"></i></th>
+                <th class="text-center" style="min-width:80px;" data-sort="total">FTC <i class="bi sort-icon" id="sort-icon-total"></i></th>
+                <th class="text-center" style="min-width:105px;" data-sort="ftd100RrPctTotal">FTD100 RR % <i class="bi sort-icon" id="sort-icon-ftd100RrPctTotal"></i></th>
+                <th class="text-center" style="min-width:90px;" data-sort="ftcRrTotal">FTC RR <i class="bi sort-icon" id="sort-icon-ftcRrTotal"></i></th>
+                <th class="text-center" style="min-width:100px;" data-sort="ftd100RrTotal">FTD100 RR <i class="bi sort-icon" id="sort-icon-ftd100RrTotal"></i></th>
+                <th class="text-center" style="min-width:115px;" data-sort="ftd100TgtPctTotal">Target FTD100 % <i class="bi sort-icon" id="sort-icon-ftd100TgtPctTotal"></i></th>
+                <th class="text-center" style="min-width:105px;" data-sort="ftcTgtPctTotal">Target FTC % <i class="bi sort-icon" id="sort-icon-ftcTgtPctTotal"></i></th>
+                <th class="text-center" style="min-width:100px;" data-sort="netDepositsTotal">NET $ <i class="bi sort-icon" id="sort-icon-netDepositsTotal"></i></th>
+                <th class="text-center" style="min-width:160px;" data-sort="needOnTargetTotal">Need to be on target (100% RR) <i class="bi sort-icon" id="sort-icon-needOnTargetTotal"></i></th>
+                <th class="text-center" style="min-width:140px;" data-sort="missingTo100Total">Missing to reach 100% <i class="bi sort-icon" id="sort-icon-missingTo100Total"></i></th>
+                <th class="text-center" style="min-width:110px;" data-sort="perWdTotal">Per Working Day <i class="bi sort-icon" id="sort-icon-perWdTotal"></i></th>
+              </tr>
+            </thead>
+            <tbody id="table-body"></tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
-    <div id="loading" style="display:none;text-align:center;padding:60px;color:#8b949e;">
-      <div class="spinner-border text-success mb-3" style="width:2rem;height:2rem;"></div>
-      <div class="small">Loading...</div>
+  <!-- Retention Table (below Sales) -->
+  <div class="mt-3">
+      <div class="card p-0" style="overflow:hidden;">
+        <div class="d-flex justify-content-between align-items-center px-4 py-3" style="border-bottom:1px solid #30363d;">
+          <div class="section-title" style="border-left-color:#388bfd;">Retention</div>
+          <span class="text-muted small" id="ret-row-count"></span>
+        </div>
+
+        <div id="ret-loading" style="display:none;text-align:center;padding:60px;color:#8b949e;">
+          <div class="spinner-border mb-3" style="color:#388bfd;width:2rem;height:2rem;"></div>
+          <div class="small">Loading...</div>
+        </div>
+
+        <div id="ret-error-msg" style="display:none;" class="text-danger text-center p-4 small"></div>
+
+        <div id="ret-table-wrapper" style="overflow-x:auto;">
+          <table class="scoreboard-table" id="retention-table">
+            <thead>
+              <tr>
+                <th>Office / Dept / Agent</th>
+                <th class="text-center" style="min-width:110px;">Target NET</th>
+                <th class="text-center" style="min-width:90px;">NET RR %</th>
+                <th class="text-center" style="min-width:130px;">Missing to 100% RR</th>
+                <th class="text-center" style="min-width:100px;">Deposit $</th>
+                <th class="text-center" style="min-width:100px;">NET $</th>
+                <th class="text-center" style="min-width:100px;">NET RR</th>
+                <th class="text-center" style="min-width:105px;">Target NET %</th>
+                <th class="text-center" style="min-width:110px;">Open Volume</th>
+                <th class="text-center" style="min-width:100px;">Volume RR</th>
+                <th class="text-center" style="min-width:115px;">Target Vol RR %</th>
+                <th class="text-center" style="min-width:160px;">Need to be on Target</th>
+                <th class="text-center" style="min-width:140px;">Missing to Reach 100%</th>
+                <th class="text-center" style="min-width:120px;">Per Working Day</th>
+              </tr>
+            </thead>
+            <tbody id="retention-tbody"></tbody>
+            <tfoot id="retention-tfoot"></tfoot>
+          </table>
+        </div>
+      </div>
     </div>
 
-    <div id="error-msg" style="display:none;" class="text-danger text-center p-4 small"></div>
-
-    <div id="table-wrapper" style="overflow-x:auto;">
-      <table class="scoreboard-table" id="scoreboard-table">
-        <thead>
-          <tr>
-            <th>Office / Agent</th>
-            <th class="text-center" style="min-width:100px;" data-sort="targetTotal">Target FTC <i class="bi sort-icon" id="sort-icon-targetTotal"></i></th>
-            <th class="text-center" style="min-width:90px;" data-sort="ftcRrPctTotal">FTC RR % <i class="bi sort-icon" id="sort-icon-ftcRrPctTotal"></i></th>
-            <th class="text-center" style="min-width:130px;" data-sort="missingTo100RrTotal">Missing to 100% RR <i class="bi sort-icon" id="sort-icon-missingTo100RrTotal"></i></th>
-            <th class="text-center" style="min-width:70px;" data-sort="ftdCountTotal">FTD <i class="bi sort-icon" id="sort-icon-ftdCountTotal"></i></th>
-            <th class="text-center" style="min-width:90px;" data-sort="ftd100Total">FTD100 <i class="bi sort-icon" id="sort-icon-ftd100Total"></i></th>
-            <th class="text-center" style="min-width:80px;" data-sort="total">FTC <i class="bi sort-icon" id="sort-icon-total"></i></th>
-            <th class="text-center" style="min-width:105px;" data-sort="ftd100RrPctTotal">FTD100 RR % <i class="bi sort-icon" id="sort-icon-ftd100RrPctTotal"></i></th>
-            <th class="text-center" style="min-width:90px;" data-sort="ftcRrTotal">FTC RR <i class="bi sort-icon" id="sort-icon-ftcRrTotal"></i></th>
-            <th class="text-center" style="min-width:100px;" data-sort="ftd100RrTotal">FTD100 RR <i class="bi sort-icon" id="sort-icon-ftd100RrTotal"></i></th>
-            <th class="text-center" style="min-width:115px;" data-sort="ftd100TgtPctTotal">Target FTD100 % <i class="bi sort-icon" id="sort-icon-ftd100TgtPctTotal"></i></th>
-            <th class="text-center" style="min-width:105px;" data-sort="ftcTgtPctTotal">Target FTC % <i class="bi sort-icon" id="sort-icon-ftcTgtPctTotal"></i></th>
-            <th class="text-center" style="min-width:100px;" data-sort="netDepositsTotal">NET $ <i class="bi sort-icon" id="sort-icon-netDepositsTotal"></i></th>
-            <th class="text-center" style="min-width:160px;" data-sort="needOnTargetTotal">Need to be on target (100% RR) <i class="bi sort-icon" id="sort-icon-needOnTargetTotal"></i></th>
-            <th class="text-center" style="min-width:140px;" data-sort="missingTo100Total">Missing to reach 100% <i class="bi sort-icon" id="sort-icon-missingTo100Total"></i></th>
-            <th class="text-center" style="min-width:110px;" data-sort="perWdTotal">Per Working Day <i class="bi sort-icon" id="sort-icon-perWdTotal"></i></th>
-          </tr>
-        </thead>
-        <tbody id="table-body"></tbody>
-      </table>
-    </div>
-  </div>
 
 </div>
 </div>
@@ -346,7 +408,7 @@
     return `${year}-${pad(month)}-01`;
   }
   function lastOfMonth(year, month) {
-    const d = new Date(year, month, 0); // day 0 of next month = last day of this month
+    const d = new Date(year, month, 0);
     return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
   }
   function dateToForMonth(year, month) {
@@ -379,7 +441,13 @@
     document.getElementById('date-to').value = state.dateTo;
   }
 
-  // ── API fetch + render ─────────────────────────────────────────────────
+  // ── Combined load ──────────────────────────────────────────────────────
+  function loadAll() {
+    loadData();
+    loadRetentionData();
+  }
+
+  // ── API fetch + render (Sales) ─────────────────────────────────────────
   async function loadData() {
     const df = document.getElementById('date-from').value;
     const dt = document.getElementById('date-to').value;
@@ -688,7 +756,7 @@
       activateYear(state.year);
       document.getElementById('date-from').value = firstOfMonth(state.year, state.month);
       document.getElementById('date-to').value   = dateToForMonth(state.year, state.month);
-      loadData();
+      loadAll();
     });
   });
 
@@ -699,7 +767,7 @@
       activateMonth(state.month);
       document.getElementById('date-from').value = firstOfMonth(state.year, state.month);
       document.getElementById('date-to').value   = dateToForMonth(state.year, state.month);
-      loadData();
+      loadAll();
     });
   });
 
@@ -707,18 +775,18 @@
   document.getElementById('btn-today').addEventListener('click', () => {
     document.getElementById('date-to').value = todayStr();
     setQuickActive('btn-today');
-    loadData();
+    loadAll();
   });
   document.getElementById('btn-ystrd').addEventListener('click', () => {
     document.getElementById('date-to').value = yesterdayStr();
     setQuickActive('btn-ystrd');
-    loadData();
+    loadAll();
   });
 
   // ── Event: Apply button ────────────────────────────────────────────────
   document.getElementById('btn-apply').addEventListener('click', () => {
     setQuickActive(null);
-    loadData();
+    loadAll();
   });
 
   // ── Sort icons ─────────────────────────────────────────────────────────
@@ -750,9 +818,8 @@
     });
   });
 
-  // ── Event: date-from manual change → clear month/year highlight ────────
+  // ── Event: date-from manual change ────────────────────────────────────
   document.getElementById('date-from').addEventListener('change', () => {
-    // Try to sync year/month highlight from the new date
     const val = document.getElementById('date-from').value;
     if (val) {
       const d = new Date(val + 'T00:00:00');
@@ -763,6 +830,338 @@
     }
   });
 
+  // ══════════════════════════════════════════════════════════════════════
+  // RETENTION TABLE
+  // ══════════════════════════════════════════════════════════════════════
+
+  let retAllRows = [];
+
+  // ── Retention formatters ───────────────────────────────────────────────
+
+  // Percentage where fraction is 0..1 (e.g. 0.85 → 85%), green ≥ 100%
+  function retPctHtml(pct, bold = false) {
+    if (pct === null || pct === undefined) return `<span style="color:#484f58;">—</span>`;
+    const pctRounded = Math.round(pct * 100);
+    const color = pctRounded >= 100 ? '#3fb950' : '#f85149';
+    const fw = bold ? '700' : '600';
+    return `<span style="color:${color};font-weight:${fw};">${pctRounded}%</span>`;
+  }
+
+  // Dollar diff where negative = good (green), positive = bad (red)
+  function netDiffHtml(val, bold = false) {
+    if (val === null || val === undefined) return `<span style="color:#484f58;">—</span>`;
+    const fw = bold ? '700' : '600';
+    const color = val <= 0 ? '#3fb950' : '#f85149';
+    const abs = Math.abs(val);
+    const fmt = abs >= 1000
+      ? (val < 0 ? '-' : '') + '$' + Math.round(abs).toLocaleString('en-US')
+      : (val < 0 ? '-$' : '$') + abs.toFixed(2);
+    return `<span style="color:${color};font-weight:${fw};">${fmt}</span>`;
+  }
+
+  // Per working day (dollar, negative = on/over target = green)
+  function retPerWdHtml(val, bold = false) {
+    if (val === null || val === undefined) return `<span style="color:#484f58;">—</span>`;
+    const fw = bold ? '700' : '600';
+    const color = val <= 0 ? '#3fb950' : '#d29922';
+    const abs = Math.abs(val);
+    const fmt = abs >= 1000
+      ? (val < 0 ? '-' : '') + '$' + Math.round(abs).toLocaleString('en-US')
+      : (val < 0 ? '-$' : '$') + abs.toFixed(2);
+    return `<span style="color:${color};font-weight:${fw};">${fmt}</span>`;
+  }
+
+  // ── Retention API fetch ────────────────────────────────────────────────
+  async function loadRetentionData() {
+    const df = document.getElementById('date-from').value;
+    const dt = document.getElementById('date-to').value;
+    if (!df || !dt) return;
+
+    document.getElementById('ret-loading').style.display = 'block';
+    document.getElementById('ret-table-wrapper').style.display = 'none';
+    document.getElementById('ret-error-msg').style.display = 'none';
+
+    try {
+      const res = await fetch(`/api/scoreboard/retention?date_from=${df}&date_to=${dt}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Server error');
+
+      const wd        = data.working_days;
+      const wd_passed = data.working_days_passed;
+      const wd_left   = data.working_days_left;
+      const safe_wdp  = Math.max(wd_passed, 1);
+
+      retAllRows = data.rows.map(r => {
+        const target_net_prorated = wd > 0 ? Math.ceil(r.target_net / wd * safe_wdp) : 0;
+        const net_rr              = r.net_usd > 0 ? Math.floor(r.net_usd / safe_wdp * wd) : r.net_usd;
+        const net_rr_pct          = r.target_net > 0 ? net_rr / r.target_net : null;
+        const need_on_target      = wd > 0 ? r.target_net * (wd_passed / wd) : 0;
+        const missing_100_rr      = need_on_target - r.net_usd;
+        const target_net_pct      = r.target_net > 0 ? r.net_usd / r.target_net : null;
+        const vol_rr              = r.open_volume_usd > 0 ? Math.round(r.open_volume_usd / safe_wdp * wd) : r.open_volume_usd;
+        const target_vol          = r.target_net * 1650;
+        const target_vol_rr_pct   = target_vol > 0 ? vol_rr / target_vol : null;
+        const missing_100         = r.target_net - r.net_usd;
+        const per_wd              = wd_left > 0 ? missing_100 / wd_left : null;
+        return {
+          ...r,
+          target_net_prorated, net_rr, net_rr_pct,
+          need_on_target, missing_100_rr, target_net_pct,
+          vol_rr, target_vol, target_vol_rr_pct,
+          missing_100, per_wd,
+        };
+      });
+
+      renderRetentionTable(wd, wd_passed, wd_left);
+    } catch(e) {
+      document.getElementById('ret-error-msg').textContent = 'Error: ' + e.message;
+      document.getElementById('ret-error-msg').style.display = 'block';
+    } finally {
+      document.getElementById('ret-loading').style.display = 'none';
+      document.getElementById('ret-table-wrapper').style.display = '';
+    }
+  }
+
+  // ── Retention table render ─────────────────────────────────────────────
+  function renderRetentionTable(wd, wd_passed, wd_left) {
+    const safe_wdp = Math.max(wd_passed, 1);
+
+    const filtered = retAllRows.filter(r =>
+      r.target_net > 0 || r.net_usd !== 0 || r.deposit_usd > 0 || r.open_volume_usd > 0
+    );
+
+    const tbody = document.getElementById('retention-tbody');
+    const tfoot = document.getElementById('retention-tfoot');
+    tbody.innerHTML = '';
+    tfoot.innerHTML = '';
+
+    // Group: office → dept → agents
+    const officeMap = new Map();
+    filtered.forEach(r => {
+      if (!officeMap.has(r.office_name)) officeMap.set(r.office_name, new Map());
+      const deptMap = officeMap.get(r.office_name);
+      if (!deptMap.has(r.dept_name)) deptMap.set(r.dept_name, []);
+      deptMap.get(r.dept_name).push(r);
+    });
+
+    // Grand totals (raw, for final row computation)
+    let gTargetNet  = 0, gNetUsd  = 0, gDepositUsd = 0, gOpenVol = 0;
+    let gNetRr      = 0, gNeedOnTarget = 0, gMissing100 = 0;
+    let totalOffices = 0, totalAgents = 0;
+    let officeIndex  = 0;
+
+    officeMap.forEach((deptMap, officeName) => {
+      totalOffices++;
+      const officeId     = 'ret-office-' + officeIndex++;
+      const officeAgents = [];
+      deptMap.forEach(agents => officeAgents.push(...agents));
+
+      // Office-level aggregates
+      const offTgtNet    = officeAgents.reduce((s, a) => s + a.target_net, 0);
+      const offNetUsd    = officeAgents.reduce((s, a) => s + a.net_usd, 0);
+      const offDepUsd    = officeAgents.reduce((s, a) => s + a.deposit_usd, 0);
+      const offOpenVol   = officeAgents.reduce((s, a) => s + a.open_volume_usd, 0);
+      const offNetRr     = officeAgents.reduce((s, a) => s + (a.net_rr ?? 0), 0);
+      const offNeedOnTgt = officeAgents.reduce((s, a) => s + a.need_on_target, 0);
+      const offMiss100   = officeAgents.reduce((s, a) => s + a.missing_100, 0);
+      const offMiss100Rr = officeAgents.reduce((s, a) => s + a.missing_100_rr, 0);
+      const offVolRr     = officeAgents.reduce((s, a) => s + (a.vol_rr ?? 0), 0);
+      const offTgtVol    = offTgtNet * 1650;
+      const offNetRrPct  = offTgtNet > 0 ? offNetRr / offTgtNet : null;
+      const offNetTgtPct = offTgtNet > 0 ? offNetUsd / offTgtNet : null;
+      const offVolRrPct  = offTgtVol > 0 ? offVolRr / offTgtVol : null;
+      const offPerWd     = wd_left > 0 ? offMiss100 / wd_left : null;
+      const offTgtPro    = wd > 0 ? Math.ceil(offTgtNet / wd * safe_wdp) : 0;
+
+      gTargetNet    += offTgtNet;
+      gNetUsd       += offNetUsd;
+      gDepositUsd   += offDepUsd;
+      gOpenVol      += offOpenVol;
+      gNetRr        += offNetRr;
+      gNeedOnTarget += offNeedOnTgt;
+      gMissing100   += offMiss100;
+
+      // Office row
+      const offTr = document.createElement('tr');
+      offTr.className = 'office-row';
+      offTr.dataset.officeId = officeId;
+      offTr.innerHTML = `
+        <td>
+          <span class="chevron">&#9654;</span>
+          <i class="bi bi-building me-2" style="color:#484f58;font-size:0.75rem;"></i>
+          <strong>${escHtml(officeName)}</strong>
+          <span class="text-muted ms-2" style="font-size:0.72rem;font-weight:400;">${officeAgents.length} agents</span>
+        </td>
+        <td class="text-center"><span class="office-total" style="color:#388bfd;">${netHtml(offTgtPro, true)}</span></td>
+        <td class="text-center">${retPctHtml(offNetRrPct, true)}</td>
+        <td class="text-center">${netDiffHtml(offMiss100Rr, true)}</td>
+        <td class="text-center">${netHtml(offDepUsd, true)}</td>
+        <td class="text-center">${netHtml(offNetUsd, true)}</td>
+        <td class="text-center"><span class="office-total" style="color:#d29922;">${netHtml(offNetRr, true)}</span></td>
+        <td class="text-center">${retPctHtml(offNetTgtPct, true)}</td>
+        <td class="text-center"><span class="office-total">${netHtml(offOpenVol, true)}</span></td>
+        <td class="text-center"><span class="office-total" style="color:#d29922;">${netHtml(offVolRr, true)}</span></td>
+        <td class="text-center">${retPctHtml(offVolRrPct, true)}</td>
+        <td class="text-center">${netHtml(offNeedOnTgt, true)}</td>
+        <td class="text-center">${netDiffHtml(offMiss100, true)}</td>
+        <td class="text-center">${retPerWdHtml(offPerWd, true)}</td>
+      `;
+      tbody.appendChild(offTr);
+
+      let deptIndex = 0;
+      deptMap.forEach((agents, deptName) => {
+        totalAgents += agents.length;
+        const deptId = officeId + '-dept-' + deptIndex++;
+
+        // Dept-level aggregates
+        const dTgtNet    = agents.reduce((s, a) => s + a.target_net, 0);
+        const dNetUsd    = agents.reduce((s, a) => s + a.net_usd, 0);
+        const dDepUsd    = agents.reduce((s, a) => s + a.deposit_usd, 0);
+        const dOpenVol   = agents.reduce((s, a) => s + a.open_volume_usd, 0);
+        const dNetRr     = agents.reduce((s, a) => s + (a.net_rr ?? 0), 0);
+        const dNeedOnTgt = agents.reduce((s, a) => s + a.need_on_target, 0);
+        const dMiss100   = agents.reduce((s, a) => s + a.missing_100, 0);
+        const dMiss100Rr = agents.reduce((s, a) => s + a.missing_100_rr, 0);
+        const dVolRr     = agents.reduce((s, a) => s + (a.vol_rr ?? 0), 0);
+        const dTgtVol    = dTgtNet * 1650;
+        const dNetRrPct  = dTgtNet > 0 ? dNetRr / dTgtNet : null;
+        const dNetTgtPct = dTgtNet > 0 ? dNetUsd / dTgtNet : null;
+        const dVolRrPct  = dTgtVol > 0 ? dVolRr / dTgtVol : null;
+        const dPerWd     = wd_left > 0 ? dMiss100 / wd_left : null;
+        const dTgtPro    = wd > 0 ? Math.ceil(dTgtNet / wd * safe_wdp) : 0;
+
+        // Dept row (hidden by default)
+        const deptTr = document.createElement('tr');
+        deptTr.className = 'dept-row';
+        deptTr.dataset.parentOffice = officeId;
+        deptTr.dataset.deptId = deptId;
+        deptTr.style.display = 'none';
+        deptTr.innerHTML = `
+          <td>
+            <span class="chevron">&#9654;</span>
+            <i class="bi bi-diagram-3 me-2" style="color:#484f58;font-size:0.72rem;"></i>
+            ${escHtml(deptName)}
+            <span class="text-muted ms-2" style="font-size:0.68rem;font-weight:400;">${agents.length} agents</span>
+          </td>
+          <td class="text-center">${netHtml(dTgtPro)}</td>
+          <td class="text-center">${retPctHtml(dNetRrPct)}</td>
+          <td class="text-center">${netDiffHtml(dMiss100Rr)}</td>
+          <td class="text-center">${netHtml(dDepUsd)}</td>
+          <td class="text-center">${netHtml(dNetUsd)}</td>
+          <td class="text-center">${netHtml(dNetRr)}</td>
+          <td class="text-center">${retPctHtml(dNetTgtPct)}</td>
+          <td class="text-center">${netHtml(dOpenVol)}</td>
+          <td class="text-center">${netHtml(dVolRr)}</td>
+          <td class="text-center">${retPctHtml(dVolRrPct)}</td>
+          <td class="text-center">${netHtml(dNeedOnTgt)}</td>
+          <td class="text-center">${netDiffHtml(dMiss100)}</td>
+          <td class="text-center">${retPerWdHtml(dPerWd)}</td>
+        `;
+        tbody.appendChild(deptTr);
+
+        // Agent rows (hidden by default)
+        agents.forEach(r => {
+          const agTr = document.createElement('tr');
+          agTr.className = 'agent-row retention-agent-row';
+          agTr.dataset.parentOffice = officeId;
+          agTr.dataset.parentDept   = deptId;
+          agTr.style.display = 'none';
+          agTr.innerHTML = `
+            <td>${escHtml(r.agent_name)}</td>
+            <td class="text-center">${netHtml(r.target_net_prorated)}</td>
+            <td class="text-center">${retPctHtml(r.net_rr_pct)}</td>
+            <td class="text-center">${netDiffHtml(r.missing_100_rr)}</td>
+            <td class="text-center">${netHtml(r.deposit_usd)}</td>
+            <td class="text-center">${netHtml(r.net_usd)}</td>
+            <td class="text-center">${netHtml(r.net_rr)}</td>
+            <td class="text-center">${retPctHtml(r.target_net_pct)}</td>
+            <td class="text-center">${netHtml(r.open_volume_usd)}</td>
+            <td class="text-center">${netHtml(r.vol_rr)}</td>
+            <td class="text-center">${retPctHtml(r.target_vol_rr_pct)}</td>
+            <td class="text-center">${netHtml(r.need_on_target)}</td>
+            <td class="text-center">${netDiffHtml(r.missing_100)}</td>
+            <td class="text-center">${retPerWdHtml(r.per_wd)}</td>
+          `;
+          tbody.appendChild(agTr);
+        });
+
+        // Dept click: toggle agent rows for this dept
+        deptTr.addEventListener('click', e => {
+          e.stopPropagation();
+          const chevron = deptTr.querySelector('.chevron');
+          const isOpen  = chevron.classList.contains('open');
+          const agRows  = tbody.querySelectorAll(`tr[data-parent-dept="${deptId}"]`);
+          chevron.classList.toggle('open', !isOpen);
+          agRows.forEach(r => r.style.display = isOpen ? 'none' : '');
+        });
+      });
+
+      // Office click: toggle dept rows (and hide agent rows when closing)
+      offTr.addEventListener('click', () => {
+        const chevron = offTr.querySelector('.chevron');
+        const isOpen  = chevron.classList.contains('open');
+        if (!isOpen) {
+          // Open: show dept rows only (agents stay hidden)
+          tbody.querySelectorAll(`tr.dept-row[data-parent-office="${officeId}"]`)
+            .forEach(r => r.style.display = '');
+          chevron.classList.add('open');
+        } else {
+          // Close: hide depts + all agent rows, reset dept chevrons
+          tbody.querySelectorAll(`tr[data-parent-office="${officeId}"]`).forEach(r => {
+            r.style.display = 'none';
+            if (r.classList.contains('dept-row')) {
+              r.querySelector('.chevron')?.classList.remove('open');
+              const dId = r.dataset.deptId;
+              if (dId) {
+                tbody.querySelectorAll(`tr[data-parent-dept="${dId}"]`)
+                  .forEach(ar => ar.style.display = 'none');
+              }
+            }
+          });
+          chevron.classList.remove('open');
+        }
+      });
+    });
+
+    if (filtered.length === 0) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td colspan="14" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No data for this period</td>`;
+      tbody.appendChild(tr);
+    } else {
+      // Grand total row
+      const gNetRrPct   = gTargetNet > 0 ? gNetRr / gTargetNet : null;
+      const gNetTgtPct  = gTargetNet > 0 ? gNetUsd / gTargetNet : null;
+      const gVolRr      = gOpenVol > 0 ? Math.round(gOpenVol / safe_wdp * wd) : gOpenVol;
+      const gTgtVol     = gTargetNet * 1650;
+      const gVolRrPct   = gTgtVol > 0 ? gVolRr / gTgtVol : null;
+      const gMiss100Rr  = gNeedOnTarget - gNetUsd;
+      const gPerWd      = wd_left > 0 ? gMissing100 / wd_left : null;
+      const gTgtPro     = wd > 0 ? Math.ceil(gTargetNet / wd * safe_wdp) : 0;
+
+      const totalTr = document.createElement('tr');
+      totalTr.className = 'total-row';
+      totalTr.innerHTML = `
+        <td>Total</td>
+        <td class="text-center">${netHtml(gTgtPro, true)}</td>
+        <td class="text-center">${retPctHtml(gNetRrPct, true)}</td>
+        <td class="text-center">${netDiffHtml(gMiss100Rr, true)}</td>
+        <td class="text-center">${netHtml(gDepositUsd, true)}</td>
+        <td class="text-center">${netHtml(gNetUsd, true)}</td>
+        <td class="text-center">${netHtml(gNetRr, true)}</td>
+        <td class="text-center">${retPctHtml(gNetTgtPct, true)}</td>
+        <td class="text-center">${netHtml(gOpenVol, true)}</td>
+        <td class="text-center">${netHtml(gVolRr, true)}</td>
+        <td class="text-center">${retPctHtml(gVolRrPct, true)}</td>
+        <td class="text-center">${netHtml(gNeedOnTarget, true)}</td>
+        <td class="text-center">${netDiffHtml(gMissing100, true)}</td>
+        <td class="text-center">${retPerWdHtml(gPerWd, true)}</td>
+      `;
+      tfoot.appendChild(totalTr);
+    }
+
+    document.getElementById('ret-row-count').textContent = `${totalOffices} offices · ${totalAgents} agents`;
+  }
+
   // ── Init ───────────────────────────────────────────────────────────────
   document.getElementById('date-from').value = firstOfMonth(state.year, state.month);
   document.getElementById('date-to').value   = todayStr();
@@ -770,7 +1169,7 @@
   activateMonth(state.month);
   setQuickActive('btn-today');
   updateSortIcons();
-  loadData();
+  loadAll();
 </script>
 
 </body>

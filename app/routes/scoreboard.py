@@ -229,3 +229,113 @@ def scoreboard_api(date_from: str, date_to: str):
         return JSONResponse(status_code=500, content={"detail": str(e)})
     finally:
         conn.close()
+
+
+@router.get("/api/scoreboard/retention")
+def scoreboard_retention_api(date_from: str, date_to: str):
+    try:
+        dt_from = datetime.strptime(date_from, "%Y-%m-%d").date()
+        dt_to   = datetime.strptime(date_to,   "%Y-%m-%d").date()
+        date_to_exclusive = (dt_to + timedelta(days=1)).strftime("%Y-%m-%d")
+        last_day = last_day_of_month(dt_from).strftime("%Y-%m-%d")
+    except ValueError:
+        return JSONResponse(status_code=400, content={"detail": "Invalid date format"})
+
+    sql = """
+        SELECT
+            COALESCE(u.office_name, 'N/A')                   AS office_name,
+            COALESCE(u.department_, 'N/A')                    AS dept_name,
+            COALESCE(u.agent_name, u.full_name, 'N/A')        AS agent_name,
+            COALESCE(tgt.monthly_target_net, 0)::float        AS target_net,
+            COALESCE(net.net_usd, 0)::float                   AS net_usd,
+            COALESCE(dep.deposit_usd, 0)::float               AS deposit_usd,
+            COALESCE(vol.open_volume_usd, 0)::float           AS open_volume_usd
+        FROM crm_users u
+        LEFT JOIN (
+            SELECT agent_id::bigint, SUM(net)::float AS monthly_target_net
+            FROM targets
+            WHERE date >= %(date_from)s AND date <= %(last_day)s AND agent_id IS NOT NULL
+            GROUP BY agent_id
+        ) tgt ON tgt.agent_id = u.id
+        LEFT JOIN (
+            SELECT a.assigned_to AS agent_id,
+                   SUM(CASE WHEN t.transactiontype IN ('Deposit','Withdrawal Cancelled') THEN t.usdamount
+                            WHEN t.transactiontype IN ('Withdrawal','Deposit Cancelled')  THEN -t.usdamount END) AS net_usd
+            FROM transactions t
+            JOIN accounts a ON a.accountid = t.vtigeraccountid
+            WHERE t.transactionapproval = 'Approved' AND (t.deleted = 0 OR t.deleted IS NULL)
+              AND t.transactiontype IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
+              AND t.confirmation_time >= %(date_from)s AND t.confirmation_time < %(date_to_excl)s
+            GROUP BY a.assigned_to
+        ) net ON net.agent_id = u.id
+        LEFT JOIN (
+            SELECT a.assigned_to AS agent_id, SUM(t.usdamount)::float AS deposit_usd
+            FROM transactions t JOIN accounts a ON a.accountid = t.vtigeraccountid
+            WHERE t.transactionapproval = 'Approved' AND (t.deleted = 0 OR t.deleted IS NULL)
+              AND t.transactiontype IN ('Deposit','Withdrawal Cancelled')
+              AND t.confirmation_time >= %(date_from)s AND t.confirmation_time < %(date_to_excl)s
+            GROUP BY a.assigned_to
+        ) dep ON dep.agent_id = u.id
+        LEFT JOIN (
+            SELECT a.assigned_to AS agent_id, SUM(d.notional_value)::float AS open_volume_usd
+            FROM dealio_mt4trades d
+            JOIN trading_accounts ta ON ta.login::bigint = d.login
+            JOIN accounts a ON a.accountid = ta.vtigeraccountid
+            WHERE d.open_time::date >= %(date_from)s AND d.open_time::date <= %(date_to)s
+              AND EXTRACT(YEAR FROM d.open_time) >= 2024
+              AND ta.vtigeraccountid IS NOT NULL
+            GROUP BY a.assigned_to
+        ) vol ON vol.agent_id = u.id
+        WHERE u.department_ = 'Retention'
+          AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
+          AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
+          AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'
+        ORDER BY u.office_name NULLS LAST, dept_name, u.agent_name
+    """
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            try:
+                cur.execute("SELECT holiday_date FROM public_holidays")
+                holidays = {row[0] for row in cur.fetchall()}
+            except Exception:
+                conn.rollback()
+                holidays = set()
+
+            cur.execute(sql, {
+                "date_from":    date_from,
+                "date_to_excl": date_to_exclusive,
+                "date_to":      date_to,
+                "last_day":     last_day,
+            })
+            rows = cur.fetchall()
+
+        today               = datetime.utcnow().date()
+        month_end           = last_day_of_month(dt_from)
+        working_days        = count_working_days(dt_from, month_end, holidays)
+        working_days_passed = count_working_days(dt_from, min(dt_to, today), holidays)
+        working_days_left   = working_days - working_days_passed
+
+        data = [
+            {
+                "office_name":     r[0],
+                "dept_name":       r[1],
+                "agent_name":      r[2],
+                "target_net":      round(r[3], 2),
+                "net_usd":         round(r[4], 2),
+                "deposit_usd":     round(r[5], 2),
+                "open_volume_usd": round(r[6], 2),
+            }
+            for r in rows
+        ]
+        return JSONResponse(content={
+            "rows":                data,
+            "working_days":        working_days,
+            "working_days_passed": working_days_passed,
+            "working_days_left":   working_days_left,
+        })
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+    finally:
+        conn.close()
