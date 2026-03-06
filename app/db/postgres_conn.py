@@ -630,6 +630,16 @@ def fetch_accounts_stats() -> dict:
         conn.close()
 
 
+def truncate_crm_users():
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("TRUNCATE TABLE crm_users")
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def upsert_crm_users(df: pd.DataFrame):
     cols = [
         "id", "email", "full_name", "status", "first_name", "last_name",
