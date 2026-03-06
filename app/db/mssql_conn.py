@@ -26,66 +26,6 @@ def _normalize_dealio_cols(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def get_vtiger_users() -> pd.DataFrame:
-    conn = _get_mssql_connection()
-    try:
-        query = """
-            SELECT
-                id,
-                user_name                           AS full_name,
-                user_name                           AS agent_name,
-                first_name,
-                last_name,
-                email,
-                status,
-                last_login                          AS last_logon_time,
-                lastupdated                         AS last_update_time,
-                department,
-                department                          AS team,
-                department                          AS desk_name,
-                department                          AS desk,
-                language,
-                position,
-                office,
-                NULL                                AS role_id,
-                NULL                                AS desk_id,
-                NULL                                AS type,
-                NULL                                AS office_id,
-                CASE
-                    WHEN office IS NULL OR LTRIM(RTRIM(office)) IN ('', 'General') THEN 'General'
-                    WHEN office = 'IN'          THEN 'India'
-                    WHEN office = 'UY'          THEN 'Uruguay'
-                    WHEN office = 'SA'          THEN 'South Africa'
-                    WHEN office = 'LAG-NG'      THEN 'LAG Nigeria'
-                    WHEN office = 'IL'          THEN 'Israel'
-                    WHEN office = 'GMT'         THEN 'GMT'
-                    WHEN office = 'Global'      THEN 'General'
-                    WHEN office = 'DU'          THEN 'Dubai'
-                    WHEN office = 'CO'          THEN 'Columbia'
-                    WHEN office = 'CY'          THEN 'Cyprus'
-                    WHEN office = 'BG'          THEN 'Bulgaria'
-                    WHEN office = 'ABJ-NG'      THEN 'ABJ Nigeria'
-                    WHEN office = 'WL-BG'       THEN 'WL Bulgaria'
-                    WHEN office = 'WL-PK'       THEN 'WL Pakistan'
-                    WHEN office = 'WL-SL'       THEN 'WL Sri Lanka'
-                    WHEN office = 'WL-IL'       THEN 'WL IL'
-                    WHEN office = 'VN'          THEN 'Vietnam'
-                    WHEN office = 'WL-Belgrad'  THEN 'WL Belgrad'
-                    WHEN office = 'WL-SNS-UAW'  THEN 'WL UAE'
-                    WHEN office = 'WL-ABUKING'  THEN 'WL ABUKING'
-                    ELSE office
-                END AS office_name,
-                CASE
-                    WHEN LOWER(ISNULL(department, '')) LIKE '%conversion%'
-                    THEN 'Sales' ELSE 'Retention'
-                END AS department_
-            FROM report.vtiger_users
-        """
-        return pd.read_sql(query, conn)
-    finally:
-        conn.close()
-
-
 def get_targets() -> pd.DataFrame:
     conn = _get_mssql_connection()
     try:
