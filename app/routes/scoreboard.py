@@ -111,8 +111,7 @@ def scoreboard_api(date_from: str, date_to: str):
               AND t.confirmation_time <  %(date_to_excl)s
             GROUP BY t.original_deposit_owner
         ) ftd_cnt ON ftd_cnt.agent_id = u.id
-        WHERE u.status = 'Active'
-          AND u.department_ = 'Sales'
+        WHERE u.department_ = 'Sales'
           AND u.team = 'Conversion'
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
