@@ -363,6 +363,12 @@ def ensure_table():
             position         VARCHAR(100),
             synced_at        TIMESTAMP DEFAULT NOW()
         );
+
+        CREATE TABLE IF NOT EXISTS public_holidays (
+            holiday_date  DATE        NOT NULL,
+            description   VARCHAR(255),
+            CONSTRAINT pk_public_holidays PRIMARY KEY (holiday_date)
+        );
     """
     conn = get_connection()
     try:
