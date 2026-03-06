@@ -278,13 +278,7 @@
   <div class="card p-0" style="overflow:hidden;">
     <div class="d-flex justify-content-between align-items-center px-4 py-3" style="border-bottom:1px solid #30363d;">
       <div class="section-title">Sales</div>
-      <div class="d-flex align-items-center gap-3">
-        <label class="d-flex align-items-center gap-2 text-muted small mb-0" style="cursor:pointer;">
-          <input type="checkbox" id="show-zeros" class="form-check-input m-0" style="background-color:#21262d;border-color:#484f58;" />
-          Show 0 FTC
-        </label>
-        <span class="text-muted small" id="row-count"></span>
-      </div>
+      <span class="text-muted small" id="row-count"></span>
     </div>
 
     <div id="loading" style="display:none;text-align:center;padding:60px;color:#8b949e;">
@@ -445,8 +439,9 @@
   }
 
   function renderTable() {
-    const showZeros = document.getElementById('show-zeros').checked;
-    const filtered  = showZeros ? allRows : allRows.filter(r => r.ftc > 0);
+    const filtered = allRows.filter(r =>
+      r.ftc > 0 || r.target_ftc > 0 || r.ftd100 > 0 || r.net_deposits !== 0 || r.ftd_count > 0
+    );
 
     const tbody = document.getElementById('table-body');
     tbody.innerHTML = '';
@@ -724,11 +719,6 @@
   document.getElementById('btn-apply').addEventListener('click', () => {
     setQuickActive(null);
     loadData();
-  });
-
-  // ── Event: show zeros checkbox ─────────────────────────────────────────
-  document.getElementById('show-zeros').addEventListener('change', () => {
-    if (allRows.length) renderTable();
   });
 
   // ── Sort icons ─────────────────────────────────────────────────────────
