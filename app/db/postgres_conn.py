@@ -370,28 +370,28 @@ def ensure_table():
             CONSTRAINT pk_public_holidays PRIMARY KEY (holiday_date)
         );
 
-        INSERT INTO public_holidays (holiday_date, description) VALUES
-            ('2024-01-01', 'New Year''s Day'),
-            ('2024-12-24', 'Christmas Eve'),
-            ('2024-12-25', 'Christmas Day'),
-            ('2024-12-26', 'Boxing Day'),
-            ('2024-12-31', 'New Year''s Eve'),
-            ('2025-01-01', 'New Year''s Day'),
-            ('2025-12-24', 'Christmas Eve'),
-            ('2025-12-25', 'Christmas Day'),
-            ('2025-12-26', 'Boxing Day'),
-            ('2025-12-31', 'New Year''s Eve'),
-            ('2026-01-01', 'New Year''s Day'),
-            ('2026-12-24', 'Christmas Eve'),
-            ('2026-12-25', 'Christmas Day'),
-            ('2026-12-26', 'Boxing Day'),
-            ('2026-12-31', 'New Year''s Eve')
-        ON CONFLICT (holiday_date) DO NOTHING;
     """
     conn = get_connection()
     try:
         with conn.cursor() as cur:
             cur.execute(sql)
+            # Seed recurring holidays for 2024 through current year + 5
+            from datetime import date
+            current_year = date.today().year
+            holiday_rows = []
+            for y in range(2024, current_year + 6):
+                holiday_rows += [
+                    (f"{y}-01-01", "New Year's Day"),
+                    (f"{y}-12-24", "Christmas Eve"),
+                    (f"{y}-12-25", "Christmas Day"),
+                    (f"{y}-12-26", "Boxing Day"),
+                    (f"{y}-12-31", "New Year's Eve"),
+                ]
+            execute_values(
+                cur,
+                "INSERT INTO public_holidays (holiday_date, description) VALUES %s ON CONFLICT (holiday_date) DO NOTHING",
+                holiday_rows,
+            )
         conn.commit()
     finally:
         conn.close()
