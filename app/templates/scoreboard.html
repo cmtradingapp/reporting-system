@@ -6,6 +6,7 @@
   <title>Scoreboard</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet"/>
+  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
   <style>
     body { background-color: #0f1117; color: #e0e0e0; font-family: 'Segoe UI', sans-serif; display: flex; min-height: 100vh; }
     .sidebar { width: 220px; min-height: 100vh; background-color: #161b22; border-right: 1px solid #30363d; display: flex; flex-direction: column; position: fixed; top: 0; left: 0; bottom: 0; z-index: 100; }
@@ -296,7 +297,12 @@
       <div class="card p-0" style="overflow:hidden;">
         <div class="d-flex justify-content-between align-items-center px-4 py-3" style="border-bottom:1px solid #30363d;">
           <div class="section-title">Sales</div>
-          <span class="text-muted small" id="row-count"></span>
+          <div class="d-flex align-items-center gap-3">
+            <span class="text-muted small" id="row-count"></span>
+            <button onclick="exportSalesExcel()" class="btn btn-sm" style="background:#1a4731;border:1px solid #238636;color:#3fb950;border-radius:6px;font-size:0.8rem;padding:4px 12px;">
+              <i class="bi bi-file-earmark-excel me-1"></i>Export Excel
+            </button>
+          </div>
         </div>
 
         <div id="loading" style="display:none;text-align:center;padding:60px;color:#8b949e;">
@@ -339,7 +345,12 @@
       <div class="card p-0" style="overflow:hidden;">
         <div class="d-flex justify-content-between align-items-center px-4 py-3" style="border-bottom:1px solid #30363d;">
           <div class="section-title" style="border-left-color:#388bfd;">Retention</div>
-          <span class="text-muted small" id="ret-row-count"></span>
+          <div class="d-flex align-items-center gap-3">
+            <span class="text-muted small" id="ret-row-count"></span>
+            <button onclick="exportRetentionExcel()" class="btn btn-sm" style="background:#0d2137;border:1px solid #1f6feb;color:#388bfd;border-radius:6px;font-size:0.8rem;padding:4px 12px;">
+              <i class="bi bi-file-earmark-excel me-1"></i>Export Excel
+            </button>
+          </div>
         </div>
 
         <div id="ret-loading" style="display:none;text-align:center;padding:60px;color:#8b949e;">
@@ -1246,6 +1257,84 @@
     }
 
     document.getElementById('ret-row-count').textContent = `${totalOffices} offices · ${totalAgents} agents`;
+  }
+
+  // ── Export Sales to Excel ──────────────────────────────────────────────
+  function exportSalesExcel() {
+    if (!allRows.length) return;
+    const filtered = allRows.filter(r =>
+      r.ftc > 0 || r.target_ftc > 0 || r.ftd100 > 0 || r.net_deposits !== 0 || r.ftd_count > 0
+    );
+    const headers = [
+      'Office', 'Agent', 'Target FTC', 'FTC RR %', 'Missing to 100% RR',
+      'FTD', 'FTD100', 'FTC', 'FTD100 RR %', 'FTC RR', 'FTD100 RR',
+      'Target FTD100 %', 'Target FTC %', 'NET $',
+      'Need to be on Target (100% RR)', 'Missing to Reach 100%', 'Per Working Day'
+    ];
+    const rows = filtered.map(r => [
+      r.office_name,
+      r.agent_name,
+      r.target_ftc,
+      r.ftc_rr_pct ?? '',
+      Math.round(r.missing_to_100rr),
+      r.ftd_count,
+      r.ftd100,
+      r.ftc,
+      r.ftd100_rr_pct ?? '',
+      r.ftc_rr,
+      r.ftd100_rr,
+      r.ftd100_tgt_pct ?? '',
+      r.ftc_tgt_pct ?? '',
+      Math.round(r.net_deposits * 100) / 100,
+      Math.round(r.need_on_target),
+      Math.round(r.missing_to_100),
+      Math.round(r.per_wd),
+    ]);
+    const df = document.getElementById('date-from').value;
+    const dt = document.getElementById('date-to').value;
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Sales');
+    XLSX.writeFile(wb, `Sales_Scoreboard_${df}_${dt}.xlsx`);
+  }
+
+  // ── Export Retention to Excel ──────────────────────────────────────────
+  function exportRetentionExcel() {
+    if (!retAllRows.length) return;
+    const filtered = retAllRows.filter(r =>
+      r.target_net > 0 || r.net_usd !== 0 || r.deposit_usd > 0 || r.open_volume_usd > 0
+    );
+    const pct = v => (v !== null && v !== undefined) ? Math.round(v * 100) : '';
+    const r2  = v => (v !== null && v !== undefined) ? Math.round(v * 100) / 100 : 0;
+    const headers = [
+      'Office', 'Department', 'Agent', 'Target NET', 'NET RR %', 'Missing to 100% RR',
+      'Deposit $', 'NET $', 'NET RR', 'Target NET %', 'Need to be on Target',
+      'Missing to Reach 100%', 'Per Working Day', 'Open Volume', 'Volume RR', 'Target Vol RR %'
+    ];
+    const rows = filtered.map(r => [
+      r.office_name,
+      r.dept_name,
+      r.agent_name,
+      r2(r.target_net),
+      pct(r.net_rr_pct),
+      r2(r.missing_100_rr),
+      r2(r.deposit_usd),
+      r2(r.net_usd),
+      r2(r.net_rr),
+      pct(r.target_net_pct),
+      r2(r.need_on_target),
+      r2(r.missing_100),
+      r.per_wd !== null && r.per_wd !== undefined ? r2(r.per_wd) : '',
+      r2(r.open_volume_usd),
+      r2(r.vol_rr),
+      pct(r.target_vol_rr_pct),
+    ]);
+    const df = document.getElementById('date-from').value;
+    const dt = document.getElementById('date-to').value;
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Retention');
+    XLSX.writeFile(wb, `Retention_Scoreboard_${df}_${dt}.xlsx`);
   }
 
   // ── Init ───────────────────────────────────────────────────────────────
