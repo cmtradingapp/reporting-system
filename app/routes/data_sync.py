@@ -2,7 +2,7 @@ import os
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from app.db.postgres_conn import fetch_accounts_stats, fetch_crm_users_stats, fetch_transactions_stats, fetch_targets_stats, fetch_dealio_mt4trades_stats, fetch_trading_accounts_stats, fetch_ftd100_stats, fetch_sync_log
+from app.db.postgres_conn import fetch_accounts_stats, fetch_crm_users_stats, fetch_transactions_stats, fetch_targets_stats, fetch_dealio_mt4trades_stats, fetch_trading_accounts_stats, fetch_ftd100_stats, fetch_sync_log, fetch_dealio_daily_profit_stats
 from datetime import datetime, timezone, timedelta
 
 router = APIRouter()
@@ -17,6 +17,8 @@ TRANSACTIONS_SYNC_HOURS = int(os.getenv("TRANSACTIONS_SYNC_HOURS", "24"))
 TARGETS_SYNC_INTERVAL_HOURS = int(os.getenv("TARGETS_SYNC_INTERVAL_HOURS", "1"))
 DEALIO_SYNC_INTERVAL_HOURS = int(os.getenv("DEALIO_SYNC_INTERVAL_HOURS", "1"))
 DEALIO_SYNC_HOURS = int(os.getenv("DEALIO_SYNC_HOURS", "24"))
+DEALIO_DAILY_PROFIT_SYNC_INTERVAL_HOURS = int(os.getenv("DEALIO_DAILY_PROFIT_SYNC_INTERVAL_HOURS", "1"))
+DEALIO_DAILY_PROFIT_SYNC_HOURS = int(os.getenv("DEALIO_DAILY_PROFIT_SYNC_HOURS", "48"))
 TRADING_ACCOUNTS_SYNC_INTERVAL_HOURS = int(os.getenv("TRADING_ACCOUNTS_SYNC_INTERVAL_HOURS", "1"))
 TRADING_ACCOUNTS_SYNC_HOURS = int(os.getenv("TRADING_ACCOUNTS_SYNC_HOURS", "24"))
 FTD100_SYNC_INTERVAL_HOURS = int(os.getenv("FTD100_SYNC_INTERVAL_HOURS", "1"))
@@ -52,6 +54,9 @@ async def data_sync_page(request: Request):
 
     ftd100_stats = fetch_ftd100_stats()
     ftd100_log = fetch_sync_log("ftd100_clients", limit=50)
+
+    ddp_stats = fetch_dealio_daily_profit_stats()
+    ddp_log = fetch_sync_log("dealio_daily_profit", limit=50)
 
     tables = [
         {
@@ -161,6 +166,24 @@ async def data_sync_page(request: Request):
             "primary_key": "accountid",
             "incremental_columns": "N/A — full refresh (running total requires full recalc)",
             "source": "PostgreSQL → transactions + accounts (CTE)",
+        },
+        {
+            "key": "dealio_daily_profit",
+            "label": "dealio_daily_profit",
+            "last_synced_at": ddp_stats["last_synced_at"],
+            "stat_cards": [
+                {"label": "Total Records",     "value": ddp_stats["total_records"],     "color": "text-info",    "icon": "bi-database"},
+                {"label": "Unique Logins",     "value": ddp_stats["unique_logins"],     "color": "text-success", "icon": "bi-person-badge"},
+                {"label": "Total Closed PnL",  "value": ddp_stats["total_closed_pnl"],  "color": "text-warning", "icon": "bi-graph-up"},
+                {"label": "Total Net Deposit", "value": ddp_stats["total_net_deposit"], "color": "text-primary", "icon": "bi-currency-dollar"},
+            ],
+            "sync_log": ddp_log,
+            "healthy": _is_healthy(ddp_log, DEALIO_DAILY_PROFIT_SYNC_INTERVAL_HOURS),
+            "sync_interval_hours": DEALIO_DAILY_PROFIT_SYNC_INTERVAL_HOURS,
+            "lookback_hours": DEALIO_DAILY_PROFIT_SYNC_HOURS,
+            "primary_key": "login",
+            "incremental_columns": "date",
+            "source": "MSSQL → report.dealio_daily_profit",
         },
         {
             "key": "targets",

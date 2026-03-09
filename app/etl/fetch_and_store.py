@@ -2,12 +2,12 @@ import time
 import pandas as pd
 from datetime import datetime, timedelta, timezone
 from app.db.mysql_conn import get_operators, get_users, get_accounts, get_accounts_full, get_crm_users, get_crm_users_full, get_transactions, get_transactions_full, get_trading_accounts, get_trading_accounts_full
-from app.db.mssql_conn import get_targets, get_dealio_mt4trades, get_dealio_mt4trades_full, get_vtiger_users
+from app.db.mssql_conn import get_targets, get_dealio_mt4trades, get_dealio_mt4trades_full, get_vtiger_users, get_dealio_daily_profit, get_dealio_daily_profit_full
 from app.db.postgres_conn import (
     ensure_table, delete_all_performance, insert_records,
     upsert_users, upsert_accounts, cleanup_accounts, upsert_crm_users, truncate_crm_users, upsert_transactions,
     upsert_targets, upsert_dealio_mt4trades, upsert_trading_accounts, log_sync,
-    truncate_and_insert_ftd100,
+    truncate_and_insert_ftd100, upsert_dealio_daily_profit,
 )
 
 
@@ -303,4 +303,46 @@ def run_transactions_full_etl() -> dict:
     finally:
         duration_ms = int((time.time() - start) * 1000)
         log_sync("transactions", cutoff, rows, duration_ms, status, error_msg)
+    return {"status": status, "rows_synced": rows, "type": "full"}
+
+
+def run_dealio_daily_profit_etl(hours: int = 48) -> dict:
+    ensure_table()
+    start = time.time()
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    status = "success"
+    error_msg = None
+    rows = 0
+    try:
+        df = get_dealio_daily_profit(hours=hours)
+        rows = len(df)
+        upsert_dealio_daily_profit(df)
+    except Exception as e:
+        status = "error"
+        error_msg = str(e)
+        raise
+    finally:
+        duration_ms = int((time.time() - start) * 1000)
+        log_sync("dealio_daily_profit", cutoff, rows, duration_ms, status, error_msg)
+    return {"status": status, "rows_synced": rows, "lookback_hours": hours}
+
+
+def run_dealio_daily_profit_full_etl() -> dict:
+    ensure_table()
+    start = time.time()
+    cutoff = datetime(1970, 1, 1)
+    status = "success"
+    error_msg = None
+    rows = 0
+    try:
+        for chunk in get_dealio_daily_profit_full():
+            upsert_dealio_daily_profit(chunk)
+            rows += len(chunk)
+    except Exception as e:
+        status = "error"
+        error_msg = str(e)
+        raise
+    finally:
+        duration_ms = int((time.time() - start) * 1000)
+        log_sync("dealio_daily_profit", cutoff, rows, duration_ms, status, error_msg)
     return {"status": status, "rows_synced": rows, "type": "full"}
