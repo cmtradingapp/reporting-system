@@ -65,6 +65,14 @@
     /* Filter separator */
     .filter-sep { width: 1px; height: 28px; background-color: #30363d; margin: 0 6px; }
 
+    /* Filter inputs */
+    .filter-input {
+      width: 120px; padding: 3px 8px; font-size: 0.78rem;
+      background: #0d1117; color: #c9d1d9;
+      border: 1px solid #30363d; border-radius: 6px; outline: none;
+    }
+    .filter-input:focus { border-color: #388bfd; }
+
     /* KPI cards */
     .kpi-card { background-color: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 10px 14px; }
     .kpi-value { font-size: 1.3rem; font-weight: 700; line-height: 1.2; }
@@ -194,6 +202,11 @@
       <button class="period-btn month-btn" data-month="10">Oct</button>
       <button class="period-btn month-btn" data-month="11">Nov</button>
       <button class="period-btn month-btn" data-month="12">Dec</button>
+      <div class="filter-sep" style="margin:0 10px;"></div>
+      <i class="bi bi-search" style="color:#484f58;font-size:0.8rem;"></i>
+      <input type="text" id="filter-office" class="filter-input" placeholder="Office…" />
+      <input type="text" id="filter-team"   class="filter-input" placeholder="Team / Dept…" />
+      <input type="text" id="filter-agent"  class="filter-input" placeholder="Agent name…" />
     </div>
     <!-- Row 2: Date range -->
     <div class="d-flex flex-wrap align-items-center gap-2">
@@ -791,9 +804,15 @@
 
   // ── Render Sales table ─────────────────────────────────────────────────
   function renderSalesTable() {
-    const filtered = salAllRows.filter(r =>
-      r.target_ftc > 0 || r.ftd100_count > 0 || r.ftc_count > 0
-    );
+    const fOffice = (document.getElementById('filter-office')?.value || '').trim().toLowerCase();
+    const fTeam   = (document.getElementById('filter-team')?.value   || '').trim().toLowerCase();
+    const fAgent  = (document.getElementById('filter-agent')?.value  || '').trim().toLowerCase();
+    const filtered = salAllRows.filter(r => {
+      if (!(r.target_ftc > 0 || r.ftd100_count > 0 || r.ftc_count > 0)) return false;
+      if (fOffice && !(r.office_name || '').toLowerCase().includes(fOffice)) return false;
+      if (fAgent  && !(r.agent_name  || '').toLowerCase().includes(fAgent))  return false;
+      return true;
+    });
 
     const tbody = document.getElementById('sales-tbody');
     const tfoot = document.getElementById('sales-tfoot');
@@ -954,9 +973,16 @@
 
   // ── Render Retention table ─────────────────────────────────────────────
   function renderBonusTable() {
-    const filtered = bonAllRows.filter(r =>
-      r.target_net > 0 || r.net_usd !== 0 || r.open_volume_usd > 0
-    );
+    const fOffice = (document.getElementById('filter-office')?.value || '').trim().toLowerCase();
+    const fTeam   = (document.getElementById('filter-team')?.value   || '').trim().toLowerCase();
+    const fAgent  = (document.getElementById('filter-agent')?.value  || '').trim().toLowerCase();
+    const filtered = bonAllRows.filter(r => {
+      if (!(r.target_net > 0 || r.net_usd !== 0 || r.open_volume_usd > 0)) return false;
+      if (fOffice && !(r.office_name || '').toLowerCase().includes(fOffice)) return false;
+      if (fTeam   && !(r.dept_name   || '').toLowerCase().includes(fTeam))   return false;
+      if (fAgent  && !(r.agent_name  || '').toLowerCase().includes(fAgent))  return false;
+      return true;
+    });
 
     const tbody = document.getElementById('bonus-tbody');
     const tfoot = document.getElementById('bonus-tfoot');
@@ -1388,6 +1414,14 @@
     XLSX.utils.book_append_sheet(wb, ws, 'Retention Bonuses');
     XLSX.writeFile(wb, `retention_bonuses_${df}_${dt}.xlsx`);
   }
+
+  // ── Filter inputs ───────────────────────────────────────────────────────
+  ['filter-office', 'filter-team', 'filter-agent'].forEach(id => {
+    document.getElementById(id)?.addEventListener('input', () => {
+      if (salAllRows.length) renderSalesTable();
+      if (bonAllRows.length) renderBonusTable();
+    });
+  });
 
   // ── Init ───────────────────────────────────────────────────────────────
   document.getElementById('date-from').value = firstOfMonth(state.year, state.month);

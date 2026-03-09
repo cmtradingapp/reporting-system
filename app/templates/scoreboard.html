@@ -62,6 +62,19 @@
     .quick-btn:hover { background-color: #2d333a; color: #c9d1d9; border-color: #484f58; }
     .quick-btn.active-quick { border-color: #388bfd; color: #388bfd; background-color: rgba(56,139,253,0.1); }
 
+    /* Search filter inputs */
+    .filter-input {
+      background-color: #21262d;
+      border: 1px solid #30363d;
+      color: #e0e0e0;
+      border-radius: 6px;
+      padding: 5px 10px;
+      font-size: 0.82rem;
+      width: 120px;
+    }
+    .filter-input::placeholder { color: #484f58; }
+    .filter-input:focus { outline: none; border-color: #388bfd; box-shadow: 0 0 0 2px rgba(56,139,253,0.15); }
+
     /* Filter separator */
     .filter-sep { width: 1px; height: 28px; background-color: #30363d; margin: 0 6px; }
 
@@ -214,6 +227,11 @@
       <button class="period-btn month-btn" data-month="10">Oct</button>
       <button class="period-btn month-btn" data-month="11">Nov</button>
       <button class="period-btn month-btn" data-month="12">Dec</button>
+      <div class="filter-sep" style="margin:0 10px;"></div>
+      <i class="bi bi-search" style="color:#484f58;font-size:0.8rem;"></i>
+      <input type="text" id="filter-office" class="filter-input" placeholder="Office…" />
+      <input type="text" id="filter-team"   class="filter-input" placeholder="Team / Dept…" />
+      <input type="text" id="filter-agent"  class="filter-input" placeholder="Agent name…" />
     </div>
 
     <!-- Row 2: Date range -->
@@ -529,9 +547,16 @@
   }
 
   function renderTable() {
-    const filtered = allRows.filter(r =>
-      r.ftc > 0 || r.target_ftc > 0 || r.ftd100 > 0 || r.net_deposits !== 0 || r.ftd_count > 0
-    );
+    const fOffice = (document.getElementById('filter-office')?.value || '').trim().toLowerCase();
+    const fTeam   = (document.getElementById('filter-team')?.value   || '').trim().toLowerCase();
+    const fAgent  = (document.getElementById('filter-agent')?.value  || '').trim().toLowerCase();
+    const filtered = allRows.filter(r => {
+      if (!(r.ftc > 0 || r.target_ftc > 0 || r.ftd100 > 0 || r.net_deposits !== 0 || r.ftd_count > 0)) return false;
+      if (fOffice && !(r.office_name || '').toLowerCase().includes(fOffice)) return false;
+      if (fTeam   && !(r.dept_name   || '').toLowerCase().includes(fTeam))   return false;
+      if (fAgent  && !(r.agent_name  || '').toLowerCase().includes(fAgent))  return false;
+      return true;
+    });
 
     const tbody = document.getElementById('table-body');
     tbody.innerHTML = '';
@@ -999,10 +1024,16 @@
   // ── Retention table render ─────────────────────────────────────────────
   function renderRetentionTable(wd, wd_passed, wd_left) {
     const safe_wdp = Math.max(wd_passed, 1);
-
-    const filtered = retAllRows.filter(r =>
-      r.target_net > 0 || r.net_usd !== 0 || r.deposit_usd > 0 || r.open_volume_usd > 0
-    );
+    const fOffice = (document.getElementById('filter-office')?.value || '').trim().toLowerCase();
+    const fTeam   = (document.getElementById('filter-team')?.value   || '').trim().toLowerCase();
+    const fAgent  = (document.getElementById('filter-agent')?.value  || '').trim().toLowerCase();
+    const filtered = retAllRows.filter(r => {
+      if (!(r.target_net > 0 || r.net_usd !== 0 || r.deposit_usd > 0 || r.open_volume_usd > 0)) return false;
+      if (fOffice && !(r.office_name || '').toLowerCase().includes(fOffice)) return false;
+      if (fTeam   && !(r.dept_name   || '').toLowerCase().includes(fTeam))   return false;
+      if (fAgent  && !(r.agent_name  || '').toLowerCase().includes(fAgent))  return false;
+      return true;
+    });
 
     const tbody = document.getElementById('retention-tbody');
     const tfoot = document.getElementById('retention-tfoot');
@@ -1347,6 +1378,14 @@
     XLSX.utils.book_append_sheet(wb, ws, 'Retention');
     XLSX.writeFile(wb, `Retention_Scoreboard_${df}_${dt}.xlsx`);
   }
+
+  // ── Filter inputs ───────────────────────────────────────────────────────
+  ['filter-office', 'filter-team', 'filter-agent'].forEach(id => {
+    document.getElementById(id)?.addEventListener('input', () => {
+      if (allRows.length)    renderTable();
+      if (retAllRows.length) renderRetentionTable(retWd, retWdPassed, retWdLeft);
+    });
+  });
 
   // ── Init ───────────────────────────────────────────────────────────────
   document.getElementById('date-from').value = firstOfMonth(state.year, state.month);
