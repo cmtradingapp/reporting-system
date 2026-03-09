@@ -445,7 +445,7 @@
             <!-- Sales Target Bonus -->
             <div class="col-md-4">
               <div class="fw-semibold mb-1" style="color:#c9d1d9;font-size:0.9rem;">Sales Target Bonus</div>
-              <p class="small text-muted mb-2">Flat bonus paid only when <strong style="color:#c9d1d9;">FTD100 ≥ Target FTC</strong></p>
+              <p class="small mb-2" style="color:#c9d1d9;">Bonus paid only when agents reach their Target or when <strong>FTD100 ≥ Target</strong></p>
               <table style="width:100%;font-size:0.82rem;border-collapse:collapse;">
                 <thead>
                   <tr>
@@ -469,7 +469,6 @@
             <!-- FTD Amount Bonus -->
             <div class="col-md-4">
               <div class="fw-semibold mb-1" style="color:#c9d1d9;font-size:0.9rem;">FTD Amount Bonus</div>
-              <p class="small text-muted mb-2">Per client based on their first deposit — summed across all FTD100 clients in the period</p>
               <table style="width:100%;font-size:0.82rem;border-collapse:collapse;">
                 <thead>
                   <tr>
@@ -508,30 +507,14 @@
       <div id="doc-ret" style="display:none;border-top:1px solid #30363d;">
         <div class="px-4 py-4">
 
-          <!-- Office Groups -->
-          <div class="mb-4">
-            <div class="fw-semibold mb-2" style="color:#c9d1d9;font-size:0.9rem;">Office Groups</div>
-            <div class="d-flex gap-3 flex-wrap">
-              <div class="p-3" style="background:#1c2128;border:1px solid #30363d;border-radius:8px;min-width:180px;">
-                <div class="small fw-semibold mb-1" style="color:#3fb950;">GMT &nbsp;·&nbsp; CY &nbsp;·&nbsp; BU</div>
-                <div class="small text-muted">Higher tier rates apply</div>
-              </div>
-              <div class="p-3" style="background:#1c2128;border:1px solid #30363d;border-radius:8px;min-width:180px;">
-                <div class="small fw-semibold mb-1" style="color:#388bfd;">ABJ-NG &nbsp;·&nbsp; SA &nbsp;·&nbsp; LAG-NG</div>
-                <div class="small text-muted">Standard tier rates apply</div>
-              </div>
-              <div class="p-3" style="background:#1c2128;border:1px solid #30363d;border-radius:8px;min-width:180px;">
-                <div class="small fw-semibold mb-1" style="color:#8b949e;">Other</div>
-                <div class="small text-muted">No bonus applied</div>
-              </div>
-            </div>
+          <!-- ── GMT · CY · BU ─────────────────────────────────────────── -->
+          <div class="mb-2 pb-1" style="border-bottom:2px solid #3fb950;">
+            <span class="fw-semibold" style="color:#3fb950;font-size:0.95rem;">GMT &nbsp;·&nbsp; CY &nbsp;·&nbsp; BU</span>
           </div>
+          <div class="row g-4 mb-5">
 
-          <div class="row g-4">
-
-            <!-- % on Net Group A -->
             <div class="col-md-3">
-              <div class="fw-semibold mb-1" style="color:#c9d1d9;font-size:0.9rem;">% on Net — <span style="color:#3fb950;">GMT · CY · BU</span></div>
+              <div class="fw-semibold mb-1" style="color:#c9d1d9;font-size:0.9rem;">% on Net</div>
               <table style="width:100%;font-size:0.82rem;border-collapse:collapse;">
                 <thead>
                   <tr>
@@ -540,59 +523,32 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr><td style="padding:4px 8px;border-bottom:1px solid #21262d;color:#c9d1d9;">&lt; $20,000</td>        <td style="text-align:center;padding:4px 8px;border-bottom:1px solid #21262d;color:#484f58;">0%</td></tr>
-                  <tr><td style="padding:4px 8px;border-bottom:1px solid #21262d;color:#c9d1d9;">$20k – $49,999</td>    <td style="text-align:center;padding:4px 8px;border-bottom:1px solid #21262d;color:#3fb950;">1.5%</td></tr>
-                  <tr><td style="padding:4px 8px;border-bottom:1px solid #21262d;color:#c9d1d9;">$50k – $74,999</td>    <td style="text-align:center;padding:4px 8px;border-bottom:1px solid #21262d;color:#3fb950;">2%</td></tr>
-                  <tr><td style="padding:4px 8px;border-bottom:1px solid #21262d;color:#c9d1d9;">$75k – $99,999</td>    <td style="text-align:center;padding:4px 8px;border-bottom:1px solid #21262d;color:#3fb950;">3%</td></tr>
-                  <tr><td style="padding:4px 8px;border-bottom:1px solid #21262d;color:#c9d1d9;">$100k – $149,999</td>  <td style="text-align:center;padding:4px 8px;border-bottom:1px solid #21262d;color:#3fb950;">3.5%</td></tr>
-                  <tr><td style="padding:4px 8px;border-bottom:1px solid #21262d;color:#c9d1d9;">$150k – $199,999</td>  <td style="text-align:center;padding:4px 8px;border-bottom:1px solid #21262d;color:#3fb950;">3.75%</td></tr>
-                  <tr><td style="padding:4px 8px;color:#c9d1d9;">$200k+</td>              <td style="text-align:center;padding:4px 8px;color:#3fb950;">4%</td></tr>
+                  <tr><td style="padding:4px 8px;border-bottom:1px solid #21262d;color:#c9d1d9;">&lt; $20,000</td>       <td style="text-align:center;padding:4px 8px;border-bottom:1px solid #21262d;color:#484f58;">0%</td></tr>
+                  <tr><td style="padding:4px 8px;border-bottom:1px solid #21262d;color:#c9d1d9;">$20k – $49,999</td>   <td style="text-align:center;padding:4px 8px;border-bottom:1px solid #21262d;color:#3fb950;">1.5%</td></tr>
+                  <tr><td style="padding:4px 8px;border-bottom:1px solid #21262d;color:#c9d1d9;">$50k – $74,999</td>   <td style="text-align:center;padding:4px 8px;border-bottom:1px solid #21262d;color:#3fb950;">2%</td></tr>
+                  <tr><td style="padding:4px 8px;border-bottom:1px solid #21262d;color:#c9d1d9;">$75k – $99,999</td>   <td style="text-align:center;padding:4px 8px;border-bottom:1px solid #21262d;color:#3fb950;">3%</td></tr>
+                  <tr><td style="padding:4px 8px;border-bottom:1px solid #21262d;color:#c9d1d9;">$100k – $149,999</td> <td style="text-align:center;padding:4px 8px;border-bottom:1px solid #21262d;color:#3fb950;">3.5%</td></tr>
+                  <tr><td style="padding:4px 8px;border-bottom:1px solid #21262d;color:#c9d1d9;">$150k – $199,999</td> <td style="text-align:center;padding:4px 8px;border-bottom:1px solid #21262d;color:#3fb950;">3.75%</td></tr>
+                  <tr><td style="padding:4px 8px;color:#c9d1d9;">$200k+</td>             <td style="text-align:center;padding:4px 8px;color:#3fb950;">4%</td></tr>
                 </tbody>
               </table>
             </div>
 
-            <!-- % on Net Group B -->
             <div class="col-md-3">
-              <div class="fw-semibold mb-1" style="color:#c9d1d9;font-size:0.9rem;">% on Net — <span style="color:#388bfd;">ABJ-NG · SA · LAG-NG</span></div>
-              <table style="width:100%;font-size:0.82rem;border-collapse:collapse;">
-                <thead>
-                  <tr>
-                    <th style="text-align:left;padding:5px 8px;color:#8b949e;border-bottom:1px solid #30363d;">Net USD</th>
-                    <th style="text-align:center;padding:5px 8px;color:#8b949e;border-bottom:1px solid #30363d;">Bonus %</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr><td style="padding:4px 8px;border-bottom:1px solid #21262d;color:#c9d1d9;">&lt; $10,000</td>      <td style="text-align:center;padding:4px 8px;border-bottom:1px solid #21262d;color:#484f58;">0%</td></tr>
-                  <tr><td style="padding:4px 8px;border-bottom:1px solid #21262d;color:#c9d1d9;">$10k – $19,999</td>  <td style="text-align:center;padding:4px 8px;border-bottom:1px solid #21262d;color:#3fb950;">1%</td></tr>
-                  <tr><td style="padding:4px 8px;border-bottom:1px solid #21262d;color:#c9d1d9;">$20k – $29,999</td>  <td style="text-align:center;padding:4px 8px;border-bottom:1px solid #21262d;color:#3fb950;">1.5%</td></tr>
-                  <tr><td style="padding:4px 8px;border-bottom:1px solid #21262d;color:#c9d1d9;">$30k – $39,999</td>  <td style="text-align:center;padding:4px 8px;border-bottom:1px solid #21262d;color:#3fb950;">1.8%</td></tr>
-                  <tr><td style="padding:4px 8px;border-bottom:1px solid #21262d;color:#c9d1d9;">$40k – $49,999</td>  <td style="text-align:center;padding:4px 8px;border-bottom:1px solid #21262d;color:#3fb950;">2%</td></tr>
-                  <tr><td style="padding:4px 8px;border-bottom:1px solid #21262d;color:#c9d1d9;">$50k – $59,999</td>  <td style="text-align:center;padding:4px 8px;border-bottom:1px solid #21262d;color:#3fb950;">2.5%</td></tr>
-                  <tr><td style="padding:4px 8px;border-bottom:1px solid #21262d;color:#c9d1d9;">$60k – $79,999</td>  <td style="text-align:center;padding:4px 8px;border-bottom:1px solid #21262d;color:#3fb950;">2.8%</td></tr>
-                  <tr><td style="padding:4px 8px;border-bottom:1px solid #21262d;color:#c9d1d9;">$80k – $99,999</td>  <td style="text-align:center;padding:4px 8px;border-bottom:1px solid #21262d;color:#3fb950;">3%</td></tr>
-                  <tr><td style="padding:4px 8px;color:#c9d1d9;">$100k+</td>            <td style="text-align:center;padding:4px 8px;color:#3fb950;">3.5%</td></tr>
-                </tbody>
-              </table>
-            </div>
-
-            <!-- % on Target Net -->
-            <div class="col-md-3">
-              <div class="fw-semibold mb-1" style="color:#c9d1d9;font-size:0.9rem;">% on Target Net <span class="small" style="color:#8b949e;">(GMT · CY · BU only)</span></div>
+              <div class="fw-semibold mb-1" style="color:#c9d1d9;font-size:0.9rem;">% on Target Net</div>
               <div class="p-3 mb-4" style="background:#1c2128;border:1px solid #30363d;border-radius:8px;font-size:0.82rem;">
                 <span style="color:#3fb950;font-weight:700;">+0.5%</span>
                 <span style="color:#c9d1d9;"> if Net USD ≥ 100% of Target NET</span><br>
                 <span class="text-muted">Otherwise: 0%</span>
               </div>
-
-              <div class="fw-semibold mb-1" style="color:#c9d1d9;font-size:0.9rem;">Target Volume <span class="small" style="color:#8b949e;">(GMT · CY · BU only)</span></div>
+              <div class="fw-semibold mb-1" style="color:#c9d1d9;font-size:0.9rem;">Target Volume</div>
               <div class="p-3" style="background:#1c2128;border:1px solid #30363d;border-radius:8px;font-size:0.82rem;">
                 <code style="color:#d29922;">Target Volume = Target NET × 1,650</code>
               </div>
             </div>
 
-            <!-- % on Target Vol -->
             <div class="col-md-3">
-              <div class="fw-semibold mb-1" style="color:#c9d1d9;font-size:0.9rem;">% on Target Vol <span class="small" style="color:#8b949e;">(GMT · CY · BU only)</span></div>
+              <div class="fw-semibold mb-1" style="color:#c9d1d9;font-size:0.9rem;">% on Target Vol</div>
               <table style="width:100%;font-size:0.82rem;border-collapse:collapse;">
                 <thead>
                   <tr>
@@ -601,21 +557,65 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr><td style="padding:4px 8px;border-bottom:1px solid #21262d;color:#c9d1d9;">&lt; 50%</td>         <td style="text-align:center;padding:4px 8px;border-bottom:1px solid #21262d;color:#f85149;">−0.5%</td></tr>
-                  <tr><td style="padding:4px 8px;border-bottom:1px solid #21262d;color:#c9d1d9;">50% – 74.9%</td>    <td style="text-align:center;padding:4px 8px;border-bottom:1px solid #21262d;color:#3fb950;">+0.2%</td></tr>
-                  <tr><td style="padding:4px 8px;border-bottom:1px solid #21262d;color:#c9d1d9;">75% – 99.9%</td>    <td style="text-align:center;padding:4px 8px;border-bottom:1px solid #21262d;color:#3fb950;">+0.5%</td></tr>
-                  <tr><td style="padding:4px 8px;border-bottom:1px solid #21262d;color:#c9d1d9;">100% – 149.9%</td>  <td style="text-align:center;padding:4px 8px;border-bottom:1px solid #21262d;color:#3fb950;">+1%</td></tr>
-                  <tr><td style="padding:4px 8px;border-bottom:1px solid #21262d;color:#c9d1d9;">150% – 199.9%</td>  <td style="text-align:center;padding:4px 8px;border-bottom:1px solid #21262d;color:#3fb950;">+1.25%</td></tr>
-                  <tr><td style="padding:4px 8px;color:#c9d1d9;">≥ 200%</td>            <td style="text-align:center;padding:4px 8px;color:#3fb950;">+1.5%</td></tr>
+                  <tr><td style="padding:4px 8px;border-bottom:1px solid #21262d;color:#c9d1d9;">&lt; 50%</td>        <td style="text-align:center;padding:4px 8px;border-bottom:1px solid #21262d;color:#f85149;">−0.5%</td></tr>
+                  <tr><td style="padding:4px 8px;border-bottom:1px solid #21262d;color:#c9d1d9;">50% – 74.9%</td>   <td style="text-align:center;padding:4px 8px;border-bottom:1px solid #21262d;color:#3fb950;">+0.2%</td></tr>
+                  <tr><td style="padding:4px 8px;border-bottom:1px solid #21262d;color:#c9d1d9;">75% – 99.9%</td>   <td style="text-align:center;padding:4px 8px;border-bottom:1px solid #21262d;color:#3fb950;">+0.5%</td></tr>
+                  <tr><td style="padding:4px 8px;border-bottom:1px solid #21262d;color:#c9d1d9;">100% – 149.9%</td> <td style="text-align:center;padding:4px 8px;border-bottom:1px solid #21262d;color:#3fb950;">+1%</td></tr>
+                  <tr><td style="padding:4px 8px;border-bottom:1px solid #21262d;color:#c9d1d9;">150% – 199.9%</td> <td style="text-align:center;padding:4px 8px;border-bottom:1px solid #21262d;color:#3fb950;">+1.25%</td></tr>
+                  <tr><td style="padding:4px 8px;color:#c9d1d9;">≥ 200%</td>           <td style="text-align:center;padding:4px 8px;color:#3fb950;">+1.5%</td></tr>
                 </tbody>
               </table>
-              <div class="mt-3 p-3" style="background:#1c2128;border:1px solid #30363d;border-radius:8px;">
-                <div class="small fw-semibold mb-1" style="color:#c9d1d9;">Basic Bonus $</div>
-                <code style="color:#d29922;font-size:0.8rem;">Total Bonus % × Net $</code>
+            </div>
+
+            <div class="col-md-3">
+              <div class="fw-semibold mb-1" style="color:#c9d1d9;font-size:0.9rem;">Basic Bonus $</div>
+              <div class="p-3" style="background:#1c2128;border:1px solid #30363d;border-radius:8px;">
+                <code style="color:#d29922;font-size:0.8rem;">Total Bonus % × Net $</code><br>
+                <span class="small text-muted mt-1 d-block">Total % = % on Net + % on Target Net + % on Target Vol</span>
               </div>
             </div>
 
-          </div><!-- /row -->
+          </div><!-- /GMT·CY·BU row -->
+
+          <!-- ── ABJ-NG · SA · LAG-NG ──────────────────────────────────── -->
+          <div class="mb-2 pb-1" style="border-bottom:2px solid #388bfd;">
+            <span class="fw-semibold" style="color:#388bfd;font-size:0.95rem;">ABJ-NG &nbsp;·&nbsp; SA &nbsp;·&nbsp; LAG-NG</span>
+          </div>
+          <div class="row g-4">
+
+            <div class="col-md-3">
+              <div class="fw-semibold mb-1" style="color:#c9d1d9;font-size:0.9rem;">% on Net</div>
+              <table style="width:100%;font-size:0.82rem;border-collapse:collapse;">
+                <thead>
+                  <tr>
+                    <th style="text-align:left;padding:5px 8px;color:#8b949e;border-bottom:1px solid #30363d;">Net USD</th>
+                    <th style="text-align:center;padding:5px 8px;color:#8b949e;border-bottom:1px solid #30363d;">Bonus %</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td style="padding:4px 8px;border-bottom:1px solid #21262d;color:#c9d1d9;">&lt; $10,000</td>     <td style="text-align:center;padding:4px 8px;border-bottom:1px solid #21262d;color:#484f58;">0%</td></tr>
+                  <tr><td style="padding:4px 8px;border-bottom:1px solid #21262d;color:#c9d1d9;">$10k – $19,999</td> <td style="text-align:center;padding:4px 8px;border-bottom:1px solid #21262d;color:#388bfd;">1%</td></tr>
+                  <tr><td style="padding:4px 8px;border-bottom:1px solid #21262d;color:#c9d1d9;">$20k – $29,999</td> <td style="text-align:center;padding:4px 8px;border-bottom:1px solid #21262d;color:#388bfd;">1.5%</td></tr>
+                  <tr><td style="padding:4px 8px;border-bottom:1px solid #21262d;color:#c9d1d9;">$30k – $39,999</td> <td style="text-align:center;padding:4px 8px;border-bottom:1px solid #21262d;color:#388bfd;">1.8%</td></tr>
+                  <tr><td style="padding:4px 8px;border-bottom:1px solid #21262d;color:#c9d1d9;">$40k – $49,999</td> <td style="text-align:center;padding:4px 8px;border-bottom:1px solid #21262d;color:#388bfd;">2%</td></tr>
+                  <tr><td style="padding:4px 8px;border-bottom:1px solid #21262d;color:#c9d1d9;">$50k – $59,999</td> <td style="text-align:center;padding:4px 8px;border-bottom:1px solid #21262d;color:#388bfd;">2.5%</td></tr>
+                  <tr><td style="padding:4px 8px;border-bottom:1px solid #21262d;color:#c9d1d9;">$60k – $79,999</td> <td style="text-align:center;padding:4px 8px;border-bottom:1px solid #21262d;color:#388bfd;">2.8%</td></tr>
+                  <tr><td style="padding:4px 8px;border-bottom:1px solid #21262d;color:#c9d1d9;">$80k – $99,999</td> <td style="text-align:center;padding:4px 8px;border-bottom:1px solid #21262d;color:#388bfd;">3%</td></tr>
+                  <tr><td style="padding:4px 8px;color:#c9d1d9;">$100k+</td>           <td style="text-align:center;padding:4px 8px;color:#388bfd;">3.5%</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="col-md-3">
+              <div class="fw-semibold mb-1" style="color:#c9d1d9;font-size:0.9rem;">Basic Bonus $</div>
+              <div class="p-3" style="background:#1c2128;border:1px solid #30363d;border-radius:8px;">
+                <code style="color:#d29922;font-size:0.8rem;">% on Net × Net $</code><br>
+                <span class="small text-muted mt-1 d-block">No % on Target Net or Target Vol for these offices</span>
+              </div>
+            </div>
+
+          </div><!-- /ABJ-NG row -->
+
         </div>
       </div>
     </div><!-- /retention doc card -->
