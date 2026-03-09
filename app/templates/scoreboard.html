@@ -62,18 +62,25 @@
     .quick-btn:hover { background-color: #2d333a; color: #c9d1d9; border-color: #484f58; }
     .quick-btn.active-quick { border-color: #388bfd; color: #388bfd; background-color: rgba(56,139,253,0.1); }
 
-    /* Search filter inputs */
+    /* Filter dropdowns */
     .filter-input {
       background-color: #21262d;
       border: 1px solid #30363d;
       color: #e0e0e0;
       border-radius: 6px;
-      padding: 5px 10px;
+      padding: 4px 8px;
       font-size: 0.82rem;
-      width: 120px;
+      width: 130px;
+      cursor: pointer;
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23484f58'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 8px center;
+      padding-right: 24px;
     }
-    .filter-input::placeholder { color: #484f58; }
     .filter-input:focus { outline: none; border-color: #388bfd; box-shadow: 0 0 0 2px rgba(56,139,253,0.15); }
+    .filter-input option { background-color: #21262d; color: #e0e0e0; }
 
     /* Filter separator */
     .filter-sep { width: 1px; height: 28px; background-color: #30363d; margin: 0 6px; }
@@ -228,10 +235,9 @@
       <button class="period-btn month-btn" data-month="11">Nov</button>
       <button class="period-btn month-btn" data-month="12">Dec</button>
       <div class="filter-sep" style="margin:0 10px;"></div>
-      <i class="bi bi-search" style="color:#484f58;font-size:0.8rem;"></i>
-      <input type="text" id="filter-office" class="filter-input" placeholder="Office…" />
-      <input type="text" id="filter-team"   class="filter-input" placeholder="Team / Dept…" />
-      <input type="text" id="filter-agent"  class="filter-input" placeholder="Agent name…" />
+      <select id="filter-office" class="filter-input"><option value="">All Offices</option></select>
+      <select id="filter-team"   class="filter-input"><option value="">All Teams</option></select>
+      <select id="filter-agent"  class="filter-input"><option value="">All Agents</option></select>
     </div>
 
     <!-- Row 2: Date range -->
@@ -434,6 +440,32 @@
   let workingDaysPassed = 0;
   let workingDaysLeft = 0;
 
+  // ── Filter dropdown helpers ─────────────────────────────────────────────
+  function populateSelect(id, values) {
+    const sel = document.getElementById(id);
+    const cur = sel.value;
+    const first = sel.options[0];
+    sel.innerHTML = '';
+    sel.appendChild(first);
+    [...values].sort().forEach(v => {
+      const opt = document.createElement('option');
+      opt.value = v; opt.textContent = v;
+      if (v === cur) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  }
+  function populateFilterDropdowns() {
+    const offices = new Set(), teams = new Set(), agents = new Set();
+    [...allRows, ...retAllRows].forEach(r => {
+      if (r.office_name) offices.add(r.office_name);
+      if (r.dept_name)   teams.add(r.dept_name);
+      if (r.agent_name)  agents.add(r.agent_name);
+    });
+    populateSelect('filter-office', offices);
+    populateSelect('filter-team',   teams);
+    populateSelect('filter-agent',  agents);
+  }
+
   // ── Helpers ────────────────────────────────────────────────────────────
   function pad(n) { return String(n).padStart(2, '0'); }
   function todayStr() {
@@ -524,6 +556,7 @@
       document.getElementById('stat-wd-passed').textContent = workingDaysPassed;
       document.getElementById('stat-wd-left').textContent   = workingDaysLeft;
       updateStats(data);
+      populateFilterDropdowns();
       renderTable();
     } catch(e) {
       document.getElementById('error-msg').textContent = 'Error: ' + e.message;
@@ -547,14 +580,14 @@
   }
 
   function renderTable() {
-    const fOffice = (document.getElementById('filter-office')?.value || '').trim().toLowerCase();
-    const fTeam   = (document.getElementById('filter-team')?.value   || '').trim().toLowerCase();
-    const fAgent  = (document.getElementById('filter-agent')?.value  || '').trim().toLowerCase();
+    const fOffice = document.getElementById('filter-office')?.value || '';
+    const fTeam   = document.getElementById('filter-team')?.value   || '';
+    const fAgent  = document.getElementById('filter-agent')?.value  || '';
     const filtered = allRows.filter(r => {
       if (!(r.ftc > 0 || r.target_ftc > 0 || r.ftd100 > 0 || r.net_deposits !== 0 || r.ftd_count > 0)) return false;
-      if (fOffice && !(r.office_name || '').toLowerCase().includes(fOffice)) return false;
-      if (fTeam   && !(r.dept_name   || '').toLowerCase().includes(fTeam))   return false;
-      if (fAgent  && !(r.agent_name  || '').toLowerCase().includes(fAgent))  return false;
+      if (fOffice && r.office_name !== fOffice) return false;
+      if (fTeam   && r.dept_name   !== fTeam)   return false;
+      if (fAgent  && r.agent_name  !== fAgent)   return false;
       return true;
     });
 
@@ -991,6 +1024,7 @@
         };
       });
 
+      populateFilterDropdowns();
       renderRetentionTable(wd, wd_passed, wd_left);
     } catch(e) {
       document.getElementById('ret-error-msg').textContent = 'Error: ' + e.message;
@@ -1024,14 +1058,14 @@
   // ── Retention table render ─────────────────────────────────────────────
   function renderRetentionTable(wd, wd_passed, wd_left) {
     const safe_wdp = Math.max(wd_passed, 1);
-    const fOffice = (document.getElementById('filter-office')?.value || '').trim().toLowerCase();
-    const fTeam   = (document.getElementById('filter-team')?.value   || '').trim().toLowerCase();
-    const fAgent  = (document.getElementById('filter-agent')?.value  || '').trim().toLowerCase();
+    const fOffice = document.getElementById('filter-office')?.value || '';
+    const fTeam   = document.getElementById('filter-team')?.value   || '';
+    const fAgent  = document.getElementById('filter-agent')?.value  || '';
     const filtered = retAllRows.filter(r => {
       if (!(r.target_net > 0 || r.net_usd !== 0 || r.deposit_usd > 0 || r.open_volume_usd > 0)) return false;
-      if (fOffice && !(r.office_name || '').toLowerCase().includes(fOffice)) return false;
-      if (fTeam   && !(r.dept_name   || '').toLowerCase().includes(fTeam))   return false;
-      if (fAgent  && !(r.agent_name  || '').toLowerCase().includes(fAgent))  return false;
+      if (fOffice && r.office_name !== fOffice) return false;
+      if (fTeam   && r.dept_name   !== fTeam)   return false;
+      if (fAgent  && r.agent_name  !== fAgent)   return false;
       return true;
     });
 
@@ -1379,9 +1413,9 @@
     XLSX.writeFile(wb, `Retention_Scoreboard_${df}_${dt}.xlsx`);
   }
 
-  // ── Filter inputs ───────────────────────────────────────────────────────
+  // ── Filter dropdowns ────────────────────────────────────────────────────
   ['filter-office', 'filter-team', 'filter-agent'].forEach(id => {
-    document.getElementById(id)?.addEventListener('input', () => {
+    document.getElementById(id)?.addEventListener('change', () => {
       if (allRows.length)    renderTable();
       if (retAllRows.length) renderRetentionTable(retWd, retWdPassed, retWdLeft);
     });
