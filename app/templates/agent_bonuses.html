@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Agent Bonuses</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet"/>
+  <style>
+    body { background-color: #0f1117; color: #e0e0e0; font-family: 'Segoe UI', sans-serif; display: flex; min-height: 100vh; }
+    .sidebar { width: 220px; min-height: 100vh; background-color: #161b22; border-right: 1px solid #30363d; display: flex; flex-direction: column; position: fixed; top: 0; left: 0; bottom: 0; z-index: 100; }
+    .sidebar-brand { padding: 20px 20px 16px; border-bottom: 1px solid #30363d; font-weight: 700; font-size: 1rem; color: #e0e0e0; }
+    .sidebar-nav { padding: 12px 0; flex: 1; }
+    .sidebar-link { display: flex; align-items: center; gap: 10px; padding: 10px 20px; color: #8b949e; text-decoration: none; font-size: 0.9rem; transition: background 0.15s, color 0.15s; border-left: 3px solid transparent; }
+    .sidebar-link:hover { background-color: #21262d; color: #e0e0e0; }
+    .sidebar-link.active { color: #3fb950; border-left-color: #3fb950; background-color: rgba(63,185,80,0.08); }
+    .main-content { margin-left: 220px; flex: 1; min-width: 0; }
+    .card { background-color: #161b22; border: 1px solid #30363d; border-radius: 12px; }
+
+    /* Period buttons */
+    .period-btn {
+      background-color: #21262d;
+      border: 1px solid #30363d;
+      color: #8b949e;
+      font-size: 0.82rem;
+      padding: 5px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .period-btn:hover { background-color: #2d333a; color: #c9d1d9; border-color: #484f58; }
+    .period-btn.active { background-color: rgba(35,134,54,0.25); border-color: #238636; color: #3fb950; font-weight: 600; }
+
+    /* Date inputs */
+    .date-input {
+      background-color: #21262d;
+      border: 1px solid #30363d;
+      color: #e0e0e0;
+      border-radius: 6px;
+      padding: 5px 10px;
+      font-size: 0.82rem;
+      width: 140px;
+    }
+    .date-input:focus { outline: none; border-color: #238636; box-shadow: 0 0 0 2px rgba(35,134,54,0.2); }
+    .date-input::-webkit-calendar-picker-indicator { filter: invert(0.7); cursor: pointer; }
+
+    /* Quick buttons */
+    .quick-btn {
+      background-color: #21262d;
+      border: 1px solid #30363d;
+      color: #8b949e;
+      font-size: 0.78rem;
+      padding: 5px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      transition: all 0.15s;
+    }
+    .quick-btn:hover { background-color: #2d333a; color: #c9d1d9; border-color: #484f58; }
+    .quick-btn.active-quick { border-color: #388bfd; color: #388bfd; background-color: rgba(56,139,253,0.1); }
+
+    /* Filter separator */
+    .filter-sep { width: 1px; height: 28px; background-color: #30363d; margin: 0 6px; }
+
+    /* KPI cards */
+    .kpi-card { background-color: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 10px 14px; }
+    .kpi-value { font-size: 1.3rem; font-weight: 700; line-height: 1.2; }
+    .kpi-label { font-size: 0.68rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.8px; margin-top: 3px; }
+
+    /* Table */
+    .scoreboard-table { width: 100%; border-collapse: collapse; }
+    .scoreboard-table th {
+      background-color: #21262d;
+      color: #8b949e;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      padding: 10px 14px;
+      border-bottom: 1px solid #30363d;
+      white-space: nowrap;
+    }
+    .scoreboard-table th[data-sort] { cursor: pointer; user-select: none; }
+    .scoreboard-table th[data-sort]:hover { color: #c9d1d9; }
+    .scoreboard-table th[data-sort].sort-active { color: #388bfd; }
+    .sort-icon { margin-left: 4px; font-size: 0.7rem; opacity: 0.4; }
+    th[data-sort].sort-active .sort-icon { opacity: 1; }
+    .scoreboard-table td { padding: 9px 14px; border-bottom: 1px solid #21262d; font-size: 0.88rem; vertical-align: middle; }
+    .scoreboard-table td { color: #e0e0e0; }
+
+    /* Office group row */
+    .office-row td {
+      background-color: #12171f;
+      color: #c9d1d9;
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      padding: 9px 14px;
+      border-top: 1px solid #30363d;
+      border-bottom: 1px solid #21262d;
+      cursor: pointer;
+      user-select: none;
+    }
+    .office-row:hover td { background-color: #161b22; }
+    .office-total { font-size: 1rem; font-weight: 700; color: #c9d1d9; }
+    .chevron { transition: transform 0.2s; display: inline-block; color: #484f58; font-size: 0.7rem; margin-right: 8px; }
+    .chevron.open { transform: rotate(90deg); }
+
+    /* Dept group row */
+    .dept-row td {
+      background-color: #161b22;
+      color: #c9d1d9;
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 7px 14px 7px 28px;
+      border-bottom: 1px solid #21262d;
+      cursor: pointer;
+      user-select: none;
+    }
+    .dept-row:hover td { background-color: #1c2128; }
+
+    /* Agent sub-row (deep indent) */
+    .retention-agent-row td { padding: 8px 14px 8px 52px; border-bottom: 1px solid #1a1f27; }
+    .retention-agent-row td:first-child { color: #e0e0e0; font-size: 0.88rem; white-space: nowrap; }
+    .office-row td:first-child { white-space: nowrap; }
+
+    /* Grand total row */
+    .total-row td {
+      background-color: #1c2128;
+      border-top: 2px solid #30363d;
+      padding: 11px 14px;
+      font-weight: 700;
+      color: #c9d1d9;
+      font-size: 0.9rem;
+    }
+
+    /* Section title */
+    .section-title { font-size: 1rem; font-weight: 600; color: #c9d1d9; border-left: 3px solid #238636; padding-left: 10px; }
+  </style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="sidebar-brand">
+    <i class="bi bi-bar-chart-fill text-success me-2"></i>Reporting System
+  </div>
+  <nav class="sidebar-nav">
+    <a href="/" class="sidebar-link"><i class="bi bi-graph-up"></i>Performance</a>
+    <a href="/users" class="sidebar-link"><i class="bi bi-people"></i>Users</a>
+    <a href="/scoreboard" class="sidebar-link"><i class="bi bi-trophy"></i>Scoreboard</a>
+    <a href="/agent-bonuses" class="sidebar-link active"><i class="bi bi-cash-stack"></i>Agent Bonuses</a>
+    <a href="/data-sync" class="sidebar-link"><i class="bi bi-database"></i>Data Sync</a>
+    <a href="/holidays" class="sidebar-link"><i class="bi bi-calendar-x"></i>Holidays</a>
+  </nav>
+</div>
+
+<div class="main-content">
+<div class="container-fluid px-4 py-4">
+
+  <!-- Header -->
+  <div class="mb-4">
+    <h4 class="fw-bold text-white mb-0">Agent Bonuses</h4>
+    <p class="text-muted small mb-0">Retention bonus calculations by agent, department, and office</p>
+  </div>
+
+  <!-- Filter Bar -->
+  <div class="card p-3 mb-4">
+    <!-- Row 1: Year + Month -->
+    <div class="d-flex flex-wrap align-items-center gap-1 mb-3">
+      <span class="text-muted small me-1" style="min-width:40px">Year</span>
+      <button class="period-btn year-btn" data-year="2024">2024</button>
+      <button class="period-btn year-btn" data-year="2025">2025</button>
+      <button class="period-btn year-btn" data-year="2026">2026</button>
+      <div class="filter-sep"></div>
+      <span class="text-muted small me-1">Month</span>
+      <button class="period-btn month-btn" data-month="1">Jan</button>
+      <button class="period-btn month-btn" data-month="2">Feb</button>
+      <button class="period-btn month-btn" data-month="3">Mar</button>
+      <button class="period-btn month-btn" data-month="4">Apr</button>
+      <button class="period-btn month-btn" data-month="5">May</button>
+      <button class="period-btn month-btn" data-month="6">Jun</button>
+      <button class="period-btn month-btn" data-month="7">Jul</button>
+      <button class="period-btn month-btn" data-month="8">Aug</button>
+      <button class="period-btn month-btn" data-month="9">Sep</button>
+      <button class="period-btn month-btn" data-month="10">Oct</button>
+      <button class="period-btn month-btn" data-month="11">Nov</button>
+      <button class="period-btn month-btn" data-month="12">Dec</button>
+    </div>
+    <!-- Row 2: Date range -->
+    <div class="d-flex flex-wrap align-items-center gap-2">
+      <span class="text-muted small">From</span>
+      <input type="date" id="date-from" class="date-input" />
+      <span class="text-muted small">To</span>
+      <input type="date" id="date-to" class="date-input" />
+      <div class="filter-sep"></div>
+      <button class="quick-btn" id="btn-today">TODAY</button>
+      <button class="quick-btn" id="btn-ystrd">YSTRD</button>
+      <div class="filter-sep"></div>
+      <button class="btn btn-sm text-white px-3" style="background:linear-gradient(135deg,#238636,#2ea043);border:none;border-radius:6px;" id="btn-apply">
+        <i class="bi bi-arrow-clockwise me-1"></i>Apply
+      </button>
+    </div>
+  </div>
+
+  <!-- KPI Cards -->
+  <div class="row g-2 mb-4">
+    <div class="col-2">
+      <div class="kpi-card text-center">
+        <div class="kpi-value" style="color:#8b949e;" id="stat-wd">—</div>
+        <div class="kpi-label">Working Days</div>
+      </div>
+    </div>
+    <div class="col-2">
+      <div class="kpi-card text-center">
+        <div class="kpi-value" style="color:#3fb950;" id="stat-wd-passed">—</div>
+        <div class="kpi-label">Days Passed</div>
+      </div>
+    </div>
+    <div class="col-2">
+      <div class="kpi-card text-center">
+        <div class="kpi-value" style="color:#d29922;" id="stat-wd-left">—</div>
+        <div class="kpi-label">Days Left</div>
+      </div>
+    </div>
+    <div class="col-2">
+      <div class="kpi-card text-center">
+        <div class="kpi-value" style="color:#3fb950;" id="stat-total-bonus">—</div>
+        <div class="kpi-label">Total Bonus $</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Retention Agent Bonuses Table -->
+  <div>
+    <div class="card p-0" style="overflow:hidden;">
+      <div class="d-flex justify-content-between align-items-center px-4 py-3" style="border-bottom:1px solid #30363d;">
+        <div class="section-title" style="border-left-color:#3fb950;">Retention Agent Bonuses</div>
+        <span class="text-muted small" id="bon-row-count"></span>
+      </div>
+
+      <div id="bon-loading" style="display:none;text-align:center;padding:60px;color:#8b949e;">
+        <div class="spinner-border text-success mb-3" style="width:2rem;height:2rem;"></div>
+        <div class="small">Loading...</div>
+      </div>
+
+      <div id="bon-error-msg" style="display:none;" class="text-danger text-center p-4 small"></div>
+
+      <div id="bon-table-wrapper" style="overflow-x:auto;">
+        <table class="scoreboard-table" id="bonus-table">
+          <thead>
+            <tr>
+              <th>Office / Dept / Agent</th>
+              <th class="text-center" style="min-width:110px;" data-sort="bon-targetNet">Target NET <i class="bi sort-icon" id="bon-sort-icon-targetNet"></i></th>
+              <th class="text-center" style="min-width:100px;" data-sort="bon-netUsd">Net $ <i class="bi sort-icon" id="bon-sort-icon-netUsd"></i></th>
+              <th class="text-center" style="min-width:110px;" data-sort="bon-targetNetPct">Target Net % <i class="bi sort-icon" id="bon-sort-icon-targetNetPct"></i></th>
+              <th class="text-center" style="min-width:120px;" data-sort="bon-targetVol">Target Volume <i class="bi sort-icon" id="bon-sort-icon-targetVol"></i></th>
+              <th class="text-center" style="min-width:110px;" data-sort="bon-openVol">Open Volume <i class="bi sort-icon" id="bon-sort-icon-openVol"></i></th>
+              <th class="text-center" style="min-width:110px;" data-sort="bon-targetVolPct">Target Vol % <i class="bi sort-icon" id="bon-sort-icon-targetVolPct"></i></th>
+              <th class="text-center" style="min-width:100px;" data-sort="bon-pctOnNet">% on Net <i class="bi sort-icon" id="bon-sort-icon-pctOnNet"></i></th>
+              <th class="text-center" style="min-width:120px;" data-sort="bon-pctOnTargetNet">% on Target Net <i class="bi sort-icon" id="bon-sort-icon-pctOnTargetNet"></i></th>
+              <th class="text-center" style="min-width:120px;" data-sort="bon-pctOnTargetVol">% on Target Vol <i class="bi sort-icon" id="bon-sort-icon-pctOnTargetVol"></i></th>
+              <th class="text-center" style="min-width:110px;" data-sort="bon-totalBonusPct">Total Bonus % <i class="bi sort-icon" id="bon-sort-icon-totalBonusPct"></i></th>
+              <th class="text-center" style="min-width:120px;" data-sort="bon-basicBonusUsd">Basic Bonus $ <i class="bi sort-icon" id="bon-sort-icon-basicBonusUsd"></i></th>
+            </tr>
+          </thead>
+          <tbody id="bonus-tbody"></tbody>
+          <tfoot id="bonus-tfoot"></tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<script>
+  // ── State ──────────────────────────────────────────────────────────────
+  const now = new Date();
+  let state = {
+    year:  now.getFullYear(),
+    month: now.getMonth() + 1,
+  };
+  let bonAllRows = [];
+  let bonSortState = { col: 'bon-basicBonusUsd', dir: 'desc' };
+  let bonWd = 0, bonWdPassed = 0, bonWdLeft = 0;
+
+  // ── Helpers ────────────────────────────────────────────────────────────
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function todayStr() {
+    return `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+  }
+  function yesterdayStr() {
+    const d = new Date(now); d.setDate(d.getDate() - 1);
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  }
+  function firstOfMonth(year, month) {
+    return `${year}-${pad(month)}-01`;
+  }
+  function lastOfMonth(year, month) {
+    const d = new Date(year, month, 0);
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  }
+  function dateToForMonth(year, month) {
+    const isCurrentMonth = year === now.getFullYear() && month === now.getMonth() + 1;
+    return isCurrentMonth ? todayStr() : lastOfMonth(year, month);
+  }
+
+  // ── Button highlight helpers ───────────────────────────────────────────
+  function activateYear(year) {
+    document.querySelectorAll('.year-btn').forEach(b => {
+      b.classList.toggle('active', parseInt(b.dataset.year) === year);
+    });
+  }
+  function activateMonth(month) {
+    document.querySelectorAll('.month-btn').forEach(b => {
+      b.classList.toggle('active', parseInt(b.dataset.month) === month);
+    });
+  }
+  function setQuickActive(id) {
+    ['btn-today','btn-ystrd'].forEach(i => {
+      document.getElementById(i).classList.toggle('active-quick', i === id);
+    });
+  }
+
+  // ── Formatters ─────────────────────────────────────────────────────────
+  function escHtml(str) {
+    return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function netHtml(val, bold = false) {
+    if (val === null || val === undefined) return `<span style="color:#484f58;">—</span>`;
+    const color = val >= 0 ? '#3fb950' : '#f85149';
+    const fw = bold ? '700' : '600';
+    const fmt = Math.abs(val) >= 1000
+      ? (val < 0 ? '-' : '') + '$' + Math.abs(val).toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})
+      : (val < 0 ? '-$' : '$') + Math.abs(val).toFixed(2);
+    return `<span style="color:${color};font-weight:${fw};">${fmt}</span>`;
+  }
+
+  // Percentage where fraction is 0..1 (e.g. 0.85 → 85%), green ≥ 100%
+  function retPctHtml(pct, bold = false) {
+    if (pct === null || pct === undefined) return `<span style="color:#484f58;">—</span>`;
+    const pctRounded = Math.round(pct * 100);
+    const color = pctRounded >= 100 ? '#3fb950' : '#f85149';
+    const fw = bold ? '700' : '600';
+    return `<span style="color:${color};font-weight:${fw};">${pctRounded}%</span>`;
+  }
+
+  // Bonus % formatter: 0.015 → "1.50%", green > 0, grey = 0, red < 0
+  function bonusPctHtml(pct, bold = false) {
+    if (pct === null || pct === undefined) return `<span style="color:#484f58;">—</span>`;
+    const fw = bold ? '700' : '600';
+    const color = pct > 0 ? '#3fb950' : pct < 0 ? '#f85149' : '#8b949e';
+    const formatted = (pct * 100).toFixed(2) + '%';
+    return `<span style="color:${color};font-weight:${fw};">${formatted}</span>`;
+  }
+
+  // ── Sort value helper ──────────────────────────────────────────────────
+  function bonSortVal(o) {
+    const m = {
+      'bon-targetNet':      o.tgtNet       ?? 0,
+      'bon-netUsd':         o.netUsd       ?? 0,
+      'bon-targetNetPct':   o.tgtNetPct    ?? -1e9,
+      'bon-targetVol':      o.tgtVol       ?? 0,
+      'bon-openVol':        o.openVol      ?? 0,
+      'bon-targetVolPct':   o.tgtVolPct    ?? -1e9,
+      'bon-pctOnNet':       o.pctOnNet     ?? -1e9,
+      'bon-pctOnTargetNet': o.pctOnTgtNet  ?? -1e9,
+      'bon-pctOnTargetVol': o.pctOnTgtVol  ?? -1e9,
+      'bon-totalBonusPct':  o.totalBonusPct ?? -1e9,
+      'bon-basicBonusUsd':  o.basicBonus   ?? 0,
+    };
+    return m[bonSortState.col] ?? 0;
+  }
+
+  // ── API fetch ──────────────────────────────────────────────────────────
+  async function loadBonusData() {
+    const df = document.getElementById('date-from').value;
+    const dt = document.getElementById('date-to').value;
+    if (!df || !dt) return;
+
+    document.getElementById('bon-loading').style.display = 'block';
+    document.getElementById('bon-table-wrapper').style.display = 'none';
+    document.getElementById('bon-error-msg').style.display = 'none';
+
+    try {
+      const res = await fetch(`/api/agent-bonuses/retention?date_from=${df}&date_to=${dt}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Server error');
+
+      bonWd = data.working_days;
+      bonWdPassed = data.working_days_passed;
+      bonWdLeft = data.working_days_left;
+
+      document.getElementById('stat-wd').textContent        = bonWd;
+      document.getElementById('stat-wd-passed').textContent = bonWdPassed;
+      document.getElementById('stat-wd-left').textContent   = bonWdLeft;
+
+      bonAllRows = data.rows;
+
+      const totalBonus = bonAllRows.reduce((s, r) => s + (r.basic_bonus_usd ?? 0), 0);
+      const bonusFmt = Math.abs(totalBonus) >= 1000
+        ? '$' + Math.round(totalBonus).toLocaleString('en-US')
+        : '$' + totalBonus.toFixed(2);
+      document.getElementById('stat-total-bonus').textContent = bonusFmt;
+
+      renderBonusTable();
+    } catch(e) {
+      document.getElementById('bon-error-msg').textContent = 'Error: ' + e.message;
+      document.getElementById('bon-error-msg').style.display = 'block';
+    } finally {
+      document.getElementById('bon-loading').style.display = 'none';
+      document.getElementById('bon-table-wrapper').style.display = '';
+    }
+  }
+
+  // ── Render table ───────────────────────────────────────────────────────
+  function renderBonusTable() {
+    const filtered = bonAllRows.filter(r =>
+      r.target_net > 0 || r.net_usd !== 0 || r.open_volume_usd > 0
+    );
+
+    const tbody = document.getElementById('bonus-tbody');
+    const tfoot = document.getElementById('bonus-tfoot');
+    tbody.innerHTML = '';
+    tfoot.innerHTML = '';
+
+    // Group: office → dept → agents
+    const officeMap = new Map();
+    filtered.forEach(r => {
+      if (!officeMap.has(r.office_name)) officeMap.set(r.office_name, new Map());
+      const deptMap = officeMap.get(r.office_name);
+      if (!deptMap.has(r.dept_name)) deptMap.set(r.dept_name, []);
+      deptMap.get(r.dept_name).push(r);
+    });
+
+    // Build office array with aggregates
+    const officeArr = [];
+    officeMap.forEach((deptMap, officeName) => {
+      const allAgents = [];
+      deptMap.forEach(agents => allAgents.push(...agents));
+      const tgtNet    = allAgents.reduce((s, a) => s + a.target_net, 0);
+      const netUsd    = allAgents.reduce((s, a) => s + a.net_usd, 0);
+      const tgtVol    = allAgents.reduce((s, a) => s + a.target_vol, 0);
+      const openVol   = allAgents.reduce((s, a) => s + a.open_volume_usd, 0);
+      const basicBonus= allAgents.reduce((s, a) => s + a.basic_bonus_usd, 0);
+      officeArr.push({
+        officeName, deptMap,
+        agentCount: allAgents.length,
+        tgtNet, netUsd, tgtVol, openVol, basicBonus,
+        tgtNetPct:     tgtNet > 0 ? netUsd   / tgtNet  : null,
+        tgtVolPct:     tgtVol > 0 ? openVol  / tgtVol  : null,
+        totalBonusPct: netUsd > 0 ? basicBonus / netUsd : null,
+        // Individual tier pcts not shown at aggregate level
+        pctOnNet: null, pctOnTgtNet: null, pctOnTgtVol: null,
+      });
+    });
+
+    officeArr.sort((a, b) => {
+      const av = bonSortVal(a), bv = bonSortVal(b);
+      return bonSortState.dir === 'desc' ? bv - av : av - bv;
+    });
+
+    let gTgtNet = 0, gNetUsd = 0, gTgtVol = 0, gOpenVol = 0, gBasicBonus = 0;
+    let totalOffices = 0, totalAgents = 0;
+
+    officeArr.forEach((office, officeIndex) => {
+      totalOffices++;
+      const officeId = 'bon-office-' + officeIndex;
+      gTgtNet     += office.tgtNet;
+      gNetUsd     += office.netUsd;
+      gTgtVol     += office.tgtVol;
+      gOpenVol    += office.openVol;
+      gBasicBonus += office.basicBonus;
+
+      const offTr = document.createElement('tr');
+      offTr.className = 'office-row';
+      offTr.dataset.officeId = officeId;
+      offTr.innerHTML = `
+        <td>
+          <span class="chevron">&#9654;</span>
+          <i class="bi bi-building me-2" style="color:#484f58;font-size:0.75rem;"></i>
+          <strong>${escHtml(office.officeName)}</strong>
+          <span class="text-muted ms-2" style="font-size:0.72rem;font-weight:400;">${office.agentCount} agents</span>
+        </td>
+        <td class="text-center">${netHtml(office.tgtNet, true)}</td>
+        <td class="text-center">${netHtml(office.netUsd, true)}</td>
+        <td class="text-center">${retPctHtml(office.tgtNetPct, true)}</td>
+        <td class="text-center">${netHtml(office.tgtVol, true)}</td>
+        <td class="text-center">${netHtml(office.openVol, true)}</td>
+        <td class="text-center">${retPctHtml(office.tgtVolPct, true)}</td>
+        <td class="text-center"><span style="color:#484f58;">—</span></td>
+        <td class="text-center"><span style="color:#484f58;">—</span></td>
+        <td class="text-center"><span style="color:#484f58;">—</span></td>
+        <td class="text-center">${bonusPctHtml(office.totalBonusPct, true)}</td>
+        <td class="text-center">${netHtml(office.basicBonus, true)}</td>
+      `;
+      tbody.appendChild(offTr);
+
+      // Build dept array
+      const deptArr = [];
+      office.deptMap.forEach((agents, deptName) => {
+        const dTgtNet  = agents.reduce((s, a) => s + a.target_net, 0);
+        const dNetUsd  = agents.reduce((s, a) => s + a.net_usd, 0);
+        const dTgtVol  = agents.reduce((s, a) => s + a.target_vol, 0);
+        const dOpenVol = agents.reduce((s, a) => s + a.open_volume_usd, 0);
+        const dBonus   = agents.reduce((s, a) => s + a.basic_bonus_usd, 0);
+        deptArr.push({
+          deptName, agents,
+          tgtNet: dTgtNet, netUsd: dNetUsd, tgtVol: dTgtVol, openVol: dOpenVol, basicBonus: dBonus,
+          tgtNetPct:     dTgtNet > 0 ? dNetUsd / dTgtNet : null,
+          tgtVolPct:     dTgtVol > 0 ? dOpenVol / dTgtVol : null,
+          totalBonusPct: dNetUsd > 0 ? dBonus / dNetUsd : null,
+          pctOnNet: null, pctOnTgtNet: null, pctOnTgtVol: null,
+        });
+      });
+
+      deptArr.sort((a, b) => {
+        const av = bonSortVal(a), bv = bonSortVal(b);
+        return bonSortState.dir === 'desc' ? bv - av : av - bv;
+      });
+
+      deptArr.forEach((dept, deptIndex) => {
+        totalAgents += dept.agents.length;
+        const deptId = officeId + '-dept-' + deptIndex;
+
+        const deptTr = document.createElement('tr');
+        deptTr.className = 'dept-row';
+        deptTr.dataset.parentOffice = officeId;
+        deptTr.dataset.deptId = deptId;
+        deptTr.style.display = 'none';
+        deptTr.innerHTML = `
+          <td>
+            <span class="chevron">&#9654;</span>
+            <i class="bi bi-diagram-3 me-2" style="color:#484f58;font-size:0.72rem;"></i>
+            ${escHtml(dept.deptName)}
+            <span class="text-muted ms-2" style="font-size:0.68rem;font-weight:400;">${dept.agents.length} agents</span>
+          </td>
+          <td class="text-center">${netHtml(dept.tgtNet)}</td>
+          <td class="text-center">${netHtml(dept.netUsd)}</td>
+          <td class="text-center">${retPctHtml(dept.tgtNetPct)}</td>
+          <td class="text-center">${netHtml(dept.tgtVol)}</td>
+          <td class="text-center">${netHtml(dept.openVol)}</td>
+          <td class="text-center">${retPctHtml(dept.tgtVolPct)}</td>
+          <td class="text-center"><span style="color:#484f58;">—</span></td>
+          <td class="text-center"><span style="color:#484f58;">—</span></td>
+          <td class="text-center"><span style="color:#484f58;">—</span></td>
+          <td class="text-center">${bonusPctHtml(dept.totalBonusPct)}</td>
+          <td class="text-center">${netHtml(dept.basicBonus)}</td>
+        `;
+        tbody.appendChild(deptTr);
+
+        // Sort agents
+        const sortedAgents = [...dept.agents].sort((a, b) => {
+          const av = bonSortVal({
+            tgtNet: a.target_net, netUsd: a.net_usd, tgtNetPct: a.target_net_pct,
+            tgtVol: a.target_vol, openVol: a.open_volume_usd, tgtVolPct: a.target_vol_pct,
+            pctOnNet: a.pct_on_net, pctOnTgtNet: a.pct_on_target_net, pctOnTgtVol: a.pct_on_target_vol,
+            totalBonusPct: a.total_bonus_pct, basicBonus: a.basic_bonus_usd,
+          });
+          const bv = bonSortVal({
+            tgtNet: b.target_net, netUsd: b.net_usd, tgtNetPct: b.target_net_pct,
+            tgtVol: b.target_vol, openVol: b.open_volume_usd, tgtVolPct: b.target_vol_pct,
+            pctOnNet: b.pct_on_net, pctOnTgtNet: b.pct_on_target_net, pctOnTgtVol: b.pct_on_target_vol,
+            totalBonusPct: b.total_bonus_pct, basicBonus: b.basic_bonus_usd,
+          });
+          return bonSortState.dir === 'desc' ? bv - av : av - bv;
+        });
+
+        sortedAgents.forEach(r => {
+          const agTr = document.createElement('tr');
+          agTr.className = 'retention-agent-row';
+          agTr.dataset.parentOffice = officeId;
+          agTr.dataset.parentDept   = deptId;
+          agTr.style.display = 'none';
+          agTr.innerHTML = `
+            <td>${escHtml(r.agent_name)}</td>
+            <td class="text-center">${netHtml(r.target_net)}</td>
+            <td class="text-center">${netHtml(r.net_usd)}</td>
+            <td class="text-center">${retPctHtml(r.target_net_pct)}</td>
+            <td class="text-center">${netHtml(r.target_vol)}</td>
+            <td class="text-center">${netHtml(r.open_volume_usd)}</td>
+            <td class="text-center">${retPctHtml(r.target_vol_pct)}</td>
+            <td class="text-center">${bonusPctHtml(r.pct_on_net)}</td>
+            <td class="text-center">${bonusPctHtml(r.pct_on_target_net)}</td>
+            <td class="text-center">${bonusPctHtml(r.pct_on_target_vol)}</td>
+            <td class="text-center">${bonusPctHtml(r.total_bonus_pct)}</td>
+            <td class="text-center">${netHtml(r.basic_bonus_usd)}</td>
+          `;
+          tbody.appendChild(agTr);
+        });
+
+        // Dept click: toggle agent rows
+        deptTr.addEventListener('click', e => {
+          e.stopPropagation();
+          const chevron = deptTr.querySelector('.chevron');
+          const isOpen  = chevron.classList.contains('open');
+          const agRows  = tbody.querySelectorAll(`tr[data-parent-dept="${deptId}"]`);
+          chevron.classList.toggle('open', !isOpen);
+          agRows.forEach(r => r.style.display = isOpen ? 'none' : '');
+        });
+      });
+
+      // Office click: toggle dept rows (and hide children when closing)
+      offTr.addEventListener('click', () => {
+        const chevron = offTr.querySelector('.chevron');
+        const isOpen  = chevron.classList.contains('open');
+        if (!isOpen) {
+          tbody.querySelectorAll(`tr.dept-row[data-parent-office="${officeId}"]`)
+            .forEach(r => r.style.display = '');
+          chevron.classList.add('open');
+        } else {
+          tbody.querySelectorAll(`tr[data-parent-office="${officeId}"]`).forEach(r => {
+            r.style.display = 'none';
+            if (r.classList.contains('dept-row')) {
+              r.querySelector('.chevron')?.classList.remove('open');
+              const dId = r.dataset.deptId;
+              if (dId) tbody.querySelectorAll(`tr[data-parent-dept="${dId}"]`).forEach(ar => ar.style.display = 'none');
+            }
+          });
+          chevron.classList.remove('open');
+        }
+      });
+    });
+
+    if (filtered.length === 0) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td colspan="12" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No data for this period</td>`;
+      tbody.appendChild(tr);
+    } else {
+      const gTgtNetPct     = gTgtNet   > 0 ? gNetUsd     / gTgtNet  : null;
+      const gTgtVolPct     = gTgtVol   > 0 ? gOpenVol    / gTgtVol  : null;
+      const gTotalBonusPct = gNetUsd   > 0 ? gBasicBonus / gNetUsd  : null;
+
+      const totalTr = document.createElement('tr');
+      totalTr.className = 'total-row';
+      totalTr.innerHTML = `
+        <td>Total</td>
+        <td class="text-center">${netHtml(gTgtNet, true)}</td>
+        <td class="text-center">${netHtml(gNetUsd, true)}</td>
+        <td class="text-center">${retPctHtml(gTgtNetPct, true)}</td>
+        <td class="text-center">${netHtml(gTgtVol, true)}</td>
+        <td class="text-center">${netHtml(gOpenVol, true)}</td>
+        <td class="text-center">${retPctHtml(gTgtVolPct, true)}</td>
+        <td class="text-center"><span style="color:#484f58;">—</span></td>
+        <td class="text-center"><span style="color:#484f58;">—</span></td>
+        <td class="text-center"><span style="color:#484f58;">—</span></td>
+        <td class="text-center">${bonusPctHtml(gTotalBonusPct, true)}</td>
+        <td class="text-center">${netHtml(gBasicBonus, true)}</td>
+      `;
+      tfoot.appendChild(totalTr);
+    }
+
+    document.getElementById('bon-row-count').textContent = `${totalOffices} offices · ${totalAgents} agents`;
+  }
+
+  // ── Sort icons ─────────────────────────────────────────────────────────
+  function updateBonSortIcons() {
+    document.querySelectorAll('#bonus-table th[data-sort]').forEach(th => {
+      const col  = th.dataset.sort;
+      const key  = col.replace('bon-', '');
+      const icon = document.getElementById('bon-sort-icon-' + key);
+      th.classList.toggle('sort-active', col === bonSortState.col);
+      if (icon) {
+        icon.className = 'bi sort-icon ' + (col !== bonSortState.col
+          ? 'bi-arrow-down-up'
+          : bonSortState.dir === 'desc' ? 'bi-sort-down' : 'bi-sort-up');
+      }
+    });
+  }
+
+  // ── Event: year buttons ────────────────────────────────────────────────
+  document.querySelectorAll('.year-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.year = parseInt(btn.dataset.year);
+      activateYear(state.year);
+      document.getElementById('date-from').value = firstOfMonth(state.year, state.month);
+      document.getElementById('date-to').value   = dateToForMonth(state.year, state.month);
+      loadBonusData();
+    });
+  });
+
+  // ── Event: month buttons ───────────────────────────────────────────────
+  document.querySelectorAll('.month-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.month = parseInt(btn.dataset.month);
+      activateMonth(state.month);
+      document.getElementById('date-from').value = firstOfMonth(state.year, state.month);
+      document.getElementById('date-to').value   = dateToForMonth(state.year, state.month);
+      loadBonusData();
+    });
+  });
+
+  // ── Event: TODAY / YSTRD ───────────────────────────────────────────────
+  document.getElementById('btn-today').addEventListener('click', () => {
+    document.getElementById('date-to').value = todayStr();
+    setQuickActive('btn-today');
+    loadBonusData();
+  });
+  document.getElementById('btn-ystrd').addEventListener('click', () => {
+    document.getElementById('date-to').value = yesterdayStr();
+    setQuickActive('btn-ystrd');
+    loadBonusData();
+  });
+
+  // ── Event: Apply button ────────────────────────────────────────────────
+  document.getElementById('btn-apply').addEventListener('click', () => {
+    setQuickActive(null);
+    loadBonusData();
+  });
+
+  // ── Event: date-from manual change ─────────────────────────────────────
+  document.getElementById('date-from').addEventListener('change', () => {
+    const val = document.getElementById('date-from').value;
+    if (val) {
+      const d = new Date(val + 'T00:00:00');
+      state.year  = d.getFullYear();
+      state.month = d.getMonth() + 1;
+      activateYear(state.year);
+      activateMonth(state.month);
+    }
+  });
+
+  // ── Event: column sort ─────────────────────────────────────────────────
+  document.querySelectorAll('#bonus-table th[data-sort]').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.sort;
+      if (bonSortState.col === col) {
+        bonSortState.dir = bonSortState.dir === 'desc' ? 'asc' : 'desc';
+      } else {
+        bonSortState.col = col;
+        bonSortState.dir = 'desc';
+      }
+      updateBonSortIcons();
+      if (bonAllRows.length) renderBonusTable();
+    });
+  });
+
+  // ── Init ───────────────────────────────────────────────────────────────
+  document.getElementById('date-from').value = firstOfMonth(state.year, state.month);
+  document.getElementById('date-to').value   = todayStr();
+  activateYear(state.year);
+  activateMonth(state.month);
+  setQuickActive('btn-today');
+  updateBonSortIcons();
+  loadBonusData();
+</script>
+
+</body>
+</html>

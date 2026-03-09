@@ -11,6 +11,7 @@ from app.routes.dealio_mt4trades_sync import router as dealio_mt4trades_sync_rou
 from app.routes.trading_accounts_sync import router as trading_accounts_sync_router
 from app.routes.ftd100_sync import router as ftd100_sync_router
 from app.routes.scoreboard import router as scoreboard_router
+from app.routes.agent_bonuses import router as agent_bonuses_router
 from app.routes.data_sync import router as data_sync_router
 from app.routes.dealio_daily_profit_sync import router as dealio_daily_profit_sync_router
 from app.routes.holidays import router as holidays_router
@@ -118,6 +119,7 @@ app.include_router(dealio_mt4trades_sync_router)
 app.include_router(trading_accounts_sync_router)
 app.include_router(ftd100_sync_router)
 app.include_router(scoreboard_router)
+app.include_router(agent_bonuses_router)
 app.include_router(data_sync_router)
 app.include_router(dealio_daily_profit_sync_router)
 app.include_router(holidays_router)
