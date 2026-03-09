@@ -145,7 +145,7 @@
           </thead>
           <tbody>
             {% for row in t.sync_log %}
-            <tr {% if loop.first %}class="latest-row"{% endif %}>
+            <tr {% if loop.first %}class="latest-row"{% elif loop.index > 10 %}class="sync-log-extra-{{ t.key }}" style="display:none"{% endif %}>
               <td class="text-muted small">{{ loop.index }}</td>
               <td class="small">
                 {% if loop.first %}<strong>{{ row.ran_at }}</strong>{% else %}{{ row.ran_at }}{% endif %}
@@ -170,6 +170,14 @@
           </tbody>
         </table>
       </div>
+      {% if t.sync_log|length > 10 %}
+      <div class="text-center mt-1">
+        <button class="btn btn-sm" style="background:#21262d;border:1px solid #30363d;color:#8b949e;font-size:0.8rem;"
+                onclick="toggleSyncLog('{{ t.key }}', {{ t.sync_log|length - 10 }}, this)">
+          <i class="bi bi-chevron-down me-1"></i>Show {{ t.sync_log|length - 10 }} more
+        </button>
+      </div>
+      {% endif %}
       {% else %}
       <div class="text-center py-5 text-muted">
         <i class="bi bi-journal-x fs-1 d-block mb-3"></i>
@@ -184,6 +192,16 @@
 </div>
 
 <script>
+  function toggleSyncLog(key, extra, btn) {
+    const rows = document.querySelectorAll('.sync-log-extra-' + key);
+    const expanded = btn.dataset.expanded === '1';
+    rows.forEach(r => r.style.display = expanded ? 'none' : '');
+    btn.dataset.expanded = expanded ? '0' : '1';
+    btn.innerHTML = expanded
+      ? `<i class="bi bi-chevron-down me-1"></i>Show ${extra} more`
+      : `<i class="bi bi-chevron-up me-1"></i>Show less`;
+  }
+
   function showToast(msg, type = 'success') {
     const id = 'toast-' + Date.now();
     const color = type === 'success' ? 'bg-success' : 'bg-danger';
