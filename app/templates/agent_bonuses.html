@@ -120,7 +120,11 @@
     }
     .dept-row:hover td { background-color: #1c2128; }
 
-    /* Agent sub-row (deep indent) */
+    /* Sales agent row (2-level, shallower indent) */
+    .sales-agent-row td { padding: 8px 14px 8px 28px; border-bottom: 1px solid #1a1f27; }
+    .sales-agent-row td:first-child { color: #e0e0e0; font-size: 0.88rem; white-space: nowrap; }
+
+    /* Retention agent sub-row (3-level, deep indent) */
     .retention-agent-row td { padding: 8px 14px 8px 52px; border-bottom: 1px solid #1a1f27; }
     .retention-agent-row td:first-child { color: #e0e0e0; font-size: 0.88rem; white-space: nowrap; }
     .office-row td:first-child { white-space: nowrap; }
@@ -161,7 +165,7 @@
   <!-- Header -->
   <div class="mb-4">
     <h4 class="fw-bold text-white mb-0">Agent Bonuses</h4>
-    <p class="text-muted small mb-0">Retention bonus calculations by agent, department, and office</p>
+    <p class="text-muted small mb-0">Sales and Retention bonus calculations by agent and office</p>
   </div>
 
   <!-- Filter Bar -->
@@ -225,8 +229,52 @@
     </div>
     <div class="col-2">
       <div class="kpi-card text-center">
-        <div class="kpi-value" style="color:#3fb950;" id="stat-total-bonus">—</div>
-        <div class="kpi-label">Total Bonus $</div>
+        <div class="kpi-value" style="color:#388bfd;" id="stat-sales-bonus">—</div>
+        <div class="kpi-label">Sales Bonus $</div>
+      </div>
+    </div>
+    <div class="col-2">
+      <div class="kpi-card text-center">
+        <div class="kpi-value" style="color:#3fb950;" id="stat-ret-bonus">—</div>
+        <div class="kpi-label">Retention Bonus $</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sales Agent Bonuses Table -->
+  <div class="mb-4">
+    <div class="card p-0" style="overflow:hidden;">
+      <div class="d-flex justify-content-between align-items-center px-4 py-3" style="border-bottom:1px solid #30363d;">
+        <div class="section-title" style="border-left-color:#388bfd;">Sales Agent Bonuses</div>
+        <span class="text-muted small" id="sal-row-count"></span>
+      </div>
+
+      <div id="sal-loading" style="display:none;text-align:center;padding:60px;color:#8b949e;">
+        <div class="spinner-border text-primary mb-3" style="width:2rem;height:2rem;"></div>
+        <div class="small">Loading...</div>
+      </div>
+
+      <div id="sal-error-msg" style="display:none;" class="text-danger text-center p-4 small"></div>
+
+      <div id="sal-table-wrapper" style="overflow-x:auto;">
+        <table class="scoreboard-table" id="sales-table">
+          <thead>
+            <tr>
+              <th>Office / Agent</th>
+              <th class="text-center" style="min-width:80px;" data-sort="sal-target">Target <i class="bi sort-icon" id="sal-sort-icon-target"></i></th>
+              <th class="text-center" style="min-width:100px;" data-sort="sal-targetPct">Target % <i class="bi sort-icon" id="sal-sort-icon-targetPct"></i></th>
+              <th class="text-center" style="min-width:90px;" data-sort="sal-ftd100">FTD100 <i class="bi sort-icon" id="sal-sort-icon-ftd100"></i></th>
+              <th class="text-center" style="min-width:120px;" data-sort="sal-ftcNet">FTC Net USD <i class="bi sort-icon" id="sal-sort-icon-ftcNet"></i></th>
+              <th class="text-center" style="min-width:130px;" data-sort="sal-salesNet">Total Sales Net <i class="bi sort-icon" id="sal-sort-icon-salesNet"></i></th>
+              <th class="text-center" style="min-width:110px;" data-sort="sal-basicBonus">Basic Bonus <i class="bi sort-icon" id="sal-sort-icon-basicBonus"></i></th>
+              <th class="text-center" style="min-width:140px;" data-sort="sal-tgtBonus">Sales Target Bonus <i class="bi sort-icon" id="sal-sort-icon-tgtBonus"></i></th>
+              <th class="text-center" style="min-width:130px;" data-sort="sal-amtBonus">FTD Amount Bonus <i class="bi sort-icon" id="sal-sort-icon-amtBonus"></i></th>
+              <th class="text-center" style="min-width:130px;" data-sort="sal-totalBonus">Total Sales Bonus <i class="bi sort-icon" id="sal-sort-icon-totalBonus"></i></th>
+            </tr>
+          </thead>
+          <tbody id="sales-tbody"></tbody>
+          <tfoot id="sales-tfoot"></tfoot>
+        </table>
       </div>
     </div>
   </div>
@@ -284,6 +332,8 @@
   let bonAllRows = [];
   let bonSortState = { col: 'bon-basicBonusUsd', dir: 'desc' };
   let bonWd = 0, bonWdPassed = 0, bonWdLeft = 0;
+  let salAllRows = [];
+  let salSortState = { col: 'sal-totalBonus', dir: 'desc' };
 
   // ── Helpers ────────────────────────────────────────────────────────────
   function pad(n) { return String(n).padStart(2, '0'); }
@@ -356,7 +406,25 @@
     return `<span style="color:${color};font-weight:${fw};">${formatted}</span>`;
   }
 
-  // ── Sort value helper ──────────────────────────────────────────────────
+  // Integer count formatter (FTC, FTD100, target)
+  function countHtml(n, bold = false) {
+    if (n === null || n === undefined) return `<span style="color:#484f58;">—</span>`;
+    const fw = bold ? '700' : '600';
+    return `<span style="font-weight:${fw};">${Math.round(n).toLocaleString('en-US')}</span>`;
+  }
+
+  // Flat $ bonus formatter (always ≥ 0: green if > 0, grey if 0)
+  function bonusDollarHtml(val, bold = false) {
+    if (val === null || val === undefined) return `<span style="color:#484f58;">—</span>`;
+    const fw = bold ? '700' : '600';
+    const color = val > 0 ? '#3fb950' : '#8b949e';
+    const fmt = val >= 1000
+      ? '$' + Math.round(val).toLocaleString('en-US')
+      : '$' + Math.round(val);
+    return `<span style="color:${color};font-weight:${fw};">${fmt}</span>`;
+  }
+
+  // ── Sort value helpers ─────────────────────────────────────────────────
   function bonSortVal(o) {
     const m = {
       'bon-targetNet':      o.tgtNet       ?? 0,
@@ -374,7 +442,55 @@
     return m[bonSortState.col] ?? 0;
   }
 
-  // ── API fetch ──────────────────────────────────────────────────────────
+  function salSortVal(o) {
+    const m = {
+      'sal-target':      o.targetFtc  ?? 0,
+      'sal-targetPct':   o.targetPct  ?? -1e9,
+      'sal-ftd100':      o.ftd100     ?? 0,
+      'sal-ftcNet':      o.ftcNet     ?? 0,
+      'sal-salesNet':    o.salesNet   ?? 0,
+      'sal-basicBonus':  o.basicBonus ?? 0,
+      'sal-tgtBonus':    o.tgtBonus   ?? 0,
+      'sal-amtBonus':    o.amtBonus   ?? 0,
+      'sal-totalBonus':  o.totalBonus ?? 0,
+    };
+    return m[salSortState.col] ?? 0;
+  }
+
+  // ── Sales API fetch ────────────────────────────────────────────────────
+  async function loadSalesData() {
+    const df = document.getElementById('date-from').value;
+    const dt = document.getElementById('date-to').value;
+    if (!df || !dt) return;
+
+    document.getElementById('sal-loading').style.display = 'block';
+    document.getElementById('sal-table-wrapper').style.display = 'none';
+    document.getElementById('sal-error-msg').style.display = 'none';
+
+    try {
+      const res = await fetch(`/api/agent-bonuses/sales?date_from=${df}&date_to=${dt}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Server error');
+
+      salAllRows = data.rows;
+
+      const totalSalesBonus = salAllRows.reduce((s, r) => s + (r.total_sales_bonus ?? 0), 0);
+      const sfmt = totalSalesBonus >= 1000
+        ? '$' + Math.round(totalSalesBonus).toLocaleString('en-US')
+        : '$' + Math.round(totalSalesBonus);
+      document.getElementById('stat-sales-bonus').textContent = sfmt;
+
+      renderSalesTable();
+    } catch(e) {
+      document.getElementById('sal-error-msg').textContent = 'Error: ' + e.message;
+      document.getElementById('sal-error-msg').style.display = 'block';
+    } finally {
+      document.getElementById('sal-loading').style.display = 'none';
+      document.getElementById('sal-table-wrapper').style.display = '';
+    }
+  }
+
+  // ── Retention API fetch ────────────────────────────────────────────────
   async function loadBonusData() {
     const df = document.getElementById('date-from').value;
     const dt = document.getElementById('date-to').value;
@@ -403,7 +519,7 @@
       const bonusFmt = Math.abs(totalBonus) >= 1000
         ? '$' + Math.round(totalBonus).toLocaleString('en-US')
         : '$' + totalBonus.toFixed(2);
-      document.getElementById('stat-total-bonus').textContent = bonusFmt;
+      document.getElementById('stat-ret-bonus').textContent = bonusFmt;
 
       renderBonusTable();
     } catch(e) {
@@ -415,7 +531,175 @@
     }
   }
 
-  // ── Render table ───────────────────────────────────────────────────────
+  // ── Load all data ──────────────────────────────────────────────────────
+  async function loadAllData() {
+    await Promise.all([loadSalesData(), loadBonusData()]);
+  }
+
+  // ── Render Sales table ─────────────────────────────────────────────────
+  function renderSalesTable() {
+    const filtered = salAllRows.filter(r =>
+      r.target_ftc > 0 || r.ftd100_count > 0 || r.ftc_count > 0
+    );
+
+    const tbody = document.getElementById('sales-tbody');
+    const tfoot = document.getElementById('sales-tfoot');
+    tbody.innerHTML = '';
+    tfoot.innerHTML = '';
+
+    // Group by office
+    const officeMap = new Map();
+    filtered.forEach(r => {
+      if (!officeMap.has(r.office_name)) officeMap.set(r.office_name, []);
+      officeMap.get(r.office_name).push(r);
+    });
+
+    // Build office aggregates
+    const officeArr = [];
+    officeMap.forEach((agents, officeName) => {
+      const targetFtc  = agents.reduce((s, a) => s + a.target_ftc, 0);
+      const ftcCount   = agents.reduce((s, a) => s + a.ftc_count, 0);
+      const ftd100     = agents.reduce((s, a) => s + a.ftd100_count, 0);
+      const ftcNet     = agents.reduce((s, a) => s + a.ftc_net_usd, 0);
+      const salesNet   = agents.reduce((s, a) => s + a.total_sales_net, 0);
+      const basicBonus = agents.reduce((s, a) => s + a.basic_bonus, 0);
+      const tgtBonus   = agents.reduce((s, a) => s + a.sales_target_bonus, 0);
+      const amtBonus   = agents.reduce((s, a) => s + a.ftd_amount_bonus, 0);
+      const totalBonus = agents.reduce((s, a) => s + a.total_sales_bonus, 0);
+      officeArr.push({
+        officeName, agents,
+        agentCount: agents.length,
+        targetFtc, ftcCount, ftd100, ftcNet, salesNet,
+        basicBonus, tgtBonus, amtBonus, totalBonus,
+        targetPct: targetFtc > 0 ? ftcCount / targetFtc : null,
+      });
+    });
+
+    officeArr.sort((a, b) => {
+      const av = salSortVal(a), bv = salSortVal(b);
+      return salSortState.dir === 'desc' ? bv - av : av - bv;
+    });
+
+    let gTgtFtc = 0, gFtcCount = 0, gFtd100 = 0, gFtcNet = 0;
+    let gSalesNet = 0, gBasicBonus = 0, gTgtBonus = 0, gAmtBonus = 0, gTotalBonus = 0;
+    let totalOffices = 0, totalAgents = 0;
+
+    officeArr.forEach((office, officeIndex) => {
+      totalOffices++;
+      const officeId = 'sal-office-' + officeIndex;
+      gTgtFtc     += office.targetFtc;
+      gFtcCount   += office.ftcCount;
+      gFtd100     += office.ftd100;
+      gFtcNet     += office.ftcNet;
+      gSalesNet   += office.salesNet;
+      gBasicBonus += office.basicBonus;
+      gTgtBonus   += office.tgtBonus;
+      gAmtBonus   += office.amtBonus;
+      gTotalBonus += office.totalBonus;
+
+      const offTr = document.createElement('tr');
+      offTr.className = 'office-row';
+      offTr.dataset.officeId = officeId;
+      offTr.innerHTML = `
+        <td>
+          <span class="chevron">&#9654;</span>
+          <i class="bi bi-building me-2" style="color:#484f58;font-size:0.75rem;"></i>
+          <strong>${escHtml(office.officeName)}</strong>
+          <span class="text-muted ms-2" style="font-size:0.72rem;font-weight:400;">${office.agentCount} agents</span>
+        </td>
+        <td class="text-center">${countHtml(office.targetFtc, true)}</td>
+        <td class="text-center">${retPctHtml(office.targetPct, true)}</td>
+        <td class="text-center">${countHtml(office.ftd100, true)}</td>
+        <td class="text-center">${netHtml(office.ftcNet, true)}</td>
+        <td class="text-center">${netHtml(office.salesNet, true)}</td>
+        <td class="text-center">${bonusDollarHtml(office.basicBonus, true)}</td>
+        <td class="text-center">${bonusDollarHtml(office.tgtBonus, true)}</td>
+        <td class="text-center">${bonusDollarHtml(office.amtBonus, true)}</td>
+        <td class="text-center">${bonusDollarHtml(office.totalBonus, true)}</td>
+      `;
+      tbody.appendChild(offTr);
+
+      // Sort agents
+      const sortedAgents = [...office.agents].sort((a, b) => {
+        const av = salSortVal({
+          targetFtc: a.target_ftc, targetPct: a.target_pct,
+          ftd100: a.ftd100_count, ftcNet: a.ftc_net_usd, salesNet: a.total_sales_net,
+          basicBonus: a.basic_bonus, tgtBonus: a.sales_target_bonus,
+          amtBonus: a.ftd_amount_bonus, totalBonus: a.total_sales_bonus,
+        });
+        const bv = salSortVal({
+          targetFtc: b.target_ftc, targetPct: b.target_pct,
+          ftd100: b.ftd100_count, ftcNet: b.ftc_net_usd, salesNet: b.total_sales_net,
+          basicBonus: b.basic_bonus, tgtBonus: b.sales_target_bonus,
+          amtBonus: b.ftd_amount_bonus, totalBonus: b.total_sales_bonus,
+        });
+        return salSortState.dir === 'desc' ? bv - av : av - bv;
+      });
+
+      sortedAgents.forEach(r => {
+        totalAgents++;
+        const agTr = document.createElement('tr');
+        agTr.className = 'sales-agent-row';
+        agTr.dataset.parentOffice = officeId;
+        agTr.style.display = 'none';
+        agTr.innerHTML = `
+          <td>${escHtml(r.agent_name)}</td>
+          <td class="text-center">${countHtml(r.target_ftc)}</td>
+          <td class="text-center">${retPctHtml(r.target_pct)}</td>
+          <td class="text-center">${countHtml(r.ftd100_count)}</td>
+          <td class="text-center">${netHtml(r.ftc_net_usd)}</td>
+          <td class="text-center">${netHtml(r.total_sales_net)}</td>
+          <td class="text-center">${bonusDollarHtml(r.basic_bonus)}</td>
+          <td class="text-center">${bonusDollarHtml(r.sales_target_bonus)}</td>
+          <td class="text-center">${bonusDollarHtml(r.ftd_amount_bonus)}</td>
+          <td class="text-center">${bonusDollarHtml(r.total_sales_bonus)}</td>
+        `;
+        tbody.appendChild(agTr);
+      });
+
+      // Office click: toggle agent rows
+      offTr.addEventListener('click', () => {
+        const chevron = offTr.querySelector('.chevron');
+        const isOpen = chevron.classList.contains('open');
+        if (!isOpen) {
+          tbody.querySelectorAll(`tr.sales-agent-row[data-parent-office="${officeId}"]`)
+            .forEach(r => r.style.display = '');
+          chevron.classList.add('open');
+        } else {
+          tbody.querySelectorAll(`tr.sales-agent-row[data-parent-office="${officeId}"]`)
+            .forEach(r => r.style.display = 'none');
+          chevron.classList.remove('open');
+        }
+      });
+    });
+
+    if (filtered.length === 0) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td colspan="10" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No data for this period</td>`;
+      tbody.appendChild(tr);
+    } else {
+      const gTargetPct = gTgtFtc > 0 ? gFtcCount / gTgtFtc : null;
+      const totalTr = document.createElement('tr');
+      totalTr.className = 'total-row';
+      totalTr.innerHTML = `
+        <td>Total</td>
+        <td class="text-center">${countHtml(gTgtFtc, true)}</td>
+        <td class="text-center">${retPctHtml(gTargetPct, true)}</td>
+        <td class="text-center">${countHtml(gFtd100, true)}</td>
+        <td class="text-center">${netHtml(gFtcNet, true)}</td>
+        <td class="text-center">${netHtml(gSalesNet, true)}</td>
+        <td class="text-center">${bonusDollarHtml(gBasicBonus, true)}</td>
+        <td class="text-center">${bonusDollarHtml(gTgtBonus, true)}</td>
+        <td class="text-center">${bonusDollarHtml(gAmtBonus, true)}</td>
+        <td class="text-center">${bonusDollarHtml(gTotalBonus, true)}</td>
+      `;
+      tfoot.appendChild(totalTr);
+    }
+
+    document.getElementById('sal-row-count').textContent = `${totalOffices} offices · ${totalAgents} agents`;
+  }
+
+  // ── Render Retention table ─────────────────────────────────────────────
   function renderBonusTable() {
     const filtered = bonAllRows.filter(r =>
       r.target_net > 0 || r.net_usd !== 0 || r.open_volume_usd > 0
@@ -440,14 +724,14 @@
     officeMap.forEach((deptMap, officeName) => {
       const allAgents = [];
       deptMap.forEach(agents => allAgents.push(...agents));
-      const tgtNet       = allAgents.reduce((s, a) => s + a.target_net, 0);
-      const netUsd       = allAgents.reduce((s, a) => s + a.net_usd, 0);
-      const tgtVol       = allAgents.reduce((s, a) => s + a.target_vol, 0);
-      const openVol      = allAgents.reduce((s, a) => s + a.open_volume_usd, 0);
-      const basicBonus   = allAgents.reduce((s, a) => s + a.basic_bonus_usd, 0);
-      const bonusOnNet   = allAgents.reduce((s, a) => s + a.pct_on_net * a.net_usd, 0);
-      const bonusOnTgtNet= allAgents.reduce((s, a) => s + a.pct_on_target_net * a.net_usd, 0);
-      const bonusOnTgtVol= allAgents.reduce((s, a) => s + a.pct_on_target_vol * a.net_usd, 0);
+      const tgtNet        = allAgents.reduce((s, a) => s + a.target_net, 0);
+      const netUsd        = allAgents.reduce((s, a) => s + a.net_usd, 0);
+      const tgtVol        = allAgents.reduce((s, a) => s + a.target_vol, 0);
+      const openVol       = allAgents.reduce((s, a) => s + a.open_volume_usd, 0);
+      const basicBonus    = allAgents.reduce((s, a) => s + a.basic_bonus_usd, 0);
+      const bonusOnNet    = allAgents.reduce((s, a) => s + a.pct_on_net * a.net_usd, 0);
+      const bonusOnTgtNet = allAgents.reduce((s, a) => s + a.pct_on_target_net * a.net_usd, 0);
+      const bonusOnTgtVol = allAgents.reduce((s, a) => s + a.pct_on_target_vol * a.net_usd, 0);
       officeArr.push({
         officeName, deptMap,
         agentCount: allAgents.length,
@@ -509,20 +793,20 @@
       // Build dept array
       const deptArr = [];
       office.deptMap.forEach((agents, deptName) => {
-        const dTgtNet       = agents.reduce((s, a) => s + a.target_net, 0);
-        const dNetUsd       = agents.reduce((s, a) => s + a.net_usd, 0);
-        const dTgtVol       = agents.reduce((s, a) => s + a.target_vol, 0);
-        const dOpenVol      = agents.reduce((s, a) => s + a.open_volume_usd, 0);
-        const dBonus        = agents.reduce((s, a) => s + a.basic_bonus_usd, 0);
-        const dBonusOnNet   = agents.reduce((s, a) => s + a.pct_on_net * a.net_usd, 0);
-        const dBonusOnTgtNet= agents.reduce((s, a) => s + a.pct_on_target_net * a.net_usd, 0);
-        const dBonusOnTgtVol= agents.reduce((s, a) => s + a.pct_on_target_vol * a.net_usd, 0);
+        const dTgtNet        = agents.reduce((s, a) => s + a.target_net, 0);
+        const dNetUsd        = agents.reduce((s, a) => s + a.net_usd, 0);
+        const dTgtVol        = agents.reduce((s, a) => s + a.target_vol, 0);
+        const dOpenVol       = agents.reduce((s, a) => s + a.open_volume_usd, 0);
+        const dBonus         = agents.reduce((s, a) => s + a.basic_bonus_usd, 0);
+        const dBonusOnNet    = agents.reduce((s, a) => s + a.pct_on_net * a.net_usd, 0);
+        const dBonusOnTgtNet = agents.reduce((s, a) => s + a.pct_on_target_net * a.net_usd, 0);
+        const dBonusOnTgtVol = agents.reduce((s, a) => s + a.pct_on_target_vol * a.net_usd, 0);
         deptArr.push({
           deptName, agents,
           tgtNet: dTgtNet, netUsd: dNetUsd, tgtVol: dTgtVol, openVol: dOpenVol, basicBonus: dBonus,
-          tgtNetPct:     dTgtNet > 0 ? dNetUsd / dTgtNet : null,
+          tgtNetPct:     dTgtNet > 0 ? dNetUsd  / dTgtNet : null,
           tgtVolPct:     dTgtVol > 0 ? dOpenVol / dTgtVol : null,
-          totalBonusPct: dNetUsd > 0 ? dBonus / dNetUsd : null,
+          totalBonusPct: dNetUsd > 0 ? dBonus   / dNetUsd : null,
           pctOnNet:    dNetUsd > 0 ? dBonusOnNet    / dNetUsd : null,
           pctOnTgtNet: dNetUsd > 0 ? dBonusOnTgtNet / dNetUsd : null,
           pctOnTgtVol: dNetUsd > 0 ? dBonusOnTgtVol / dNetUsd : null,
@@ -686,6 +970,20 @@
     });
   }
 
+  function updateSalSortIcons() {
+    document.querySelectorAll('#sales-table th[data-sort]').forEach(th => {
+      const col  = th.dataset.sort;
+      const key  = col.replace('sal-', '');
+      const icon = document.getElementById('sal-sort-icon-' + key);
+      th.classList.toggle('sort-active', col === salSortState.col);
+      if (icon) {
+        icon.className = 'bi sort-icon ' + (col !== salSortState.col
+          ? 'bi-arrow-down-up'
+          : salSortState.dir === 'desc' ? 'bi-sort-down' : 'bi-sort-up');
+      }
+    });
+  }
+
   // ── Event: year buttons ────────────────────────────────────────────────
   document.querySelectorAll('.year-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -693,7 +991,7 @@
       activateYear(state.year);
       document.getElementById('date-from').value = firstOfMonth(state.year, state.month);
       document.getElementById('date-to').value   = dateToForMonth(state.year, state.month);
-      loadBonusData();
+      loadAllData();
     });
   });
 
@@ -704,7 +1002,7 @@
       activateMonth(state.month);
       document.getElementById('date-from').value = firstOfMonth(state.year, state.month);
       document.getElementById('date-to').value   = dateToForMonth(state.year, state.month);
-      loadBonusData();
+      loadAllData();
     });
   });
 
@@ -712,18 +1010,18 @@
   document.getElementById('btn-today').addEventListener('click', () => {
     document.getElementById('date-to').value = todayStr();
     setQuickActive('btn-today');
-    loadBonusData();
+    loadAllData();
   });
   document.getElementById('btn-ystrd').addEventListener('click', () => {
     document.getElementById('date-to').value = yesterdayStr();
     setQuickActive('btn-ystrd');
-    loadBonusData();
+    loadAllData();
   });
 
   // ── Event: Apply button ────────────────────────────────────────────────
   document.getElementById('btn-apply').addEventListener('click', () => {
     setQuickActive(null);
-    loadBonusData();
+    loadAllData();
   });
 
   // ── Event: date-from manual change ─────────────────────────────────────
@@ -738,7 +1036,7 @@
     }
   });
 
-  // ── Event: column sort ─────────────────────────────────────────────────
+  // ── Event: column sort (retention) ─────────────────────────────────────
   document.querySelectorAll('#bonus-table th[data-sort]').forEach(th => {
     th.addEventListener('click', () => {
       const col = th.dataset.sort;
@@ -753,6 +1051,21 @@
     });
   });
 
+  // ── Event: column sort (sales) ─────────────────────────────────────────
+  document.querySelectorAll('#sales-table th[data-sort]').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.sort;
+      if (salSortState.col === col) {
+        salSortState.dir = salSortState.dir === 'desc' ? 'asc' : 'desc';
+      } else {
+        salSortState.col = col;
+        salSortState.dir = 'desc';
+      }
+      updateSalSortIcons();
+      if (salAllRows.length) renderSalesTable();
+    });
+  });
+
   // ── Init ───────────────────────────────────────────────────────────────
   document.getElementById('date-from').value = firstOfMonth(state.year, state.month);
   document.getElementById('date-to').value   = todayStr();
@@ -760,7 +1073,8 @@
   activateMonth(state.month);
   setQuickActive('btn-today');
   updateBonSortIcons();
-  loadBonusData();
+  updateSalSortIcons();
+  loadAllData();
 </script>
 
 </body>

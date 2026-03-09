@@ -53,6 +53,37 @@ def get_vol_bonus_pct(vol_pct: float, group: str) -> float:
     return 0.0
 
 
+def get_sales_multiplier(ftd100: int) -> int:
+    """Per-FTD100 $ amount based on count tier."""
+    if ftd100 >= 48: return 65
+    if ftd100 >= 44: return 60
+    if ftd100 >= 40: return 55
+    if ftd100 >= 36: return 50
+    if ftd100 >= 32: return 45
+    if ftd100 >= 28: return 40
+    if ftd100 >= 24: return 35
+    if ftd100 >= 20: return 30
+    if ftd100 >= 15: return 25
+    if ftd100 >= 10: return 20
+    if ftd100 >= 5:  return 15
+    return 0
+
+
+def get_sales_target_bonus(ftd100_actual: int, target_ftc: int) -> int:
+    """Flat $ bonus paid when ftd100_actual >= target_ftc."""
+    if target_ftc <= 0 or ftd100_actual < target_ftc:
+        return 0
+    n = ftd100_actual
+    if n >= 60: return 1500
+    if n >= 50: return 1000
+    if n >= 35: return 500
+    if n >= 30: return 300
+    if n >= 25: return 200
+    if n >= 20: return 150
+    if n >= 5:  return 100
+    return 0
+
+
 def last_day_of_month(d: date_type) -> date_type:
     return d.replace(day=calendar.monthrange(d.year, d.month)[1])
 
@@ -212,6 +243,149 @@ def agent_bonuses_retention_api(date_from: str, date_to: str):
             "working_days_passed": working_days_passed,
             "working_days_left":   working_days_left,
         })
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+    finally:
+        conn.close()
+
+
+@router.get("/api/agent-bonuses/sales")
+def agent_bonuses_sales_api(date_from: str, date_to: str):
+    try:
+        dt_to             = datetime.strptime(date_to, "%Y-%m-%d").date()
+        date_to_exclusive = (dt_to + timedelta(days=1)).strftime("%Y-%m-%d")
+        # validate date_from too
+        datetime.strptime(date_from, "%Y-%m-%d")
+    except ValueError:
+        return JSONResponse(status_code=400, content={"detail": "Invalid date format"})
+
+    sql = """
+        SELECT
+            COALESCE(u.office_name, 'N/A')                       AS office_name,
+            COALESCE(u.agent_name, u.full_name, 'N/A')            AS agent_name,
+            COALESCE(tgt.target_ftc, 0)::int                      AS target_ftc,
+            COALESCE(ftc.ftc_count, 0)::int                       AS ftc_count,
+            COALESCE(f100.ftd100_count, 0)::int                   AS ftd100_count,
+            COALESCE(ftc_net.net_usd, 0)::float                   AS ftc_net_usd,
+            COALESCE(sn.total_sales_net, 0)::float                AS total_sales_net,
+            COALESCE(fab.ftd_amount_bonus, 0)::float              AS ftd_amount_bonus_sql
+        FROM crm_users u
+        LEFT JOIN (
+            SELECT agent_id::bigint, SUM(ftc)::int AS target_ftc
+            FROM targets
+            WHERE date >= %(date_from)s AND date < %(date_to_excl)s
+            GROUP BY agent_id
+        ) tgt ON tgt.agent_id = u.id
+        LEFT JOIN (
+            SELECT t.original_deposit_owner AS agent_id,
+                   COUNT(DISTINCT t.vtigeraccountid)::int AS ftc_count
+            FROM transactions t
+            JOIN accounts a ON a.accountid = t.vtigeraccountid
+            WHERE t.transactionapproval = 'Approved'
+              AND (t.deleted = 0 OR t.deleted IS NULL)
+              AND t.transactiontype = 'Deposit'
+              AND t.ftd = 1
+              AND a.client_qualification_date IS NOT NULL
+              AND a.client_qualification_date >= %(date_from)s
+              AND a.client_qualification_date <  %(date_to_excl)s
+            GROUP BY t.original_deposit_owner
+        ) ftc ON ftc.agent_id = u.id
+        LEFT JOIN (
+            SELECT f.original_deposit_owner AS agent_id,
+                   COUNT(DISTINCT f.accountid)::int AS ftd100_count
+            FROM ftd100_clients f
+            WHERE f.ftd_100_date >= %(date_from)s
+              AND f.ftd_100_date <  %(date_to_excl)s
+            GROUP BY f.original_deposit_owner
+        ) f100 ON f100.agent_id = u.id
+        LEFT JOIN (
+            SELECT t.original_deposit_owner AS agent_id,
+                   SUM(CASE WHEN t.transactiontype IN ('Deposit','Withdrawal Cancelled') THEN  t.usdamount
+                            WHEN t.transactiontype IN ('Withdrawal','Deposit Cancelled')  THEN -t.usdamount END)::float AS net_usd
+            FROM transactions t
+            JOIN accounts a ON a.accountid = t.vtigeraccountid
+            WHERE t.transactionapproval = 'Approved'
+              AND (t.deleted = 0 OR t.deleted IS NULL)
+              AND t.transactiontype IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
+              AND a.client_qualification_date IS NOT NULL
+              AND a.client_qualification_date >= %(date_from)s
+              AND a.client_qualification_date <  %(date_to_excl)s
+              AND (a.client_qualification_date >= t.confirmation_time::date OR t.ftd = 1)
+            GROUP BY t.original_deposit_owner
+        ) ftc_net ON ftc_net.agent_id = u.id
+        LEFT JOIN (
+            SELECT f.original_deposit_owner AS agent_id,
+                   SUM(f.net_until_qualification)::float AS total_sales_net
+            FROM ftd100_clients f
+            WHERE f.ftd_100_date >= %(date_from)s
+              AND f.ftd_100_date <  %(date_to_excl)s
+            GROUP BY f.original_deposit_owner
+        ) sn ON sn.agent_id = u.id
+        LEFT JOIN (
+            SELECT f.original_deposit_owner AS agent_id,
+                   SUM(CASE
+                       WHEN f.ftd_100_amount < 500  THEN 0
+                       WHEN f.ftd_100_amount < 1000 THEN 10
+                       WHEN f.ftd_100_amount < 5000 THEN 20
+                       ELSE 50
+                   END)::float AS ftd_amount_bonus
+            FROM ftd100_clients f
+            WHERE f.ftd_100_date >= %(date_from)s
+              AND f.ftd_100_date <  %(date_to_excl)s
+            GROUP BY f.original_deposit_owner
+        ) fab ON fab.agent_id = u.id
+        WHERE u.department_ = 'Sales'
+          AND u.team = 'Conversion'
+          AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
+          AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
+          AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'
+        ORDER BY u.office_name NULLS LAST, COALESCE(f100.ftd100_count, 0) DESC, u.agent_name
+    """
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql, {"date_from": date_from, "date_to_excl": date_to_exclusive})
+            rows = cur.fetchall()
+
+        data = []
+        for r in rows:
+            office_name          = r[0]
+            agent_name           = r[1]
+            target_ftc           = int(r[2])
+            ftc_count            = int(r[3])
+            ftd100_count         = int(r[4])
+            ftc_net_usd          = round(float(r[5]), 2)
+            total_sales_net      = round(float(r[6]), 2)
+            ftd_amount_bonus_raw = round(float(r[7]), 2)
+
+            target_pct = ftc_count / target_ftc if target_ftc > 0 else None
+
+            # Global rule: all bonuses = 0 if FTD100 < 50% of target FTC
+            qualify = target_ftc > 0 and ftd100_count >= 0.50 * target_ftc
+
+            multiplier         = get_sales_multiplier(ftd100_count)
+            basic_bonus        = ftd100_count * multiplier if qualify else 0
+            sales_target_bonus = get_sales_target_bonus(ftd100_count, target_ftc) if qualify else 0
+            ftd_amount_bonus   = ftd_amount_bonus_raw if qualify else 0
+            total_sales_bonus  = basic_bonus + sales_target_bonus + ftd_amount_bonus
+
+            data.append({
+                "office_name":        office_name,
+                "agent_name":         agent_name,
+                "target_ftc":         target_ftc,
+                "ftc_count":          ftc_count,
+                "ftd100_count":       ftd100_count,
+                "ftc_net_usd":        ftc_net_usd,
+                "total_sales_net":    total_sales_net,
+                "basic_bonus":        basic_bonus,
+                "sales_target_bonus": sales_target_bonus,
+                "ftd_amount_bonus":   ftd_amount_bonus,
+                "total_sales_bonus":  total_sales_bonus,
+                "target_pct":         round(target_pct, 6) if target_pct is not None else None,
+            })
+
+        return JSONResponse(content={"rows": data})
     except Exception as e:
         return JSONResponse(status_code=500, content={"detail": str(e)})
     finally:
