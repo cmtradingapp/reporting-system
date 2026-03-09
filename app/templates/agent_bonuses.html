@@ -65,17 +65,14 @@
     /* Filter separator */
     .filter-sep { width: 1px; height: 28px; background-color: #30363d; margin: 0 6px; }
 
-    /* Filter dropdowns */
+    /* Filter combo inputs */
     .filter-input {
-      width: 130px; padding: 4px 24px 4px 8px; font-size: 0.78rem;
+      width: 130px; padding: 4px 8px; font-size: 0.78rem;
       background: #21262d; color: #c9d1d9;
       border: 1px solid #30363d; border-radius: 6px; outline: none;
-      cursor: pointer; appearance: none; -webkit-appearance: none;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23484f58'/%3E%3C/svg%3E");
-      background-repeat: no-repeat; background-position: right 8px center;
     }
+    .filter-input::placeholder { color: #484f58; }
     .filter-input:focus { border-color: #388bfd; box-shadow: 0 0 0 2px rgba(56,139,253,0.15); }
-    .filter-input option { background-color: #21262d; color: #c9d1d9; }
 
     /* KPI cards */
     .kpi-card { background-color: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 10px 14px; }
@@ -207,9 +204,12 @@
       <button class="period-btn month-btn" data-month="11">Nov</button>
       <button class="period-btn month-btn" data-month="12">Dec</button>
       <div class="filter-sep" style="margin:0 10px;"></div>
-      <select id="filter-office" class="filter-input"><option value="">All Offices</option></select>
-      <select id="filter-team"   class="filter-input"><option value="">All Teams</option></select>
-      <select id="filter-agent"  class="filter-input"><option value="">All Agents</option></select>
+      <input id="filter-office" class="filter-input" list="dl-office" placeholder="Office…"      autocomplete="off" />
+      <input id="filter-team"   class="filter-input" list="dl-team"   placeholder="Team / Dept…"  autocomplete="off" />
+      <input id="filter-agent"  class="filter-input" list="dl-agent"  placeholder="Agent name…"   autocomplete="off" />
+      <datalist id="dl-office"></datalist>
+      <datalist id="dl-team"></datalist>
+      <datalist id="dl-agent"></datalist>
     </div>
     <!-- Row 2: Date range -->
     <div class="d-flex flex-wrap align-items-center gap-2">
@@ -604,18 +604,14 @@
   let salAllRows = [];
   let salSortState = { col: 'sal-totalBonus', dir: 'desc' };
 
-  // ── Filter dropdown helpers ─────────────────────────────────────────────
-  function populateSelect(id, values) {
-    const sel = document.getElementById(id);
-    const cur = sel.value;
-    const first = sel.options[0];
-    sel.innerHTML = '';
-    sel.appendChild(first);
+  // ── Filter combo helpers ─────────────────────────────────────────────────
+  function populateDatalist(id, values) {
+    const dl = document.getElementById(id);
+    dl.innerHTML = '';
     [...values].sort().forEach(v => {
       const opt = document.createElement('option');
-      opt.value = v; opt.textContent = v;
-      if (v === cur) opt.selected = true;
-      sel.appendChild(opt);
+      opt.value = v;
+      dl.appendChild(opt);
     });
   }
   function populateFilterDropdowns() {
@@ -625,9 +621,9 @@
       if (r.dept_name)   teams.add(r.dept_name);
       if (r.agent_name)  agents.add(r.agent_name);
     });
-    populateSelect('filter-office', offices);
-    populateSelect('filter-team',   teams);
-    populateSelect('filter-agent',  agents);
+    populateDatalist('dl-office', offices);
+    populateDatalist('dl-team',   teams);
+    populateDatalist('dl-agent',  agents);
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────
@@ -835,12 +831,12 @@
 
   // ── Render Sales table ─────────────────────────────────────────────────
   function renderSalesTable() {
-    const fOffice = document.getElementById('filter-office')?.value || '';
-    const fAgent  = document.getElementById('filter-agent')?.value  || '';
+    const fOffice = (document.getElementById('filter-office')?.value || '').trim().toLowerCase();
+    const fAgent  = (document.getElementById('filter-agent')?.value  || '').trim().toLowerCase();
     const filtered = salAllRows.filter(r => {
       if (!(r.target_ftc > 0 || r.ftd100_count > 0 || r.ftc_count > 0)) return false;
-      if (fOffice && r.office_name !== fOffice) return false;
-      if (fAgent  && r.agent_name  !== fAgent)  return false;
+      if (fOffice && !(r.office_name || '').toLowerCase().includes(fOffice)) return false;
+      if (fAgent  && !(r.agent_name  || '').toLowerCase().includes(fAgent))  return false;
       return true;
     });
 
@@ -1003,14 +999,14 @@
 
   // ── Render Retention table ─────────────────────────────────────────────
   function renderBonusTable() {
-    const fOffice = document.getElementById('filter-office')?.value || '';
-    const fTeam   = document.getElementById('filter-team')?.value   || '';
-    const fAgent  = document.getElementById('filter-agent')?.value  || '';
+    const fOffice = (document.getElementById('filter-office')?.value || '').trim().toLowerCase();
+    const fTeam   = (document.getElementById('filter-team')?.value   || '').trim().toLowerCase();
+    const fAgent  = (document.getElementById('filter-agent')?.value  || '').trim().toLowerCase();
     const filtered = bonAllRows.filter(r => {
       if (!(r.target_net > 0 || r.net_usd !== 0 || r.open_volume_usd > 0)) return false;
-      if (fOffice && r.office_name !== fOffice) return false;
-      if (fTeam   && r.dept_name   !== fTeam)   return false;
-      if (fAgent  && r.agent_name  !== fAgent)   return false;
+      if (fOffice && !(r.office_name || '').toLowerCase().includes(fOffice)) return false;
+      if (fTeam   && !(r.dept_name   || '').toLowerCase().includes(fTeam))   return false;
+      if (fAgent  && !(r.agent_name  || '').toLowerCase().includes(fAgent))  return false;
       return true;
     });
 
@@ -1445,9 +1441,9 @@
     XLSX.writeFile(wb, `retention_bonuses_${df}_${dt}.xlsx`);
   }
 
-  // ── Filter dropdowns ────────────────────────────────────────────────────
+  // ── Filter combo boxes ──────────────────────────────────────────────────
   ['filter-office', 'filter-team', 'filter-agent'].forEach(id => {
-    document.getElementById(id)?.addEventListener('change', () => {
+    document.getElementById(id)?.addEventListener('input', () => {
       if (salAllRows.length) renderSalesTable();
       if (bonAllRows.length) renderBonusTable();
     });
