@@ -4,7 +4,6 @@ from fastapi.templating import Jinja2Templates
 from app.db.postgres_conn import get_connection
 from datetime import datetime, timedelta, date as date_type
 import calendar
-import math
 
 
 OFFICE_GROUP_A = {'GMT', 'CY', 'BU'}
@@ -162,9 +161,6 @@ def agent_bonuses_retention_api(date_from: str, date_to: str):
         working_days_passed = count_working_days(dt_from, min(dt_to, today), holidays)
         working_days_left   = working_days - working_days_passed
 
-        wd_total  = working_days
-        wd_passed = working_days_passed
-
         data = []
         for r in rows:
             office_name     = r[0]
@@ -175,12 +171,8 @@ def agent_bonuses_retention_api(date_from: str, date_to: str):
             net_usd         = round(float(r[5]), 2)
             open_volume_usd = round(float(r[6]), 2)
 
-            # Target volume prorated to working days passed
-            target_vol_base = target_net * 1650
-            if wd_total > 0:
-                target_vol = math.ceil(target_vol_base / wd_total * wd_passed)
-            else:
-                target_vol = target_vol_base
+            # Target volume: full monthly value (same approach as target_net)
+            target_vol = target_net * 1650
 
             group          = get_office_group(office)
             target_net_pct = net_usd / target_net if target_net > 0 else None
