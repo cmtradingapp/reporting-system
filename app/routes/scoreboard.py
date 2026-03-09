@@ -182,6 +182,54 @@ def scoreboard_api(date_from: str, date_to: str):
             """, {"date_from": date_from, "date_to": date_to})
             open_volume = float(cur.fetchone()[0] or 0)
 
+            # End Equity Zeroed — last available date in the selected month/year
+            cur.execute("""
+                WITH last_date AS (
+                    SELECT MAX(date) AS last_available_date
+                    FROM dealio_daily_profit
+                    WHERE EXTRACT(YEAR  FROM date) = EXTRACT(YEAR  FROM %(date_to)s::date)
+                      AND EXTRACT(MONTH FROM date) = EXTRACT(MONTH FROM %(date_to)s::date)
+                ),
+                old_bal_bonus AS (
+                    SELECT
+                        t.login,
+                        t.confirmation_time::date AS bonus_date,
+                        SUM(CASE WHEN t.transactiontype = 'Deposit'    THEN t.usdamount ELSE 0 END)
+                      - SUM(CASE WHEN t.transactiontype = 'Withdrawal' THEN t.usdamount ELSE 0 END)
+                            AS old_bonus_usd
+                    FROM transactions t
+                    WHERE t.transactionapproval = 'Approved'
+                      AND (t.deleted = 0 OR t.deleted IS NULL)
+                      AND (
+                            (t.transactiontype = 'Deposit'    AND t.transaction_type_name IN ('FRF Commission', 'Bonus'))
+                         OR (t.transactiontype = 'Withdrawal' AND t.transaction_type_name IN ('FRF Commission Cancelled', 'BonusCancelled'))
+                          )
+                    GROUP BY t.login, t.confirmation_time::date
+                ),
+                old_bonus_balance AS (
+                    SELECT
+                        login,
+                        SUM(old_bonus_usd) AS old_bonus_balance
+                    FROM old_bal_bonus
+                    WHERE bonus_date <= (SELECT last_available_date FROM last_date)
+                    GROUP BY login
+                )
+                SELECT COALESCE(SUM(
+                    GREATEST(
+                        GREATEST(d.convertedbalance + d.convertedfloatingpnl, 0)
+                            - COALESCE(ob.old_bonus_balance, 0),
+                        0
+                    )
+                ), 0) AS end_equity_zeroed
+                FROM dealio_daily_profit d
+                JOIN trading_accounts ta  ON ta.login::bigint = d.login
+                JOIN accounts a           ON a.accountid = ta.vtigeraccountid
+                JOIN crm_users u          ON u.id = d.assigned_to
+                LEFT JOIN old_bonus_balance ob ON ob.login::bigint = d.login
+                WHERE d.date = (SELECT last_available_date FROM last_date)
+            """, {"date_to": date_to})
+            end_equity_zeroed = float(cur.fetchone()[0] or 0)
+
         today = datetime.utcnow().date()
         month_end           = last_day_of_month(dt_from)
         working_days        = count_working_days(dt_from, month_end, holidays)
@@ -219,6 +267,7 @@ def scoreboard_api(date_from: str, date_to: str):
             "grand_net_rr":         grand_net_rr,
             "open_volume":          round(open_volume, 2),
             "open_volume_rr":       open_volume_rr,
+            "end_equity_zeroed":    round(end_equity_zeroed, 2),
             "working_days":         working_days,
             "working_days_passed":  working_days_passed,
             "working_days_left":    working_days_left,

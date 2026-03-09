@@ -271,7 +271,13 @@
 
   <!-- KPI Cards Row 2 (RR values) -->
   <div class="row g-2 mb-4">
-    <div class="col-6"></div>
+    <div class="col-4"></div>
+    <div class="col-2">
+      <div class="kpi-card text-center">
+        <div class="kpi-value" style="color:#a371f7;" id="stat-end-equity-zeroed">—</div>
+        <div class="kpi-label">End Equity Zeroed</div>
+      </div>
+    </div>
     <div class="col-2">
       <div class="kpi-card text-center">
         <div class="kpi-value" style="color:#d29922;" id="stat-grand-ftc-rr">—</div>
@@ -515,6 +521,7 @@
     const volFmt = v => Math.round(v).toLocaleString();
     document.getElementById('stat-open-volume').textContent   = volFmt(data.open_volume);
     document.getElementById('stat-open-volume-rr').textContent = volFmt(data.open_volume_rr);
+    document.getElementById('stat-end-equity-zeroed').textContent = Math.round(data.end_equity_zeroed ?? 0).toLocaleString();
   }
 
   function renderTable() {
