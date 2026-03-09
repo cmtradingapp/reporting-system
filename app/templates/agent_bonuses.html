@@ -440,20 +440,24 @@
     officeMap.forEach((deptMap, officeName) => {
       const allAgents = [];
       deptMap.forEach(agents => allAgents.push(...agents));
-      const tgtNet    = allAgents.reduce((s, a) => s + a.target_net, 0);
-      const netUsd    = allAgents.reduce((s, a) => s + a.net_usd, 0);
-      const tgtVol    = allAgents.reduce((s, a) => s + a.target_vol, 0);
-      const openVol   = allAgents.reduce((s, a) => s + a.open_volume_usd, 0);
-      const basicBonus= allAgents.reduce((s, a) => s + a.basic_bonus_usd, 0);
+      const tgtNet       = allAgents.reduce((s, a) => s + a.target_net, 0);
+      const netUsd       = allAgents.reduce((s, a) => s + a.net_usd, 0);
+      const tgtVol       = allAgents.reduce((s, a) => s + a.target_vol, 0);
+      const openVol      = allAgents.reduce((s, a) => s + a.open_volume_usd, 0);
+      const basicBonus   = allAgents.reduce((s, a) => s + a.basic_bonus_usd, 0);
+      const bonusOnNet   = allAgents.reduce((s, a) => s + a.pct_on_net * a.net_usd, 0);
+      const bonusOnTgtNet= allAgents.reduce((s, a) => s + a.pct_on_target_net * a.net_usd, 0);
+      const bonusOnTgtVol= allAgents.reduce((s, a) => s + a.pct_on_target_vol * a.net_usd, 0);
       officeArr.push({
         officeName, deptMap,
         agentCount: allAgents.length,
         tgtNet, netUsd, tgtVol, openVol, basicBonus,
-        tgtNetPct:     tgtNet > 0 ? netUsd   / tgtNet  : null,
-        tgtVolPct:     tgtVol > 0 ? openVol  / tgtVol  : null,
-        totalBonusPct: netUsd > 0 ? basicBonus / netUsd : null,
-        // Individual tier pcts not shown at aggregate level
-        pctOnNet: null, pctOnTgtNet: null, pctOnTgtVol: null,
+        tgtNetPct:     tgtNet > 0 ? netUsd     / tgtNet  : null,
+        tgtVolPct:     tgtVol > 0 ? openVol    / tgtVol  : null,
+        totalBonusPct: netUsd > 0 ? basicBonus / netUsd  : null,
+        pctOnNet:    netUsd > 0 ? bonusOnNet    / netUsd : null,
+        pctOnTgtNet: netUsd > 0 ? bonusOnTgtNet / netUsd : null,
+        pctOnTgtVol: netUsd > 0 ? bonusOnTgtVol / netUsd : null,
       });
     });
 
@@ -463,16 +467,20 @@
     });
 
     let gTgtNet = 0, gNetUsd = 0, gTgtVol = 0, gOpenVol = 0, gBasicBonus = 0;
+    let gBonusOnNet = 0, gBonusOnTgtNet = 0, gBonusOnTgtVol = 0;
     let totalOffices = 0, totalAgents = 0;
 
     officeArr.forEach((office, officeIndex) => {
       totalOffices++;
       const officeId = 'bon-office-' + officeIndex;
-      gTgtNet     += office.tgtNet;
-      gNetUsd     += office.netUsd;
-      gTgtVol     += office.tgtVol;
-      gOpenVol    += office.openVol;
-      gBasicBonus += office.basicBonus;
+      gTgtNet        += office.tgtNet;
+      gNetUsd        += office.netUsd;
+      gTgtVol        += office.tgtVol;
+      gOpenVol       += office.openVol;
+      gBasicBonus    += office.basicBonus;
+      gBonusOnNet    += office.pctOnNet    != null ? office.pctOnNet    * office.netUsd : 0;
+      gBonusOnTgtNet += office.pctOnTgtNet != null ? office.pctOnTgtNet * office.netUsd : 0;
+      gBonusOnTgtVol += office.pctOnTgtVol != null ? office.pctOnTgtVol * office.netUsd : 0;
 
       const offTr = document.createElement('tr');
       offTr.className = 'office-row';
@@ -490,9 +498,9 @@
         <td class="text-center">${netHtml(office.tgtVol, true)}</td>
         <td class="text-center">${netHtml(office.openVol, true)}</td>
         <td class="text-center">${retPctHtml(office.tgtVolPct, true)}</td>
-        <td class="text-center"><span style="color:#484f58;">—</span></td>
-        <td class="text-center"><span style="color:#484f58;">—</span></td>
-        <td class="text-center"><span style="color:#484f58;">—</span></td>
+        <td class="text-center">${bonusPctHtml(office.pctOnNet, true)}</td>
+        <td class="text-center">${bonusPctHtml(office.pctOnTgtNet, true)}</td>
+        <td class="text-center">${bonusPctHtml(office.pctOnTgtVol, true)}</td>
         <td class="text-center">${bonusPctHtml(office.totalBonusPct, true)}</td>
         <td class="text-center">${netHtml(office.basicBonus, true)}</td>
       `;
@@ -501,18 +509,23 @@
       // Build dept array
       const deptArr = [];
       office.deptMap.forEach((agents, deptName) => {
-        const dTgtNet  = agents.reduce((s, a) => s + a.target_net, 0);
-        const dNetUsd  = agents.reduce((s, a) => s + a.net_usd, 0);
-        const dTgtVol  = agents.reduce((s, a) => s + a.target_vol, 0);
-        const dOpenVol = agents.reduce((s, a) => s + a.open_volume_usd, 0);
-        const dBonus   = agents.reduce((s, a) => s + a.basic_bonus_usd, 0);
+        const dTgtNet       = agents.reduce((s, a) => s + a.target_net, 0);
+        const dNetUsd       = agents.reduce((s, a) => s + a.net_usd, 0);
+        const dTgtVol       = agents.reduce((s, a) => s + a.target_vol, 0);
+        const dOpenVol      = agents.reduce((s, a) => s + a.open_volume_usd, 0);
+        const dBonus        = agents.reduce((s, a) => s + a.basic_bonus_usd, 0);
+        const dBonusOnNet   = agents.reduce((s, a) => s + a.pct_on_net * a.net_usd, 0);
+        const dBonusOnTgtNet= agents.reduce((s, a) => s + a.pct_on_target_net * a.net_usd, 0);
+        const dBonusOnTgtVol= agents.reduce((s, a) => s + a.pct_on_target_vol * a.net_usd, 0);
         deptArr.push({
           deptName, agents,
           tgtNet: dTgtNet, netUsd: dNetUsd, tgtVol: dTgtVol, openVol: dOpenVol, basicBonus: dBonus,
           tgtNetPct:     dTgtNet > 0 ? dNetUsd / dTgtNet : null,
           tgtVolPct:     dTgtVol > 0 ? dOpenVol / dTgtVol : null,
           totalBonusPct: dNetUsd > 0 ? dBonus / dNetUsd : null,
-          pctOnNet: null, pctOnTgtNet: null, pctOnTgtVol: null,
+          pctOnNet:    dNetUsd > 0 ? dBonusOnNet    / dNetUsd : null,
+          pctOnTgtNet: dNetUsd > 0 ? dBonusOnTgtNet / dNetUsd : null,
+          pctOnTgtVol: dNetUsd > 0 ? dBonusOnTgtVol / dNetUsd : null,
         });
       });
 
@@ -543,9 +556,9 @@
           <td class="text-center">${netHtml(dept.tgtVol)}</td>
           <td class="text-center">${netHtml(dept.openVol)}</td>
           <td class="text-center">${retPctHtml(dept.tgtVolPct)}</td>
-          <td class="text-center"><span style="color:#484f58;">—</span></td>
-          <td class="text-center"><span style="color:#484f58;">—</span></td>
-          <td class="text-center"><span style="color:#484f58;">—</span></td>
+          <td class="text-center">${bonusPctHtml(dept.pctOnNet)}</td>
+          <td class="text-center">${bonusPctHtml(dept.pctOnTgtNet)}</td>
+          <td class="text-center">${bonusPctHtml(dept.pctOnTgtVol)}</td>
           <td class="text-center">${bonusPctHtml(dept.totalBonusPct)}</td>
           <td class="text-center">${netHtml(dept.basicBonus)}</td>
         `;
@@ -629,9 +642,12 @@
       tr.innerHTML = `<td colspan="12" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No data for this period</td>`;
       tbody.appendChild(tr);
     } else {
-      const gTgtNetPct     = gTgtNet   > 0 ? gNetUsd     / gTgtNet  : null;
-      const gTgtVolPct     = gTgtVol   > 0 ? gOpenVol    / gTgtVol  : null;
-      const gTotalBonusPct = gNetUsd   > 0 ? gBasicBonus / gNetUsd  : null;
+      const gTgtNetPct     = gTgtNet > 0 ? gNetUsd        / gTgtNet  : null;
+      const gTgtVolPct     = gTgtVol > 0 ? gOpenVol       / gTgtVol  : null;
+      const gTotalBonusPct = gNetUsd > 0 ? gBasicBonus    / gNetUsd  : null;
+      const gPctOnNet      = gNetUsd > 0 ? gBonusOnNet    / gNetUsd  : null;
+      const gPctOnTgtNet   = gNetUsd > 0 ? gBonusOnTgtNet / gNetUsd  : null;
+      const gPctOnTgtVol   = gNetUsd > 0 ? gBonusOnTgtVol / gNetUsd  : null;
 
       const totalTr = document.createElement('tr');
       totalTr.className = 'total-row';
@@ -643,9 +659,9 @@
         <td class="text-center">${netHtml(gTgtVol, true)}</td>
         <td class="text-center">${netHtml(gOpenVol, true)}</td>
         <td class="text-center">${retPctHtml(gTgtVolPct, true)}</td>
-        <td class="text-center"><span style="color:#484f58;">—</span></td>
-        <td class="text-center"><span style="color:#484f58;">—</span></td>
-        <td class="text-center"><span style="color:#484f58;">—</span></td>
+        <td class="text-center">${bonusPctHtml(gPctOnNet, true)}</td>
+        <td class="text-center">${bonusPctHtml(gPctOnTgtNet, true)}</td>
+        <td class="text-center">${bonusPctHtml(gPctOnTgtVol, true)}</td>
         <td class="text-center">${bonusPctHtml(gTotalBonusPct, true)}</td>
         <td class="text-center">${netHtml(gBasicBonus, true)}</td>
       `;
