@@ -34,7 +34,8 @@
     .text-purple { color: #bc8cff; }
     .filter-card { background-color: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 16px 20px; margin-bottom: 24px; }
     .form-control, .form-select { background-color: #0f1117; border: 1px solid #30363d; color: #e0e0e0; border-radius: 8px; font-size: 0.88rem; }
-    .form-control:focus { background-color: #0f1117; border-color: #238636; color: #e0e0e0; box-shadow: 0 0 0 3px rgba(35,134,54,0.2); }
+    .form-control:focus, .form-select:focus { background-color: #0f1117; border-color: #238636; color: #e0e0e0; box-shadow: 0 0 0 3px rgba(35,134,54,0.2); }
+    .form-select option { background-color: #161b22; }
     .btn-apply { background: linear-gradient(135deg, #238636, #2ea043); border: none; color: #fff; font-weight: 600; border-radius: 8px; padding: 7px 20px; font-size: 0.88rem; }
     .btn-apply:hover { background: linear-gradient(135deg, #2ea043, #3fb950); color: #fff; }
     .spinner-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 9998; align-items: center; justify-content: center; }
@@ -42,6 +43,9 @@
     .section-title { font-size: 1.05rem; font-weight: 600; color: #c9d1d9; border-left: 3px solid #238636; padding-left: 12px; margin-bottom: 16px; }
     .legend-card { background-color: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 16px 20px; font-size: 0.82rem; color: #8b949e; line-height: 1.8; }
     .legend-card strong { color: #e0e0e0; }
+    .filter-label { font-size: 0.78rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.8px; display: block; margin-bottom: 4px; }
+    .group-cb-wrap { display: flex; align-items: center; gap: 5px; font-size: 0.8rem; color: #c9d1d9; white-space: nowrap; }
+    .group-cb-wrap input[type=checkbox] { accent-color: #3fb950; width: 14px; height: 14px; cursor: pointer; }
     /* Flatpickr dark override fixes */
     .flatpickr-calendar { font-family: 'Segoe UI', sans-serif; }
   </style>
@@ -94,15 +98,51 @@
   </div>
 
   <!-- Filter bar -->
-  <div class="filter-card d-flex align-items-end gap-4 flex-wrap">
-    <div>
-      <label class="form-label mb-1" style="font-size:0.78rem; color:#8b949e; text-transform:uppercase; letter-spacing:0.8px;">End Date</label>
-      <input type="text" id="endDate" class="form-control" style="width:175px; cursor:pointer;" placeholder="Select date…" readonly />
+  <div class="filter-card">
+    <!-- Row 1: Date + Apply -->
+    <div class="d-flex align-items-end gap-4 flex-wrap mb-3">
+      <div>
+        <label class="filter-label">End Date</label>
+        <input type="text" id="endDate" class="form-control" style="width:175px; cursor:pointer;" placeholder="Select date…" readonly />
+      </div>
+      <div>
+        <button class="btn-apply" onclick="loadData()"><i class="bi bi-arrow-clockwise me-1"></i>Apply</button>
+      </div>
+      <div id="appliedDate" style="font-size:0.8rem; color:#8b949e; margin-bottom:2px;"></div>
     </div>
-    <div>
-      <button class="btn-apply" onclick="loadData()"><i class="bi bi-arrow-clockwise me-1"></i>Apply</button>
+    <!-- Row 2: Agent / Office / Team dropdowns + group checkboxes -->
+    <div class="d-flex align-items-end gap-3 flex-wrap">
+      <div>
+        <label class="filter-label">Agent</label>
+        <select id="filterAgent" class="form-select" style="width:200px;" onchange="loadData()">
+          <option value="">All</option>
+        </select>
+      </div>
+      <div>
+        <label class="filter-label">Office</label>
+        <select id="filterOffice" class="form-select" style="width:160px;" onchange="loadData()">
+          <option value="">All</option>
+        </select>
+      </div>
+      <div>
+        <label class="filter-label">Team</label>
+        <select id="filterTeam" class="form-select" style="width:160px;" onchange="loadData()">
+          <option value="">All</option>
+        </select>
+      </div>
+      <div class="ms-2">
+        <label class="filter-label">Groups</label>
+        <div class="d-flex gap-3 flex-wrap" style="padding-top:2px;">
+          <label class="group-cb-wrap"><input type="checkbox" class="group-cb" value="0 - 7 days" checked onchange="renderWithFilters()"> 0–7d</label>
+          <label class="group-cb-wrap"><input type="checkbox" class="group-cb" value="8 - 14 days" checked onchange="renderWithFilters()"> 8–14d</label>
+          <label class="group-cb-wrap"><input type="checkbox" class="group-cb" value="15 - 30 days" checked onchange="renderWithFilters()"> 15–30d</label>
+          <label class="group-cb-wrap"><input type="checkbox" class="group-cb" value="31 - 60 days" checked onchange="renderWithFilters()"> 31–60d</label>
+          <label class="group-cb-wrap"><input type="checkbox" class="group-cb" value="61 - 90 days" checked onchange="renderWithFilters()"> 61–90d</label>
+          <label class="group-cb-wrap"><input type="checkbox" class="group-cb" value="91 - 120 days" checked onchange="renderWithFilters()"> 91–120d</label>
+          <label class="group-cb-wrap"><input type="checkbox" class="group-cb" value="120+ days" checked onchange="renderWithFilters()"> 120+d</label>
+        </div>
+      </div>
     </div>
-    <div id="appliedDate" style="font-size:0.8rem; color:#8b949e; margin-bottom:2px;"></div>
   </div>
 
   <div class="row g-4">
@@ -125,10 +165,12 @@
                   <th class="text-num">% STD</th>
                   <th class="text-num">% WD</th>
                   <th class="text-num">% WD $</th>
+                  <th class="text-num"># Traders</th>
+                  <th class="text-num">Traders %</th>
                 </tr>
               </thead>
               <tbody id="ftcBody">
-                <tr><td colspan="10" class="text-center text-secondary py-4">Select an end date and click Apply</td></tr>
+                <tr><td colspan="12" class="text-center text-secondary py-4">Select an end date and click Apply</td></tr>
               </tbody>
             </table>
           </div>
@@ -149,6 +191,8 @@
         <div><strong>% STD</strong> — # Loaders / # FTC</div>
         <div><strong>% WD</strong> — # Withdrawalers / # FTC</div>
         <div><strong>% WD $</strong> — $ Withdrawal / $ Deposit</div>
+        <div><strong># Traders</strong> — unique clients who placed ≥1 trade (notional_value > 0) before End Date</div>
+        <div><strong>Traders %</strong> — # Traders / # FTC</div>
       </div>
     </div>
   </div>
@@ -166,6 +210,8 @@
     disableMobile: true,
   });
 
+  let lastData = null;
+
   function fmt(n) {
     if (n === null || n === undefined) return '—';
     return Number(n).toLocaleString('en-US');
@@ -177,6 +223,34 @@
   function fmtPct(n) {
     if (n === null || n === undefined) return '—';
     return n + '%';
+  }
+
+  function computeGrand(rows) {
+    let t = { ftc: 0, rdp: 0, deposit: 0, withdrawal: 0, wd_count: 0, traders: 0 };
+    for (const r of rows) {
+      t.ftc        += r.ftc;
+      t.rdp        += r.rdp;
+      t.deposit    += r.deposit;
+      t.withdrawal += r.withdrawal;
+      t.wd_count   += r.wd_count;
+      t.traders    += r.traders;
+    }
+    const net = t.deposit - t.withdrawal;
+    return {
+      day_group:      'Grand Total',
+      ftc:            t.ftc,
+      rdp:            t.rdp,
+      deposit:        t.deposit,
+      withdrawal:     t.withdrawal,
+      net_deposit:    net,
+      ltv:            t.ftc > 0 ? Math.round(net / t.ftc) : 0,
+      pct_std:        t.ftc > 0 ? Math.round(t.rdp / t.ftc * 100) : 0,
+      wd_count:       t.wd_count,
+      pct_wd_clients: t.ftc > 0 ? Math.round(t.wd_count / t.ftc * 100) : 0,
+      pct_wd_usd:     t.deposit > 0 ? Math.round(t.withdrawal / t.deposit * 100) : 0,
+      traders:        t.traders,
+      traders_pct:    t.ftc > 0 ? Math.round(t.traders / t.ftc * 100) : 0,
+    };
   }
 
   function renderRow(r, isGrand) {
@@ -191,39 +265,90 @@
       <td class="text-num">${fmtPct(r.pct_std)}</td>
       <td class="text-num">${fmtPct(r.pct_wd_clients)}</td>
       <td class="text-num">${fmtPct(r.pct_wd_usd)}</td>
+      <td class="text-num">${fmt(r.traders)}</td>
+      <td class="text-num">${fmtPct(r.traders_pct)}</td>
     </tr>`;
+  }
+
+  function renderWithFilters() {
+    if (!lastData) return;
+    const checkedGroups = [...document.querySelectorAll('.group-cb:checked')].map(e => e.value);
+    const rows = checkedGroups.length ? lastData.rows.filter(r => checkedGroups.includes(r.day_group)) : lastData.rows;
+    const grand = computeGrand(rows);
+    let html = renderRow(grand, true);
+    rows.forEach(r => { html += renderRow(r, false); });
+    document.getElementById('ftcBody').innerHTML = html;
   }
 
   function loadData() {
     const endDate = document.getElementById('endDate').value;
     if (!endDate) return;
 
+    const agentId = document.getElementById('filterAgent').value;
+    const office  = document.getElementById('filterOffice').value;
+    const team    = document.getElementById('filterTeam').value;
+
+    let url = `/api/ftc-date?end_date=${endDate}`;
+    if (agentId) url += `&agent_id=${agentId}`;
+    if (office)  url += `&office=${encodeURIComponent(office)}`;
+    if (team)    url += `&team=${encodeURIComponent(team)}`;
+
     document.getElementById('spinner').classList.add('active');
     document.getElementById('appliedDate').textContent = '';
 
-    fetch(`/api/ftc-date?end_date=${endDate}`)
+    fetch(url)
       .then(r => r.json())
       .then(data => {
         if (data.detail) {
           document.getElementById('ftcBody').innerHTML =
-            `<tr><td colspan="10" class="text-center text-danger py-3">${data.detail}</td></tr>`;
+            `<tr><td colspan="12" class="text-center text-danger py-3">${data.detail}</td></tr>`;
           return;
         }
-        let html = renderRow(data.grand_total, true);
-        data.rows.forEach(r => { html += renderRow(r, false); });
-        document.getElementById('ftcBody').innerHTML = html;
+        lastData = data;
+        renderWithFilters();
         document.getElementById('appliedDate').textContent = `End date: ${data.end_date}`;
       })
       .catch(e => {
         document.getElementById('ftcBody').innerHTML =
-          `<tr><td colspan="10" class="text-center text-danger py-3">${e}</td></tr>`;
+          `<tr><td colspan="12" class="text-center text-danger py-3">${e}</td></tr>`;
       })
       .finally(() => {
         document.getElementById('spinner').classList.remove('active');
       });
   }
 
-  // Auto-load on page open
+  function loadOptions() {
+    fetch('/api/ftc-date/options')
+      .then(r => r.json())
+      .then(opts => {
+        if (opts.detail) return;
+        const agentSel = document.getElementById('filterAgent');
+        opts.agents.forEach(a => {
+          const o = document.createElement('option');
+          o.value = a.id;
+          o.textContent = a.name;
+          agentSel.appendChild(o);
+        });
+        const officeSel = document.getElementById('filterOffice');
+        opts.offices.forEach(v => {
+          const o = document.createElement('option');
+          o.value = v;
+          o.textContent = v;
+          officeSel.appendChild(o);
+        });
+        const teamSel = document.getElementById('filterTeam');
+        opts.teams.forEach(v => {
+          const o = document.createElement('option');
+          o.value = v;
+          o.textContent = v;
+          teamSel.appendChild(o);
+        });
+      })
+      .catch(() => {});
+  }
+
+  // Load options then auto-load data on page open
+  loadOptions();
   loadData();
 </script>
 <script src="https://instant.page/5.2.0/instantpage.min.js" type="module"></script>

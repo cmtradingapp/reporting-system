@@ -20,14 +20,61 @@ async def ftc_date_page(request: Request):
     })
 
 
+@router.get("/api/ftc-date/options")
+async def ftc_date_options(request: Request):
+    user = await get_current_user(request)
+    if isinstance(user, RedirectResponse):
+        return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+
+    sql = """
+        SELECT DISTINCT u.id, u.agent_name, u.office_name, u.department
+        FROM crm_users u
+        WHERE u.id IN (SELECT DISTINCT assigned_to FROM accounts WHERE assigned_to IS NOT NULL)
+          AND u.agent_name IS NOT NULL
+        ORDER BY u.agent_name
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+            rows = cur.fetchall()
+        agents = [{"id": r[0], "name": r[1]} for r in rows]
+        offices = sorted(set(r[2] for r in rows if r[2]))
+        teams = sorted(set(r[3] for r in rows if r[3]))
+        return JSONResponse(content={"agents": agents, "offices": offices, "teams": teams})
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+    finally:
+        conn.close()
+
+
 @router.get("/api/ftc-date")
-async def ftc_date_api(request: Request, end_date: str = None):
+async def ftc_date_api(
+    request: Request,
+    end_date: str = None,
+    agent_id: int = None,
+    office: str = None,
+    team: str = None,
+    groups: str = None,
+):
     user = await get_current_user(request)
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
     if not end_date:
         end_date = date.today().strftime("%Y-%m-%d")
+
+    params = {"end_date": end_date}
+    agent_clause = office_clause = team_clause = ""
+    if agent_id:
+        agent_clause = "AND u.id = %(agent_id)s"
+        params["agent_id"] = agent_id
+    if office:
+        office_clause = "AND u.office_name = %(office)s"
+        params["office"] = office
+    if team:
+        team_clause = "AND u.department = %(team)s"
+        params["team"] = team
 
     sql = """
         WITH ftc_groups AS (
@@ -36,10 +83,13 @@ async def ftc_date_api(request: Request, end_date: str = None):
                 a.client_qualification_date::date AS qual_date,
                 (%(end_date)s::date - a.client_qualification_date::date) AS days_diff
             FROM accounts a
+            LEFT JOIN crm_users u ON u.id = a.assigned_to
             WHERE a.client_qualification_date IS NOT NULL
               AND a.client_qualification_date::date <= %(end_date)s::date
               AND a.is_test_account = 0
-              AND (%(end_date)s::date - a.client_qualification_date::date) BETWEEN 0 AND 120
+              {agent_clause}
+              {office_clause}
+              {team_clause}
         ),
         tx_per_account AS (
             SELECT
@@ -78,6 +128,15 @@ async def ftc_date_api(request: Request, end_date: str = None):
               AND t.confirmation_time::date <= %(end_date)s::date
               AND a.is_test_account = 0
         ),
+        traders AS (
+            SELECT DISTINCT ta.vtigeraccountid AS accountid
+            FROM dealio_mt4trades d
+            JOIN trading_accounts ta ON ta.login::bigint = d.login::bigint
+            WHERE d.notional_value > 0
+              AND d.accid IS NOT NULL
+              AND d.accid::text != ''
+              AND d.open_time::date <= %(end_date)s::date
+        ),
         grouped AS (
             SELECT
                 CASE
@@ -87,6 +146,7 @@ async def ftc_date_api(request: Request, end_date: str = None):
                     WHEN fg.days_diff BETWEEN 31  AND 60  THEN 4
                     WHEN fg.days_diff BETWEEN 61  AND 90  THEN 5
                     WHEN fg.days_diff BETWEEN 91  AND 120 THEN 6
+                    WHEN fg.days_diff > 120               THEN 7
                 END AS group_order,
                 CASE
                     WHEN fg.days_diff BETWEEN 0   AND 7   THEN '0 - 7 days'
@@ -95,16 +155,19 @@ async def ftc_date_api(request: Request, end_date: str = None):
                     WHEN fg.days_diff BETWEEN 31  AND 60  THEN '31 - 60 days'
                     WHEN fg.days_diff BETWEEN 61  AND 90  THEN '61 - 90 days'
                     WHEN fg.days_diff BETWEEN 91  AND 120 THEN '91 - 120 days'
+                    WHEN fg.days_diff > 120               THEN '120+ days'
                 END AS day_group,
                 fg.accountid,
                 COALESCE(tx.deposit_usd,    0) AS deposit_usd,
                 COALESCE(tx.withdrawal_usd, 0) AS withdrawal_usd,
                 CASE WHEN rdp.accountid IS NOT NULL THEN 1 ELSE 0 END AS is_rdp,
-                CASE WHEN wd.accountid  IS NOT NULL THEN 1 ELSE 0 END AS is_withdrawaler
+                CASE WHEN wd.accountid  IS NOT NULL THEN 1 ELSE 0 END AS is_withdrawaler,
+                CASE WHEN tr.accountid  IS NOT NULL THEN 1 ELSE 0 END AS is_trader
             FROM ftc_groups fg
             LEFT JOIN tx_per_account tx ON tx.accountid = fg.accountid
             LEFT JOIN rdp              ON rdp.accountid = fg.accountid
             LEFT JOIN withdrawalers wd ON wd.accountid  = fg.accountid
+            LEFT JOIN traders tr       ON tr.accountid  = fg.accountid
         )
         SELECT
             group_order,
@@ -113,29 +176,32 @@ async def ftc_date_api(request: Request, end_date: str = None):
             SUM(is_rdp)                      AS rdp_count,
             COALESCE(SUM(deposit_usd),    0) AS deposit_usd,
             COALESCE(SUM(withdrawal_usd), 0) AS withdrawal_usd,
-            SUM(is_withdrawaler)             AS wd_count
+            SUM(is_withdrawaler)             AS wd_count,
+            SUM(is_trader)                   AS trader_count
         FROM grouped
-        WHERE group_order IS NOT NULL
         GROUP BY group_order, day_group
         ORDER BY group_order
-    """
+    """.format(
+        agent_clause=agent_clause,
+        office_clause=office_clause,
+        team_clause=team_clause,
+    )
 
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute(sql, {"end_date": end_date})
+            cur.execute(sql, params)
             rows = cur.fetchall()
 
         data = []
-        total_ftc = total_rdp = total_dep = total_wd = total_wdcount = 0
-
         for r in rows:
-            group_order, day_group, ftc, rdp_cnt, dep, wd, wdcount = r
+            group_order, day_group, ftc, rdp_cnt, dep, wd, wdcount, trader_count = r
             ftc = int(ftc or 0)
             rdp_cnt = int(rdp_cnt or 0)
             dep = float(dep or 0)
             wd = float(wd or 0)
             wdcount = int(wdcount or 0)
+            traders = int(trader_count or 0)
             net_dep = dep - wd
             data.append({
                 "day_group":      day_group,
@@ -149,12 +215,22 @@ async def ftc_date_api(request: Request, end_date: str = None):
                 "wd_count":       wdcount,
                 "pct_wd_clients": round(wdcount / ftc * 100) if ftc > 0 else 0,
                 "pct_wd_usd":     round(wd / dep * 100) if dep > 0 else 0,
+                "traders":        traders,
+                "traders_pct":    round(traders / ftc * 100) if ftc > 0 else 0,
             })
-            total_ftc    += ftc
-            total_rdp    += rdp_cnt
-            total_dep    += dep
-            total_wd     += wd
-            total_wdcount += wdcount
+
+        if groups:
+            allowed = set(groups.split(','))
+            data = [r for r in data if r['day_group'] in allowed]
+
+        total_ftc = total_rdp = total_dep = total_wd = total_wdcount = total_traders = 0
+        for r in data:
+            total_ftc     += r['ftc']
+            total_rdp     += r['rdp']
+            total_dep     += r['deposit']
+            total_wd      += r['withdrawal']
+            total_wdcount += r['wd_count']
+            total_traders += r['traders']
 
         total_net = total_dep - total_wd
         grand = {
@@ -169,6 +245,8 @@ async def ftc_date_api(request: Request, end_date: str = None):
             "wd_count":       total_wdcount,
             "pct_wd_clients": round(total_wdcount / total_ftc * 100) if total_ftc > 0 else 0,
             "pct_wd_usd":     round(total_wd / total_dep * 100) if total_dep > 0 else 0,
+            "traders":        total_traders,
+            "traders_pct":    round(total_traders / total_ftc * 100) if total_ftc > 0 else 0,
         }
 
         return JSONResponse(content={"rows": data, "grand_total": grand, "end_date": end_date})
