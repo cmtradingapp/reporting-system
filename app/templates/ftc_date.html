@@ -40,18 +40,6 @@
     .section-title { font-size: 1.05rem; font-weight: 600; color: #c9d1d9; border-left: 3px solid #238636; padding-left: 12px; margin-bottom: 16px; }
     .legend-card { background-color: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 16px 20px; font-size: 0.82rem; color: #8b949e; line-height: 1.8; }
     .legend-card strong { color: #e0e0e0; }
-    /* Column header colours */
-    .text-teal { color: #38bdf8; }
-    .text-orange { color: #fb923c; }
-    .th-ftc-col   { background-color: rgba(88,166,255,0.14)  !important; color: #58a6ff !important; }
-    .th-load-col  { background-color: rgba(56,189,248,0.14)  !important; color: #38bdf8 !important; }
-    .th-dep-col   { background-color: rgba(63,185,80,0.14)   !important; color: #3fb950 !important; }
-    .th-wd-col    { background-color: rgba(248,81,73,0.14)   !important; color: #f85149 !important; }
-    .th-net-col   { background-color: rgba(87,210,107,0.12)  !important; color: #79c97e !important; }
-    .th-ltv-col   { background-color: rgba(227,179,65,0.14)  !important; color: #e3b341 !important; }
-    .th-std-col   { background-color: rgba(139,148,158,0.12) !important; color: #8b949e !important; }
-    .th-pctwd-col { background-color: rgba(251,146,60,0.14)  !important; color: #fb923c !important; }
-    .th-pusd-col  { background-color: rgba(188,140,255,0.14) !important; color: #bc8cff !important; }
     /* Flatpickr dark override fixes */
     .flatpickr-calendar { font-family: 'Segoe UI', sans-serif; }
   </style>
@@ -126,15 +114,15 @@
               <thead>
                 <tr>
                   <th style="min-width:130px;">Days from FTC</th>
-                  <th class="text-num th-ftc-col"># FTC</th>
-                  <th class="text-num th-load-col"># Loaders</th>
-                  <th class="text-num th-dep-col">$ Deposit</th>
-                  <th class="text-num th-wd-col">$ Withdrawal</th>
-                  <th class="text-num th-net-col">$ Net Deposit</th>
-                  <th class="text-num th-ltv-col">$ LTV</th>
-                  <th class="text-num th-std-col">% STD</th>
-                  <th class="text-num th-pctwd-col">% WD</th>
-                  <th class="text-num th-pusd-col">% WD $</th>
+                  <th class="text-num"># FTC</th>
+                  <th class="text-num"># Loaders</th>
+                  <th class="text-num">$ Deposit</th>
+                  <th class="text-num">$ Withdrawal</th>
+                  <th class="text-num">$ Net Deposit</th>
+                  <th class="text-num">$ LTV</th>
+                  <th class="text-num">% STD</th>
+                  <th class="text-num">% WD</th>
+                  <th class="text-num">% WD $</th>
                 </tr>
               </thead>
               <tbody id="ftcBody">
@@ -190,18 +178,17 @@
   }
 
   function renderRow(r, isGrand) {
-    const netClass = r.net_deposit >= 0 ? 'text-green' : 'text-red';
     return `<tr class="${isGrand ? 'row-grand' : ''}">
       <td>${r.day_group}</td>
-      <td class="text-num text-blue">${fmt(r.ftc)}</td>
-      <td class="text-num text-teal">${fmt(r.rdp)}</td>
-      <td class="text-num text-green">${fmtUsd(r.deposit)}</td>
-      <td class="text-num text-red">${fmtUsd(r.withdrawal)}</td>
-      <td class="text-num ${netClass}">${fmtUsd(r.net_deposit)}</td>
-      <td class="text-num text-yellow">${r.ltv !== null && r.ltv !== undefined ? '$' + Math.round(r.ltv).toLocaleString('en-US') : '—'}</td>
+      <td class="text-num">${fmt(r.ftc)}</td>
+      <td class="text-num">${fmt(r.rdp)}</td>
+      <td class="text-num">${fmtUsd(r.deposit)}</td>
+      <td class="text-num">${fmtUsd(r.withdrawal)}</td>
+      <td class="text-num">${fmtUsd(r.net_deposit)}</td>
+      <td class="text-num">${r.ltv !== null && r.ltv !== undefined ? '$' + Math.round(r.ltv).toLocaleString('en-US') : '—'}</td>
       <td class="text-num">${fmtPct(r.pct_std)}</td>
-      <td class="text-num text-orange">${fmtPct(r.pct_wd_clients)}</td>
-      <td class="text-num text-purple">${fmtPct(r.pct_wd_usd)}</td>
+      <td class="text-num">${fmtPct(r.pct_wd_clients)}</td>
+      <td class="text-num">${fmtPct(r.pct_wd_usd)}</td>
     </tr>`;
   }
 
