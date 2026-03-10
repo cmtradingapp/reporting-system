@@ -115,6 +115,7 @@ async def ftc_date_api(
               AND t.transactionapproval = 'Approved'
               AND (t.deleted = 0 OR t.deleted IS NULL)
               AND a.client_qualification_date IS NOT NULL
+              AND a.client_qualification_date::date >= '2024-01-01'
               AND t.confirmation_time::date > a.client_qualification_date::date
               AND t.confirmation_time::date <= %(end_date)s::date
               AND a.is_test_account = 0
@@ -126,6 +127,8 @@ async def ftc_date_api(
             WHERE t.transactiontype = 'Withdrawal'
               AND t.transactionapproval = 'Approved'
               AND (t.deleted = 0 OR t.deleted IS NULL)
+              AND a.client_qualification_date IS NOT NULL
+              AND a.client_qualification_date::date >= '2024-01-01'
               AND t.confirmation_time::date <= %(end_date)s::date
               AND a.is_test_account = 0
         ),
