@@ -17,7 +17,7 @@ async def login_page(request: Request):
         if uid:
             user = get_auth_user_by_id(uid)
             if user and user['is_active'] == 1:
-                return RedirectResponse(url='/', status_code=302)
+                return RedirectResponse(url='/scoreboard', status_code=302)
     return templates.TemplateResponse("login.html", {"request": request, "error": None})
 
 
