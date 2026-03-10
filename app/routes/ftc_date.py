@@ -85,6 +85,7 @@ async def ftc_date_api(
             FROM accounts a
             LEFT JOIN crm_users u ON u.id = a.assigned_to
             WHERE a.client_qualification_date IS NOT NULL
+              AND a.client_qualification_date::date >= '2024-01-01'
               AND a.client_qualification_date::date <= %(end_date)s::date
               AND a.is_test_account = 0
               {agent_clause}
