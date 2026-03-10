@@ -16,8 +16,9 @@
     .sidebar-link:hover { background-color: #21262d; color: #e0e0e0; }
     .sidebar-link.active { color: #3fb950; border-left-color: #3fb950; background-color: rgba(63,185,80,0.08); }
     .main-content { margin-left: 220px; flex: 1; min-width: 0; }
-    .card { background-color: #161b22; border: 1px solid #30363d; border-radius: 12px; }
-    .table { color: #e0e0e0; }
+    .card { --bs-card-bg: #161b22; background-color: #161b22 !important; border: 1px solid #30363d; border-radius: 12px; }
+    .table { --bs-table-bg: transparent; --bs-table-hover-bg: rgba(255,255,255,0.04); color: #e0e0e0; }
+    .table > :not(caption) > * > * { background-color: transparent !important; }
     .table thead th { background-color: #21262d; color: #8b949e; border-color: #30363d; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.8px; white-space: nowrap; }
     .table tbody tr { border-color: #21262d; transition: background 0.15s; }
     .table tbody tr:hover { background-color: #21262d; }
