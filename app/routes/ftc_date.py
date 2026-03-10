@@ -95,16 +95,11 @@ async def ftc_date_api(
         tx_per_account AS (
             SELECT
                 t.vtigeraccountid AS accountid,
-                SUM(CASE WHEN t.transactiontype = 'Deposit'             THEN t.usdamount ELSE 0 END)
-              - SUM(CASE WHEN t.transactiontype = 'Deposit Cancelled'   THEN t.usdamount ELSE 0 END)
-                    AS deposit_usd,
-                SUM(CASE WHEN t.transactiontype = 'Withdrawal'          THEN t.usdamount ELSE 0 END)
-              - SUM(CASE WHEN t.transactiontype = 'Withdrawal Cancelled' THEN t.usdamount ELSE 0 END)
-                    AS withdrawal_usd
+                SUM(CASE WHEN t.transactiontype IN ('Deposit', 'Withdrawal Cancelled') THEN t.usdamount ELSE 0 END) AS deposit_usd,
+                SUM(CASE WHEN t.transactiontype IN ('Withdrawal', 'Deposit Cancelled') THEN t.usdamount ELSE 0 END) AS withdrawal_usd
             FROM transactions t
             WHERE t.transactionapproval = 'Approved'
               AND (t.deleted = 0 OR t.deleted IS NULL)
-              AND t.confirmation_time::date <= %(end_date)s::date
             GROUP BY t.vtigeraccountid
         ),
         rdp AS (
