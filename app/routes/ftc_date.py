@@ -133,8 +133,8 @@ async def ftc_date_api(
             FROM dealio_mt4trades d
             JOIN trading_accounts ta ON ta.login::bigint = d.login::bigint
             WHERE d.notional_value > 0
-              AND d.accid IS NOT NULL
-              AND d.accid::text != ''
+              AND ta.vtigeraccountid IS NOT NULL
+              AND ta.vtigeraccountid::text != ''
               AND d.open_time::date <= %(end_date)s::date
         ),
         grouped AS (
