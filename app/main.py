@@ -1,4 +1,5 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import RedirectResponse
 from contextlib import asynccontextmanager
 from apscheduler.schedulers.background import BackgroundScheduler
 from app.routes.accounts import router as accounts_router
@@ -121,6 +122,12 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Agent Performance Report", lifespan=lifespan)
+
+
+@app.get("/")
+async def root(request: Request):
+    return RedirectResponse(url="/scoreboard", status_code=302)
+
 
 app.include_router(accounts_router)
 app.include_router(users_sync_router)
