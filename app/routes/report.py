@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from app.auth.dependencies import get_current_user
+from app.auth.role_filters import get_role_filter
 from app.db.postgres_conn import fetch_report_data, fetch_last_sync
 from app.etl.fetch_and_store import run_etl
 from datetime import datetime
@@ -11,7 +13,12 @@ templates = Jinja2Templates(directory="app/templates")
 
 @router.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):
-    df = fetch_report_data()
+    user = await get_current_user(request)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    role_filter = get_role_filter(user)
+    df = fetch_report_data(role_filter)
     last_sync = fetch_last_sync()
     current_month = datetime.now().strftime("%B %Y")
 
@@ -26,6 +33,7 @@ async def dashboard(request: Request):
 
     return templates.TemplateResponse("report.html", {
         "request": request,
+        "current_user": user,
         "current_month": current_month,
         "last_sync": last_sync,
         "agents": agents,
@@ -39,6 +47,10 @@ async def dashboard(request: Request):
 
 
 @router.post("/sync")
-def sync_data():
+async def sync_data(request: Request):
+    user = await get_current_user(request)
+    if isinstance(user, RedirectResponse):
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     result = run_etl()
     return result

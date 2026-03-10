@@ -1,9 +1,23 @@
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from app.auth.dependencies import get_current_user
+from app.auth.role_filters import get_role_filter
 from app.db.postgres_conn import get_connection
 from datetime import datetime, timedelta, date as date_type
 import calendar
+
+
+def _apply_role_filter(sql: str, params: dict, role_filter: dict) -> tuple[str, dict]:
+    if not role_filter['crm_where']:
+        return sql.replace('{role_filter}', ''), params
+    named_where = role_filter['crm_where']
+    extra = {}
+    for i, val in enumerate(role_filter['crm_params']):
+        key = f'_rf{i}'
+        named_where = named_where.replace('%s', f'%({key})s', 1)
+        extra[key] = val
+    return sql.replace('{role_filter}', named_where), {**params, **extra}
 
 
 def last_day_of_month(d: date_type) -> date_type:
@@ -28,12 +42,19 @@ templates = Jinja2Templates(directory="app/templates")
 
 
 @router.get("/scoreboard", response_class=HTMLResponse)
-def scoreboard_page(request: Request):
-    return templates.TemplateResponse("scoreboard.html", {"request": request})
+async def scoreboard_page(request: Request):
+    user = await get_current_user(request)
+    if isinstance(user, RedirectResponse):
+        return user
+    return templates.TemplateResponse("scoreboard.html", {"request": request, "current_user": user})
 
 
 @router.get("/api/scoreboard")
-def scoreboard_api(date_from: str, date_to: str):
+async def scoreboard_api(request: Request, date_from: str, date_to: str):
+    user = await get_current_user(request)
+    if isinstance(user, RedirectResponse):
+        return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+    role_filter = get_role_filter(user)
     try:
         dt_from = datetime.strptime(date_from, "%Y-%m-%d").date()
         dt_to   = datetime.strptime(date_to,   "%Y-%m-%d").date()
@@ -116,6 +137,7 @@ def scoreboard_api(date_from: str, date_to: str):
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'
+          {role_filter}
         ORDER BY u.office_name NULLS LAST, COALESCE(ftc.cnt, 0) DESC, u.agent_name
     """
 
@@ -130,7 +152,9 @@ def scoreboard_api(date_from: str, date_to: str):
                 conn.rollback()
                 holidays = set()
 
-            cur.execute(sql, {"date_from": date_from, "date_to_excl": date_to_exclusive})
+            base_params = {"date_from": date_from, "date_to_excl": date_to_exclusive}
+            final_sql, final_params = _apply_role_filter(sql, base_params, role_filter)
+            cur.execute(final_sql, final_params)
             rows = cur.fetchall()
 
             # Grand FTC — all departments/teams
@@ -278,7 +302,11 @@ def scoreboard_api(date_from: str, date_to: str):
 
 
 @router.get("/api/scoreboard/retention")
-def scoreboard_retention_api(date_from: str, date_to: str):
+async def scoreboard_retention_api(request: Request, date_from: str, date_to: str):
+    user = await get_current_user(request)
+    if isinstance(user, RedirectResponse):
+        return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+    role_filter = get_role_filter(user)
     try:
         dt_from = datetime.strptime(date_from, "%Y-%m-%d").date()
         dt_to   = datetime.strptime(date_to,   "%Y-%m-%d").date()
@@ -342,6 +370,7 @@ def scoreboard_retention_api(date_from: str, date_to: str):
           AND TRIM(COALESCE(u.department, '')) NOT ILIKE '%%Conversion%%'
           AND TRIM(COALESCE(u.department, '')) NOT ILIKE '%%Support%%'
           AND TRIM(COALESCE(u.department, '')) NOT ILIKE '%%General%%'
+          {role_filter}
         ORDER BY u.office_name NULLS LAST, dept_name, u.agent_name
     """
 
@@ -355,12 +384,14 @@ def scoreboard_retention_api(date_from: str, date_to: str):
                 conn.rollback()
                 holidays = set()
 
-            cur.execute(sql, {
+            base_params = {
                 "date_from":    date_from,
                 "date_to_excl": date_to_exclusive,
                 "date_to":      date_to,
                 "last_day":     last_day,
-            })
+            }
+            final_sql, final_params = _apply_role_filter(sql, base_params, role_filter)
+            cur.execute(final_sql, final_params)
             rows = cur.fetchall()
 
         today               = datetime.utcnow().date()

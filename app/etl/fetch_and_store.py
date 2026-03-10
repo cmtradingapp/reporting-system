@@ -100,6 +100,8 @@ def run_users_etl(hours: int = 24) -> dict:
         df = get_vtiger_users()
         rows = len(df)
         upsert_crm_users(df)
+        from app.db.postgres_conn import sync_auth_users_from_crm
+        sync_auth_users_from_crm()
     except Exception as e:
         status = "error"
         error_msg = str(e)
@@ -122,6 +124,8 @@ def run_users_full_etl() -> dict:
         rows = len(df)
         truncate_crm_users()
         upsert_crm_users(df)
+        from app.db.postgres_conn import sync_auth_users_from_crm
+        sync_auth_users_from_crm()
     except Exception as e:
         status = "error"
         error_msg = str(e)

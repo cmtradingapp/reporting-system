@@ -1,7 +1,8 @@
 import os
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from app.auth.dependencies import get_current_user
 from app.db.postgres_conn import fetch_accounts_stats, fetch_crm_users_stats, fetch_transactions_stats, fetch_targets_stats, fetch_dealio_mt4trades_stats, fetch_trading_accounts_stats, fetch_ftd100_stats, fetch_sync_log, fetch_dealio_daily_profit_stats
 from datetime import datetime, timezone, timedelta
 
@@ -34,6 +35,9 @@ def _is_healthy(sync_log: list, interval_hours: int) -> bool:
 
 @router.get("/data-sync", response_class=HTMLResponse)
 async def data_sync_page(request: Request):
+    user = await get_current_user(request)
+    if isinstance(user, RedirectResponse):
+        return user
     accounts_stats = fetch_accounts_stats()
     accounts_log = fetch_sync_log("crm_accounts", limit=50)
 
@@ -207,5 +211,6 @@ async def data_sync_page(request: Request):
 
     return templates.TemplateResponse("data_sync.html", {
         "request": request,
+        "current_user": user,
         "tables": tables,
     })

@@ -589,8 +589,216 @@ def insert_records(df: pd.DataFrame):
         conn.close()
 
 
-def fetch_report_data() -> pd.DataFrame:
+def ensure_auth_table():
     sql = """
+        CREATE TABLE IF NOT EXISTS auth_users (
+            id                    SERIAL PRIMARY KEY,
+            crm_user_id           BIGINT NULL,
+            email                 VARCHAR(255) NOT NULL UNIQUE,
+            full_name             VARCHAR(255) NOT NULL,
+            password_hash         VARCHAR(255) NOT NULL,
+            role                  VARCHAR(50)  NOT NULL,
+            is_active             SMALLINT DEFAULT 1,
+            force_password_change SMALLINT DEFAULT 0,
+            created_at            TIMESTAMP DEFAULT NOW(),
+            last_login            TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_auth_users_email ON auth_users(email);
+        CREATE INDEX IF NOT EXISTS idx_auth_users_crm_user_id ON auth_users(crm_user_id);
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def seed_admin_user(password_hash: str):
+    sql = """
+        INSERT INTO auth_users (email, full_name, password_hash, role, is_active, force_password_change)
+        VALUES (%s, %s, %s, %s, 1, 0)
+        ON CONFLICT (email) DO NOTHING
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql, ('admin@cmtrading.com', 'Administrator', password_hash, 'admin'))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_auth_user_by_email(email: str) -> dict | None:
+    sql = "SELECT id, crm_user_id, email, full_name, password_hash, role, is_active, force_password_change FROM auth_users WHERE email = %s"
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql, (email,))
+            row = cur.fetchone()
+            if row is None:
+                return None
+            return {
+                'id': row[0], 'crm_user_id': row[1], 'email': row[2],
+                'full_name': row[3], 'password_hash': row[4], 'role': row[5],
+                'is_active': row[6], 'force_password_change': row[7],
+            }
+    finally:
+        conn.close()
+
+
+def get_auth_user_by_id(user_id: int) -> dict | None:
+    sql = "SELECT id, crm_user_id, email, full_name, password_hash, role, is_active, force_password_change FROM auth_users WHERE id = %s"
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql, (user_id,))
+            row = cur.fetchone()
+            if row is None:
+                return None
+            return {
+                'id': row[0], 'crm_user_id': row[1], 'email': row[2],
+                'full_name': row[3], 'password_hash': row[4], 'role': row[5],
+                'is_active': row[6], 'force_password_change': row[7],
+            }
+    finally:
+        conn.close()
+
+
+def update_auth_user_last_login(user_id: int):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE auth_users SET last_login = NOW() WHERE id = %s", (user_id,))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def list_auth_users() -> list:
+    sql = """
+        SELECT
+            a.id, a.crm_user_id, a.email, a.full_name, a.role,
+            a.is_active, a.force_password_change, a.created_at, a.last_login,
+            COALESCE(c.agent_name, c.full_name) AS crm_name
+        FROM auth_users a
+        LEFT JOIN crm_users c ON c.id = a.crm_user_id
+        ORDER BY a.id
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+            rows = cur.fetchall()
+            return [
+                {
+                    'id': r[0], 'crm_user_id': r[1], 'email': r[2], 'full_name': r[3],
+                    'role': r[4], 'is_active': r[5], 'force_password_change': r[6],
+                    'created_at': r[7].strftime('%Y-%m-%d %H:%M') if r[7] else '',
+                    'last_login': r[8].strftime('%Y-%m-%d %H:%M') if r[8] else '',
+                    'crm_name': r[9] or '',
+                }
+                for r in rows
+            ]
+    finally:
+        conn.close()
+
+
+def create_auth_user(email: str, full_name: str, password_hash: str, role: str, crm_user_id) -> int:
+    sql = """
+        INSERT INTO auth_users (email, full_name, password_hash, role, crm_user_id, force_password_change)
+        VALUES (%s, %s, %s, %s, %s, 1)
+        RETURNING id
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql, (email, full_name, password_hash, role, crm_user_id or None))
+            new_id = cur.fetchone()[0]
+        conn.commit()
+        return new_id
+    finally:
+        conn.close()
+
+
+def update_auth_user(user_id: int, full_name: str, email: str, role: str, is_active: int, crm_user_id):
+    sql = """
+        UPDATE auth_users
+        SET full_name = %s, email = %s, role = %s, is_active = %s, crm_user_id = %s
+        WHERE id = %s
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql, (full_name, email, role, is_active, crm_user_id or None, user_id))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def update_auth_user_password(user_id: int, password_hash: str, force_change: int = 1):
+    sql = "UPDATE auth_users SET password_hash = %s, force_password_change = %s WHERE id = %s"
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql, (password_hash, force_change, user_id))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def deactivate_auth_user(user_id: int):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE auth_users SET is_active = 0 WHERE id = %s", (user_id,))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def sync_auth_users_from_crm():
+    from app.auth.auth import hash_password  # local import to avoid circular import
+    default_hash = hash_password('Welcome1!')
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            # Insert missing active CRM agents
+            cur.execute("""
+                INSERT INTO auth_users (crm_user_id, email, full_name, password_hash, role, force_password_change)
+                SELECT
+                    c.id,
+                    COALESCE(NULLIF(TRIM(c.email), ''), c.id::text || '@agent.local'),
+                    COALESCE(NULLIF(TRIM(c.agent_name), ''), NULLIF(TRIM(c.full_name), ''), c.id::text),
+                    %s,
+                    'agent',
+                    1
+                FROM crm_users c
+                WHERE c.status = 'Active'
+                  AND NOT EXISTS (
+                      SELECT 1 FROM auth_users a WHERE a.crm_user_id = c.id
+                  )
+                ON CONFLICT (email) DO NOTHING
+            """, (default_hash,))
+
+            # Deactivate auth users whose CRM user is no longer active
+            cur.execute("""
+                UPDATE auth_users a
+                SET is_active = 0
+                FROM crm_users c
+                WHERE a.crm_user_id = c.id
+                  AND c.status != 'Active'
+                  AND a.is_active = 1
+                  AND a.role = 'agent'
+            """)
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def fetch_report_data(role_filter: dict = None) -> pd.DataFrame:
+    base_sql = """
         SELECT
             agent_id,
             full_name,
@@ -602,9 +810,55 @@ def fetch_report_data() -> pd.DataFrame:
         GROUP BY agent_id, full_name
         ORDER BY total_net DESC
     """
+    if role_filter is None or role_filter.get('is_full_access'):
+        conn = get_connection()
+        try:
+            return pd.read_sql(base_sql, conn)
+        finally:
+            conn.close()
+
+    filter_type = role_filter.get('filter_type')
+    if filter_type == 'agent':
+        crm_user_id = role_filter['crm_params'][0]
+        sql = """
+            SELECT
+                agent_id,
+                full_name,
+                SUM(ftc)  AS total_ftc,
+                SUM(net)  AS total_net,
+                COUNT(*)  AS trading_days
+            FROM agent_performance
+            WHERE DATE_TRUNC('month', report_date) = DATE_TRUNC('month', CURRENT_DATE)
+              AND agent_id = %s
+            GROUP BY agent_id, full_name
+            ORDER BY total_net DESC
+        """
+        conn = get_connection()
+        try:
+            return pd.read_sql(sql, conn, params=(str(crm_user_id),))
+        finally:
+            conn.close()
+
+    # filter_type == 'crm': join crm_users and apply where fragment
+    crm_where = role_filter['crm_where'].replace('u.', 'c.')
+    params = role_filter['crm_params']
+    sql = f"""
+        SELECT
+            ap.agent_id,
+            ap.full_name,
+            SUM(ap.ftc)  AS total_ftc,
+            SUM(ap.net)  AS total_net,
+            COUNT(*)     AS trading_days
+        FROM agent_performance ap
+        JOIN crm_users c ON c.id::text = ap.agent_id
+        WHERE DATE_TRUNC('month', ap.report_date) = DATE_TRUNC('month', CURRENT_DATE)
+          {crm_where}
+        GROUP BY ap.agent_id, ap.full_name
+        ORDER BY total_net DESC
+    """
     conn = get_connection()
     try:
-        return pd.read_sql(sql, conn)
+        return pd.read_sql(sql, conn, params=params)
     finally:
         conn.close()
 
@@ -1169,8 +1423,8 @@ def fetch_dealio_daily_profit_stats() -> dict:
         conn.close()
 
 
-def fetch_users_with_targets() -> pd.DataFrame:
-    sql = """
+def fetch_users_with_targets(role_filter: dict = None) -> pd.DataFrame:
+    base_sql = """
         SELECT
             u.id,
             u.full_name,
@@ -1199,8 +1453,88 @@ def fetch_users_with_targets() -> pd.DataFrame:
         WHERE u.status = 'Active'
         ORDER BY total_net DESC
     """
+    if role_filter is None or role_filter.get('is_full_access'):
+        conn = get_connection()
+        try:
+            return pd.read_sql(base_sql, conn)
+        finally:
+            conn.close()
+
+    filter_type = role_filter.get('filter_type')
+    if filter_type == 'agent':
+        crm_user_id = role_filter['crm_params'][0]
+        sql = """
+            SELECT
+                u.id,
+                u.full_name,
+                u.email,
+                u.position,
+                u.office,
+                u.team,
+                u.department,
+                u.desk_name,
+                u.status,
+                u.last_logon_time,
+                COALESCE(ap.total_ftc, 0) AS total_ftc,
+                COALESCE(ap.total_net, 0) AS total_net,
+                COALESCE(ap.trading_days, 0) AS trading_days
+            FROM users u
+            LEFT JOIN (
+                SELECT
+                    agent_id,
+                    SUM(ftc)  AS total_ftc,
+                    SUM(net)  AS total_net,
+                    COUNT(*)  AS trading_days
+                FROM agent_performance
+                WHERE DATE_TRUNC('month', report_date) = DATE_TRUNC('month', CURRENT_DATE)
+                GROUP BY agent_id
+            ) ap ON u.id = ap.agent_id
+            WHERE u.status = 'Active'
+              AND u.id = %s
+            ORDER BY total_net DESC
+        """
+        conn = get_connection()
+        try:
+            return pd.read_sql(sql, conn, params=(str(crm_user_id),))
+        finally:
+            conn.close()
+
+    # filter_type == 'crm': rename users alias to uu, join crm_users as c
+    crm_where = role_filter['crm_where'].replace('u.', 'c.')
+    params = role_filter['crm_params']
+    sql = f"""
+        SELECT
+            uu.id,
+            uu.full_name,
+            uu.email,
+            uu.position,
+            uu.office,
+            uu.team,
+            uu.department,
+            uu.desk_name,
+            uu.status,
+            uu.last_logon_time,
+            COALESCE(ap.total_ftc, 0) AS total_ftc,
+            COALESCE(ap.total_net, 0) AS total_net,
+            COALESCE(ap.trading_days, 0) AS trading_days
+        FROM users uu
+        JOIN crm_users c ON c.id = uu.id::BIGINT
+        LEFT JOIN (
+            SELECT
+                agent_id,
+                SUM(ftc)  AS total_ftc,
+                SUM(net)  AS total_net,
+                COUNT(*)  AS trading_days
+            FROM agent_performance
+            WHERE DATE_TRUNC('month', report_date) = DATE_TRUNC('month', CURRENT_DATE)
+            GROUP BY agent_id
+        ) ap ON uu.id = ap.agent_id
+        WHERE uu.status = 'Active'
+          {crm_where}
+        ORDER BY total_net DESC
+    """
     conn = get_connection()
     try:
-        return pd.read_sql(sql, conn)
+        return pd.read_sql(sql, conn, params=params)
     finally:
         conn.close()

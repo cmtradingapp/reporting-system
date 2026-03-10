@@ -621,7 +621,7 @@ def get_crm_users_full() -> pd.DataFrame:
                 MAX(o.full_name)                                                                  AS agent_name,
                 MAX(IF(LOWER(TRIM(SUBSTRING_INDEX(d.name, '-', 1))) LIKE '%conversion%',
                     'Sales', 'Retention'))                                                        AS department_
-            FROM v_ant_operators o
+            FROM operators o
             LEFT JOIN operator_desk_rel od ON o.id = od.operator_id
             LEFT JOIN desk d ON od.desk_id = d.id
             LEFT JOIN office ofc ON d.office_id = ofc.id

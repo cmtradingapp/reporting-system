@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from app.auth.dependencies import get_current_user
 from app.db.postgres_conn import get_connection
 
 router = APIRouter()
@@ -8,7 +9,10 @@ templates = Jinja2Templates(directory="app/templates")
 
 
 @router.get("/holidays", response_class=HTMLResponse)
-def holidays_page(request: Request):
+async def holidays_page(request: Request):
+    user = await get_current_user(request)
+    if isinstance(user, RedirectResponse):
+        return user
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -18,7 +22,7 @@ def holidays_page(request: Request):
             rows = cur.fetchall()
         holidays = [{"date": str(r[0]), "description": r[1] or ""} for r in rows]
         return templates.TemplateResponse(
-            "holidays.html", {"request": request, "holidays": holidays}
+            "holidays.html", {"request": request, "current_user": user, "holidays": holidays}
         )
     finally:
         conn.close()

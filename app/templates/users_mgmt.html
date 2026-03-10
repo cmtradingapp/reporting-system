@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Admin Users — Reporting System</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet"/>
+  <style>
+    body { background-color: #0f1117; color: #e0e0e0; font-family: 'Segoe UI', sans-serif; display: flex; min-height: 100vh; }
+    .sidebar { width: 220px; min-height: 100vh; background-color: #161b22; border-right: 1px solid #30363d; display: flex; flex-direction: column; position: fixed; top: 0; left: 0; bottom: 0; z-index: 100; }
+    .sidebar-brand { padding: 20px 20px 16px; border-bottom: 1px solid #30363d; font-weight: 700; font-size: 1rem; color: #e0e0e0; }
+    .sidebar-nav { padding: 12px 0; flex: 1; }
+    .sidebar-link { display: flex; align-items: center; gap: 10px; padding: 10px 20px; color: #8b949e; text-decoration: none; font-size: 0.9rem; transition: background 0.15s, color 0.15s; border-left: 3px solid transparent; }
+    .sidebar-link:hover { background-color: #21262d; color: #e0e0e0; }
+    .sidebar-link.active { color: #3fb950; border-left-color: #3fb950; background-color: rgba(63,185,80,0.08); }
+    .main-content { margin-left: 220px; flex: 1; min-width: 0; }
+    .card { background-color: #161b22; border: 1px solid #30363d; border-radius: 12px; }
+    .table { color: #e0e0e0; }
+    .table thead th { background-color: #21262d; color: #8b949e; border-color: #30363d; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; }
+    .table tbody tr { border-color: #21262d; }
+    .table tbody tr:hover { background-color: #21262d; }
+    .table td { border-color: #21262d; vertical-align: middle; }
+    .modal-content { background-color: #161b22; border: 1px solid #30363d; color: #e0e0e0; }
+    .modal-header { border-bottom: 1px solid #30363d; }
+    .modal-footer { border-top: 1px solid #30363d; }
+    .form-control, .form-select { background-color: #0f1117; border: 1px solid #30363d; color: #e0e0e0; border-radius: 8px; }
+    .form-control:focus, .form-select:focus { background-color: #0f1117; border-color: #238636; color: #e0e0e0; box-shadow: 0 0 0 3px rgba(35,134,54,0.2); }
+    .form-label { color: #8b949e; font-size: 0.85rem; }
+    .form-select option { background-color: #161b22; }
+    .badge-role { font-size: 0.75rem; padding: 4px 8px; border-radius: 6px; font-weight: 600; }
+    .badge-admin { background-color: rgba(248,81,73,0.15); color: #f85149; }
+    .badge-general { background-color: rgba(139,148,158,0.15); color: #8b949e; }
+    .badge-agent { background-color: rgba(63,185,80,0.15); color: #3fb950; }
+    .badge-other { background-color: rgba(88,166,255,0.15); color: #58a6ff; }
+    #toast-container { position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 9999; }
+    .temp-pw-box { background-color: #0f1117; border: 1px solid #30363d; border-radius: 8px; padding: 12px 16px; font-family: monospace; font-size: 1.1rem; color: #3fb950; text-align: center; letter-spacing: 2px; }
+  </style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<div class="sidebar">
+  <div class="sidebar-brand">
+    <i class="bi bi-bar-chart-fill text-success me-2"></i>Reporting System
+  </div>
+  <nav class="sidebar-nav">
+    <a href="/" class="sidebar-link"><i class="bi bi-graph-up"></i>Performance</a>
+    <a href="/users" class="sidebar-link"><i class="bi bi-people"></i>Users</a>
+    <a href="/scoreboard" class="sidebar-link"><i class="bi bi-trophy"></i>Scoreboard</a>
+    <a href="/agent-bonuses" class="sidebar-link"><i class="bi bi-cash-stack"></i>Agent Bonuses</a>
+    <a href="/data-sync" class="sidebar-link"><i class="bi bi-database"></i>Data Sync</a>
+    <a href="/holidays" class="sidebar-link"><i class="bi bi-calendar-x"></i>Holidays</a>
+  </nav>
+  <div style="padding:16px 20px; border-top:1px solid #30363d; margin-top:auto;">
+    <div style="font-size:0.75rem; color:#8b949e; margin-bottom:4px;">Signed in as</div>
+    <div style="font-weight:600; font-size:0.875rem; color:#e0e0e0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+      {{ current_user.full_name }}
+    </div>
+    <div style="font-size:0.75rem; color:#3fb950; margin-bottom:10px;">
+      {{ current_user.role | replace('_', ' ') | title }}
+    </div>
+    <a href="/admin/users" class="sidebar-link active"><i class="bi bi-people-fill"></i>Admin Users</a>
+    <a href="/logout" class="sidebar-link" style="color:#f85149;"><i class="bi bi-box-arrow-right"></i>Logout</a>
+  </div>
+</div>
+
+<div class="main-content">
+<div id="toast-container"></div>
+<div class="container-fluid px-4 py-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="fw-bold text-white mb-0"><i class="bi bi-people-fill text-success me-2"></i>User Management</h4>
+    <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#addUserModal">
+      <i class="bi bi-plus-lg me-1"></i>Add User
+    </button>
+  </div>
+
+  <!-- Search -->
+  <div class="mb-3">
+    <input type="text" id="searchInput" class="form-control" placeholder="Search by name or email..." style="max-width:340px;">
+  </div>
+
+  <!-- Table -->
+  <div class="card">
+    <div class="card-body p-0">
+      <table class="table table-hover mb-0" id="usersTable">
+        <thead>
+          <tr>
+            <th>Full Name</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th>CRM Agent</th>
+            <th>Active</th>
+            <th>Last Login</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in users %}
+          <tr data-name="{{ u.full_name | lower }}" data-email="{{ u.email | lower }}">
+            <td>{{ u.full_name }}</td>
+            <td class="text-secondary">{{ u.email }}</td>
+            <td>
+              {% set rc = {'admin':'badge-admin','general':'badge-general','agent':'badge-agent'}.get(u.role, 'badge-other') %}
+              <span class="badge-role {{ rc }}">{{ u.role | replace('_', ' ') | title }}</span>
+            </td>
+            <td class="text-secondary">{{ u.crm_name or '—' }}</td>
+            <td>
+              {% if u.is_active %}
+              <span class="text-success"><i class="bi bi-circle-fill" style="font-size:0.6rem;"></i> Active</span>
+              {% else %}
+              <span class="text-danger"><i class="bi bi-circle-fill" style="font-size:0.6rem;"></i> Inactive</span>
+              {% endif %}
+            </td>
+            <td class="text-secondary">{{ u.last_login or '—' }}</td>
+            <td>
+              <button class="btn btn-sm btn-outline-secondary me-1" title="Edit"
+                onclick='openEditModal({{ u | tojson }})'>
+                <i class="bi bi-pencil"></i>
+              </button>
+              <button class="btn btn-sm btn-outline-warning me-1" title="Reset Password"
+                onclick="resetPassword({{ u.id }})">
+                <i class="bi bi-key"></i>
+              </button>
+              {% if u.is_active %}
+              <button class="btn btn-sm btn-outline-danger" title="Deactivate"
+                onclick="deactivateUser({{ u.id }}, '{{ u.full_name }}')">
+                <i class="bi bi-person-x"></i>
+              </button>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- Add User Modal -->
+<div class="modal fade" id="addUserModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Add User</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Full Name</label>
+          <input type="text" id="add-fullname" class="form-control" placeholder="John Smith" />
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Email</label>
+          <input type="email" id="add-email" class="form-control" placeholder="john@example.com" />
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Role</label>
+          <select id="add-role" class="form-select">
+            <option value="agent">Agent</option>
+            <option value="general">General</option>
+            <option value="admin">Admin</option>
+            <option value="retention_all">Retention — All</option>
+            <option value="retention_gmt">Retention — GMT</option>
+            <option value="retention_abj_ng">Retention — ABJ-NG</option>
+            <option value="retention_lag_ng">Retention — LAG-NG</option>
+            <option value="retention_sa">Retention — SA</option>
+            <option value="retention_bg_team1">Retention — BG Team 1</option>
+            <option value="retention_bg_team2">Retention — BG Team 2</option>
+            <option value="retention_bg_team3">Retention — BG Team 3</option>
+            <option value="sales_gmt">Sales — GMT</option>
+            <option value="sales_lag_ng">Sales — LAG-NG</option>
+            <option value="sales_abj_ng">Sales — ABJ-NG</option>
+            <option value="sales_sa">Sales — SA</option>
+            <option value="sales_bg">Sales — BG</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Link CRM Agent (optional)</label>
+          <input type="text" id="add-crm-search" class="form-control" placeholder="Search by name or email..." autocomplete="off" />
+          <div id="add-crm-results" class="mt-1" style="background:#0f1117; border:1px solid #30363d; border-radius:8px; display:none; max-height:160px; overflow-y:auto;"></div>
+          <input type="hidden" id="add-crm-user-id" />
+          <div id="add-crm-selected" class="text-success mt-1" style="font-size:0.85rem;"></div>
+        </div>
+        <div class="text-secondary" style="font-size:0.8rem;">Default password: <code>Welcome1!</code> (user must change on first login)</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-success" onclick="createUser()">Create User</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit User Modal -->
+<div class="modal fade" id="editUserModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Edit User</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="edit-id" />
+        <div class="mb-3">
+          <label class="form-label">Full Name</label>
+          <input type="text" id="edit-fullname" class="form-control" />
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Email</label>
+          <input type="email" id="edit-email" class="form-control" />
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Role</label>
+          <select id="edit-role" class="form-select">
+            <option value="agent">Agent</option>
+            <option value="general">General</option>
+            <option value="admin">Admin</option>
+            <option value="retention_all">Retention — All</option>
+            <option value="retention_gmt">Retention — GMT</option>
+            <option value="retention_abj_ng">Retention — ABJ-NG</option>
+            <option value="retention_lag_ng">Retention — LAG-NG</option>
+            <option value="retention_sa">Retention — SA</option>
+            <option value="retention_bg_team1">Retention — BG Team 1</option>
+            <option value="retention_bg_team2">Retention — BG Team 2</option>
+            <option value="retention_bg_team3">Retention — BG Team 3</option>
+            <option value="sales_gmt">Sales — GMT</option>
+            <option value="sales_lag_ng">Sales — LAG-NG</option>
+            <option value="sales_abj_ng">Sales — ABJ-NG</option>
+            <option value="sales_sa">Sales — SA</option>
+            <option value="sales_bg">Sales — BG</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Active</label>
+          <select id="edit-active" class="form-select">
+            <option value="1">Active</option>
+            <option value="0">Inactive</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Link CRM Agent (optional)</label>
+          <input type="text" id="edit-crm-search" class="form-control" placeholder="Search by name or email..." autocomplete="off" />
+          <div id="edit-crm-results" class="mt-1" style="background:#0f1117; border:1px solid #30363d; border-radius:8px; display:none; max-height:160px; overflow-y:auto;"></div>
+          <input type="hidden" id="edit-crm-user-id" />
+          <div id="edit-crm-selected" class="text-success mt-1" style="font-size:0.85rem;"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="saveEdit()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Reset Password Result Modal -->
+<div class="modal fade" id="resetPwModal" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Temporary Password</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body text-center">
+        <p class="text-secondary mb-3" style="font-size:0.85rem;">Share this with the user. It will not be shown again.</p>
+        <div class="temp-pw-box" id="resetPwValue"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  // Toast helper
+  function toast(msg, type='success') {
+    const el = document.createElement('div');
+    el.className = `alert alert-${type} shadow py-2 px-3`;
+    el.style.cssText = 'min-width:220px;font-size:0.85rem;';
+    el.textContent = msg;
+    document.getElementById('toast-container').appendChild(el);
+    setTimeout(() => el.remove(), 3500);
+  }
+
+  // Search filter
+  document.getElementById('searchInput').addEventListener('input', function() {
+    const q = this.value.toLowerCase();
+    document.querySelectorAll('#usersTable tbody tr').forEach(row => {
+      const match = row.dataset.name.includes(q) || row.dataset.email.includes(q);
+      row.style.display = match ? '' : 'none';
+    });
+  });
+
+  // CRM agent search (shared)
+  function setupCrmSearch(inputId, resultsId, hiddenId, selectedId) {
+    let timer;
+    document.getElementById(inputId).addEventListener('input', function() {
+      clearTimeout(timer);
+      const q = this.value.trim();
+      if (q.length < 2) { document.getElementById(resultsId).style.display = 'none'; return; }
+      timer = setTimeout(() => {
+        fetch(`/api/admin/crm-users/search?q=${encodeURIComponent(q)}`)
+          .then(r => r.json())
+          .then(data => {
+            const box = document.getElementById(resultsId);
+            if (!data.length) { box.style.display = 'none'; return; }
+            box.innerHTML = data.map(u =>
+              `<div style="padding:8px 12px;cursor:pointer;font-size:0.85rem;"
+                onmousedown="selectCrm('${inputId}','${resultsId}','${hiddenId}','${selectedId}',${u.id},'${u.name.replace(/'/g,"\\'")}','${(u.email||'').replace(/'/g,"\\'")}')">
+                ${u.name} <span style="color:#8b949e;font-size:0.75rem;">${u.email||''}</span>
+              </div>`
+            ).join('');
+            box.style.display = 'block';
+          });
+      }, 250);
+    });
+  }
+
+  function selectCrm(inputId, resultsId, hiddenId, selectedId, id, name, email) {
+    document.getElementById(hiddenId).value = id;
+    document.getElementById(inputId).value = '';
+    document.getElementById(selectedId).textContent = `✓ Linked: ${name}${email ? ' ('+email+')' : ''}`;
+    document.getElementById(resultsId).style.display = 'none';
+  }
+
+  setupCrmSearch('add-crm-search', 'add-crm-results', 'add-crm-user-id', 'add-crm-selected');
+  setupCrmSearch('edit-crm-search', 'edit-crm-results', 'edit-crm-user-id', 'edit-crm-selected');
+
+  // Create user
+  function createUser() {
+    const payload = {
+      full_name: document.getElementById('add-fullname').value.trim(),
+      email: document.getElementById('add-email').value.trim(),
+      role: document.getElementById('add-role').value,
+      crm_user_id: document.getElementById('add-crm-user-id').value || null,
+    };
+    if (!payload.full_name || !payload.email) { toast('Name and email are required', 'danger'); return; }
+    fetch('/api/admin/users', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) })
+      .then(r => r.json())
+      .then(d => {
+        if (d.detail) { toast(d.detail, 'danger'); return; }
+        toast('User created successfully');
+        setTimeout(() => location.reload(), 800);
+      });
+  }
+
+  // Edit modal
+  function openEditModal(u) {
+    document.getElementById('edit-id').value = u.id;
+    document.getElementById('edit-fullname').value = u.full_name;
+    document.getElementById('edit-email').value = u.email;
+    document.getElementById('edit-role').value = u.role;
+    document.getElementById('edit-active').value = u.is_active;
+    document.getElementById('edit-crm-user-id').value = u.crm_user_id || '';
+    document.getElementById('edit-crm-selected').textContent = u.crm_name ? `✓ Linked: ${u.crm_name}` : '';
+    new bootstrap.Modal(document.getElementById('editUserModal')).show();
+  }
+
+  function saveEdit() {
+    const id = document.getElementById('edit-id').value;
+    const payload = {
+      full_name: document.getElementById('edit-fullname').value.trim(),
+      email: document.getElementById('edit-email').value.trim(),
+      role: document.getElementById('edit-role').value,
+      is_active: parseInt(document.getElementById('edit-active').value),
+      crm_user_id: document.getElementById('edit-crm-user-id').value || null,
+    };
+    fetch(`/api/admin/users/${id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) })
+      .then(r => r.json())
+      .then(d => {
+        if (d.detail) { toast(d.detail, 'danger'); return; }
+        toast('User updated');
+        setTimeout(() => location.reload(), 800);
+      });
+  }
+
+  // Reset password
+  function resetPassword(id) {
+    if (!confirm('Reset this user\'s password?')) return;
+    fetch(`/api/admin/users/${id}/reset-password`, { method: 'POST' })
+      .then(r => r.json())
+      .then(d => {
+        if (d.detail) { toast(d.detail, 'danger'); return; }
+        document.getElementById('resetPwValue').textContent = d.temp_password;
+        new bootstrap.Modal(document.getElementById('resetPwModal')).show();
+      });
+  }
+
+  // Deactivate
+  function deactivateUser(id, name) {
+    if (!confirm(`Deactivate ${name}?`)) return;
+    fetch(`/api/admin/users/${id}/deactivate`, { method: 'POST' })
+      .then(r => r.json())
+      .then(d => {
+        if (d.detail) { toast(d.detail, 'danger'); return; }
+        toast(`${name} deactivated`);
+        setTimeout(() => location.reload(), 800);
+      });
+  }
+</script>
+</body>
+</html>

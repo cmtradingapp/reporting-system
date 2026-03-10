@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from app.auth.dependencies import get_current_user
+from app.auth.role_filters import get_role_filter
 from app.db.postgres_conn import fetch_users_with_targets, fetch_last_sync
 from datetime import datetime
 import pandas as pd
@@ -11,11 +13,15 @@ templates = Jinja2Templates(directory="app/templates")
 
 @router.get("/users", response_class=HTMLResponse)
 async def users_page(request: Request):
-    df = fetch_users_with_targets()
+    user = await get_current_user(request)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    role_filter = get_role_filter(user)
+    df = fetch_users_with_targets(role_filter)
     last_sync = fetch_last_sync()
     current_month = datetime.now().strftime("%B %Y")
 
-    # Format datetime columns as strings to avoid NaT issues in Jinja2
     for col in ["last_logon_time", "last_update_time"]:
         if col in df.columns:
             df[col] = df[col].apply(lambda x: x.strftime("%Y-%m-%d") if pd.notnull(x) else None)
@@ -28,6 +34,7 @@ async def users_page(request: Request):
 
     return templates.TemplateResponse("users.html", {
         "request": request,
+        "current_user": user,
         "current_month": current_month,
         "last_sync": last_sync,
         "users": users,
