@@ -14,6 +14,8 @@ async def ftc_date_page(request: Request):
     user = await get_current_user(request)
     if isinstance(user, RedirectResponse):
         return user
+    if user.get("role") != "admin":
+        return RedirectResponse(url="/performance")
     return templates.TemplateResponse("ftc_date.html", {
         "request": request,
         "current_user": user,

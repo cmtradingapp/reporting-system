@@ -253,11 +253,13 @@
   </div>
   <nav class="sidebar-nav">
     <a href="/performance" class="sidebar-link active"><i class="bi bi-trophy"></i>Performance Report</a>
-    <a href="/dashboard" class="sidebar-link"><i class="bi bi-speedometer2"></i>Dashboard</a>
     <a href="/agent-bonuses" class="sidebar-link"><i class="bi bi-cash-stack"></i>Agent Bonuses</a>
+    {% if current_user.role == 'admin' %}
+    <a href="/dashboard" class="sidebar-link"><i class="bi bi-speedometer2"></i>Dashboard</a>
     <a href="/ftc-date" class="sidebar-link"><i class="bi bi-calendar2-check"></i>FTC Date</a>
-    {% if current_user.role == 'admin' %}<a href="/data-sync" class="sidebar-link"><i class="bi bi-database"></i>Data Sync</a>{% endif %}
+    <a href="/data-sync" class="sidebar-link"><i class="bi bi-database"></i>Data Sync</a>
     <a href="/holidays" class="sidebar-link"><i class="bi bi-calendar-x"></i>Holidays</a>
+    {% endif %}
   </nav>
   <div class="sidebar-user">
     <div style="font-size:0.68rem;color:#8b949e;margin-bottom:2px;">Signed in as</div>

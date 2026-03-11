@@ -13,6 +13,8 @@ async def holidays_page(request: Request):
     user = await get_current_user(request)
     if isinstance(user, RedirectResponse):
         return user
+    if user.get("role") != "admin":
+        return RedirectResponse(url="/performance")
     conn = get_connection()
     try:
         with conn.cursor() as cur:
