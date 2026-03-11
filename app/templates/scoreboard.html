@@ -194,6 +194,25 @@
     /* Section title */
     .section-title { font-size: 1rem; font-weight: 600; color: #c9d1d9; border-left: 3px solid #238636; padding-left: 10px; }
 
+    /* Sidebar user block */
+    .sidebar-user { padding: 14px 20px; border-top: 1px solid #30363d; }
+    .sidebar-nav { overflow-y: auto; }
+
+    /* Filter bar collapsible */
+    #filter-toggle { cursor: pointer; padding: 10px 16px; user-select: none; border-radius: 12px; }
+    #filter-toggle:hover { background: rgba(255,255,255,0.03); }
+    #filter-body { border-top: 1px solid #30363d; padding: 12px 16px 14px; }
+
+    /* Sticky first column */
+    .scoreboard-table th:first-child { position: sticky; left: 0; z-index: 3; background-color: #21262d; }
+    .scoreboard-table td:first-child { position: sticky; left: 0; z-index: 2; background-color: #0f1117; }
+    .scoreboard-table .office-row td:first-child { background-color: #12171f; }
+    .scoreboard-table .dept-row td:first-child { background-color: #161b22; }
+    .scoreboard-table .total-row td:first-child { background-color: #1c2128; }
+    .scoreboard-table tr.agent-row:hover td:first-child { background-color: #1c2128; }
+    .scoreboard-table .office-row:hover td:first-child { background-color: #161b22; }
+    .scoreboard-table .dept-row:hover td:first-child { background-color: #1c2128; }
+
     /* ── Mobile Responsive ─────────────────────────── */
     .sidebar-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:99; }
     .sidebar-overlay.show { display:block; }
@@ -227,19 +246,15 @@
     {% if current_user.role == 'admin' %}<a href="/data-sync" class="sidebar-link"><i class="bi bi-database"></i>Data Sync</a>{% endif %}
     <a href="/holidays" class="sidebar-link"><i class="bi bi-calendar-x"></i>Holidays</a>
   </nav>
-</div>
-
-<!-- User badge top-right -->
-<div style="position:fixed; top:14px; right:22px; z-index:200; display:flex; align-items:center; gap:14px; background:#161b22; border:1px solid #30363d; border-radius:10px; padding:8px 16px;">
-  <div>
-    <div style="font-size:0.7rem; color:#8b949e; line-height:1;">Signed in as</div>
-    <div style="font-weight:600; font-size:0.85rem; color:#e0e0e0; line-height:1.4;">{{ current_user.full_name }}</div>
-    <div style="font-size:0.72rem; color:#3fb950; line-height:1;">{{ current_user.role | replace('_', ' ') | title }}</div>
+  <div class="sidebar-user">
+    <div style="font-size:0.68rem;color:#8b949e;margin-bottom:2px;">Signed in as</div>
+    <div style="font-weight:600;font-size:0.82rem;color:#e0e0e0;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ current_user.full_name }}</div>
+    <div style="font-size:0.7rem;color:#3fb950;margin-bottom:8px;">{{ current_user.role | replace('_', ' ') | title }}</div>
+    <div style="display:flex;gap:12px;align-items:center;">
+      {% if current_user.role == 'admin' %}<a href="/admin/users" style="color:#8b949e;text-decoration:none;font-size:1.05rem;" title="Admin Users"><i class="bi bi-people-fill"></i></a>{% endif %}
+      <a href="/logout" style="color:#f85149;text-decoration:none;font-size:1.05rem;" title="Logout"><i class="bi bi-box-arrow-right"></i></a>
+    </div>
   </div>
-  {% if current_user.role == 'admin' %}
-  <a href="/admin/users" style="color:#8b949e; text-decoration:none; font-size:1.15rem;" title="Admin Users"><i class="bi bi-people-fill"></i></a>
-  {% endif %}
-  <a href="/logout" style="color:#f85149; text-decoration:none; font-size:1.15rem;" title="Logout"><i class="bi bi-box-arrow-right"></i></a>
 </div>
 
 <div class="main-content">
@@ -251,7 +266,12 @@
   </div>
 
   <!-- Filter Bar -->
-  <div class="card p-3 mb-4">
+  <div class="card mb-4">
+    <div class="d-flex align-items-center justify-content-between" id="filter-toggle">
+      <span style="font-size:0.8rem;color:#8b949e;font-weight:600;"><i class="bi bi-sliders me-2" style="color:#388bfd;"></i>Filters</span>
+      <i class="bi bi-chevron-up" id="filter-chevron" style="color:#8b949e;font-size:0.8rem;transition:transform 0.2s;"></i>
+    </div>
+    <div id="filter-body">
 
     <!-- Row 1: Year + Month -->
     <div class="d-flex flex-wrap align-items-center gap-1 mb-3">
@@ -312,6 +332,7 @@
       </button>
     </div>
 
+    </div><!-- /filter-body -->
   </div>
 
   <!-- KPI Cards Row 1 -->
@@ -886,6 +907,7 @@
     }
 
     document.getElementById('row-count').textContent = `${offices.length} offices · ${agentCount} agents`;
+    applyMobileColOrder();
   }
 
   function escHtml(str) {
@@ -1429,6 +1451,7 @@
     }
 
     document.getElementById('ret-row-count').textContent = `${totalOffices} offices · ${totalAgents} agents`;
+    applyMobileColOrder();
   }
 
   // ── Export Sales to Excel ──────────────────────────────────────────────
@@ -1523,6 +1546,47 @@
   updateSortIcons();
   updateRetSortIcons();
   loadAll();
+
+  // ── Filter bar toggle ──────────────────────────────────────────────────
+  (function(){
+    const FKEY = 'sb_filter_open';
+    const fbody = document.getElementById('filter-body');
+    const fchev = document.getElementById('filter-chevron');
+    if (localStorage.getItem(FKEY) === '0') {
+      fbody.style.display = 'none';
+      fchev.style.transform = 'rotate(180deg)';
+    }
+    document.getElementById('filter-toggle').addEventListener('click', function() {
+      const open = fbody.style.display !== 'none';
+      fbody.style.display = open ? 'none' : '';
+      fchev.style.transform = open ? 'rotate(180deg)' : '';
+      localStorage.setItem(FKEY, open ? '0' : '1');
+    });
+  })();
+
+  // ── Mobile column reorder ──────────────────────────────────────────────
+  function _moveCol(row, fromIdx, toIdx) {
+    const cell = row.children[fromIdx];
+    if (!cell) return;
+    row.insertBefore(cell, row.children[toIdx]);
+  }
+  function applyMobileColOrder() {
+    if (window.innerWidth >= 768) return;
+    // Sales: move FTC (index 6) to index 1
+    const st = document.getElementById('scoreboard-table');
+    if (st && !st.dataset.mobReordered) {
+      _moveCol(st.querySelector('thead tr'), 6, 1);
+      st.dataset.mobReordered = '1';
+    }
+    if (st) Array.from(st.querySelectorAll('tbody tr, tfoot tr')).forEach(r => { if (r.children.length > 6) _moveCol(r, 6, 1); });
+    // Retention: move NET $ (index 5) to index 1
+    const rt = document.getElementById('retention-table');
+    if (rt && !rt.dataset.mobRetReordered) {
+      _moveCol(rt.querySelector('thead tr'), 5, 1);
+      rt.dataset.mobRetReordered = '1';
+    }
+    if (rt) Array.from(rt.querySelectorAll('tbody tr, tfoot tr')).forEach(r => { if (r.children.length > 5) _moveCol(r, 5, 1); });
+  }
 
   // Mobile sidebar toggle
   (function(){
