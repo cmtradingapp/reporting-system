@@ -65,7 +65,7 @@ async def dashboard_api(request: Request):
             wd_left = wd_total - wd_passed
             safe_wdp = wd_passed if wd_passed > 0 else 1
 
-            # Get PnL reference dates — find closest available snapshots dynamically
+            # Get PnL reference dates — find nearest date with actual non-zero equity
             cur.execute("""
                 WITH current_last AS (
                     SELECT MAX(date) AS dt
@@ -75,10 +75,16 @@ async def dashboard_api(request: Request):
                 )
                 SELECT
                     (SELECT dt FROM current_last) AS last_mtd,
-                    (SELECT MAX(date) FROM dealio_daily_profit
-                     WHERE date < (SELECT dt FROM current_last))           AS pnl_prev_day,
-                    (SELECT MAX(date) FROM dealio_daily_profit
-                     WHERE date < DATE_TRUNC('month', CURRENT_DATE)::date) AS pnl_prev_month
+                    (SELECT date FROM dealio_daily_profit
+                     WHERE date < (SELECT dt FROM current_last)
+                     GROUP BY date
+                     HAVING SUM(GREATEST(COALESCE(convertedbalance,0) + COALESCE(convertedfloatingpnl,0), 0)) > 0
+                     ORDER BY date DESC LIMIT 1)  AS pnl_prev_day,
+                    (SELECT date FROM dealio_daily_profit
+                     WHERE date < DATE_TRUNC('month', CURRENT_DATE)::date
+                     GROUP BY date
+                     HAVING SUM(GREATEST(COALESCE(convertedbalance,0) + COALESCE(convertedfloatingpnl,0), 0)) > 0
+                     ORDER BY date DESC LIMIT 1)  AS pnl_prev_month
             """)
             drow = cur.fetchone()
             last_mtd_date       = drow[0] or (today - timedelta(days=1))
@@ -319,11 +325,11 @@ async def dashboard_api(request: Request):
             }
             cur.execute("""
                 SELECT
-                    COALESCE(SUM(GREATEST(d.convertedbalance + d.convertedfloatingpnl, 0))
+                    COALESCE(SUM(GREATEST(COALESCE(d.convertedbalance,0) + COALESCE(d.convertedfloatingpnl,0), 0))
                         FILTER (WHERE d.date = %(last_mtd)s), 0)             AS end_eq,
-                    COALESCE(SUM(GREATEST(d.convertedbalance + d.convertedfloatingpnl, 0))
+                    COALESCE(SUM(GREATEST(COALESCE(d.convertedbalance,0) + COALESCE(d.convertedfloatingpnl,0), 0))
                         FILTER (WHERE d.date = %(pnl_prev_day)s), 0)         AS start_eq_daily,
-                    COALESCE(SUM(GREATEST(d.convertedbalance + d.convertedfloatingpnl, 0))
+                    COALESCE(SUM(GREATEST(COALESCE(d.convertedbalance,0) + COALESCE(d.convertedfloatingpnl,0), 0))
                         FILTER (WHERE d.date = %(pnl_prev_month)s), 0)       AS start_eq_monthly
                 FROM dealio_daily_profit d
                 WHERE d.date IN (%(last_mtd)s, %(pnl_prev_day)s, %(pnl_prev_month)s)
