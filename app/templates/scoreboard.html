@@ -233,6 +233,12 @@
       .cnt-badge { display:none; }
       #row-count, #ret-row-count { display:none; }
       .row-icon { display:none; }
+      /* Constrain first (sticky) column so 3 columns fit on screen */
+      .scoreboard-table th, .scoreboard-table td { padding-left:7px !important; padding-right:7px !important; }
+      .scoreboard-table th:first-child, .scoreboard-table td:first-child { max-width:105px; min-width:80px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      .scoreboard-table th { font-size:0.68rem; }
+      .agent-row td:first-child { padding-left:18px !important; }
+      .retention-agent-row td:first-child { padding-left:26px !important; }
     }
   </style>
 </head>
@@ -1558,7 +1564,7 @@
     const FKEY = 'sb_filter_open';
     const fbody = document.getElementById('filter-body');
     const fchev = document.getElementById('filter-chevron');
-    if (localStorage.getItem(FKEY) === '0') {
+    if (localStorage.getItem(FKEY) !== '1') {
       fbody.style.display = 'none';
       fchev.style.transform = 'rotate(180deg)';
     }
