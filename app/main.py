@@ -128,7 +128,7 @@ app = FastAPI(title="Agent Performance Report", lifespan=lifespan)
 
 @app.get("/")
 async def root(request: Request):
-    return RedirectResponse(url="/scoreboard", status_code=302)
+    return RedirectResponse(url="/performance", status_code=302)
 
 
 app.include_router(accounts_router)

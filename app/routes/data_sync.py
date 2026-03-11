@@ -39,7 +39,7 @@ async def data_sync_page(request: Request):
     if isinstance(user, RedirectResponse):
         return user
     if user.get("role") != "admin":
-        return RedirectResponse(url="/scoreboard", status_code=302)
+        return RedirectResponse(url="/performance", status_code=302)
     accounts_stats = fetch_accounts_stats()
     accounts_log = fetch_sync_log("crm_accounts", limit=50)
 

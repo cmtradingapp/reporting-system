@@ -252,7 +252,7 @@
     <i class="bi bi-bar-chart-fill text-success me-2"></i>Reporting System
   </div>
   <nav class="sidebar-nav">
-    <a href="/scoreboard" class="sidebar-link active"><i class="bi bi-trophy"></i>Performance Report</a>
+    <a href="/performance" class="sidebar-link active"><i class="bi bi-trophy"></i>Performance Report</a>
     <a href="/dashboard" class="sidebar-link"><i class="bi bi-speedometer2"></i>Dashboard</a>
     <a href="/agent-bonuses" class="sidebar-link"><i class="bi bi-cash-stack"></i>Agent Bonuses</a>
     <a href="/ftc-date" class="sidebar-link"><i class="bi bi-calendar2-check"></i>FTC Date</a>
@@ -658,7 +658,7 @@
     document.getElementById('error-msg').style.display = 'none';
 
     try {
-      const res = await fetch(`/api/scoreboard?date_from=${df}&date_to=${dt}`);
+      const res = await fetch(`/api/performance?date_from=${df}&date_to=${dt}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Server error');
 
@@ -1123,7 +1123,7 @@
     document.getElementById('ret-error-msg').style.display = 'none';
 
     try {
-      const res = await fetch(`/api/scoreboard/retention?date_from=${df}&date_to=${dt}`);
+      const res = await fetch(`/api/performance/retention?date_from=${df}&date_to=${dt}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Server error');
 

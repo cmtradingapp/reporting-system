@@ -41,7 +41,7 @@ router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
 
-@router.get("/scoreboard", response_class=HTMLResponse)
+@router.get("/performance", response_class=HTMLResponse)
 async def scoreboard_page(request: Request):
     user = await get_current_user(request)
     if isinstance(user, RedirectResponse):
@@ -49,7 +49,7 @@ async def scoreboard_page(request: Request):
     return templates.TemplateResponse("scoreboard.html", {"request": request, "current_user": user})
 
 
-@router.get("/api/scoreboard")
+@router.get("/api/performance")
 async def scoreboard_api(request: Request, date_from: str, date_to: str):
     user = await get_current_user(request)
     if isinstance(user, RedirectResponse):
@@ -301,7 +301,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
         conn.close()
 
 
-@router.get("/api/scoreboard/retention")
+@router.get("/api/performance/retention")
 async def scoreboard_retention_api(request: Request, date_from: str, date_to: str):
     user = await get_current_user(request)
     if isinstance(user, RedirectResponse):
