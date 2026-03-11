@@ -48,10 +48,28 @@
     .group-cb-wrap input[type=checkbox] { accent-color: #3fb950; width: 14px; height: 14px; cursor: pointer; }
     /* Flatpickr dark override fixes */
     .flatpickr-calendar { font-family: 'Segoe UI', sans-serif; }
+
+    /* ── Mobile Responsive ─────────────────────────── */
+    .sidebar-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:99; }
+    .sidebar-overlay.show { display:block; }
+    .sidebar-toggle { display:none; position:fixed; top:12px; left:12px; z-index:300; background:#161b22; border:1px solid #30363d; color:#e0e0e0; border-radius:8px; padding:7px 10px; cursor:pointer; font-size:1.1rem; line-height:1; }
+    @media (max-width: 767px) {
+      body { display:block; }
+      .sidebar-toggle { display:block; }
+      .sidebar { transform:translateX(-240px); transition:transform 0.25s ease; }
+      .sidebar.open { transform:translateX(0); box-shadow:4px 0 20px rgba(0,0,0,0.6); }
+      .main-content { margin-left:0 !important; padding-top:56px; }
+      .table-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+      .kpi-card { padding:8px 10px; }
+      .kpi-value { font-size:1.1rem; }
+      .date-input { width:120px; }
+    }
   </style>
 </head>
 <body>
 
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+<button class="sidebar-toggle" id="sidebar-toggle"><i class="bi bi-list"></i></button>
 <!-- Sidebar -->
 <div class="sidebar">
   <div class="sidebar-brand">
@@ -61,7 +79,7 @@
     <a href="/scoreboard" class="sidebar-link"><i class="bi bi-trophy"></i>Scoreboard</a>
     <a href="/agent-bonuses" class="sidebar-link"><i class="bi bi-cash-stack"></i>Agent Bonuses</a>
     <a href="/ftc-date" class="sidebar-link active"><i class="bi bi-calendar2-check"></i>FTC Date</a>
-    <a href="/data-sync" class="sidebar-link"><i class="bi bi-database"></i>Data Sync</a>
+    {% if current_user.role == 'admin' %}<a href="/data-sync" class="sidebar-link"><i class="bi bi-database"></i>Data Sync</a>{% endif %}
     <a href="/holidays" class="sidebar-link"><i class="bi bi-calendar-x"></i>Holidays</a>
   </nav>
 </div>
@@ -350,6 +368,16 @@
   // Load options then auto-load data on page open
   loadOptions();
   loadData();
+
+  // Mobile sidebar toggle
+  (function(){
+    var toggle = document.getElementById('sidebar-toggle');
+    var sb = document.querySelector('.sidebar');
+    var overlay = document.getElementById('sidebar-overlay');
+    if (!toggle) return;
+    toggle.addEventListener('click', function(){ sb.classList.toggle('open'); overlay.classList.toggle('show'); });
+    overlay.addEventListener('click', function(){ sb.classList.remove('open'); overlay.classList.remove('show'); });
+  })();
 </script>
 <script src="https://instant.page/5.2.0/instantpage.min.js" type="module"></script>
 </body>
