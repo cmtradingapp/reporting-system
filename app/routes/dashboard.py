@@ -281,11 +281,97 @@ async def dashboard_api(request: Request):
             """)
             abs_exposure = float(cur.fetchone()[0] or 0)
 
+            # Q10 — Equity snapshots for PnL (end today/MTD, start yesterday/prev-month-end)
+            cur.execute("""
+                WITH last_mtd AS (
+                    SELECT MAX(date) AS dt
+                    FROM dealio_daily_profit
+                    WHERE EXTRACT(YEAR  FROM date) = EXTRACT(YEAR  FROM CURRENT_DATE)
+                      AND EXTRACT(MONTH FROM date) = EXTRACT(MONTH FROM CURRENT_DATE)
+                )
+                SELECT
+                    COALESCE(SUM(GREATEST(d.convertedbalance + d.convertedfloatingpnl, 0))
+                        FILTER (WHERE d.date = (SELECT dt FROM last_mtd)), 0)                      AS end_monthly,
+                    COALESCE(SUM(GREATEST(d.convertedbalance + d.convertedfloatingpnl, 0))
+                        FILTER (WHERE d.date = CURRENT_DATE), 0)                                   AS end_daily,
+                    COALESCE(SUM(GREATEST(d.convertedbalance + d.convertedfloatingpnl, 0))
+                        FILTER (WHERE d.date = CURRENT_DATE - 1), 0)                               AS start_daily,
+                    COALESCE(SUM(GREATEST(d.convertedbalance + d.convertedfloatingpnl, 0))
+                        FILTER (WHERE d.date = DATE_TRUNC('month', CURRENT_DATE)::date - 1), 0)    AS start_monthly
+                FROM dealio_daily_profit d
+                WHERE d.date IN (
+                    CURRENT_DATE,
+                    CURRENT_DATE - 1,
+                    DATE_TRUNC('month', CURRENT_DATE)::date - 1,
+                    (SELECT dt FROM last_mtd)
+                )
+            """)
+            row = cur.fetchone()
+            end_eq_monthly   = float(row[0] or 0)
+            end_eq_daily     = float(row[1] or 0)
+            start_eq_daily   = float(row[2] or 0)
+            start_eq_monthly = float(row[3] or 0)
+
+            # Q11 — Bonuses / Fees / Adj in period
+            cur.execute("""
+                SELECT
+                    COALESCE(SUM(CASE
+                        WHEN (transaction_type_name NOT IN ('Deposit', 'Withdrawal Cancelled')
+                              AND transactiontype = 'Deposit')
+                          OR transaction_type_name = 'Transfer To Account'
+                        THEN usdamount ELSE 0 END
+                    ) FILTER (WHERE confirmation_time::date = CURRENT_DATE), 0) AS dep_adj_daily,
+
+                    COALESCE(SUM(CASE
+                        WHEN (transaction_type_name NOT IN ('Deposit', 'Withdrawal Cancelled')
+                              AND transactiontype = 'Deposit')
+                          OR transaction_type_name = 'Transfer To Account'
+                        THEN usdamount ELSE 0 END
+                    ), 0) AS dep_adj_monthly,
+
+                    COALESCE(SUM(CASE
+                        WHEN (transaction_type_name NOT IN ('Withdrawal', 'Deposit Cancelled')
+                              AND transactiontype = 'Withdrawal')
+                          OR transaction_type_name = 'Transfer From Account'
+                        THEN usdamount ELSE 0 END
+                    ) FILTER (WHERE confirmation_time::date = CURRENT_DATE), 0) AS wd_adj_daily,
+
+                    COALESCE(SUM(CASE
+                        WHEN (transaction_type_name NOT IN ('Withdrawal', 'Deposit Cancelled')
+                              AND transactiontype = 'Withdrawal')
+                          OR transaction_type_name = 'Transfer From Account'
+                        THEN usdamount ELSE 0 END
+                    ), 0) AS wd_adj_monthly
+
+                FROM transactions
+                WHERE transactionapproval = 'Approved'
+                  AND (deleted = 0 OR deleted IS NULL)
+                  AND confirmation_time::date >= %(month_start)s
+                  AND confirmation_time::date <= %(today)s
+                  AND (
+                    (transaction_type_name NOT IN ('Deposit', 'Withdrawal Cancelled') AND transactiontype = 'Deposit')
+                    OR transaction_type_name = 'Transfer To Account'
+                    OR (transaction_type_name NOT IN ('Withdrawal', 'Deposit Cancelled') AND transactiontype = 'Withdrawal')
+                    OR transaction_type_name = 'Transfer From Account'
+                  )
+            """, {"month_start": month_start_str, "today": today_str})
+            row = cur.fetchone()
+            dep_adj_daily    = float(row[0] or 0)
+            dep_adj_monthly  = float(row[1] or 0)
+            wd_adj_daily     = float(row[2] or 0)
+            wd_adj_monthly   = float(row[3] or 0)
+
+            bonuses_adj_daily   = dep_adj_daily   - wd_adj_daily
+            bonuses_adj_monthly = dep_adj_monthly - wd_adj_monthly
+
         def rr_money(val):
             return round(val / safe_wdp * wd_total, 2)
 
         def rr_int(val):
             return round(val / safe_wdp * wd_total)
+
+        pnl_daily   = round(end_eq_daily   - start_eq_daily   - nd_daily   - bonuses_adj_daily,   2)
+        pnl_monthly = round(end_eq_monthly - start_eq_monthly - nd_monthly - bonuses_adj_monthly, 2)
 
         return JSONResponse(content={
             "date":                 today_str,
@@ -302,6 +388,7 @@ async def dashboard_api(request: Request):
             "open_volume": {"daily": round(ov_daily, 2), "monthly": round(ov_monthly, 2), "rr": rr_money(ov_monthly)},
             "end_equity_zeroed": round(end_equity_zeroed, 2),
             "abs_exposure":      round(abs_exposure, 2),
+            "pnl_cash": {"daily": pnl_daily, "monthly": pnl_monthly},
         })
     except Exception as e:
         return JSONResponse(status_code=500, content={"detail": str(e)})
