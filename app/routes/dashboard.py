@@ -313,56 +313,38 @@ async def dashboard_api(request: Request):
             start_eq_monthly = float(row[3] or 0)
 
             # Q11 — Bonuses / Fees / Adj in period
+            # Non-standard types: Bonus/FRF Commission go IN, their cancellations + Transfer From go OUT
             cur.execute("""
                 SELECT
                     COALESCE(SUM(CASE
-                        WHEN (transaction_type_name NOT IN ('Deposit', 'Withdrawal Cancelled')
-                              AND transactiontype = 'Deposit')
-                          OR transaction_type_name = 'Transfer To Account'
-                        THEN usdamount ELSE 0 END
-                    ) FILTER (WHERE confirmation_time::date = CURRENT_DATE), 0) AS dep_adj_daily,
+                        WHEN transactiontype IN ('Bonus', 'FRF Commission', 'Transfer To Account')
+                            THEN  usdamount
+                        WHEN transactiontype IN ('BonusCancelled', 'FRF Commission Cancelled', 'Transfer From Account')
+                            THEN -usdamount
+                        ELSE 0 END
+                    ) FILTER (WHERE confirmation_time::date = CURRENT_DATE), 0) AS bonuses_adj_daily,
 
                     COALESCE(SUM(CASE
-                        WHEN (transaction_type_name NOT IN ('Deposit', 'Withdrawal Cancelled')
-                              AND transactiontype = 'Deposit')
-                          OR transaction_type_name = 'Transfer To Account'
-                        THEN usdamount ELSE 0 END
-                    ), 0) AS dep_adj_monthly,
-
-                    COALESCE(SUM(CASE
-                        WHEN (transaction_type_name NOT IN ('Withdrawal', 'Deposit Cancelled')
-                              AND transactiontype = 'Withdrawal')
-                          OR transaction_type_name = 'Transfer From Account'
-                        THEN usdamount ELSE 0 END
-                    ) FILTER (WHERE confirmation_time::date = CURRENT_DATE), 0) AS wd_adj_daily,
-
-                    COALESCE(SUM(CASE
-                        WHEN (transaction_type_name NOT IN ('Withdrawal', 'Deposit Cancelled')
-                              AND transactiontype = 'Withdrawal')
-                          OR transaction_type_name = 'Transfer From Account'
-                        THEN usdamount ELSE 0 END
-                    ), 0) AS wd_adj_monthly
+                        WHEN transactiontype IN ('Bonus', 'FRF Commission', 'Transfer To Account')
+                            THEN  usdamount
+                        WHEN transactiontype IN ('BonusCancelled', 'FRF Commission Cancelled', 'Transfer From Account')
+                            THEN -usdamount
+                        ELSE 0 END
+                    ), 0) AS bonuses_adj_monthly
 
                 FROM transactions
                 WHERE transactionapproval = 'Approved'
                   AND (deleted = 0 OR deleted IS NULL)
                   AND confirmation_time::date >= %(month_start)s
                   AND confirmation_time::date <= %(today)s
-                  AND (
-                    (transaction_type_name NOT IN ('Deposit', 'Withdrawal Cancelled') AND transactiontype = 'Deposit')
-                    OR transaction_type_name = 'Transfer To Account'
-                    OR (transaction_type_name NOT IN ('Withdrawal', 'Deposit Cancelled') AND transactiontype = 'Withdrawal')
-                    OR transaction_type_name = 'Transfer From Account'
+                  AND transactiontype IN (
+                    'Bonus', 'FRF Commission', 'Transfer To Account',
+                    'BonusCancelled', 'FRF Commission Cancelled', 'Transfer From Account'
                   )
             """, {"month_start": month_start_str, "today": today_str})
             row = cur.fetchone()
-            dep_adj_daily    = float(row[0] or 0)
-            dep_adj_monthly  = float(row[1] or 0)
-            wd_adj_daily     = float(row[2] or 0)
-            wd_adj_monthly   = float(row[3] or 0)
-
-            bonuses_adj_daily   = dep_adj_daily   - wd_adj_daily
-            bonuses_adj_monthly = dep_adj_monthly - wd_adj_monthly
+            bonuses_adj_daily   = float(row[0] or 0)
+            bonuses_adj_monthly = float(row[1] or 0)
 
         def rr_money(val):
             return round(val / safe_wdp * wd_total, 2)
