@@ -174,7 +174,7 @@ async def dashboard_api(request: Request):
             # Q5 — FTC #
             cur.execute("""
                 SELECT
-                  COUNT(DISTINCT t.vtigeraccountid) FILTER (WHERE a.client_qualification_date = CURRENT_DATE) AS daily,
+                  COUNT(DISTINCT t.vtigeraccountid) FILTER (WHERE a.client_qualification_date::date = CURRENT_DATE) AS daily,
                   COUNT(DISTINCT t.vtigeraccountid) AS monthly
                 FROM transactions t
                 JOIN accounts a ON a.accountid = t.vtigeraccountid
