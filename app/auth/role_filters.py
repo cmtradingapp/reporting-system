@@ -1,5 +1,6 @@
 ROLE_MAP = {
     'retention_all':      ("u.department_ = %s",                                         ['Retention']),
+    'sales_all':          ("u.department_ = %s",                                         ['Sales']),
     'retention_gmt':      ("u.department_ = %s AND u.office = %s",                       ['Retention', 'GMT']),
     'retention_abj_ng':   ("u.department_ = %s AND u.office = %s",                       ['Retention', 'ABJ-NG']),
     'retention_lag_ng':   ("u.department_ = %s AND u.office = %s",                       ['Retention', 'LAG-NG']),
