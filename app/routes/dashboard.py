@@ -398,7 +398,20 @@ async def dashboard_api(request: Request):
             "open_volume": {"daily": round(ov_daily, 2), "monthly": round(ov_monthly, 2), "rr": rr_money(ov_monthly)},
             "end_equity_zeroed": round(end_equity_zeroed, 2),
             "abs_exposure":      round(abs_exposure, 2),
-            "pnl_cash": {"daily": pnl_daily, "monthly": pnl_monthly},
+            "pnl_cash": {
+                "daily": pnl_daily,
+                "monthly": pnl_monthly,
+                "pnl_date": last_mtd_str,
+                "_debug": {
+                    "end_eq":            round(end_eq, 2),
+                    "start_eq_daily":    round(start_eq_daily, 2),
+                    "start_eq_monthly":  round(start_eq_monthly, 2),
+                    "pnl_nd_daily":      round(pnl_nd_daily, 2),
+                    "pnl_nd_monthly":    round(pnl_nd_monthly, 2),
+                    "pnl_bonuses_daily": round(pnl_bonuses_daily, 2),
+                    "pnl_bonuses_monthly": round(pnl_bonuses_monthly, 2),
+                },
+            },
         })
     except Exception as e:
         return JSONResponse(status_code=500, content={"detail": str(e)})

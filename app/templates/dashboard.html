@@ -323,6 +323,7 @@
             <div><span class="variant-badge daily-badge">Daily</span></div>
             <div class="kpi-value" id="pnl-daily">—</div>
             <div class="kpi-label">PnL Cash</div>
+            <div style="font-size:0.65rem;color:#484f58;margin-top:3px;" id="pnl-date-label">—</div>
           </div>
         </div>
         <div class="col-12 col-sm-6">
@@ -330,6 +331,7 @@
             <div><span class="variant-badge monthly-badge">Monthly</span></div>
             <div class="kpi-value" id="pnl-monthly">—</div>
             <div class="kpi-label">PnL Cash</div>
+            <div style="font-size:0.65rem;color:#484f58;margin-top:3px;" id="pnl-month-label">—</div>
           </div>
         </div>
       </div>
@@ -434,6 +436,7 @@
       document.getElementById('ov-rr').textContent      = fmtMoney(data.open_volume.rr);
 
       // PnL Cash
+      console.table(data.pnl_cash._debug);
       const pnlColor = v => v >= 0 ? '#3fb950' : '#f85149';
       const pnlD = document.getElementById('pnl-daily');
       const pnlM = document.getElementById('pnl-monthly');
@@ -441,6 +444,9 @@
       pnlD.style.color = pnlColor(data.pnl_cash.daily);
       pnlM.textContent = fmtMoney(data.pnl_cash.monthly);
       pnlM.style.color = pnlColor(data.pnl_cash.monthly);
+      const pnlDate = data.pnl_cash.pnl_date;
+      document.getElementById('pnl-date-label').textContent = 'As of ' + pnlDate;
+      document.getElementById('pnl-month-label').textContent = data.month_start + ' → ' + pnlDate;
 
       // Snapshots
       document.getElementById('eez-val').textContent = fmtMoney(data.end_equity_zeroed);
