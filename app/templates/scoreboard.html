@@ -227,6 +227,8 @@
       .kpi-card { padding:8px 10px; }
       .kpi-value { font-size:1.1rem; }
       .date-input { width:120px; }
+      .cnt-badge { display:none; }
+      #row-count, #ret-row-count { display:none; }
     }
   </style>
 </head>
@@ -779,7 +781,7 @@
           <span class="chevron">&#9654;</span>
           <i class="bi bi-building me-2" style="color:#484f58;font-size:0.75rem;"></i>
           <strong>${escHtml(office.name)}</strong>
-          <span class="text-muted ms-2" style="font-size:0.72rem;font-weight:400;">${office.agents.length} agents</span>
+          <span class="text-muted cnt-badge ms-2" style="font-size:0.72rem;font-weight:400;">${office.agents.length} agents</span>
         </td>
         <td class="text-center"><span class="office-total" style="color:#388bfd;">${office.targetTotal.toLocaleString()}</span></td>
         <td class="text-center">${pctHtml(office.ftcRrPctTotal, true)}</td>
@@ -1258,7 +1260,7 @@
           <span class="chevron">&#9654;</span>
           <i class="bi bi-building me-2" style="color:#484f58;font-size:0.75rem;"></i>
           <strong>${escHtml(office.officeName)}</strong>
-          <span class="text-muted ms-2" style="font-size:0.72rem;font-weight:400;">${office.agentCount} agents</span>
+          <span class="text-muted cnt-badge ms-2" style="font-size:0.72rem;font-weight:400;">${office.agentCount} agents</span>
         </td>
         <td class="text-center"><span class="office-total" style="color:#388bfd;">${netHtml(office.tgtNet, true)}</span></td>
         <td class="text-center">${retPctHtml(office.netRrPct, true)}</td>
@@ -1321,7 +1323,7 @@
             <span class="chevron">&#9654;</span>
             <i class="bi bi-diagram-3 me-2" style="color:#484f58;font-size:0.72rem;"></i>
             ${escHtml(dept.deptName)}
-            <span class="text-muted ms-2" style="font-size:0.68rem;font-weight:400;">${dept.agents.length} agents</span>
+            <span class="text-muted cnt-badge ms-2" style="font-size:0.68rem;font-weight:400;">${dept.agents.length} agents</span>
           </td>
           <td class="text-center">${netHtml(dept.tgtNet)}</td>
           <td class="text-center">${retPctHtml(dept.netRrPct)}</td>
