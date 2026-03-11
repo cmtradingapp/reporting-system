@@ -65,41 +65,16 @@ async def dashboard_api(request: Request):
             wd_left = wd_total - wd_passed
             safe_wdp = wd_passed if wd_passed > 0 else 1
 
-            # Get PnL reference dates — find nearest date with actual non-zero equity
+            # Get last_mtd date (for display on PnL cards)
             cur.execute("""
-                WITH current_last AS (
-                    SELECT MAX(date) AS dt
-                    FROM dealio_daily_profit
-                    WHERE EXTRACT(YEAR  FROM date) = EXTRACT(YEAR  FROM CURRENT_DATE)
-                      AND EXTRACT(MONTH FROM date) = EXTRACT(MONTH FROM CURRENT_DATE)
-                )
-                SELECT
-                    (SELECT dt FROM current_last) AS last_mtd,
-                    (SELECT date FROM dealio_daily_profit
-                     WHERE date < (SELECT dt FROM current_last)
-                     GROUP BY date
-                     HAVING SUM(GREATEST(COALESCE(convertedbalance,0) + COALESCE(convertedfloatingpnl,0), 0)) > 0
-                     ORDER BY date DESC LIMIT 1)  AS pnl_prev_day,
-                    (SELECT date FROM dealio_daily_profit
-                     WHERE date < DATE_TRUNC('month', CURRENT_DATE)::date
-                     GROUP BY date
-                     HAVING SUM(GREATEST(COALESCE(convertedbalance,0) + COALESCE(convertedfloatingpnl,0), 0)) > 0
-                     ORDER BY date DESC LIMIT 1)  AS pnl_prev_month
+                SELECT MAX(date)::date
+                FROM dealio_daily_profit
+                WHERE EXTRACT(YEAR  FROM date) = EXTRACT(YEAR  FROM CURRENT_DATE)
+                  AND EXTRACT(MONTH FROM date) = EXTRACT(MONTH FROM CURRENT_DATE)
             """)
-            drow = cur.fetchone()
-            last_mtd_date       = drow[0] or (today - timedelta(days=1))
-            pnl_prev_day_date   = drow[1]   # nearest snapshot before last_mtd
-            pnl_prev_month_date = drow[2]   # nearest snapshot before current month
-
+            last_mtd_date = cur.fetchone()[0] or (today - timedelta(days=1))
             last_mtd_str       = last_mtd_date.strftime("%Y-%m-%d")
             last_mtd_plus1_str = (last_mtd_date + timedelta(days=1)).strftime("%Y-%m-%d")
-
-            # Date ranges for PnL net deposits / bonuses
-            # daily:   transactions from (pnl_prev_day+1) through last_mtd
-            # monthly: transactions from month_start through last_mtd
-            pnl_prev_day_str   = pnl_prev_day_date.strftime("%Y-%m-%d")   if pnl_prev_day_date   else None
-            pnl_prev_month_str = pnl_prev_month_date.strftime("%Y-%m-%d") if pnl_prev_month_date else None
-            pnl_nd_daily_from  = (pnl_prev_day_date + timedelta(days=1)).strftime("%Y-%m-%d") if pnl_prev_day_date else last_mtd_str
 
             # Q1 — Net Deposits (grand overall)
             cur.execute("""
@@ -317,100 +292,30 @@ async def dashboard_api(request: Request):
             """)
             abs_exposure = float(cur.fetchone()[0] or 0)
 
-            # Q10 — Equity snapshots for PnL (using dynamically found closest dates)
-            _eq_params = {
-                "last_mtd":       last_mtd_str,
-                "pnl_prev_day":   pnl_prev_day_str   or last_mtd_str,
-                "pnl_prev_month": pnl_prev_month_str or last_mtd_str,
-            }
+            # Q10 — Daily PnL: sum of closed + delta floating from PostgreSQL snapshot
+            # dealio_daily_profit has PRIMARY KEY (login) — one row per account, current day only
+            # closedpnl + deltafloatingpnl = trading PnL for that day, no history needed
             cur.execute("""
-                SELECT
-                    COALESCE(SUM(GREATEST(COALESCE(d.convertedbalance,0) + COALESCE(d.convertedfloatingpnl,0), 0))
-                        FILTER (WHERE d.date = %(last_mtd)s), 0)             AS end_eq,
-                    COALESCE(SUM(GREATEST(COALESCE(d.convertedbalance,0) + COALESCE(d.convertedfloatingpnl,0), 0))
-                        FILTER (WHERE d.date = %(pnl_prev_day)s), 0)         AS start_eq_daily,
-                    COALESCE(SUM(GREATEST(COALESCE(d.convertedbalance,0) + COALESCE(d.convertedfloatingpnl,0), 0))
-                        FILTER (WHERE d.date = %(pnl_prev_month)s), 0)       AS start_eq_monthly
-                FROM dealio_daily_profit d
-                WHERE d.date IN (%(last_mtd)s, %(pnl_prev_day)s, %(pnl_prev_month)s)
-            """, _eq_params)
-            row = cur.fetchone()
-            end_eq           = float(row[0] or 0)
-            start_eq_daily   = float(row[1] or 0)
-            start_eq_monthly = float(row[2] or 0)
+                SELECT COALESCE(SUM(
+                    COALESCE(convertedclosedpnl, 0) + COALESCE(converteddeltafloatingpnl, 0)
+                ), 0)
+                FROM dealio_daily_profit
+                WHERE date::date = %(last_mtd)s
+            """, {"last_mtd": last_mtd_str})
+            pnl_daily = round(float(cur.fetchone()[0] or 0), 2)
 
-            # Q11 — Net deposits for PnL
-            # daily:   deposits from (pnl_prev_day+1) through last_mtd
-            # monthly: deposits from month_start through last_mtd
-            cur.execute("""
-                SELECT
-                    COALESCE(SUM(CASE
-                        WHEN t.transactiontype IN ('Deposit', 'Withdrawal Cancelled') THEN  t.usdamount
-                        WHEN t.transactiontype IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
-                    END) FILTER (WHERE t.confirmation_time::date >= %(pnl_nd_daily_from)s
-                                   AND t.confirmation_time::date <= %(last_mtd)s), 0) AS pnl_nd_daily,
-                    COALESCE(SUM(CASE
-                        WHEN t.transactiontype IN ('Deposit', 'Withdrawal Cancelled') THEN  t.usdamount
-                        WHEN t.transactiontype IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
-                    END), 0)                                                           AS pnl_nd_monthly
-                FROM transactions t
-                JOIN crm_users u ON u.id = t.original_deposit_owner
-                WHERE t.transactionapproval = 'Approved'
-                  AND (t.deleted = 0 OR t.deleted IS NULL)
-                  AND t.transactiontype IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
-                  AND t.confirmation_time >= %(month_start)s
-                  AND t.confirmation_time <  %(last_mtd_plus1)s
-                  AND EXTRACT(YEAR FROM t.confirmation_time) >= 2024
-                  AND t.vtigeraccountid IS NOT NULL
-                  AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
-            """, {"month_start": month_start_str, "last_mtd": last_mtd_str,
-                  "last_mtd_plus1": last_mtd_plus1_str, "pnl_nd_daily_from": pnl_nd_daily_from})
-            row = cur.fetchone()
-            pnl_nd_daily   = float(row[0] or 0)
-            pnl_nd_monthly = float(row[1] or 0)
-
-            # Q12 — Bonuses / Fees / Adj for PnL
-            # daily:   bonuses from (pnl_prev_day+1) through last_mtd
-            # monthly: bonuses from month_start through last_mtd
-            cur.execute("""
-                SELECT
-                    COALESCE(SUM(CASE
-                        WHEN transactiontype IN ('Bonus', 'FRF Commission', 'Transfer To Account')
-                            THEN  usdamount
-                        WHEN transactiontype IN ('BonusCancelled', 'FRF Commission Cancelled', 'Transfer From Account')
-                            THEN -usdamount
-                        ELSE 0 END
-                    ) FILTER (WHERE confirmation_time::date >= %(pnl_nd_daily_from)s
-                               AND confirmation_time::date <= %(last_mtd)s), 0) AS pnl_bonuses_daily,
-                    COALESCE(SUM(CASE
-                        WHEN transactiontype IN ('Bonus', 'FRF Commission', 'Transfer To Account')
-                            THEN  usdamount
-                        WHEN transactiontype IN ('BonusCancelled', 'FRF Commission Cancelled', 'Transfer From Account')
-                            THEN -usdamount
-                        ELSE 0 END
-                    ), 0)                                                        AS pnl_bonuses_monthly
-                FROM transactions
-                WHERE transactionapproval = 'Approved'
-                  AND (deleted = 0 OR deleted IS NULL)
-                  AND confirmation_time::date >= %(month_start)s
-                  AND confirmation_time::date <= %(last_mtd)s
-                  AND transactiontype IN (
-                    'Bonus', 'FRF Commission', 'Transfer To Account',
-                    'BonusCancelled', 'FRF Commission Cancelled', 'Transfer From Account'
-                  )
-            """, {"month_start": month_start_str, "last_mtd": last_mtd_str, "pnl_nd_daily_from": pnl_nd_daily_from})
-            row = cur.fetchone()
-            pnl_bonuses_daily   = float(row[0] or 0)
-            pnl_bonuses_monthly = float(row[1] or 0)
+        # Monthly PnL from MSSQL (history table) — sum of daily closedpnl + deltafloatingpnl
+        from app.db.mssql_conn import get_pnl_cash_monthly
+        try:
+            pnl_monthly = round(get_pnl_cash_monthly(month_start_str, tomorrow_str), 2)
+        except Exception:
+            pnl_monthly = None
 
         def rr_money(val):
             return round(val / safe_wdp * wd_total, 2)
 
         def rr_int(val):
             return round(val / safe_wdp * wd_total)
-
-        pnl_daily   = round(end_eq - start_eq_daily   - pnl_nd_daily   - pnl_bonuses_daily,   2)
-        pnl_monthly = round(end_eq - start_eq_monthly - pnl_nd_monthly - pnl_bonuses_monthly, 2)
 
         return JSONResponse(content={
             "date":                 today_str,
@@ -428,21 +333,9 @@ async def dashboard_api(request: Request):
             "end_equity_zeroed": round(end_equity_zeroed, 2),
             "abs_exposure":      round(abs_exposure, 2),
             "pnl_cash": {
-                "daily": pnl_daily,
-                "monthly": pnl_monthly,
+                "daily":    pnl_daily,
+                "monthly":  pnl_monthly,
                 "pnl_date": last_mtd_str,
-                "_debug": {
-                    "end_eq_date":        last_mtd_str,
-                    "start_daily_date":   pnl_prev_day_str,
-                    "start_monthly_date": pnl_prev_month_str,
-                    "end_eq":             round(end_eq, 2),
-                    "start_eq_daily":     round(start_eq_daily, 2),
-                    "start_eq_monthly":   round(start_eq_monthly, 2),
-                    "pnl_nd_daily":       round(pnl_nd_daily, 2),
-                    "pnl_nd_monthly":     round(pnl_nd_monthly, 2),
-                    "pnl_bonuses_daily":  round(pnl_bonuses_daily, 2),
-                    "pnl_bonuses_monthly": round(pnl_bonuses_monthly, 2),
-                },
             },
         })
     except Exception as e:

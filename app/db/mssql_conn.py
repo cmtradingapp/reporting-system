@@ -166,6 +166,22 @@ def get_dealio_daily_profit_full():
         yield df
 
 
+def get_pnl_cash_monthly(month_start: str, month_end_exclusive: str) -> float:
+    """Sum convertedclosedpnl + converteddeltafloatingpnl from MSSQL for the given date range."""
+    conn = _get_mssql_connection()
+    try:
+        query = f"""
+            SELECT COALESCE(SUM(COALESCE(convertedclosedpnl, 0) + COALESCE(converteddeltafloatingpnl, 0)), 0)
+            FROM report.dealio_daily_profit
+            WHERE CAST(date AS DATE) >= '{month_start}'
+              AND CAST(date AS DATE) < '{month_end_exclusive}'
+        """
+        df = pd.read_sql(query, conn)
+        return float(df.iloc[0, 0] or 0)
+    finally:
+        conn.close()
+
+
 def get_dealio_mt4trades_full():
     """
     Generator using keyset pagination on ticket (clustered PK).

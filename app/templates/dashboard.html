@@ -436,7 +436,6 @@
       document.getElementById('ov-rr').textContent      = fmtMoney(data.open_volume.rr);
 
       // PnL Cash
-      console.table(data.pnl_cash._debug);
       const pnlColor = v => v >= 0 ? '#3fb950' : '#f85149';
       const pnlD = document.getElementById('pnl-daily');
       const pnlM = document.getElementById('pnl-monthly');
