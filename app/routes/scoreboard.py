@@ -46,7 +46,15 @@ async def scoreboard_page(request: Request):
     user = await get_current_user(request)
     if isinstance(user, RedirectResponse):
         return user
-    return templates.TemplateResponse("scoreboard.html", {"request": request, "current_user": user})
+    role = user.get("role", "")
+    show_sales = not role.startswith("retention_")
+    show_retention = not role.startswith("sales_")
+    return templates.TemplateResponse("scoreboard.html", {
+        "request": request,
+        "current_user": user,
+        "show_sales": show_sales,
+        "show_retention": show_retention,
+    })
 
 
 @router.get("/api/performance")

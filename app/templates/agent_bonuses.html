@@ -336,20 +336,25 @@
         <div class="kpi-label">Days Left</div>
       </div>
     </div>
+    {% if show_sales %}
     <div class="col-6 col-md-2">
       <div class="kpi-card text-center">
         <div class="kpi-value" style="color:#388bfd;" id="stat-sales-bonus">—</div>
         <div class="kpi-label">Sales Bonus $</div>
       </div>
     </div>
+    {% endif %}
+    {% if show_retention %}
     <div class="col-6 col-md-2">
       <div class="kpi-card text-center">
         <div class="kpi-value" style="color:#3fb950;" id="stat-ret-bonus">—</div>
         <div class="kpi-label">Retention Bonus $</div>
       </div>
     </div>
+    {% endif %}
   </div>
 
+  {% if show_sales %}
   <!-- Sales Agent Bonuses Table -->
   <div class="mb-4">
     <div class="card p-0" style="overflow:hidden;">
@@ -392,7 +397,9 @@
       </div>
     </div>
   </div>
+  {% endif %}
 
+  {% if show_retention %}
   <!-- Retention Agent Bonuses Table -->
   <div>
     <div class="card p-0" style="overflow:hidden;">
@@ -437,6 +444,7 @@
       </div>
     </div>
   </div>
+  {% endif %}
 
   <!-- ── Bonus Calculation Documentation ─────────────────────────────── -->
   <div class="mt-5">
@@ -444,6 +452,7 @@
       Bonus Calculation Reference
     </div>
 
+    {% if show_sales %}
     <!-- Sales Documentation -->
     <div class="card mb-3">
       <div class="px-4 py-3 d-flex justify-content-between align-items-center"
@@ -548,7 +557,9 @@
         </div>
       </div>
     </div><!-- /sales doc card -->
+    {% endif %}
 
+    {% if show_retention %}
     <!-- Retention Documentation -->
     <div class="card mb-3">
       <div class="px-4 py-3 d-flex justify-content-between align-items-center"
@@ -674,6 +685,7 @@
         </div>
       </div>
     </div><!-- /retention doc card -->
+    {% endif %}
 
   </div><!-- /documentation section -->
 
@@ -681,6 +693,9 @@
 </div>
 
 <script>
+  const SHOW_SALES      = {{ 'true' if show_sales else 'false' }};
+  const SHOW_RETENTION  = {{ 'true' if show_retention else 'false' }};
+
   // ── State ──────────────────────────────────────────────────────────────
   const now = new Date();
   let state = {
@@ -958,7 +973,10 @@
 
   // ── Load all data ──────────────────────────────────────────────────────
   async function loadAllData() {
-    await Promise.all([loadSalesData(), loadBonusData()]);
+    const tasks = [];
+    if (SHOW_SALES)     tasks.push(loadSalesData());
+    if (SHOW_RETENTION) tasks.push(loadBonusData());
+    await Promise.all(tasks);
   }
 
   // ── Render Sales table ─────────────────────────────────────────────────

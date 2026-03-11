@@ -418,6 +418,7 @@
     </div>
   </div>
 
+  {% if show_sales %}
   <!-- Sales Table -->
   <div>
       <div class="card p-0" style="overflow:hidden;">
@@ -465,7 +466,9 @@
         </div>
       </div>
     </div>
+  {% endif %}
 
+  {% if show_retention %}
   <!-- Retention Table (below Sales) -->
   <div class="mt-3">
       <div class="card p-0" style="overflow:hidden;">
@@ -512,12 +515,16 @@
         </div>
       </div>
     </div>
+  {% endif %}
 
 
 </div>
 </div>
 
 <script>
+  const SHOW_SALES      = {{ 'true' if show_sales else 'false' }};
+  const SHOW_RETENTION  = {{ 'true' if show_retention else 'false' }};
+
   // ── State ──────────────────────────────────────────────────────────────
   const now = new Date();
   let state = {
@@ -645,8 +652,8 @@
 
   // ── Combined load ──────────────────────────────────────────────────────
   function loadAll() {
-    loadData();
-    loadRetentionData();
+    if (SHOW_SALES)     loadData();
+    if (SHOW_RETENTION) loadRetentionData();
   }
 
   // ── API fetch + render (Sales) ─────────────────────────────────────────
