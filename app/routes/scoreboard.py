@@ -47,8 +47,13 @@ async def scoreboard_page(request: Request):
     if isinstance(user, RedirectResponse):
         return user
     role = user.get("role", "")
-    show_sales = not role.startswith("retention_")
-    show_retention = not role.startswith("sales_")
+    if role == "agent":
+        dept = user.get("department_") or ""
+        show_sales = dept != "Retention"
+        show_retention = dept != "Sales"
+    else:
+        show_sales = not role.startswith("retention_")
+        show_retention = not role.startswith("sales_")
     return templates.TemplateResponse("scoreboard.html", {
         "request": request,
         "current_user": user,

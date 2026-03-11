@@ -649,7 +649,13 @@ def get_auth_user_by_email(email: str) -> dict | None:
 
 
 def get_auth_user_by_id(user_id: int) -> dict | None:
-    sql = "SELECT id, crm_user_id, email, full_name, password_hash, role, is_active, force_password_change FROM auth_users WHERE id = %s"
+    sql = """
+        SELECT a.id, a.crm_user_id, a.email, a.full_name, a.password_hash, a.role,
+               a.is_active, a.force_password_change, c.department_
+        FROM auth_users a
+        LEFT JOIN crm_users c ON c.id = a.crm_user_id
+        WHERE a.id = %s
+    """
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -661,6 +667,7 @@ def get_auth_user_by_id(user_id: int) -> dict | None:
                 'id': row[0], 'crm_user_id': row[1], 'email': row[2],
                 'full_name': row[3], 'password_hash': row[4], 'role': row[5],
                 'is_active': row[6], 'force_password_change': row[7],
+                'department_': row[8],
             }
     finally:
         conn.close()
