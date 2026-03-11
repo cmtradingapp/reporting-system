@@ -17,6 +17,7 @@ from app.routes.dealio_daily_profit_sync import router as dealio_daily_profit_sy
 from app.routes.holidays import router as holidays_router
 from app.routes.auth import router as auth_router
 from app.routes.users_mgmt import router as users_mgmt_router
+from app.routes.dashboard import router as dashboard_router
 from app.db.postgres_conn import ensure_table, ensure_auth_table, seed_admin_user
 from app.auth.auth import hash_password
 from app.etl.fetch_and_store import run_accounts_etl, run_users_etl, run_transactions_etl, run_targets_etl, run_dealio_mt4trades_etl, run_trading_accounts_etl, run_ftd100_etl, run_dealio_daily_profit_etl
@@ -145,3 +146,4 @@ app.include_router(dealio_daily_profit_sync_router)
 app.include_router(holidays_router)
 app.include_router(auth_router)
 app.include_router(users_mgmt_router)
+app.include_router(dashboard_router)
