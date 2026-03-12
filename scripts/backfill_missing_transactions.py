@@ -12,6 +12,7 @@ import pymssql
 import psycopg2
 from psycopg2.extras import execute_values
 import time
+import sys
 
 MSSQL = dict(server='cmtmainserver.database.windows.net', port='1433',
              user='clawreadonly', password='1231!#ASDF!a', database='cmt_main',
@@ -132,6 +133,6 @@ while True:
         total_inserted += len(missing)
 
     elapsed = int(time.time() - start)
-    print(f"  Processed up to id={last_id:,} | inserted={total_inserted:,} | {elapsed}s elapsed")
+    print(f"  Processed up to id={last_id:,} | inserted={total_inserted:,} | {elapsed}s elapsed", flush=True)
 
 print(f"\nDone. Total inserted: {total_inserted:,}")
