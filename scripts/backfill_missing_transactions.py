@@ -106,7 +106,23 @@ while True:
 
     if missing:
         SMALLINT_COLS = {'ftd', 'is_frd', 'deleted', 'server_id', 'manualorauto',
-                         'original_owner_department', 'need_revise'}
+                         'original_owner_department', 'need_revise', 'fee_included'}
+        VARCHAR_LIMITS = {
+            'transaction_no': 100, 'paymenttype': 100, 'transactionapproval': 100,
+            'transactiontype': 100, 'login': 100, 'platform': 100, 'cardtype': 100,
+            'cvv2pin': 100, 'expmon': 20, 'expyear': 20, 'server': 100,
+            'expiration': 100, 'actionok': 100, 'cleared_by': 100,
+            'transaction_source': 100, 'currency_id': 20, 'bank_country_id': 20,
+            'bank_state': 100, 'bank_city': 100, 'swift': 100,
+            'chb_type': 100, 'chb_status': 100, 'cellexpert': 100,
+            'client_source': 100, 'iban': 100, 'deposifromip': 50,
+            'creditcardlast': 50, 'ticket': 100, 'payment_method_id': 100,
+            'expiration_card': 20, 'granted_by': 100, 'compliance_status': 100,
+            'ftd_owner': 100, 'finance_status': 100, 'session_id': 100,
+            'gateway_name': 100, 'payment_subtype': 100, 'legacy_mtt': 100,
+            'fee_type': 100, 'transaction_promo': 100, 'assisted_by': 100,
+            'deposit_ip': 50,
+        }
 
         def _val(r, c):
             v = r.get(c)
@@ -123,6 +139,8 @@ while True:
                     return int(v)
                 except (TypeError, ValueError):
                     return None
+            if c in VARCHAR_LIMITS and isinstance(v, str):
+                return v[:VARCHAR_LIMITS[c]]
             return v
         rows = [tuple(_val(r, c) for c in INSERT_COLS) for r in missing]
         pg = psycopg2.connect(**PG)
