@@ -167,7 +167,7 @@
         </select>
       </div>
       <div class="ms-2">
-        <label class="filter-label">Groups</label>
+        <label class="filter-label">FTC Groups</label>
         <div class="d-flex gap-3 flex-wrap" style="padding-top:2px;">
           <label class="group-cb-wrap"><input type="checkbox" class="group-cb" value="0 - 7 days" checked onchange="renderWithFilters()"> 0–7</label>
           <label class="group-cb-wrap"><input type="checkbox" class="group-cb" value="8 - 14 days" checked onchange="renderWithFilters()"> 8–14</label>
@@ -175,7 +175,7 @@
           <label class="group-cb-wrap"><input type="checkbox" class="group-cb" value="31 - 60 days" checked onchange="renderWithFilters()"> 31–60</label>
           <label class="group-cb-wrap"><input type="checkbox" class="group-cb" value="61 - 90 days" checked onchange="renderWithFilters()"> 61–90</label>
           <label class="group-cb-wrap"><input type="checkbox" class="group-cb" value="91 - 120 days" checked onchange="renderWithFilters()"> 91–120</label>
-          <label class="group-cb-wrap"><input type="checkbox" class="group-cb" value="120+ days" checked onchange="renderWithFilters()"> 120+</label>
+          <label class="group-cb-wrap"><input type="checkbox" class="group-cb" value="120+ days" onchange="renderWithFilters()"> 120+</label>
         </div>
       </div>
     </div>
@@ -185,7 +185,6 @@
   <div class="row g-4">
     <!-- Main table -->
     <div class="col-12 col-xl-9">
-      <div class="section-title">Days from FTC</div>
       <div class="card">
         <div class="card-body p-0">
           <div class="table-responsive">
