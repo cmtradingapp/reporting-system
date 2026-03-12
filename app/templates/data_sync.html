@@ -107,10 +107,11 @@
 <div class="container-fluid px-4 py-4">
 
   <!-- Header -->
-  <div class="mb-4">
+  <div class="mb-1 d-none d-md-block">
     <h4 class="fw-bold text-white mb-0">Data Sync</h4>
     <p class="text-muted small mb-0">Monitor synced tables, sync status, and incremental sync details</p>
   </div>
+  <div id="sync-bar" style="font-size:0.73rem;color:#8b949e;margin-bottom:14px;"><i class="bi bi-arrow-repeat me-1"></i>Last sync: <span id="sync-bar-val">—</span></div>
 
   <!-- Table Sections -->
   {% for t in tables %}
@@ -301,6 +302,27 @@
     if (!toggle) return;
     toggle.addEventListener('click', function(){ sb.classList.toggle('open'); overlay.classList.toggle('show'); });
     overlay.addEventListener('click', function(){ sb.classList.remove('open'); overlay.classList.remove('show'); });
+  })();
+
+  // ── Last sync bar ──────────────────────────────────────────────────────
+  (async function() {
+    function fmtRelTime(iso) {
+      if (!iso) return '—';
+      const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+      if (diff < 1) return 'just now';
+      if (diff < 60) return diff + ' min ago';
+      const h = Math.floor(diff / 60), m = diff % 60;
+      return h + 'h ' + (m > 0 ? m + 'm ' : '') + 'ago';
+    }
+    try {
+      const res = await fetch('/api/last-sync');
+      if (!res.ok) return;
+      const d = await res.json();
+      let latest = null;
+      Object.values(d).forEach(iso => { if (iso) { const ts = new Date(iso); if (!latest || ts > latest) latest = ts; } });
+      const el = document.getElementById('sync-bar-val');
+      if (el) el.textContent = latest ? fmtRelTime(latest.toISOString()) : '—';
+    } catch(e) {}
   })();
 </script>
 </div><!-- /main-content -->

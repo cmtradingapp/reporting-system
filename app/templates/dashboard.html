@@ -106,6 +106,7 @@
     <div>
       <h4 class="fw-bold text-white mb-0">Dashboard</h4>
       <p class="text-muted small mb-0">Refreshed: <span id="last-updated">—</span></p>
+      <p class="mb-0" style="font-size:0.73rem;color:#8b949e;"><i class="bi bi-arrow-repeat me-1"></i>Last sync: <span id="sync-bar-val">—</span></p>
     </div>
     <button class="btn-refresh" id="btn-refresh">&#8635; Refresh</button>
   </div>
@@ -480,7 +481,33 @@
   toggle.addEventListener('click',  () => { sidebar.classList.toggle('open'); overlay.classList.toggle('show'); });
   overlay.addEventListener('click', () => { sidebar.classList.remove('open'); overlay.classList.remove('show'); });
 
+  // ── Last sync bar ──────────────────────────────────────────────────────
+  function fmtRelTime(iso) {
+    if (!iso) return '—';
+    const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+    if (diff < 1) return 'just now';
+    if (diff < 60) return diff + ' min ago';
+    const h = Math.floor(diff / 60), m = diff % 60;
+    return h + 'h ' + (m > 0 ? m + 'm ' : '') + 'ago';
+  }
+  async function updateSyncBar() {
+    try {
+      const res = await fetch('/api/last-sync');
+      if (!res.ok) return;
+      const d = await res.json();
+      const tables = ['transactions', 'dealio_mt4trades'];
+      let latest = null;
+      tables.forEach(t => { if (d[t]) { const ts = new Date(d[t]); if (!latest || ts > latest) latest = ts; } });
+      const el = document.getElementById('sync-bar-val');
+      if (el) el.textContent = latest ? fmtRelTime(latest.toISOString()) : '—';
+    } catch(e) {}
+  }
+
   fetchData();
+  updateSyncBar();
+  setInterval(function() {
+    if (document.visibilityState === 'visible') { fetchData(); updateSyncBar(); }
+  }, 120000);
 </script>
 </body>
 </html>

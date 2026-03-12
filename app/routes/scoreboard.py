@@ -4,6 +4,7 @@ from fastapi.templating import Jinja2Templates
 from app.auth.dependencies import get_current_user
 from app.auth.role_filters import get_role_filter
 from app.db.postgres_conn import get_connection
+from app import cache
 from datetime import datetime, timedelta, date as date_type
 import calendar
 
@@ -68,6 +69,10 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
+    _ck = f"perf:{user.get('role','')}:{date_from}:{date_to}"
+    _hit = cache.get(_ck)
+    if _hit is not None:
+        return JSONResponse(content=_hit)
     try:
         dt_from = datetime.strptime(date_from, "%Y-%m-%d").date()
         dt_to   = datetime.strptime(date_to,   "%Y-%m-%d").date()
@@ -288,7 +293,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
             }
             for r in rows
         ]
-        return JSONResponse(content={
+        _result = {
             "rows":                 data,
             "total_ftc":            sum(r["ftc"] for r in data),
             "total_target_ftc":     sum(r["target_ftc"] for r in data),
@@ -307,7 +312,9 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
             "working_days_left":    working_days_left,
             "date_from":            date_from,
             "date_to":              date_to,
-        })
+        }
+        cache.set(_ck, _result)
+        return JSONResponse(content=_result)
     except Exception as e:
         return JSONResponse(status_code=500, content={"detail": str(e)})
     finally:
@@ -320,6 +327,10 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
+    _ck = f"perf_ret:{user.get('role','')}:{date_from}:{date_to}"
+    _hit = cache.get(_ck)
+    if _hit is not None:
+        return JSONResponse(content=_hit)
     try:
         dt_from = datetime.strptime(date_from, "%Y-%m-%d").date()
         dt_to   = datetime.strptime(date_to,   "%Y-%m-%d").date()
@@ -425,12 +436,14 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
             }
             for r in rows
         ]
-        return JSONResponse(content={
+        _result = {
             "rows":                data,
             "working_days":        working_days,
             "working_days_passed": working_days_passed,
             "working_days_left":   working_days_left,
-        })
+        }
+        cache.set(_ck, _result)
+        return JSONResponse(content=_result)
     except Exception as e:
         return JSONResponse(status_code=500, content={"detail": str(e)})
     finally:

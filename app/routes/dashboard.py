@@ -3,6 +3,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from app.auth.dependencies import get_current_user
 from app.db.postgres_conn import get_connection
+from app import cache
 from datetime import datetime, timedelta, date as date_type
 import calendar
 
@@ -43,6 +44,10 @@ async def dashboard_api(request: Request):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
     today = datetime.utcnow().date()
+    _ck = f"dashboard:{today.isoformat()}"
+    _hit = cache.get(_ck)
+    if _hit is not None:
+        return JSONResponse(content=_hit)
     month_start = today.replace(day=1)
     month_end = last_day_of_month(today)
     tomorrow = today + timedelta(days=1)
@@ -319,7 +324,7 @@ async def dashboard_api(request: Request):
         def rr_int(val):
             return round(val / safe_wdp * wd_total)
 
-        return JSONResponse(content={
+        _result = {
             "date":                 today_str,
             "month_start":          month_start_str,
             "working_days":         wd_total,
@@ -339,7 +344,9 @@ async def dashboard_api(request: Request):
                 "monthly":  pnl_monthly,
                 "pnl_date": last_mtd_str,
             },
-        })
+        }
+        cache.set(_ck, _result)
+        return JSONResponse(content=_result)
     except Exception as e:
         return JSONResponse(status_code=500, content={"detail": str(e)})
     finally:

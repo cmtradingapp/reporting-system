@@ -18,25 +18,19 @@ from app.routes.holidays import router as holidays_router
 from app.routes.auth import router as auth_router
 from app.routes.users_mgmt import router as users_mgmt_router
 from app.routes.dashboard import router as dashboard_router
+from app.routes.last_sync import router as last_sync_router
 from app.db.postgres_conn import ensure_table, ensure_auth_table, seed_admin_user
 from app.auth.auth import hash_password
 from app.etl.fetch_and_store import run_accounts_etl, run_users_etl, run_transactions_etl, run_targets_etl, run_dealio_mt4trades_etl, run_trading_accounts_etl, run_ftd100_etl, run_dealio_daily_profit_etl
 import os
 from datetime import datetime, timedelta
 
-ACCOUNTS_SYNC_HOURS = int(os.getenv("ACCOUNTS_SYNC_HOURS", "24"))
-ACCOUNTS_SYNC_INTERVAL_HOURS = int(os.getenv("ACCOUNTS_SYNC_INTERVAL_HOURS", "1"))
-USERS_SYNC_HOURS = int(os.getenv("USERS_SYNC_HOURS", "24"))
-USERS_SYNC_INTERVAL_HOURS = int(os.getenv("USERS_SYNC_INTERVAL_HOURS", "1"))
-TRANSACTIONS_SYNC_HOURS = int(os.getenv("TRANSACTIONS_SYNC_HOURS", "24"))
-TRANSACTIONS_SYNC_INTERVAL_HOURS = int(os.getenv("TRANSACTIONS_SYNC_INTERVAL_HOURS", "1"))
-TARGETS_SYNC_INTERVAL_HOURS = int(os.getenv("TARGETS_SYNC_INTERVAL_HOURS", "1"))
-DEALIO_SYNC_HOURS = int(os.getenv("DEALIO_SYNC_HOURS", "24"))
-DEALIO_SYNC_INTERVAL_HOURS = int(os.getenv("DEALIO_SYNC_INTERVAL_HOURS", "1"))
-TRADING_ACCOUNTS_SYNC_HOURS = int(os.getenv("TRADING_ACCOUNTS_SYNC_HOURS", "24"))
-TRADING_ACCOUNTS_SYNC_INTERVAL_HOURS = int(os.getenv("TRADING_ACCOUNTS_SYNC_INTERVAL_HOURS", "1"))
-FTD100_SYNC_INTERVAL_HOURS = int(os.getenv("FTD100_SYNC_INTERVAL_HOURS", "1"))
-DEALIO_DAILY_PROFIT_SYNC_INTERVAL_HOURS = int(os.getenv("DEALIO_DAILY_PROFIT_SYNC_INTERVAL_HOURS", "1"))
+SYNC_INTERVAL_MINUTES          = int(os.getenv("SYNC_INTERVAL_MINUTES", "5"))
+ACCOUNTS_SYNC_HOURS            = int(os.getenv("ACCOUNTS_SYNC_HOURS", "6"))
+USERS_SYNC_HOURS               = int(os.getenv("USERS_SYNC_HOURS", "6"))
+TRANSACTIONS_SYNC_HOURS        = int(os.getenv("TRANSACTIONS_SYNC_HOURS", "6"))
+DEALIO_SYNC_HOURS              = int(os.getenv("DEALIO_SYNC_HOURS", "6"))
+TRADING_ACCOUNTS_SYNC_HOURS    = int(os.getenv("TRADING_ACCOUNTS_SYNC_HOURS", "6"))
 DEALIO_DAILY_PROFIT_SYNC_HOURS = int(os.getenv("DEALIO_DAILY_PROFIT_SYNC_HOURS", "48"))
 
 scheduler = BackgroundScheduler()
@@ -51,71 +45,71 @@ async def lifespan(app: FastAPI):
     scheduler.add_job(
         run_accounts_etl,
         "interval",
-        hours=ACCOUNTS_SYNC_INTERVAL_HOURS,
+        minutes=SYNC_INTERVAL_MINUTES,
         kwargs={"hours": ACCOUNTS_SYNC_HOURS},
         id="accounts_sync",
-        start_date=_base + timedelta(minutes=0),
+        start_date=_base + timedelta(seconds=0),
         replace_existing=True,
     )
     scheduler.add_job(
         run_users_etl,
         "interval",
-        hours=USERS_SYNC_INTERVAL_HOURS,
+        minutes=SYNC_INTERVAL_MINUTES,
         kwargs={"hours": USERS_SYNC_HOURS},
         id="users_sync",
-        start_date=_base + timedelta(minutes=7),
+        start_date=_base + timedelta(seconds=30),
         replace_existing=True,
     )
     scheduler.add_job(
         run_transactions_etl,
         "interval",
-        hours=TRANSACTIONS_SYNC_INTERVAL_HOURS,
+        minutes=SYNC_INTERVAL_MINUTES,
         kwargs={"hours": TRANSACTIONS_SYNC_HOURS},
         id="transactions_sync",
-        start_date=_base + timedelta(minutes=14),
+        start_date=_base + timedelta(seconds=60),
         replace_existing=True,
     )
     scheduler.add_job(
         run_targets_etl,
         "interval",
-        hours=TARGETS_SYNC_INTERVAL_HOURS,
+        minutes=SYNC_INTERVAL_MINUTES,
         id="targets_sync",
-        start_date=_base + timedelta(minutes=21),
+        start_date=_base + timedelta(seconds=90),
         replace_existing=True,
     )
     scheduler.add_job(
         run_trading_accounts_etl,
         "interval",
-        hours=TRADING_ACCOUNTS_SYNC_INTERVAL_HOURS,
+        minutes=SYNC_INTERVAL_MINUTES,
         kwargs={"hours": TRADING_ACCOUNTS_SYNC_HOURS},
         id="trading_accounts_sync",
-        start_date=_base + timedelta(minutes=28),
+        start_date=_base + timedelta(seconds=120),
         replace_existing=True,
     )
     scheduler.add_job(
         run_dealio_mt4trades_etl,
         "interval",
-        hours=DEALIO_SYNC_INTERVAL_HOURS,
+        minutes=SYNC_INTERVAL_MINUTES,
         kwargs={"hours": DEALIO_SYNC_HOURS},
         id="dealio_mt4trades_sync",
-        start_date=_base + timedelta(minutes=35),
+        start_date=_base + timedelta(seconds=150),
         replace_existing=True,
     )
     scheduler.add_job(
         run_ftd100_etl,
         "interval",
-        hours=FTD100_SYNC_INTERVAL_HOURS,
+        minutes=SYNC_INTERVAL_MINUTES,
         id="ftd100_sync",
-        start_date=_base + timedelta(minutes=42),
+        start_date=_base + timedelta(seconds=180),
         replace_existing=True,
     )
     scheduler.add_job(
         run_dealio_daily_profit_etl,
         "interval",
-        hours=DEALIO_DAILY_PROFIT_SYNC_INTERVAL_HOURS,
+        minutes=SYNC_INTERVAL_MINUTES,
         kwargs={"hours": DEALIO_DAILY_PROFIT_SYNC_HOURS},
         id="dealio_daily_profit_sync",
-        start_date=_base + timedelta(minutes=49),
+        start_date=_base + timedelta(seconds=210),
         replace_existing=True,
     )
     scheduler.start()
@@ -147,3 +141,4 @@ app.include_router(holidays_router)
 app.include_router(auth_router)
 app.include_router(users_mgmt_router)
 app.include_router(dashboard_router)
+app.include_router(last_sync_router)

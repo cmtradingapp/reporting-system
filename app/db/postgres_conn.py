@@ -1236,6 +1236,24 @@ def fetch_sync_log(table_name: str, limit: int = 50) -> list:
         conn.close()
 
 
+def get_last_sync_times() -> dict:
+    """Return most recent successful sync timestamp (ISO string) per table."""
+    sql = """
+        SELECT DISTINCT ON (table_name) table_name, ran_at
+        FROM sync_log
+        WHERE status = 'success'
+        ORDER BY table_name, ran_at DESC
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+            rows = cur.fetchall()
+        return {row[0]: row[1].isoformat() if row[1] else None for row in rows}
+    finally:
+        conn.close()
+
+
 def truncate_and_insert_ftd100() -> int:
     """Full refresh: TRUNCATE ftd100_clients then INSERT from CTE computed entirely within PostgreSQL."""
     cte_sql = """

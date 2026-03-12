@@ -3,6 +3,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from app.auth.dependencies import get_current_user
 from app.db.postgres_conn import get_connection
+from app import cache
 from datetime import date
 
 router = APIRouter()
@@ -65,6 +66,10 @@ async def ftc_date_api(
 
     if not end_date:
         end_date = date.today().strftime("%Y-%m-%d")
+    _ck = f"ftc:{end_date}:{agent_id}:{office}:{team}:{groups}"
+    _hit = cache.get(_ck)
+    if _hit is not None:
+        return JSONResponse(content=_hit)
 
     params = {"end_date": end_date}
     agent_clause = office_clause = team_clause = ""
@@ -247,7 +252,9 @@ async def ftc_date_api(
             "traders_pct":    round(total_traders / total_ftc * 100) if total_ftc > 0 else 0,
         }
 
-        return JSONResponse(content={"rows": data, "grand_total": grand, "end_date": end_date})
+        _result = {"rows": data, "grand_total": grand, "end_date": end_date}
+        cache.set(_ck, _result)
+        return JSONResponse(content=_result)
     except Exception as e:
         return JSONResponse(status_code=500, content={"detail": str(e)})
     finally:

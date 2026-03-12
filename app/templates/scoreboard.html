@@ -277,9 +277,10 @@
 <div class="container-fluid px-4 py-4">
 
   <!-- Header -->
-  <div class="mb-4 d-none d-md-block">
+  <div class="mb-1 d-none d-md-block">
     <h4 class="fw-bold text-white mb-0">Performance Report</h4>
   </div>
+  <div id="sync-bar" style="font-size:0.73rem;color:#8b949e;margin-bottom:14px;"><i class="bi bi-arrow-repeat me-1"></i>Last sync: <span id="sync-bar-val">—</span></div>
 
   <!-- Filter Bar -->
   <div class="card mb-4">
@@ -1625,6 +1626,33 @@
     toggle.addEventListener('click', function(){ sb.classList.toggle('open'); overlay.classList.toggle('show'); });
     overlay.addEventListener('click', function(){ sb.classList.remove('open'); overlay.classList.remove('show'); });
   })();
+
+  // ── Last sync bar ──────────────────────────────────────────────────────
+  function fmtRelTime(iso) {
+    if (!iso) return '—';
+    const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+    if (diff < 1) return 'just now';
+    if (diff < 60) return diff + ' min ago';
+    const h = Math.floor(diff / 60), m = diff % 60;
+    return h + 'h ' + (m > 0 ? m + 'm ' : '') + 'ago';
+  }
+  async function updateSyncBar() {
+    try {
+      const res = await fetch('/api/last-sync');
+      if (!res.ok) return;
+      const d = await res.json();
+      const tables = ['transactions', 'ftd100'];
+      let latest = null;
+      tables.forEach(t => { if (d[t]) { const ts = new Date(d[t]); if (!latest || ts > latest) latest = ts; } });
+      const el = document.getElementById('sync-bar-val');
+      if (el) el.textContent = latest ? fmtRelTime(latest.toISOString()) : '—';
+    } catch(e) {}
+  }
+  updateSyncBar();
+  // Auto-refresh every 2 minutes when page is visible
+  setInterval(function() {
+    if (document.visibilityState === 'visible') { loadAll(); updateSyncBar(); }
+  }, 120000);
 </script>
 
 <script src="https://instant.page/5.2.0/instantpage.min.js" type="module"></script>
