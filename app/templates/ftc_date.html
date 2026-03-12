@@ -114,13 +114,18 @@
 <div class="container-fluid px-4 py-4">
 
   <!-- Header -->
-  <div class="mb-4">
+  <div class="mb-4 d-none d-md-block">
     <h4 class="fw-bold text-white mb-0">FTC Date Report</h4>
     <p class="text-muted small mb-0">Client performance grouped by days since qualification</p>
   </div>
 
   <!-- Filter bar -->
-  <div class="filter-card">
+  <div class="filter-card" style="padding:0;">
+    <div id="ftc-filter-toggle" style="cursor:pointer;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;user-select:none;border-radius:10px;">
+      <span style="font-size:0.8rem;color:#8b949e;font-weight:600;"><i class="bi bi-sliders me-2" style="color:#388bfd;"></i>Filters</span>
+      <i class="bi bi-chevron-up" id="ftc-filter-chevron" style="color:#8b949e;font-size:0.8rem;transition:transform 0.2s;"></i>
+    </div>
+    <div id="ftc-filter-body" style="padding:0 16px 16px;">
     <!-- Row 1: Date + Apply -->
     <div class="d-flex align-items-end gap-4 flex-wrap mb-3">
       <div>
@@ -164,6 +169,7 @@
           <label class="group-cb-wrap"><input type="checkbox" class="group-cb" value="120+ days" checked onchange="renderWithFilters()"> 120+d</label>
         </div>
       </div>
+    </div>
     </div>
   </div>
 
@@ -372,6 +378,23 @@
   // Load options then auto-load data on page open
   loadOptions();
   loadData();
+
+  // Filter collapse
+  (function(){
+    const FKEY = 'ftc_filter_open';
+    const fbody = document.getElementById('ftc-filter-body');
+    const fchev = document.getElementById('ftc-filter-chevron');
+    if (localStorage.getItem(FKEY) !== '1') {
+      fbody.style.display = 'none';
+      fchev.style.transform = 'rotate(180deg)';
+    }
+    document.getElementById('ftc-filter-toggle').addEventListener('click', function() {
+      const open = fbody.style.display !== 'none';
+      fbody.style.display = open ? 'none' : '';
+      fchev.style.transform = open ? 'rotate(180deg)' : '';
+      localStorage.setItem(FKEY, open ? '0' : '1');
+    });
+  })();
 
   // Mobile sidebar toggle
   (function(){
