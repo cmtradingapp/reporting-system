@@ -5,6 +5,9 @@ from fastapi.templating import Jinja2Templates
 from app.auth.dependencies import get_current_user
 from app.db.postgres_conn import fetch_accounts_stats, fetch_crm_users_stats, fetch_transactions_stats, fetch_targets_stats, fetch_dealio_mt4trades_stats, fetch_trading_accounts_stats, fetch_ftd100_stats, fetch_sync_log, fetch_dealio_daily_profit_stats
 from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
+
+_TZ = ZoneInfo("Europe/Nicosia")
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -29,7 +32,7 @@ def _is_healthy(sync_log: list, interval_hours: int) -> bool:
     if not sync_log or sync_log[0]["status"] != "success":
         return False
     last_ran = datetime.strptime(sync_log[0]["ran_at"], "%Y-%m-%d %H:%M:%S")
-    threshold = datetime.utcnow() - timedelta(hours=interval_hours + 1)
+    threshold = datetime.now(_TZ) - timedelta(hours=interval_hours + 1)
     return last_ran >= threshold
 
 

@@ -5,7 +5,10 @@ from app.auth.dependencies import get_current_user
 from app.db.postgres_conn import get_connection
 from app import cache
 from datetime import datetime, timedelta, date as date_type
+from zoneinfo import ZoneInfo
 import calendar
+
+_TZ = ZoneInfo("Europe/Nicosia")
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -43,7 +46,7 @@ async def dashboard_api(request: Request):
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
-    today = datetime.utcnow().date()
+    today = datetime.now(_TZ).date()
     _ck = f"dashboard:{today.isoformat()}"
     _hit = cache.get(_ck)
     if _hit is not None:

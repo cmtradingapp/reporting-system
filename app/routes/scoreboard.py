@@ -6,7 +6,10 @@ from app.auth.role_filters import get_role_filter
 from app.db.postgres_conn import get_connection
 from app import cache
 from datetime import datetime, timedelta, date as date_type
+from zoneinfo import ZoneInfo
 import calendar
+
+_TZ = ZoneInfo("Europe/Nicosia")
 
 
 def _apply_role_filter(sql: str, params: dict, role_filter: dict) -> tuple[str, dict]:
@@ -269,7 +272,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
             """, {"date_to": date_to})
             end_equity_zeroed = float(cur.fetchone()[0] or 0)
 
-        today = datetime.utcnow().date()
+        today = datetime.now(_TZ).date()
         month_end           = last_day_of_month(dt_from)
         working_days        = count_working_days(dt_from, month_end, holidays)
         working_days_passed = count_working_days(dt_from, min(dt_to, today), holidays)
@@ -418,7 +421,7 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
             cur.execute(final_sql, final_params)
             rows = cur.fetchall()
 
-        today               = datetime.utcnow().date()
+        today               = datetime.now(_TZ).date()
         month_end           = last_day_of_month(dt_from)
         working_days        = count_working_days(dt_from, month_end, holidays)
         working_days_passed = count_working_days(dt_from, min(dt_to, today), holidays)
