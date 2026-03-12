@@ -106,6 +106,8 @@ while True:
     if missing:
         def _val(r, c):
             v = r.get(c)
+            if v == '' or v == b'':
+                return None
             if c in ('ftd', 'is_frd') and isinstance(v, bool):
                 return int(v)
             return v
