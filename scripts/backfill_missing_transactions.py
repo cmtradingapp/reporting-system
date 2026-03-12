@@ -81,7 +81,7 @@ while True:
             cellexpert, client_source, iban, deposifromip, cardownername,
             server_id, ticket, payment_method_id, confirmation_time,
             payment_processor, withdrawal_reason, deposit_ip, expiration_card,
-            original_owner_department, NULL AS dod, granted_by, destination_wallet,
+            NULL AS original_owner_department, NULL AS dod, granted_by, destination_wallet,
             payment_method, compliance_status, ftd_owner, NULL AS email,
             created_time, modifiedtime, psp_transaction_id, finance_status,
             session_id, gateway_name, payment_subtype, legacy_mtt, fee_type,
@@ -104,6 +104,9 @@ while True:
     missing = [r for r in chunk if int(r['mttransactionsid']) not in existing_ids]
 
     if missing:
+        SMALLINT_COLS = {'ftd', 'is_frd', 'deleted', 'server_id', 'manualorauto',
+                         'original_owner_department', 'need_revise'}
+
         def _val(r, c):
             v = r.get(c)
             if v is None:
@@ -112,8 +115,13 @@ while True:
                 return None
             if isinstance(v, bytes) and v.strip() == b'':
                 return None
-            if c in ('ftd', 'is_frd') and isinstance(v, bool):
+            if isinstance(v, bool):
                 return int(v)
+            if c in SMALLINT_COLS:
+                try:
+                    return int(v)
+                except (TypeError, ValueError):
+                    return None
             return v
         rows = [tuple(_val(r, c) for c in INSERT_COLS) for r in missing]
         pg = psycopg2.connect(**PG)
