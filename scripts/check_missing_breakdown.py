@@ -38,7 +38,7 @@ cur = mc.cursor()
 
 # Insert missing IDs into a temp table for efficient querying
 cur.execute("CREATE TABLE #missing_ids (id BIGINT)")
-batch_size = 5000
+batch_size = 1000
 missing_list = list(missing)
 for i in range(0, len(missing_list), batch_size):
     batch = missing_list[i:i+batch_size]
