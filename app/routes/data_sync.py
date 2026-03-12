@@ -31,7 +31,7 @@ FTD100_SYNC_INTERVAL_HOURS = int(os.getenv("FTD100_SYNC_INTERVAL_HOURS", "1"))
 def _is_healthy(sync_log: list, interval_hours: int) -> bool:
     if not sync_log or sync_log[0]["status"] != "success":
         return False
-    last_ran = datetime.strptime(sync_log[0]["ran_at"], "%Y-%m-%d %H:%M:%S")
+    last_ran = datetime.strptime(sync_log[0]["ran_at"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=_TZ)
     threshold = datetime.now(_TZ) - timedelta(hours=interval_hours + 1)
     return last_ran >= threshold
 
