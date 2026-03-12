@@ -439,7 +439,7 @@
   }
   updateSyncBar();
   setInterval(function() {
-    if (document.visibilityState === 'visible') { loadData(); updateSyncBar(); }
+    if (document.visibilityState === 'visible') { updateSyncBar(); }
   }, 120000);
 </script>
 <script src="https://instant.page/5.2.0/instantpage.min.js" type="module"></script>

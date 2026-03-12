@@ -506,7 +506,7 @@
   fetchData();
   updateSyncBar();
   setInterval(function() {
-    if (document.visibilityState === 'visible') { fetchData(); updateSyncBar(); }
+    if (document.visibilityState === 'visible') { updateSyncBar(); }
   }, 120000);
 </script>
 </body>

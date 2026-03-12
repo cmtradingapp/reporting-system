@@ -1651,7 +1651,7 @@
   updateSyncBar();
   // Auto-refresh every 2 minutes when page is visible
   setInterval(function() {
-    if (document.visibilityState === 'visible') { loadAll(); updateSyncBar(); }
+    if (document.visibilityState === 'visible') { updateSyncBar(); }
   }, 120000);
 </script>
 
