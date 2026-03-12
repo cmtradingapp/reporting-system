@@ -182,6 +182,20 @@ def get_pnl_cash_monthly(month_start: str, month_end_exclusive: str) -> float:
         conn.close()
 
 
+def get_client_classification() -> pd.DataFrame:
+    conn = _get_mssql_connection()
+    try:
+        query = """
+            SELECT
+                CAST(accountid AS BIGINT) AS accountid,
+                client_classification
+            FROM dbo.client_classification_date
+        """
+        return pd.read_sql(query, conn)
+    finally:
+        conn.close()
+
+
 def get_dealio_mt4trades_full():
     """
     Generator using keyset pagination on ticket (clustered PK).

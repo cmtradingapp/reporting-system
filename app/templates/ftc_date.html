@@ -157,16 +157,25 @@
           <option value="">All</option>
         </select>
       </div>
+      <div>
+        <label class="filter-label">Client Classification</label>
+        <select id="filterClassification" class="form-select" style="width:190px;" onchange="loadData()">
+          <option value="">All</option>
+          <option value="Low Quality">Low Quality</option>
+          <option value="High Quality">High Quality</option>
+          <option value="No segmentation">No segmentation</option>
+        </select>
+      </div>
       <div class="ms-2">
         <label class="filter-label">Groups</label>
         <div class="d-flex gap-3 flex-wrap" style="padding-top:2px;">
-          <label class="group-cb-wrap"><input type="checkbox" class="group-cb" value="0 - 7 days" checked onchange="renderWithFilters()"> 0–7d</label>
-          <label class="group-cb-wrap"><input type="checkbox" class="group-cb" value="8 - 14 days" checked onchange="renderWithFilters()"> 8–14d</label>
-          <label class="group-cb-wrap"><input type="checkbox" class="group-cb" value="15 - 30 days" checked onchange="renderWithFilters()"> 15–30d</label>
-          <label class="group-cb-wrap"><input type="checkbox" class="group-cb" value="31 - 60 days" checked onchange="renderWithFilters()"> 31–60d</label>
-          <label class="group-cb-wrap"><input type="checkbox" class="group-cb" value="61 - 90 days" checked onchange="renderWithFilters()"> 61–90d</label>
-          <label class="group-cb-wrap"><input type="checkbox" class="group-cb" value="91 - 120 days" checked onchange="renderWithFilters()"> 91–120d</label>
-          <label class="group-cb-wrap"><input type="checkbox" class="group-cb" value="120+ days" checked onchange="renderWithFilters()"> 120+d</label>
+          <label class="group-cb-wrap"><input type="checkbox" class="group-cb" value="0 - 7 days" checked onchange="renderWithFilters()"> 0–7</label>
+          <label class="group-cb-wrap"><input type="checkbox" class="group-cb" value="8 - 14 days" checked onchange="renderWithFilters()"> 8–14</label>
+          <label class="group-cb-wrap"><input type="checkbox" class="group-cb" value="15 - 30 days" checked onchange="renderWithFilters()"> 15–30</label>
+          <label class="group-cb-wrap"><input type="checkbox" class="group-cb" value="31 - 60 days" checked onchange="renderWithFilters()"> 31–60</label>
+          <label class="group-cb-wrap"><input type="checkbox" class="group-cb" value="61 - 90 days" checked onchange="renderWithFilters()"> 61–90</label>
+          <label class="group-cb-wrap"><input type="checkbox" class="group-cb" value="91 - 120 days" checked onchange="renderWithFilters()"> 91–120</label>
+          <label class="group-cb-wrap"><input type="checkbox" class="group-cb" value="120+ days" checked onchange="renderWithFilters()"> 120+</label>
         </div>
       </div>
     </div>
@@ -312,14 +321,16 @@
     const endDate = document.getElementById('endDate').value;
     if (!endDate) return;
 
-    const agentId = document.getElementById('filterAgent').value;
-    const office  = document.getElementById('filterOffice').value;
-    const team    = document.getElementById('filterTeam').value;
+    const agentId        = document.getElementById('filterAgent').value;
+    const office         = document.getElementById('filterOffice').value;
+    const team           = document.getElementById('filterTeam').value;
+    const classification = document.getElementById('filterClassification').value;
 
     let url = `/api/ftc-date?end_date=${endDate}`;
-    if (agentId) url += `&agent_id=${agentId}`;
-    if (office)  url += `&office=${encodeURIComponent(office)}`;
-    if (team)    url += `&team=${encodeURIComponent(team)}`;
+    if (agentId)        url += `&agent_id=${agentId}`;
+    if (office)         url += `&office=${encodeURIComponent(office)}`;
+    if (team)           url += `&team=${encodeURIComponent(team)}`;
+    if (classification) url += `&classification=${encodeURIComponent(classification)}`;
 
     document.getElementById('spinner').classList.add('active');
     document.getElementById('appliedDate').textContent = '';

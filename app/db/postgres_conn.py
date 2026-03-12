@@ -1448,6 +1448,62 @@ def fetch_dealio_daily_profit_stats() -> dict:
         conn.close()
 
 
+def ensure_client_classification_table():
+    sql = """
+        CREATE TABLE IF NOT EXISTS client_classification (
+            accountid               BIGINT PRIMARY KEY,
+            classification_category VARCHAR(20) NOT NULL,
+            synced_at               TIMESTAMP DEFAULT NOW()
+        );
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def upsert_client_classification(df: pd.DataFrame):
+    def _category(val):
+        try:
+            v = int(val)
+            if 1 <= v <= 5:
+                return 'Low Quality'
+            if 6 <= v <= 10:
+                return 'High Quality'
+        except (TypeError, ValueError):
+            pass
+        return 'No segmentation'
+
+    rows = []
+    for _, row in df.iterrows():
+        accountid = _clean(row.get('accountid'))
+        if accountid is None:
+            continue
+        category = _category(row.get('client_classification'))
+        rows.append((int(accountid), category))
+
+    if not rows:
+        return
+
+    sql = """
+        INSERT INTO client_classification (accountid, classification_category, synced_at)
+        VALUES %s
+        ON CONFLICT (accountid) DO UPDATE SET
+            classification_category = EXCLUDED.classification_category,
+            synced_at               = NOW()
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            execute_values(cur, sql, rows)
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def fetch_users_with_targets(role_filter: dict = None) -> pd.DataFrame:
     base_sql = """
         SELECT

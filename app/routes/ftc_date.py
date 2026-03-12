@@ -62,6 +62,7 @@ async def ftc_date_api(
     office: str = None,
     team: str = None,
     groups: str = None,
+    classification: str = None,
 ):
     user = await get_current_user(request)
     if isinstance(user, RedirectResponse):
@@ -69,13 +70,13 @@ async def ftc_date_api(
 
     if not end_date:
         end_date = datetime.now(_TZ).date().strftime("%Y-%m-%d")
-    _ck = f"ftc:{end_date}:{agent_id}:{office}:{team}:{groups}"
+    _ck = f"ftc:{end_date}:{agent_id}:{office}:{team}:{groups}:{classification}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
 
     params = {"end_date": end_date}
-    agent_clause = office_clause = team_clause = ""
+    agent_clause = office_clause = team_clause = classification_clause = ""
     if agent_id:
         agent_clause = "AND u.id = %(agent_id)s"
         params["agent_id"] = agent_id
@@ -85,6 +86,12 @@ async def ftc_date_api(
     if team:
         team_clause = "AND u.department = %(team)s"
         params["team"] = team
+    if classification == "Low Quality":
+        classification_clause = "AND cc.classification_category = 'Low Quality'"
+    elif classification == "High Quality":
+        classification_clause = "AND cc.classification_category = 'High Quality'"
+    elif classification == "No segmentation":
+        classification_clause = "AND (cc.classification_category = 'No segmentation' OR cc.accountid IS NULL)"
 
     sql = """
         WITH ftc_groups AS (
@@ -94,6 +101,7 @@ async def ftc_date_api(
                 (%(end_date)s::date - a.client_qualification_date::date) AS days_diff
             FROM accounts a
             LEFT JOIN crm_users u ON u.id = a.assigned_to
+            LEFT JOIN client_classification cc ON cc.accountid = a.accountid
             WHERE a.client_qualification_date IS NOT NULL
               AND a.client_qualification_date::date >= '2024-01-01'
               AND a.client_qualification_date::date <= %(end_date)s::date
@@ -101,6 +109,7 @@ async def ftc_date_api(
               {agent_clause}
               {office_clause}
               {team_clause}
+              {classification_clause}
         ),
         tx_per_account AS (
             SELECT
@@ -191,6 +200,7 @@ async def ftc_date_api(
         agent_clause=agent_clause,
         office_clause=office_clause,
         team_clause=team_clause,
+        classification_clause=classification_clause,
     )
 
     conn = get_connection()

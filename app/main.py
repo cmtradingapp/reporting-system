@@ -19,9 +19,10 @@ from app.routes.auth import router as auth_router
 from app.routes.users_mgmt import router as users_mgmt_router
 from app.routes.dashboard import router as dashboard_router
 from app.routes.last_sync import router as last_sync_router
-from app.db.postgres_conn import ensure_table, ensure_auth_table, seed_admin_user
+from app.routes.client_classification_sync import router as client_classification_sync_router
+from app.db.postgres_conn import ensure_table, ensure_auth_table, seed_admin_user, ensure_client_classification_table
 from app.auth.auth import hash_password
-from app.etl.fetch_and_store import run_accounts_etl, run_users_etl, run_transactions_etl, run_targets_etl, run_dealio_mt4trades_etl, run_trading_accounts_etl, run_ftd100_etl, run_dealio_daily_profit_etl
+from app.etl.fetch_and_store import run_accounts_etl, run_users_etl, run_transactions_etl, run_targets_etl, run_dealio_mt4trades_etl, run_trading_accounts_etl, run_ftd100_etl, run_dealio_daily_profit_etl, run_client_classification_etl
 import os
 from datetime import datetime, timedelta
 
@@ -40,6 +41,7 @@ scheduler = BackgroundScheduler()
 async def lifespan(app: FastAPI):
     ensure_table()
     ensure_auth_table()
+    ensure_client_classification_table()
     seed_admin_user(hash_password('Admin123!'))
     _base = datetime.utcnow()
     scheduler.add_job(
@@ -112,6 +114,14 @@ async def lifespan(app: FastAPI):
         start_date=_base + timedelta(seconds=210),
         replace_existing=True,
     )
+    scheduler.add_job(
+        run_client_classification_etl,
+        "interval",
+        hours=6,
+        id="client_classification_sync",
+        start_date=_base + timedelta(seconds=240),
+        replace_existing=True,
+    )
     scheduler.start()
     yield
     scheduler.shutdown()
@@ -142,3 +152,4 @@ app.include_router(auth_router)
 app.include_router(users_mgmt_router)
 app.include_router(dashboard_router)
 app.include_router(last_sync_router)
+app.include_router(client_classification_sync_router)
