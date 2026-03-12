@@ -81,7 +81,7 @@ while True:
             cellexpert, client_source, iban, deposifromip, cardownername,
             server_id, ticket, payment_method_id, confirmation_time,
             payment_processor, withdrawal_reason, deposit_ip, expiration_card,
-            original_owner_department, dod, granted_by, destination_wallet,
+            original_owner_department, NULL AS dod, granted_by, destination_wallet,
             payment_method, compliance_status, ftd_owner, NULL AS email,
             created_time, modifiedtime, psp_transaction_id, finance_status,
             session_id, gateway_name, payment_subtype, legacy_mtt, fee_type,
