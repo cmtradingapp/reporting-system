@@ -104,7 +104,12 @@ while True:
     missing = [r for r in chunk if int(r['mttransactionsid']) not in existing_ids]
 
     if missing:
-        rows = [tuple(r.get(c) for c in INSERT_COLS) for r in missing]
+        def _val(r, c):
+            v = r.get(c)
+            if c in ('ftd', 'is_frd') and isinstance(v, bool):
+                return int(v)
+            return v
+        rows = [tuple(_val(r, c) for c in INSERT_COLS) for r in missing]
         pg = psycopg2.connect(**PG)
         with pg.cursor() as cur_pg:
             execute_values(cur_pg, INSERT_SQL, rows)
