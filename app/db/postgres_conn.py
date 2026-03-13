@@ -432,29 +432,33 @@ def ensure_table():
         CREATE INDEX IF NOT EXISTS idx_dealio_users_lastupdate ON dealio_users (lastupdate);
         CREATE INDEX IF NOT EXISTS idx_dealio_users_group      ON dealio_users (groupname);
 
-        CREATE TABLE IF NOT EXISTS dealio_trades_mt4 (
-            ticket        BIGINT          PRIMARY KEY,
-            login         BIGINT,
-            cmd           SMALLINT,
-            volume        BIGINT,
-            open_time     TIMESTAMP,
-            close_time    TIMESTAMP,
-            open_price    DOUBLE PRECISION,
-            close_price   DOUBLE PRECISION,
-            stop_loss     DOUBLE PRECISION,
-            take_profit   DOUBLE PRECISION,
-            profit        DOUBLE PRECISION,
-            symbol        VARCHAR(100),
-            commission    DOUBLE PRECISION,
-            swap          DOUBLE PRECISION,
-            comment       VARCHAR(500),
-            last_modified TIMESTAMP,
-            reason        INTEGER,
-            taxes         DOUBLE PRECISION,
-            magic         BIGINT,
-            digits        INTEGER,
-            expiration    TIMESTAMP,
-            synced_at     TIMESTAMP DEFAULT NOW()
+        DROP TABLE IF EXISTS dealio_trades_mt4;
+        CREATE TABLE dealio_trades_mt4 (
+            ticket          BIGINT           NOT NULL,
+            source_id       TEXT             NOT NULL,
+            login           BIGINT,
+            cmd             SMALLINT,
+            volume          DOUBLE PRECISION,
+            open_time       TIMESTAMP,
+            close_time      TIMESTAMP,
+            last_modified   TIMESTAMP,
+            profit          DOUBLE PRECISION,
+            computed_profit DOUBLE PRECISION,
+            symbol          TEXT,
+            core_symbol     TEXT,
+            book            TEXT,
+            open_price      DOUBLE PRECISION,
+            close_price     DOUBLE PRECISION,
+            commission      DOUBLE PRECISION,
+            swaps           DOUBLE PRECISION,
+            comment         TEXT,
+            group_name      TEXT,
+            group_currency  TEXT,
+            source_name     TEXT,
+            source_type     TEXT,
+            reason          INTEGER,
+            synced_at       TIMESTAMPTZ DEFAULT NOW(),
+            PRIMARY KEY (source_id, ticket)
         );
         CREATE INDEX IF NOT EXISTS idx_dtm4_login         ON dealio_trades_mt4 (login);
         CREATE INDEX IF NOT EXISTS idx_dtm4_open_time     ON dealio_trades_mt4 (open_time);
@@ -1742,19 +1746,20 @@ def fetch_dealio_users_stats() -> dict:
 
 def upsert_dealio_trades_mt4(df: pd.DataFrame):
     cols = [
-        "ticket", "login", "cmd", "volume", "open_time", "close_time",
-        "open_price", "close_price", "stop_loss", "take_profit", "profit",
-        "symbol", "commission", "swap", "comment", "last_modified",
-        "reason", "taxes", "magic", "digits", "expiration",
+        "ticket", "source_id", "login", "cmd", "volume",
+        "open_time", "close_time", "last_modified", "profit", "computed_profit",
+        "symbol", "core_symbol", "book", "open_price", "close_price",
+        "commission", "swaps", "comment", "group_name", "group_currency",
+        "source_name", "source_type", "reason",
     ]
     rows = [tuple(_clean(row.get(c)) for c in cols) for _, row in df.iterrows()]
-    update_cols = [c for c in cols if c != "ticket"]
+    update_cols = [c for c in cols if c not in ("ticket", "source_id")]
     update_set = ", ".join(f"{c} = EXCLUDED.{c}" for c in update_cols)
     col_list = ", ".join(cols)
     sql = f"""
         INSERT INTO dealio_trades_mt4 ({col_list})
         VALUES %s
-        ON CONFLICT (ticket) DO UPDATE SET
+        ON CONFLICT (source_id, ticket) DO UPDATE SET
             {update_set},
             synced_at = NOW()
     """

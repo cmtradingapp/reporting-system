@@ -52,6 +52,7 @@ def get_dealio_connection():
         sslcert=DEALIO_PG_SSLCERT,
         sslkey=DEALIO_PG_SSLKEY,
         sslrootcert=DEALIO_PG_SSLROOTCERT,
+        client_encoding="utf8",
     )
 
 
@@ -128,26 +129,28 @@ def get_dealio_users_full():
 
 _TRADES_COLS = """
     ticket,
+    source_id,
     login,
     cmd,
     volume,
     open_time,
     close_time,
+    last_modified,
+    profit,
+    computed_profit,
+    symbol,
+    core_symbol,
+    book,
     open_price,
     close_price,
-    stop_loss,
-    take_profit,
-    profit,
-    symbol,
     commission,
-    swap,
+    swaps,
     comment,
-    last_modified,
-    reason,
-    taxes,
-    magic,
-    digits,
-    expiration
+    group_name,
+    group_currency,
+    source_name,
+    source_type,
+    reason
 """
 
 def get_dealio_trades_mt4(hours: int = 24) -> pd.DataFrame:
