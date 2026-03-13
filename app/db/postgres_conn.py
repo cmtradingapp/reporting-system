@@ -401,31 +401,36 @@ def ensure_table():
         CREATE INDEX IF NOT EXISTS idx_ddp_date        ON dealio_daily_profit (date);
         CREATE INDEX IF NOT EXISTS idx_ddp_assigned_to ON dealio_daily_profit (assigned_to);
 
-        CREATE TABLE IF NOT EXISTS dealio_users (
-            login       BIGINT          PRIMARY KEY,
-            name        VARCHAR(255),
-            email       VARCHAR(255),
-            group_name  VARCHAR(100),
-            country     VARCHAR(100),
-            currency    VARCHAR(10),
-            leverage    INTEGER,
-            balance     DOUBLE PRECISION,
-            equity      DOUBLE PRECISION,
-            credit      DOUBLE PRECISION,
-            registered  TIMESTAMP,
-            lastlogin   TIMESTAMP,
-            lastupdate  TIMESTAMP,
-            city        VARCHAR(100),
-            zipcode     VARCHAR(50),
-            address     VARCHAR(500),
-            phone       VARCHAR(100),
-            comment     VARCHAR(500),
-            agent       VARCHAR(255),
-            status      INTEGER,
-            synced_at   TIMESTAMP DEFAULT NOW()
+        DROP TABLE IF EXISTS dealio_users;
+        CREATE TABLE dealio_users (
+            login          BIGINT           NOT NULL,
+            sourceid       TEXT             NOT NULL,
+            sourcename     TEXT,
+            sourcetype     TEXT,
+            groupname      TEXT,
+            groupcurrency  TEXT,
+            name           TEXT,
+            email          TEXT,
+            country        TEXT,
+            city           TEXT,
+            zipcode        TEXT,
+            address        TEXT,
+            phone          TEXT,
+            comment        TEXT,
+            balance        DOUBLE PRECISION,
+            credit         DOUBLE PRECISION,
+            leverage       INTEGER,
+            status         TEXT,
+            regdate        TIMESTAMP,
+            lastdate       TIMESTAMP,
+            lastupdate     TIMESTAMPTZ,
+            agentaccount   BIGINT,
+            isenabled      BOOLEAN,
+            synced_at      TIMESTAMPTZ DEFAULT NOW(),
+            PRIMARY KEY (login, sourceid)
         );
         CREATE INDEX IF NOT EXISTS idx_dealio_users_lastupdate ON dealio_users (lastupdate);
-        CREATE INDEX IF NOT EXISTS idx_dealio_users_group      ON dealio_users (group_name);
+        CREATE INDEX IF NOT EXISTS idx_dealio_users_group      ON dealio_users (groupname);
 
         CREATE TABLE IF NOT EXISTS dealio_trades_mt4 (
             ticket        BIGINT          PRIMARY KEY,
@@ -1681,19 +1686,20 @@ def fetch_users_with_targets(role_filter: dict = None) -> pd.DataFrame:
 
 def upsert_dealio_users(df: pd.DataFrame):
     cols = [
-        "login", "name", "email", "group_name", "country", "currency",
-        "leverage", "balance", "equity", "credit", "registered",
-        "lastlogin", "lastupdate", "city", "zipcode", "address",
-        "phone", "comment", "agent", "status",
+        "login", "sourceid", "sourcename", "sourcetype",
+        "groupname", "groupcurrency", "name", "email",
+        "country", "city", "zipcode", "address", "phone", "comment",
+        "balance", "credit", "leverage", "status",
+        "regdate", "lastdate", "lastupdate", "agentaccount", "isenabled",
     ]
     rows = [tuple(_clean(row.get(c)) for c in cols) for _, row in df.iterrows()]
-    update_cols = [c for c in cols if c != "login"]
+    update_cols = [c for c in cols if c not in ("login", "sourceid")]
     update_set = ", ".join(f"{c} = EXCLUDED.{c}" for c in update_cols)
     col_list = ", ".join(cols)
     sql = f"""
         INSERT INTO dealio_users ({col_list})
         VALUES %s
-        ON CONFLICT (login) DO UPDATE SET
+        ON CONFLICT (login, sourceid) DO UPDATE SET
             {update_set},
             synced_at = NOW()
     """
@@ -1711,8 +1717,8 @@ def fetch_dealio_users_stats() -> dict:
         SELECT
             COUNT(*)                             AS total_records,
             MAX(synced_at)                       AS last_synced_at,
-            COUNT(DISTINCT group_name)           AS unique_groups,
-            COUNT(DISTINCT currency)             AS unique_currencies,
+            COUNT(DISTINCT groupname)            AS unique_groups,
+            COUNT(DISTINCT groupcurrency)        AS unique_currencies,
             COUNT(*) FILTER (WHERE balance > 0)  AS users_with_balance
         FROM dealio_users
     """

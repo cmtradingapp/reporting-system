@@ -59,25 +59,28 @@ def get_dealio_connection():
 
 _USERS_COLS = """
     login,
+    sourceid,
+    sourcename,
+    sourcetype,
+    groupname,
+    groupcurrency,
     name,
     email,
-    "group"          AS group_name,
     country,
-    currency,
-    leverage,
-    balance,
-    equity,
-    credit,
-    registered,
-    lastlogin,
-    lastupdate,
     city,
     zipcode,
     address,
     phone,
     comment,
-    agent,
-    status
+    balance,
+    credit,
+    leverage,
+    status,
+    regdate,
+    lastdate,
+    lastupdate,
+    agentaccount,
+    isenabled
 """
 
 def get_dealio_users(hours: int = 24) -> pd.DataFrame:
