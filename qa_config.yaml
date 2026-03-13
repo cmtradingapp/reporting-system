@@ -1,0 +1,24 @@
+schedule:
+  time: "09:00"
+  timezone: "Europe/Nicosia"
+
+output:
+  folder: "reports/qa"
+
+reports:
+  performance: true
+  agent_bonuses: true
+  dashboard: true
+  ftc_date: true
+
+tolerances:
+  default: 0.0          # 0% → any difference = FAIL
+  open_volume: 0.01     # 1% tolerance for float arithmetic on volume
+  end_equity: 0.01
+  pnl: 0.01
+  bonus_usd: 0.01       # float multiplication rounding
+
+checks:
+  sync_freshness_hours: 3     # Flag if sync older than N hours
+  min_retention_agents: 10
+  min_sales_agents: 5
