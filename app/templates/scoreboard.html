@@ -352,27 +352,55 @@
     </div><!-- /filter-body -->
   </div>
 
-  <!-- KPI Cards Row 1: standalone metrics -->
+  <!-- KPI Cards Row 1: working days + daily metrics -->
   <div class="row g-2 mb-1">
-    <div class="col-6 col-md-3">
+    <div class="col-6 col-md">
       <div class="kpi-card text-center">
-        <div class="kpi-value" style="color:#8b949e;" id="stat-wd">—</div>
-        <div class="kpi-label">Working Days</div>
+        <div style="display:flex;justify-content:center;align-items:center;gap:14px;">
+          <div>
+            <div class="kpi-value" style="color:#8b949e;" id="stat-wd">—</div>
+            <div class="kpi-label">Work Days</div>
+          </div>
+          <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
+          <div>
+            <div class="kpi-value" style="color:#d29922;" id="stat-wd-left">—</div>
+            <div class="kpi-label">Days Left</div>
+          </div>
+        </div>
       </div>
     </div>
-    <div class="col-6 col-md-3">
+    {% if show_sales %}
+    <div class="col-6 col-md">
       <div class="kpi-card text-center">
-        <div class="kpi-value" style="color:#3fb950;" id="stat-wd-passed">—</div>
-        <div class="kpi-label">Days Passed</div>
+        <div style="display:flex;justify-content:center;align-items:center;gap:14px;">
+          <div>
+            <div class="kpi-value" style="color:#388bfd;" id="stat-daily-ftd">—</div>
+            <div class="kpi-label">Daily FTD</div>
+          </div>
+          <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
+          <div>
+            <div class="kpi-value" style="color:#388bfd;" id="stat-daily-ftc">—</div>
+            <div class="kpi-label">Daily FTC</div>
+          </div>
+        </div>
       </div>
     </div>
-    <div class="col-6 col-md-3">
+    <div class="col-6 col-md">
       <div class="kpi-card text-center">
-        <div class="kpi-value" style="color:#d29922;" id="stat-wd-left">—</div>
-        <div class="kpi-label">Days Left</div>
+        <div class="kpi-value" style="color:#3fb950;" id="stat-daily-net">—</div>
+        <div class="kpi-label">Daily Net</div>
       </div>
     </div>
-    <div class="col-6 col-md-3">
+    {% endif %}
+    {% if show_retention %}
+    <div class="col-6 col-md">
+      <div class="kpi-card text-center">
+        <div class="kpi-value" style="color:#388bfd;" id="stat-daily-net-ret">—</div>
+        <div class="kpi-label">Daily Net Retention</div>
+      </div>
+    </div>
+    {% endif %}
+    <div class="col-6 col-md">
       <div class="kpi-card text-center">
         <div class="kpi-value" style="color:#a371f7;" id="stat-end-equity-zeroed">—</div>
         <div class="kpi-label">End Equity Zeroed</div>
@@ -384,8 +412,17 @@
   <div class="row g-2 mb-4">
     <div class="col-6 col-md-2">
       <div class="kpi-card text-center">
-        <div class="kpi-value" style="color:#388bfd;" id="stat-grand-ftc">—</div>
-        <div class="kpi-label">FTC</div>
+        <div style="display:flex;justify-content:center;align-items:center;gap:10px;">
+          <div>
+            <div class="kpi-value" style="color:#388bfd;" id="stat-total-ftd">—</div>
+            <div class="kpi-label">FTD</div>
+          </div>
+          <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
+          <div>
+            <div class="kpi-value" style="color:#388bfd;" id="stat-grand-ftc">—</div>
+            <div class="kpi-label">FTC</div>
+          </div>
+        </div>
       </div>
     </div>
     <div class="col-6 col-md-2">
@@ -692,9 +729,8 @@
                  net_deposits: r.net_deposits ?? 0, ftd_count: r.ftd_count ?? 0,
                  need_on_target, missing_to_100, missing_to_100rr, per_wd };
       });
-      document.getElementById('stat-wd').textContent        = workingDays;
-      document.getElementById('stat-wd-passed').textContent = workingDaysPassed;
-      document.getElementById('stat-wd-left').textContent   = workingDaysLeft;
+      document.getElementById('stat-wd').textContent      = workingDays;
+      document.getElementById('stat-wd-left').textContent = workingDaysLeft;
       updateStats(data);
       populateFilterDropdowns();
       renderTable();
@@ -708,15 +744,26 @@
   }
 
   function updateStats(data) {
-    document.getElementById('stat-grand-ftc').textContent     = data.grand_ftc.toLocaleString();
-    document.getElementById('stat-grand-ftc-rr').textContent  = data.grand_ftc_rr.toLocaleString();
     const netFmt = v => (v < 0 ? '-$' : '$') + Math.round(Math.abs(v)).toLocaleString();
-    document.getElementById('stat-grand-net').textContent     = netFmt(data.grand_net);
-    document.getElementById('stat-grand-net-rr').textContent  = netFmt(data.grand_net_rr);
     const volFmt = v => Math.round(v).toLocaleString();
-    document.getElementById('stat-open-volume').textContent   = volFmt(data.open_volume);
+    document.getElementById('stat-grand-ftc').textContent      = data.grand_ftc.toLocaleString();
+    document.getElementById('stat-grand-ftc-rr').textContent   = data.grand_ftc_rr.toLocaleString();
+    document.getElementById('stat-grand-net').textContent      = netFmt(data.grand_net);
+    document.getElementById('stat-grand-net-rr').textContent   = netFmt(data.grand_net_rr);
+    document.getElementById('stat-open-volume').textContent    = volFmt(data.open_volume);
     document.getElementById('stat-open-volume-rr').textContent = volFmt(data.open_volume_rr);
     document.getElementById('stat-end-equity-zeroed').textContent = Math.round(data.end_equity_zeroed ?? 0).toLocaleString();
+    // Monthly FTD
+    const ftdEl = document.getElementById('stat-total-ftd');
+    if (ftdEl) ftdEl.textContent = (data.total_ftd_count ?? 0).toLocaleString();
+    // Daily averages
+    const safeWdp = workingDaysPassed > 0 ? workingDaysPassed : 1;
+    const dailyFtdEl = document.getElementById('stat-daily-ftd');
+    if (dailyFtdEl) dailyFtdEl.textContent = Math.round((data.total_ftd_count ?? 0) / safeWdp).toLocaleString();
+    const dailyFtcEl = document.getElementById('stat-daily-ftc');
+    if (dailyFtcEl) dailyFtcEl.textContent = Math.round((data.grand_ftc ?? 0) / safeWdp).toLocaleString();
+    const dailyNetEl = document.getElementById('stat-daily-net');
+    if (dailyNetEl) dailyNetEl.textContent = netFmt((data.total_net_deposits ?? 0) / safeWdp);
   }
 
   function renderTable() {
@@ -991,12 +1038,16 @@
 
   // ── Event: TODAY / YSTRD ───────────────────────────────────────────────
   document.getElementById('btn-today').addEventListener('click', () => {
-    document.getElementById('date-to').value = todayStr();
+    const t = todayStr();
+    document.getElementById('date-from').value = t;
+    document.getElementById('date-to').value   = t;
     setQuickActive('btn-today');
     loadAll();
   });
   document.getElementById('btn-ystrd').addEventListener('click', () => {
-    document.getElementById('date-to').value = yesterdayStr();
+    const y = yesterdayStr();
+    document.getElementById('date-from').value = y;
+    document.getElementById('date-to').value   = y;
     setQuickActive('btn-ystrd');
     loadAll();
   });
@@ -1158,6 +1209,11 @@
 
       populateFilterDropdowns();
       renderRetentionTable(wd, wd_passed, wd_left);
+      // Update daily net retention card
+      const retTotalNet = retAllRows.reduce((s, r) => s + (r.net_usd || 0), 0);
+      const _nf = v => (v < 0 ? '-$' : '$') + Math.round(Math.abs(v)).toLocaleString();
+      const retDailyEl = document.getElementById('stat-daily-net-ret');
+      if (retDailyEl) retDailyEl.textContent = _nf(retTotalNet / safe_wdp);
     } catch(e) {
       document.getElementById('ret-error-msg').textContent = 'Error: ' + e.message;
       document.getElementById('ret-error-msg').style.display = 'block';
