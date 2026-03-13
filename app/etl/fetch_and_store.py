@@ -3,12 +3,14 @@ import pandas as pd
 from datetime import datetime, timedelta, timezone
 from app.db.mysql_conn import get_operators, get_users, get_accounts, get_accounts_full, get_crm_users, get_crm_users_full, get_transactions, get_transactions_full, get_trading_accounts, get_trading_accounts_full
 from app.db.mssql_conn import get_targets, get_dealio_mt4trades, get_dealio_mt4trades_full, get_vtiger_users, get_dealio_daily_profit, get_dealio_daily_profit_full, get_client_classification
+from app.db.dealio_conn import get_dealio_users, get_dealio_users_full, get_dealio_trades_mt4, get_dealio_trades_mt4_full
 from app.db.postgres_conn import (
     ensure_table, delete_all_performance, insert_records,
     upsert_users, upsert_accounts, cleanup_accounts, upsert_crm_users, truncate_crm_users, upsert_transactions,
     upsert_targets, upsert_dealio_mt4trades, upsert_trading_accounts, log_sync,
     truncate_and_insert_ftd100, upsert_dealio_daily_profit,
     ensure_client_classification_table, upsert_client_classification,
+    upsert_dealio_users, upsert_dealio_trades_mt4,
 )
 
 
@@ -350,6 +352,95 @@ def run_dealio_daily_profit_full_etl() -> dict:
     finally:
         duration_ms = int((time.time() - start) * 1000)
         log_sync("dealio_daily_profit", cutoff, rows, duration_ms, status, error_msg)
+    return {"status": status, "rows_synced": rows, "type": "full"}
+
+
+def run_dealio_users_etl(hours: int = 24) -> dict:
+    ensure_table()
+    start = time.time()
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    status = "success"
+    error_msg = None
+    rows = 0
+    try:
+        df = get_dealio_users(hours=hours)
+        rows = len(df)
+        upsert_dealio_users(df)
+    except Exception as e:
+        status = "error"
+        error_msg = str(e)
+        raise
+    finally:
+        duration_ms = int((time.time() - start) * 1000)
+        log_sync("dealio_users", cutoff, rows, duration_ms, status, error_msg)
+    return {"status": status, "rows_synced": rows, "lookback_hours": hours}
+
+
+def run_dealio_users_full_etl() -> dict:
+    ensure_table()
+    start = time.time()
+    cutoff = datetime(1970, 1, 1)
+    status = "success"
+    error_msg = None
+    rows = 0
+    try:
+        for chunk in get_dealio_users_full():
+            upsert_dealio_users(chunk)
+            rows += len(chunk)
+    except Exception as e:
+        status = "error"
+        error_msg = str(e)
+        raise
+    finally:
+        duration_ms = int((time.time() - start) * 1000)
+        log_sync("dealio_users", cutoff, rows, duration_ms, status, error_msg)
+    return {"status": status, "rows_synced": rows, "type": "full"}
+
+
+def run_dealio_trades_mt4_etl(hours: int = 24) -> dict:
+    ensure_table()
+    start = time.time()
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    status = "success"
+    error_msg = None
+    rows = 0
+    try:
+        df = get_dealio_trades_mt4(hours=hours)
+        rows = len(df)
+        upsert_dealio_trades_mt4(df)
+    except Exception as e:
+        status = "error"
+        error_msg = str(e)
+        raise
+    finally:
+        duration_ms = int((time.time() - start) * 1000)
+        log_sync("dealio_trades_mt4", cutoff, rows, duration_ms, status, error_msg)
+    return {"status": status, "rows_synced": rows, "lookback_hours": hours}
+
+
+def run_dealio_trades_mt4_full_etl() -> dict:
+    ensure_table()
+    start = time.time()
+    cutoff = datetime(1970, 1, 1)
+    status = "success"
+    error_msg = None
+    rows = 0
+    chunk_num = 0
+    try:
+        for chunk in get_dealio_trades_mt4_full():
+            upsert_dealio_trades_mt4(chunk)
+            rows += len(chunk)
+            chunk_num += 1
+            if chunk_num % 10 == 0:
+                elapsed = int((time.time() - start) * 1000)
+                log_sync("dealio_trades_mt4", cutoff, rows, elapsed, "running", f"chunk {chunk_num}, {rows} rows so far")
+    except Exception as e:
+        status = "error"
+        error_msg = str(e)
+        raise
+    finally:
+        duration_ms = int((time.time() - start) * 1000)
+        log_sync("dealio_trades_mt4", cutoff, rows, duration_ms, status, error_msg)
     return {"status": status, "rows_synced": rows, "type": "full"}
 
 

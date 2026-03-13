@@ -401,6 +401,62 @@ def ensure_table():
         CREATE INDEX IF NOT EXISTS idx_ddp_date        ON dealio_daily_profit (date);
         CREATE INDEX IF NOT EXISTS idx_ddp_assigned_to ON dealio_daily_profit (assigned_to);
 
+        CREATE TABLE IF NOT EXISTS dealio_users (
+            login       BIGINT          PRIMARY KEY,
+            name        VARCHAR(255),
+            email       VARCHAR(255),
+            group_name  VARCHAR(100),
+            country     VARCHAR(100),
+            currency    VARCHAR(10),
+            leverage    INTEGER,
+            balance     DOUBLE PRECISION,
+            equity      DOUBLE PRECISION,
+            credit      DOUBLE PRECISION,
+            registered  TIMESTAMP,
+            lastlogin   TIMESTAMP,
+            lastupdate  TIMESTAMP,
+            city        VARCHAR(100),
+            zipcode     VARCHAR(50),
+            address     VARCHAR(500),
+            phone       VARCHAR(100),
+            comment     VARCHAR(500),
+            agent       VARCHAR(255),
+            status      INTEGER,
+            synced_at   TIMESTAMP DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_dealio_users_lastupdate ON dealio_users (lastupdate);
+        CREATE INDEX IF NOT EXISTS idx_dealio_users_group      ON dealio_users (group_name);
+
+        CREATE TABLE IF NOT EXISTS dealio_trades_mt4 (
+            ticket        BIGINT          PRIMARY KEY,
+            login         BIGINT,
+            cmd           SMALLINT,
+            volume        BIGINT,
+            open_time     TIMESTAMP,
+            close_time    TIMESTAMP,
+            open_price    DOUBLE PRECISION,
+            close_price   DOUBLE PRECISION,
+            stop_loss     DOUBLE PRECISION,
+            take_profit   DOUBLE PRECISION,
+            profit        DOUBLE PRECISION,
+            symbol        VARCHAR(100),
+            commission    DOUBLE PRECISION,
+            swap          DOUBLE PRECISION,
+            comment       VARCHAR(500),
+            last_modified TIMESTAMP,
+            reason        INTEGER,
+            taxes         DOUBLE PRECISION,
+            magic         BIGINT,
+            digits        INTEGER,
+            expiration    TIMESTAMP,
+            synced_at     TIMESTAMP DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_dtm4_login         ON dealio_trades_mt4 (login);
+        CREATE INDEX IF NOT EXISTS idx_dtm4_open_time     ON dealio_trades_mt4 (open_time);
+        CREATE INDEX IF NOT EXISTS idx_dtm4_close_time    ON dealio_trades_mt4 (close_time);
+        CREATE INDEX IF NOT EXISTS idx_dtm4_last_modified ON dealio_trades_mt4 (last_modified);
+        CREATE INDEX IF NOT EXISTS idx_dtm4_symbol        ON dealio_trades_mt4 (symbol);
+
     """
     conn = get_connection()
     try:
@@ -1617,5 +1673,113 @@ def fetch_users_with_targets(role_filter: dict = None) -> pd.DataFrame:
     conn = get_connection()
     try:
         return pd.read_sql(sql, conn, params=params)
+    finally:
+        conn.close()
+
+
+# ── Dealio Users (from dealio PG replica) ────────────────────────────────────
+
+def upsert_dealio_users(df: pd.DataFrame):
+    cols = [
+        "login", "name", "email", "group_name", "country", "currency",
+        "leverage", "balance", "equity", "credit", "registered",
+        "lastlogin", "lastupdate", "city", "zipcode", "address",
+        "phone", "comment", "agent", "status",
+    ]
+    rows = [tuple(_clean(row.get(c)) for c in cols) for _, row in df.iterrows()]
+    update_cols = [c for c in cols if c != "login"]
+    update_set = ", ".join(f"{c} = EXCLUDED.{c}" for c in update_cols)
+    col_list = ", ".join(cols)
+    sql = f"""
+        INSERT INTO dealio_users ({col_list})
+        VALUES %s
+        ON CONFLICT (login) DO UPDATE SET
+            {update_set},
+            synced_at = NOW()
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            execute_values(cur, sql, rows)
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def fetch_dealio_users_stats() -> dict:
+    sql = """
+        SELECT
+            COUNT(*)                   AS total_records,
+            MAX(synced_at)             AS last_synced_at,
+            COUNT(DISTINCT group_name) AS unique_groups,
+            COUNT(DISTINCT currency)   AS unique_currencies
+        FROM dealio_users
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+            row = cur.fetchone()
+            return {
+                "total_records":     row[0] or 0,
+                "last_synced_at":    row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else "Never",
+                "unique_groups":     row[2] or 0,
+                "unique_currencies": row[3] or 0,
+            }
+    finally:
+        conn.close()
+
+
+# ── Dealio Trades MT4 (from dealio PG replica) ───────────────────────────────
+
+def upsert_dealio_trades_mt4(df: pd.DataFrame):
+    cols = [
+        "ticket", "login", "cmd", "volume", "open_time", "close_time",
+        "open_price", "close_price", "stop_loss", "take_profit", "profit",
+        "symbol", "commission", "swap", "comment", "last_modified",
+        "reason", "taxes", "magic", "digits", "expiration",
+    ]
+    rows = [tuple(_clean(row.get(c)) for c in cols) for _, row in df.iterrows()]
+    update_cols = [c for c in cols if c != "ticket"]
+    update_set = ", ".join(f"{c} = EXCLUDED.{c}" for c in update_cols)
+    col_list = ", ".join(cols)
+    sql = f"""
+        INSERT INTO dealio_trades_mt4 ({col_list})
+        VALUES %s
+        ON CONFLICT (ticket) DO UPDATE SET
+            {update_set},
+            synced_at = NOW()
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            execute_values(cur, sql, rows)
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def fetch_dealio_trades_mt4_stats() -> dict:
+    sql = """
+        SELECT
+            COUNT(*)                  AS total_records,
+            MAX(synced_at)            AS last_synced_at,
+            COUNT(DISTINCT login)     AS unique_logins,
+            COALESCE(SUM(profit), 0)  AS total_profit,
+            COUNT(DISTINCT symbol)    AS unique_symbols
+        FROM dealio_trades_mt4
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+            row = cur.fetchone()
+            return {
+                "total_records":  row[0] or 0,
+                "last_synced_at": row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else "Never",
+                "unique_logins":  row[2] or 0,
+                "total_profit":   int(row[3] or 0),
+                "unique_symbols": row[4] or 0,
+            }
     finally:
         conn.close()
