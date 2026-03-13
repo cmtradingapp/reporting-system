@@ -233,8 +233,8 @@
       .kpi-split .kpi-value { font-size:0.88rem; }
       #kpi-daily-ftd { order:1; }
       #kpi-ftd-ftc   { order:2; }
-      #kpi-ftd-rr    { order:3; }
-      #kpi-daily-net { order:4; }
+      #kpi-daily-net { order:3; }
+      #kpi-ftd-rr    { order:4; }
       #kpi-net       { order:5; }
       #kpi-net-rr    { order:6; }
       #kpi-vol       { order:7; }
@@ -364,7 +364,7 @@
   <!-- KPI Cards -->
   <div class="row g-2 mb-4">
     {% if show_sales %}
-    <div class="col-12 col-md" id="kpi-daily-ftd">
+    <div class="col-6 col-md" id="kpi-daily-ftd">
       <div class="kpi-card text-center">
         <div style="display:flex;justify-content:center;align-items:center;gap:14px;">
           <div>
@@ -380,7 +380,7 @@
       </div>
     </div>
     {% endif %}
-    <div class="col-12 col-md" id="kpi-daily-net">
+    <div class="col-6 col-md" id="kpi-daily-net">
       <div class="kpi-card text-center">
         <div class="kpi-split" style="display:flex;justify-content:center;align-items:center;gap:14px;">
           {% if show_sales %}
@@ -401,7 +401,7 @@
         </div>
       </div>
     </div>
-    <div class="col-12 col-md-2" id="kpi-ftd-ftc">
+    <div class="col-6 col-md-2" id="kpi-ftd-ftc">
       <div class="kpi-card text-center">
         <div style="display:flex;justify-content:center;align-items:center;gap:10px;">
           <div>
@@ -416,7 +416,7 @@
         </div>
       </div>
     </div>
-    <div class="col-12 col-md-2" id="kpi-ftd-rr">
+    <div class="col-6 col-md-2" id="kpi-ftd-rr">
       <div class="kpi-card text-center">
         <div class="kpi-split" style="display:flex;justify-content:center;align-items:center;gap:14px;">
           <div>
@@ -431,13 +431,13 @@
         </div>
       </div>
     </div>
-    <div class="col-12 col-md-2" id="kpi-net">
+    <div class="col-6 col-md-2" id="kpi-net">
       <div class="kpi-card text-center">
         <div class="kpi-value" style="color:#3fb950;" id="stat-grand-net">—</div>
         <div class="kpi-label">NET $</div>
       </div>
     </div>
-    <div class="col-12 col-md-2" id="kpi-net-rr">
+    <div class="col-6 col-md-2" id="kpi-net-rr">
       <div class="kpi-card text-center">
         <div class="kpi-value" style="color:#d29922;" id="stat-grand-net-rr">—</div>
         <div class="kpi-label">NET RR</div>
