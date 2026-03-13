@@ -272,6 +272,53 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
             """, {"date_to": date_to})
             end_equity_zeroed = float(cur.fetchone()[0] or 0)
 
+            # Daily net — Sales (date_to only, same logic as dashboard Q2)
+            cur.execute("""
+                SELECT COALESCE(SUM(CASE
+                    WHEN t.transactiontype IN ('Deposit', 'Withdrawal Cancelled') THEN  t.usdamount
+                    WHEN t.transactiontype IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
+                END), 0)
+                FROM transactions t
+                JOIN crm_users u ON u.id = t.original_deposit_owner
+                WHERE t.transactionapproval = 'Approved'
+                  AND (t.deleted = 0 OR t.deleted IS NULL)
+                  AND t.transactiontype IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
+                  AND t.confirmation_time::date = %(date_to)s
+                  AND EXTRACT(YEAR FROM t.confirmation_time) >= 2024
+                  AND t.vtigeraccountid IS NOT NULL
+                  AND u.department_ = 'Sales'
+                  AND u.team = 'Conversion'
+                  AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
+                  AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
+                  AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'
+            """, {"date_to": date_to})
+            daily_net_sales = float(cur.fetchone()[0] or 0)
+
+            # Daily FTD — count for date_to
+            cur.execute("""
+                SELECT COUNT(t.mttransactionsid)
+                FROM transactions t
+                WHERE t.transactionapproval = 'Approved'
+                  AND (t.deleted = 0 OR t.deleted IS NULL)
+                  AND t.transactiontype = 'Deposit'
+                  AND t.ftd = 1
+                  AND t.confirmation_time::date = %(date_to)s
+            """, {"date_to": date_to})
+            daily_ftd = int(cur.fetchone()[0] or 0)
+
+            # Daily FTC — unique clients qualified on date_to
+            cur.execute("""
+                SELECT COUNT(DISTINCT t.vtigeraccountid)
+                FROM transactions t
+                JOIN accounts a ON a.accountid = t.vtigeraccountid
+                WHERE t.transactionapproval = 'Approved'
+                  AND (t.deleted = 0 OR t.deleted IS NULL)
+                  AND t.transactiontype = 'Deposit'
+                  AND t.ftd = 1
+                  AND a.client_qualification_date::date = %(date_to)s
+            """, {"date_to": date_to})
+            daily_ftc = int(cur.fetchone()[0] or 0)
+
         today = datetime.now(_TZ).date()
         month_end           = last_day_of_month(dt_from)
         working_days        = count_working_days(dt_from, month_end, holidays)
@@ -310,6 +357,9 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
             "open_volume":          round(open_volume, 2),
             "open_volume_rr":       open_volume_rr,
             "end_equity_zeroed":    round(end_equity_zeroed, 2),
+            "daily_net_sales":      round(daily_net_sales, 2),
+            "daily_ftd":            daily_ftd,
+            "daily_ftc":            daily_ftc,
             "working_days":         working_days,
             "working_days_passed":  working_days_passed,
             "working_days_left":    working_days_left,
@@ -421,6 +471,31 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
             cur.execute(final_sql, final_params)
             rows = cur.fetchall()
 
+            # Daily net retention — date_to only (same logic as dashboard Q3)
+            cur.execute("""
+                SELECT COALESCE(SUM(CASE
+                    WHEN t.transactiontype IN ('Deposit', 'Withdrawal Cancelled') THEN  t.usdamount
+                    WHEN t.transactiontype IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
+                END), 0)
+                FROM transactions t
+                JOIN accounts a ON a.accountid = t.vtigeraccountid
+                JOIN crm_users u ON u.id = a.assigned_to
+                WHERE t.transactionapproval = 'Approved'
+                  AND (t.deleted = 0 OR t.deleted IS NULL)
+                  AND t.transactiontype IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
+                  AND t.confirmation_time::date = %(date_to)s
+                  AND COALESCE(t.comment, '') NOT ILIKE '%%bonus%%'
+                  AND u.department_ = 'Retention'
+                  AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
+                  AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
+                  AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'
+                  AND TRIM(COALESCE(u.department, '')) NOT ILIKE '%%Retention%%'
+                  AND TRIM(COALESCE(u.department, '')) NOT ILIKE '%%Conversion%%'
+                  AND TRIM(COALESCE(u.department, '')) NOT ILIKE '%%Support%%'
+                  AND TRIM(COALESCE(u.department, '')) NOT ILIKE '%%General%%'
+            """, {"date_to": date_to})
+            daily_net_retention = float(cur.fetchone()[0] or 0)
+
         today               = datetime.now(_TZ).date()
         month_end           = last_day_of_month(dt_from)
         working_days        = count_working_days(dt_from, month_end, holidays)
@@ -440,10 +515,11 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
             for r in rows
         ]
         _result = {
-            "rows":                data,
-            "working_days":        working_days,
-            "working_days_passed": working_days_passed,
-            "working_days_left":   working_days_left,
+            "rows":                    data,
+            "daily_net_retention":     round(daily_net_retention, 2),
+            "working_days":            working_days,
+            "working_days_passed":     working_days_passed,
+            "working_days_left":       working_days_left,
         }
         cache.set(_ck, _result)
         return JSONResponse(content=_result)

@@ -277,8 +277,9 @@
 <div class="container-fluid px-4 py-4">
 
   <!-- Header -->
-  <div class="mb-1 d-none d-md-block">
+  <div class="mb-1 d-none d-md-flex align-items-baseline gap-3">
     <h4 class="fw-bold text-white mb-0">Performance Report</h4>
+    <span style="font-size:0.73rem;color:#8b949e;white-space:nowrap;"><span id="stat-wd">—</span> work days &middot; <span id="stat-wd-left">—</span> left</span>
   </div>
   <div id="sync-bar" style="font-size:0.73rem;color:#8b949e;margin-bottom:14px;"><i class="bi bi-arrow-repeat me-1"></i>Last sync: <span id="sync-bar-val">—</span></div>
 
@@ -352,23 +353,8 @@
     </div><!-- /filter-body -->
   </div>
 
-  <!-- KPI Cards Row 1: working days + daily metrics -->
+  <!-- KPI Cards Row 1: daily metrics -->
   <div class="row g-2 mb-1">
-    <div class="col-6 col-md">
-      <div class="kpi-card text-center">
-        <div style="display:flex;justify-content:center;align-items:center;gap:14px;">
-          <div>
-            <div class="kpi-value" style="color:#8b949e;" id="stat-wd">—</div>
-            <div class="kpi-label">Work Days</div>
-          </div>
-          <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
-          <div>
-            <div class="kpi-value" style="color:#d29922;" id="stat-wd-left">—</div>
-            <div class="kpi-label">Days Left</div>
-          </div>
-        </div>
-      </div>
-    </div>
     {% if show_sales %}
     <div class="col-6 col-md">
       <div class="kpi-card text-center">
@@ -385,21 +371,28 @@
         </div>
       </div>
     </div>
+    {% endif %}
     <div class="col-6 col-md">
       <div class="kpi-card text-center">
-        <div class="kpi-value" style="color:#3fb950;" id="stat-daily-net">—</div>
-        <div class="kpi-label">Daily Net</div>
+        <div style="display:flex;justify-content:center;align-items:center;gap:14px;">
+          {% if show_sales %}
+          <div>
+            <div class="kpi-value" style="color:#3fb950;" id="stat-daily-net">—</div>
+            <div class="kpi-label">Daily Net</div>
+          </div>
+          {% endif %}
+          {% if show_sales and show_retention %}
+          <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
+          {% endif %}
+          {% if show_retention %}
+          <div>
+            <div class="kpi-value" style="color:#388bfd;" id="stat-daily-net-ret">—</div>
+            <div class="kpi-label">Daily Ret.</div>
+          </div>
+          {% endif %}
+        </div>
       </div>
     </div>
-    {% endif %}
-    {% if show_retention %}
-    <div class="col-6 col-md">
-      <div class="kpi-card text-center">
-        <div class="kpi-value" style="color:#388bfd;" id="stat-daily-net-ret">—</div>
-        <div class="kpi-label">Daily Net Retention</div>
-      </div>
-    </div>
-    {% endif %}
     <div class="col-6 col-md">
       <div class="kpi-card text-center">
         <div class="kpi-value" style="color:#a371f7;" id="stat-end-equity-zeroed">—</div>
@@ -756,14 +749,13 @@
     // Monthly FTD
     const ftdEl = document.getElementById('stat-total-ftd');
     if (ftdEl) ftdEl.textContent = (data.total_ftd_count ?? 0).toLocaleString();
-    // Daily averages
-    const safeWdp = workingDaysPassed > 0 ? workingDaysPassed : 1;
+    // Daily actuals for date_to (from backend queries)
     const dailyFtdEl = document.getElementById('stat-daily-ftd');
-    if (dailyFtdEl) dailyFtdEl.textContent = Math.round((data.total_ftd_count ?? 0) / safeWdp).toLocaleString();
+    if (dailyFtdEl) dailyFtdEl.textContent = (data.daily_ftd ?? 0).toLocaleString();
     const dailyFtcEl = document.getElementById('stat-daily-ftc');
-    if (dailyFtcEl) dailyFtcEl.textContent = Math.round((data.grand_ftc ?? 0) / safeWdp).toLocaleString();
+    if (dailyFtcEl) dailyFtcEl.textContent = (data.daily_ftc ?? 0).toLocaleString();
     const dailyNetEl = document.getElementById('stat-daily-net');
-    if (dailyNetEl) dailyNetEl.textContent = netFmt((data.total_net_deposits ?? 0) / safeWdp);
+    if (dailyNetEl) dailyNetEl.textContent = netFmt(data.daily_net_sales ?? 0);
   }
 
   function renderTable() {
@@ -1209,11 +1201,12 @@
 
       populateFilterDropdowns();
       renderRetentionTable(wd, wd_passed, wd_left);
-      // Update daily net retention card
-      const retTotalNet = retAllRows.reduce((s, r) => s + (r.net_usd || 0), 0);
-      const _nf = v => (v < 0 ? '-$' : '$') + Math.round(Math.abs(v)).toLocaleString();
+      // Update daily net retention card (actual date_to value from backend)
       const retDailyEl = document.getElementById('stat-daily-net-ret');
-      if (retDailyEl) retDailyEl.textContent = _nf(retTotalNet / safe_wdp);
+      if (retDailyEl) {
+        const _nf = v => (v < 0 ? '-$' : '$') + Math.round(Math.abs(v)).toLocaleString();
+        retDailyEl.textContent = _nf(data.daily_net_retention ?? 0);
+      }
     } catch(e) {
       document.getElementById('ret-error-msg').textContent = 'Error: ' + e.message;
       document.getElementById('ret-error-msg').style.display = 'block';
