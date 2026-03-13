@@ -26,10 +26,13 @@ POSTGRES_DB = os.getenv("POSTGRES_DB", "datawarehouse")
 
 # Dealio PostgreSQL (replica source)
 DEALIO_PG_HOST     = os.getenv("DEALIO_PG_HOST", "cmtrading-replicadb.dealio.ai")
-DEALIO_PG_PORT     = int(os.getenv("DEALIO_PG_PORT", 5432))
+DEALIO_PG_PORT     = int(os.getenv("DEALIO_PG_PORT", 5106))
 DEALIO_PG_USER     = os.getenv("DEALIO_PG_USER", "")
 DEALIO_PG_PASSWORD = os.getenv("DEALIO_PG_PASSWORD", "")
 DEALIO_PG_DB       = os.getenv("DEALIO_PG_DB", "dealio")
+DEALIO_PG_SSLCERT  = os.getenv("DEALIO_PG_SSLCERT", "/root/.postgresql/client.crt")
+DEALIO_PG_SSLKEY   = os.getenv("DEALIO_PG_SSLKEY", "/root/.postgresql/client.key")
+DEALIO_PG_SSLROOTCERT = os.getenv("DEALIO_PG_SSLROOTCERT", "/root/.postgresql/ca.crt")
 
 # JWT / Auth
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "change-me-in-production")

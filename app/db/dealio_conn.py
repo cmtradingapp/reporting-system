@@ -18,6 +18,7 @@ from datetime import datetime, timedelta, timezone
 from app.config import (
     DEALIO_PG_HOST, DEALIO_PG_PORT, DEALIO_PG_USER,
     DEALIO_PG_PASSWORD, DEALIO_PG_DB,
+    DEALIO_PG_SSLCERT, DEALIO_PG_SSLKEY, DEALIO_PG_SSLROOTCERT,
 )
 
 # ── Symbols to exclude from trades_mt4 ──────────────────────────────────────
@@ -47,6 +48,10 @@ def get_dealio_connection():
         dbname=DEALIO_PG_DB,
         connect_timeout=15,
         options="-c statement_timeout=120000",
+        sslmode="require",
+        sslcert=DEALIO_PG_SSLCERT,
+        sslkey=DEALIO_PG_SSLKEY,
+        sslrootcert=DEALIO_PG_SSLROOTCERT,
     )
 
 
