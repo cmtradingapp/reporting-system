@@ -442,7 +442,7 @@
               <th class="text-center" style="min-width:120px;" data-sort="bon-pctOnTargetNet">% on Target Net <i class="bi sort-icon" id="bon-sort-icon-pctOnTargetNet"></i></th>
               <th class="text-center" style="min-width:120px;" data-sort="bon-pctOnTargetVol">% on Target Vol <i class="bi sort-icon" id="bon-sort-icon-pctOnTargetVol"></i></th>
               <th class="text-center" style="min-width:110px;" data-sort="bon-totalBonusPct">Total Bonus % <i class="bi sort-icon" id="bon-sort-icon-totalBonusPct"></i></th>
-              <th class="text-center" style="min-width:120px;" data-sort="bon-basicBonusUsd">Basic Bonus $ <i class="bi sort-icon" id="bon-sort-icon-basicBonusUsd"></i></th>
+              <th class="text-center" style="min-width:150px;" data-sort="bon-basicBonusUsd">Total Retention Bonus $ <i class="bi sort-icon" id="bon-sort-icon-basicBonusUsd"></i></th>
             </tr>
           </thead>
           <tbody id="bonus-tbody"></tbody>
@@ -609,14 +609,10 @@
 
             <div class="col-md-3">
               <div class="fw-semibold mb-1" style="color:#c9d1d9;font-size:0.9rem;">% on Target Net</div>
-              <div class="p-3 mb-4" style="background:#1c2128;border:1px solid #30363d;border-radius:8px;font-size:0.82rem;">
+              <div class="p-3" style="background:#1c2128;border:1px solid #30363d;border-radius:8px;font-size:0.82rem;">
                 <span style="color:#3fb950;font-weight:700;">+0.5%</span>
                 <span style="color:#c9d1d9;"> if Net USD ≥ 100% of Target NET</span><br>
                 <span class="text-muted">Otherwise: 0%</span>
-              </div>
-              <div class="fw-semibold mb-1" style="color:#c9d1d9;font-size:0.9rem;">Target Volume</div>
-              <div class="p-3" style="background:#1c2128;border:1px solid #30363d;border-radius:8px;font-size:0.82rem;">
-                <code style="color:#d29922;">Target Volume = Target NET × 1,650</code>
               </div>
             </div>
 
@@ -638,13 +634,23 @@
                   <tr><td style="padding:4px 8px;color:#c9d1d9;">≥ 200%</td>           <td style="text-align:center;padding:4px 8px;color:#3fb950;">+1.5%</td></tr>
                 </tbody>
               </table>
+              <div class="fw-semibold mb-1 mt-3" style="color:#c9d1d9;font-size:0.9rem;">Target Volume</div>
+              <div class="p-3" style="background:#1c2128;border:1px solid #30363d;border-radius:8px;font-size:0.82rem;">
+                <code style="color:#d29922;">Target Volume = Target NET × 1,650</code>
+              </div>
             </div>
 
             <div class="col-md-3">
-              <div class="fw-semibold mb-1" style="color:#c9d1d9;font-size:0.9rem;">Basic Bonus $</div>
-              <div class="p-3" style="background:#1c2128;border:1px solid #30363d;border-radius:8px;">
-                <code style="color:#d29922;font-size:0.8rem;">Total Bonus % × Net $</code><br>
-                <span class="small text-muted mt-1 d-block">Total % = % on Net + % on Target Net + % on Target Vol</span>
+              <div class="fw-semibold mb-1" style="color:#c9d1d9;font-size:0.9rem;">Total Retention Bonus $</div>
+              <div class="p-3" style="background:#1c2128;border:1px solid #30363d;border-radius:8px;line-height:2;">
+                <code style="color:#3fb950;font-size:0.82rem;">% on Net</code><br>
+                <code style="color:#8b949e;font-size:0.82rem;">+ % on Target Net</code><br>
+                <code style="color:#8b949e;font-size:0.82rem;">+ % on Target Vol</code><br>
+                <code style="color:#d29922;font-size:0.82rem;">= Total Bonus %</code><br>
+                <div style="border-top:1px solid #30363d;margin-top:6px;padding-top:6px;">
+                  <code style="color:#d29922;font-size:0.82rem;">Total Bonus % × Net $</code><br>
+                  <code style="color:#3fb950;font-size:0.82rem;">= Total Retention Bonus $</code>
+                </div>
               </div>
             </div>
 
@@ -680,7 +686,7 @@
             </div>
 
             <div class="col-md-3">
-              <div class="fw-semibold mb-1" style="color:#c9d1d9;font-size:0.9rem;">Basic Bonus $</div>
+              <div class="fw-semibold mb-1" style="color:#c9d1d9;font-size:0.9rem;">Total Retention Bonus $</div>
               <div class="p-3" style="background:#1c2128;border:1px solid #30363d;border-radius:8px;">
                 <code style="color:#d29922;font-size:0.8rem;">% on Net × Net $</code><br>
                 <span class="small text-muted mt-1 d-block">No % on Target Net or Target Vol for these offices</span>
@@ -1567,7 +1573,7 @@
       'Office', 'Department', 'Agent', 'Target NET', 'Net $', 'Target Net %',
       'Target Volume', 'Open Volume', 'Target Vol %',
       '% on Net', '% on Target Net', '% on Target Vol',
-      'Total Bonus %', 'Basic Bonus $',
+      'Total Bonus %', 'Total Retention Bonus $',
     ];
     const rows = bonAllRows.map(r => [
       r.office_name,
