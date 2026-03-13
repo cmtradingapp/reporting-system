@@ -94,6 +94,7 @@ _MYSQL_FTC = """
         COUNT(DISTINCT bb.user_id) AS ftc_count
     FROM crmdb.broker_banking bb
     JOIN crmdb.v_ant_broker_user bu ON bb.broker_user_id = bu.id
+    LEFT JOIN crmdb.user_additional_info_rel uair ON uair.user_id = bb.user_id
     LEFT JOIN (SELECT `key`, value FROM crmdb.autolut WHERE type = 'TransactionStatus') l1
         ON l1.`key` = bb.status
     LEFT JOIN (SELECT `key`, value FROM crmdb.autolut WHERE type = 'BrokerBankingType') l2
@@ -101,8 +102,8 @@ _MYSQL_FTC = """
     WHERE l1.value = 'Success'
       AND l2.value = 'Deposit'
       AND bb.is_ftd = 1
-      AND bb.decision_time >= %s
-      AND bb.decision_time <  %s
+      AND uair.qualification_time >= %s
+      AND uair.qualification_time <  %s
       AND bu.is_demo = 0
     GROUP BY agent_id
     HAVING agent_id IS NOT NULL AND agent_id > 0
