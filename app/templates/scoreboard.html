@@ -229,6 +229,8 @@
       .table-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
       .kpi-card { padding:8px 10px; }
       .kpi-value { font-size:1.1rem; }
+      .kpi-split { flex-wrap:nowrap !important; gap:6px !important; }
+      .kpi-split .kpi-value { font-size:0.88rem; }
       .date-input { width:120px; }
       .cnt-badge { display:none; }
       #row-count, #ret-row-count { display:none; }
@@ -374,7 +376,7 @@
     {% endif %}
     <div class="col-6 col-md">
       <div class="kpi-card text-center">
-        <div style="display:flex;justify-content:center;align-items:center;gap:14px;">
+        <div class="kpi-split" style="display:flex;justify-content:center;align-items:center;gap:14px;">
           {% if show_sales %}
           <div>
             <div class="kpi-value" style="color:#3fb950;" id="stat-daily-net">—</div>
@@ -387,7 +389,7 @@
           {% if show_retention %}
           <div>
             <div class="kpi-value" style="color:#388bfd;" id="stat-daily-net-ret">—</div>
-            <div class="kpi-label">Daily Ret.</div>
+            <div class="kpi-label">Daily Ret Net</div>
           </div>
           {% endif %}
         </div>
