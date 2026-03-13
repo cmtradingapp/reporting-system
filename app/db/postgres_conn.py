@@ -401,8 +401,7 @@ def ensure_table():
         CREATE INDEX IF NOT EXISTS idx_ddp_date        ON dealio_daily_profit (date);
         CREATE INDEX IF NOT EXISTS idx_ddp_assigned_to ON dealio_daily_profit (assigned_to);
 
-        DROP TABLE IF EXISTS dealio_users;
-        CREATE TABLE dealio_users (
+        CREATE TABLE IF NOT EXISTS dealio_users (
             login          BIGINT           NOT NULL,
             sourceid       TEXT             NOT NULL,
             sourcename     TEXT,
@@ -432,8 +431,7 @@ def ensure_table():
         CREATE INDEX IF NOT EXISTS idx_dealio_users_lastupdate ON dealio_users (lastupdate);
         CREATE INDEX IF NOT EXISTS idx_dealio_users_group      ON dealio_users (groupname);
 
-        DROP TABLE IF EXISTS dealio_trades_mt4;
-        CREATE TABLE dealio_trades_mt4 (
+        CREATE TABLE IF NOT EXISTS dealio_trades_mt4 (
             ticket          BIGINT           NOT NULL,
             source_id       TEXT             NOT NULL,
             login           BIGINT,
