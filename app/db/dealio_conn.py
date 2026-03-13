@@ -102,27 +102,27 @@ def get_dealio_users(hours: int = 24) -> pd.DataFrame:
 
 
 def get_dealio_users_full():
-    """Full fetch of dealio.users in chunks (keyset pagination on login)."""
+    """Full fetch of dealio.users in chunks. Reconnects per chunk to avoid SSL timeout."""
     last_login = 0
-    conn = get_dealio_connection()
-    try:
-        while True:
-            sql = f"""
-                SELECT {_USERS_COLS}
-                FROM dealio.users
-                WHERE login > %(last_login)s
-                ORDER BY login
-                LIMIT {_CHUNK_SIZE}
-            """
+    while True:
+        sql = f"""
+            SELECT {_USERS_COLS}
+            FROM dealio.users
+            WHERE login > %(last_login)s
+            ORDER BY login
+            LIMIT {_CHUNK_SIZE}
+        """
+        conn = get_dealio_connection()
+        try:
             df = pd.read_sql(sql, conn, params={"last_login": last_login})
-            if df.empty:
-                break
-            yield df
-            if len(df) < _CHUNK_SIZE:
-                break
-            last_login = int(df["login"].max())
-    finally:
-        conn.close()
+        finally:
+            conn.close()
+        if df.empty:
+            break
+        yield df
+        if len(df) < _CHUNK_SIZE:
+            break
+        last_login = int(df["login"].max())
 
 
 # ── dealio.trades_mt4 ────────────────────────────────────────────────────────
@@ -173,29 +173,30 @@ def get_dealio_trades_mt4(hours: int = 24) -> pd.DataFrame:
 
 
 def get_dealio_trades_mt4_full():
-    """Full fetch of dealio.trades_mt4 in chunks (cmd 0/1, filtered symbols)."""
+    """Full fetch of dealio.trades_mt4 in chunks (cmd 0/1, filtered symbols).
+    Reconnects per chunk to avoid SSL timeout on long-running syncs."""
     last_ticket = 0
-    conn = get_dealio_connection()
-    try:
-        while True:
-            sql = f"""
-                SELECT {_TRADES_COLS}
-                FROM dealio.trades_mt4
-                WHERE ticket > %(last_ticket)s
-                  AND cmd IN (0, 1)
-                  AND symbol NOT IN %(excluded)s
-                ORDER BY ticket
-                LIMIT {_CHUNK_SIZE}
-            """
+    while True:
+        sql = f"""
+            SELECT {_TRADES_COLS}
+            FROM dealio.trades_mt4
+            WHERE ticket > %(last_ticket)s
+              AND cmd IN (0, 1)
+              AND symbol NOT IN %(excluded)s
+            ORDER BY ticket
+            LIMIT {_CHUNK_SIZE}
+        """
+        conn = get_dealio_connection()
+        try:
             df = pd.read_sql(sql, conn, params={
                 "last_ticket": last_ticket,
                 "excluded": _EXCLUDED_SYMBOLS_TUPLE,
             })
-            if df.empty:
-                break
-            yield df
-            if len(df) < _CHUNK_SIZE:
-                break
-            last_ticket = int(df["ticket"].max())
-    finally:
-        conn.close()
+        finally:
+            conn.close()
+        if df.empty:
+            break
+        yield df
+        if len(df) < _CHUNK_SIZE:
+            break
+        last_ticket = int(df["ticket"].max())
