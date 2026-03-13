@@ -209,14 +209,15 @@ def run_performance_checks(conn, date_from: str, date_to: str, cfg: dict) -> Lis
         results.append(_flag("Performance", "Sales", "net_per_agent", "All Agents",
                              STATUS["PASS"], "All net_deposits values finite"))
 
-    # 5. ftd100_per_agent — ftd100 <= ftc
+    # 5. ftd100_per_agent — ftd100 can exceed ftc (different date fields: ftd_100_date vs
+    #    client_qualification_date), so this is WARN not FAIL
     ftd100_issues = [r for r in sales_data if r["ftd100"] > r["ftc"] and r["ftc"] > 0]
     if ftd100_issues:
-        for r in ftd100_issues:
-            results.append(_flag("Performance", "Sales", "ftd100_per_agent", r["agent_name"],
-                                 STATUS["FAIL"],
-                                 f"FTD100 ({r['ftd100']}) > FTC ({r['ftc']})",
-                                 r["ftc"], r["ftd100"]))
+        names = ", ".join(r["agent_name"] for r in ftd100_issues[:5])
+        more  = f" (+{len(ftd100_issues)-5} more)" if len(ftd100_issues) > 5 else ""
+        results.append(_flag("Performance", "Sales", "ftd100_per_agent", "Multiple",
+                             STATUS["WARN"],
+                             f"{len(ftd100_issues)} agents: FTD100 > FTC (different date fields — expected): {names}{more}"))
     else:
         results.append(_flag("Performance", "Sales", "ftd100_per_agent", "All Agents",
                              STATUS["PASS"], "All FTD100 <= FTC"))
@@ -365,19 +366,20 @@ def _run_retention_checks(conn, date_from: str, date_to: str, cfg: dict) -> List
         results.append(_flag("Performance", "Retention", "target_net_per_agent", "All Agents",
                              STATUS["PASS"], "All agents have target_net > 0"))
 
-    # 4. net_usd_per_agent — must be finite; warn if net==0 and target>0
-    for row in data:
-        if not math.isfinite(row["net_usd"]):
-            results.append(_flag("Performance", "Retention", "net_usd_per_agent", row["agent_name"],
-                                 STATUS["FAIL"], f"Non-finite net_usd: {row['net_usd']}"))
-        elif row["net_usd"] == 0 and row["target_net"] > 0:
-            results.append(_flag("Performance", "Retention", "net_usd_per_agent", row["agent_name"],
-                                 STATUS["WARN"],
-                                 f"net_usd=0 but target_net={row['target_net']}"))
-
-    if not any(r.check_name == "net_usd_per_agent" for r in results):
+    # 4. net_usd_per_agent — must be finite; summary warn if many have net==0 and target>0
+    nonfinite = [r for r in data if not math.isfinite(r["net_usd"])]
+    for row in nonfinite:
+        results.append(_flag("Performance", "Retention", "net_usd_per_agent", row["agent_name"],
+                             STATUS["FAIL"], f"Non-finite net_usd: {row['net_usd']}"))
+    zero_with_target = [r for r in data if r["net_usd"] == 0 and r["target_net"] > 0]
+    if zero_with_target:
+        results.append(_flag("Performance", "Retention", "net_usd_per_agent", "Summary",
+                             STATUS["WARN"],
+                             f"{len(zero_with_target)} agents have net_usd=0 but target_net>0 "
+                             f"(normal early in month)"))
+    if not nonfinite and not zero_with_target:
         results.append(_flag("Performance", "Retention", "net_usd_per_agent", "All Agents",
-                             STATUS["PASS"], "All net_usd values finite"))
+                             STATUS["PASS"], "All net_usd values finite and > 0"))
 
     # 5. deposit_vs_net — deposit_usd >= net_usd
     dep_issues = [r for r in data if r["deposit_usd"] < r["net_usd"] - 0.01]

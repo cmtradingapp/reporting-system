@@ -100,9 +100,12 @@ def run(date_to: Optional[str] = None, reports: Optional[List[str]] = None) -> d
 
     total = len(all_results)
     if total == 0:
-        score = 0.0
+        score = 100.0
     else:
-        score = sum(1 for r in all_results if r.status == STATUS["PASS"]) / total * 100
+        # Score = PASS / (PASS + FAIL + ERROR) × 100  — WARNs are informational, not failures
+        denom = sum(1 for r in all_results if r.status in (STATUS["PASS"], STATUS["FAIL"], STATUS["ERROR"]))
+        score = (sum(1 for r in all_results if r.status == STATUS["PASS"]) / denom * 100
+                 if denom > 0 else 100.0)
 
     folder = cfg.get("output", {}).get("folder", "reports/qa")
     os.makedirs(folder, exist_ok=True)

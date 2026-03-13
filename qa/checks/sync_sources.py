@@ -60,20 +60,21 @@ def run_sync_checks(conn, date_from: str, date_to: str, cfg: dict) -> List[QARes
     freshness_hours = cfg.get("checks", {}).get("sync_freshness_hours", 3)
 
     # ── 1. Sync freshness ────────────────────────────────────────────────────
-    entities = ["accounts", "transactions", "targets", "dealio_mt4trades", "crm_users"]
+    # sync_log columns: table_name, ran_at (see postgres_conn.py ensure_table)
+    table_names = ["accounts", "transactions", "targets", "dealio_mt4trades", "crm_users"]
     with conn.cursor() as cur:
-        for entity in entities:
+        for tbl in table_names:
             try:
                 cur.execute("""
-                    SELECT MAX(created_at)
+                    SELECT MAX(ran_at)
                     FROM sync_log
-                    WHERE entity = %(entity)s
-                """, {"entity": entity})
+                    WHERE table_name = %(tbl)s
+                """, {"tbl": tbl})
                 row = cur.fetchone()
                 last_sync = row[0] if row else None
                 if last_sync is None:
-                    results.append(_flag("Freshness", "sync_freshness", entity,
-                                         STATUS["ERROR"], f"No sync_log entry for {entity}"))
+                    results.append(_flag("Freshness", "sync_freshness", tbl,
+                                         STATUS["ERROR"], f"No sync_log entry for {tbl}"))
                 else:
                     from datetime import timezone
                     now = datetime.now(timezone.utc)
@@ -82,14 +83,14 @@ def run_sync_checks(conn, date_from: str, date_to: str, cfg: dict) -> List[QARes
                         last_sync = last_sync.replace(tzinfo=tz.utc)
                     age_hours = (now - last_sync).total_seconds() / 3600
                     st = STATUS["PASS"] if age_hours <= freshness_hours else STATUS["ERROR"]
-                    results.append(_flag("Freshness", "sync_freshness", entity,
+                    results.append(_flag("Freshness", "sync_freshness", tbl,
                                          st,
-                                         f"{entity}: last sync {round(age_hours,1)}h ago (max={freshness_hours}h)",
+                                         f"{tbl}: last sync {round(age_hours,1)}h ago (max={freshness_hours}h)",
                                          freshness_hours, round(age_hours, 1)))
             except Exception as e:
                 conn.rollback()
-                results.append(_flag("Freshness", "sync_freshness", entity,
-                                     STATUS["ERROR"], f"Freshness query failed for {entity}: {e}"))
+                results.append(_flag("Freshness", "sync_freshness", tbl,
+                                     STATUS["ERROR"], f"Freshness query failed for {tbl}: {e}"))
 
     # ── 2. Transaction count cross-check: PostgreSQL vs MySQL ────────────────
     tomorrow_str = (datetime.strptime(date_to, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
@@ -111,7 +112,7 @@ def run_sync_checks(conn, date_from: str, date_to: str, cfg: dict) -> List[QARes
             results.append(_flag("Transaction Count", "tx_count_crosscheck", "Grand Total",
                                  STATUS["ERROR"], f"PG tx count query failed: {e}"))
 
-    # MySQL transaction count
+    # MySQL transaction count — broker_banking uses decision_time + autolut JOIN for approval status
     mysql_tx_count = None
     try:
         my_conn = _get_mysql()
@@ -119,10 +120,15 @@ def run_sync_checks(conn, date_from: str, date_to: str, cfg: dict) -> List[QARes
             with my_conn.cursor() as cur:
                 cur.execute("""
                     SELECT COUNT(*)
-                    FROM broker_banking
-                    WHERE confirmation_time >= %s
-                      AND confirmation_time <  %s
-                      AND statusmapping = 'Approved'
+                    FROM crmdb.broker_banking bb
+                    JOIN crmdb.v_ant_broker_user bu ON bb.broker_user_id = bu.id
+                    LEFT JOIN (SELECT `key`, value FROM crmdb.autolut WHERE type = 'TransactionStatus') l1
+                        ON l1.`key` = bb.status
+                    WHERE l1.value = 'Success'
+                      AND bb.decision_time >= %s
+                      AND bb.decision_time <  %s
+                      AND bb.server_id = 2
+                      AND (bb.normalized_amount / 100) < 10000000
                 """, (date_from, tomorrow_str))
                 mysql_tx_count = int(cur.fetchone()[0] or 0)
         finally:
@@ -160,12 +166,19 @@ def run_sync_checks(conn, date_from: str, date_to: str, cfg: dict) -> List[QARes
         try:
             with my_conn.cursor() as cur:
                 cur.execute("""
-                    SELECT COALESCE(SUM(usdamount), 0)
-                    FROM broker_banking
-                    WHERE confirmation_time >= %s
-                      AND confirmation_time <  %s
-                      AND statusmapping = 'Approved'
-                      AND transactiontype = 'Deposit'
+                    SELECT COALESCE(SUM(bb.normalized_amount / 100), 0)
+                    FROM crmdb.broker_banking bb
+                    JOIN crmdb.v_ant_broker_user bu ON bb.broker_user_id = bu.id
+                    LEFT JOIN (SELECT `key`, value FROM crmdb.autolut WHERE type = 'TransactionStatus') l1
+                        ON l1.`key` = bb.status
+                    LEFT JOIN (SELECT `key`, value FROM crmdb.autolut WHERE type = 'BrokerBankingType') l2
+                        ON l2.`key` = bb.type
+                    WHERE l1.value = 'Success'
+                      AND l2.value = 'Deposit'
+                      AND bb.decision_time >= %s
+                      AND bb.decision_time <  %s
+                      AND bb.server_id = 2
+                      AND (bb.normalized_amount / 100) < 10000000
                 """, (date_from, tomorrow_str))
                 mysql_dep_sum = float(cur.fetchone()[0] or 0)
         finally:
@@ -244,8 +257,8 @@ def run_sync_checks(conn, date_from: str, date_to: str, cfg: dict) -> List[QARes
             with my_conn.cursor() as cur:
                 cur.execute("""
                     SELECT COUNT(*)
-                    FROM v_ant_operators
-                    WHERE status = 'Active'
+                    FROM crmdb.v_ant_operators o
+                    WHERE o.is_active = 1
                 """)
                 mysql_crm_count = int(cur.fetchone()[0] or 0)
         finally:
