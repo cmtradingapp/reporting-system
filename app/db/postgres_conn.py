@@ -1709,10 +1709,11 @@ def upsert_dealio_users(df: pd.DataFrame):
 def fetch_dealio_users_stats() -> dict:
     sql = """
         SELECT
-            COUNT(*)                   AS total_records,
-            MAX(synced_at)             AS last_synced_at,
-            COUNT(DISTINCT group_name) AS unique_groups,
-            COUNT(DISTINCT currency)   AS unique_currencies
+            COUNT(*)                             AS total_records,
+            MAX(synced_at)                       AS last_synced_at,
+            COUNT(DISTINCT group_name)           AS unique_groups,
+            COUNT(DISTINCT currency)             AS unique_currencies,
+            COUNT(*) FILTER (WHERE balance > 0)  AS users_with_balance
         FROM dealio_users
     """
     conn = get_connection()
@@ -1721,10 +1722,11 @@ def fetch_dealio_users_stats() -> dict:
             cur.execute(sql)
             row = cur.fetchone()
             return {
-                "total_records":     row[0] or 0,
-                "last_synced_at":    row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else "Never",
-                "unique_groups":     row[2] or 0,
-                "unique_currencies": row[3] or 0,
+                "total_records":      row[0] or 0,
+                "last_synced_at":     row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else "Never",
+                "unique_groups":      row[2] or 0,
+                "unique_currencies":  row[3] or 0,
+                "users_with_balance": row[4] or 0,
             }
     finally:
         conn.close()

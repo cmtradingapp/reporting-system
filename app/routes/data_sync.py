@@ -230,7 +230,7 @@ async def data_sync_page(request: Request):
                 {"label": "Total Records",     "value": du_stats["total_records"],     "color": "text-info",    "icon": "bi-database"},
                 {"label": "Unique Groups",     "value": du_stats["unique_groups"],     "color": "text-success", "icon": "bi-diagram-3"},
                 {"label": "Unique Currencies", "value": du_stats["unique_currencies"], "color": "text-warning", "icon": "bi-currency-exchange"},
-                {"label": "Last Synced",       "value": du_stats["last_synced_at"],    "color": "text-primary", "icon": "bi-clock"},
+                {"label": "With Balance",      "value": du_stats["users_with_balance"], "color": "text-primary", "icon": "bi-wallet2"},
             ],
             "sync_log": du_log,
             "healthy": _is_healthy(du_log, DEALIO_USERS_SYNC_INTERVAL_HOURS),
