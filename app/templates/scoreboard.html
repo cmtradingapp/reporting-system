@@ -422,8 +422,17 @@
     </div>
     <div class="col-6 col-md-2">
       <div class="kpi-card text-center">
-        <div class="kpi-value" style="color:#d29922;" id="stat-grand-ftc-rr">—</div>
-        <div class="kpi-label">FTC RR</div>
+        <div class="kpi-split" style="display:flex;justify-content:center;align-items:center;gap:14px;">
+          <div>
+            <div class="kpi-value" style="color:#d29922;" id="stat-grand-ftd-rr">—</div>
+            <div class="kpi-label">FTD RR</div>
+          </div>
+          <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
+          <div>
+            <div class="kpi-value" style="color:#d29922;" id="stat-grand-ftc-rr">—</div>
+            <div class="kpi-label">FTC RR</div>
+          </div>
+        </div>
       </div>
     </div>
     <div class="col-6 col-md-2">
@@ -743,6 +752,8 @@
     const volFmt = v => Math.round(v).toLocaleString();
     document.getElementById('stat-grand-ftc').textContent      = data.grand_ftc.toLocaleString();
     document.getElementById('stat-grand-ftc-rr').textContent   = data.grand_ftc_rr.toLocaleString();
+    const ftdRrEl = document.getElementById('stat-grand-ftd-rr');
+    if (ftdRrEl) ftdRrEl.textContent = (data.grand_ftd_rr ?? 0).toLocaleString();
     document.getElementById('stat-grand-net').textContent      = netFmt(data.grand_net);
     document.getElementById('stat-grand-net-rr').textContent   = netFmt(data.grand_net_rr);
     document.getElementById('stat-open-volume').textContent    = volFmt(data.open_volume);

@@ -336,6 +336,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
 
         safe_wdp        = working_days_passed if working_days_passed > 0 else 1
         grand_ftc_rr    = round(grand_ftc  / safe_wdp * working_days)
+        grand_ftd_rr    = round(grand_ftd  / safe_wdp * working_days)
         grand_net_rr    = round(grand_net  / safe_wdp * working_days, 2)
         open_volume_rr  = round(open_volume / safe_wdp * working_days) if open_volume > 0 else round(open_volume)
 
@@ -361,6 +362,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
             "total_ftd_count":      sum(r["ftd_count"] for r in data),
             "grand_ftc":            grand_ftc,
             "grand_ftc_rr":         grand_ftc_rr,
+            "grand_ftd_rr":         grand_ftd_rr,
             "grand_net":            round(grand_net, 2),
             "grand_net_rr":         grand_net_rr,
             "open_volume":          round(open_volume, 2),
