@@ -292,7 +292,7 @@
     <h4 class="fw-bold text-white mb-0">Performance Report</h4>
     <span style="font-size:0.73rem;color:#8b949e;white-space:nowrap;"><span id="stat-wd">—</span> work days &middot; <span id="stat-wd-left">—</span> left</span>
   </div>
-  <div id="sync-bar" style="font-size:0.73rem;color:#8b949e;margin-bottom:14px;"><i class="bi bi-arrow-repeat me-1"></i>Last sync: <span id="sync-bar-val">—</span></div>
+  <div id="sync-bar" style="font-size:0.73rem;color:#8b949e;margin-bottom:14px;display:flex;align-items:center;gap:12px;"><i class="bi bi-arrow-repeat me-1"></i>Last sync: <span id="sync-bar-val">—</span><span class="d-md-none" style="white-space:nowrap;"><span id="stat-wd-mob">—</span> work days &middot; <span id="stat-wd-left-mob">—</span> left</span></div>
 
   <!-- Filter Bar -->
   <div class="card mb-4">
@@ -737,6 +737,8 @@
       });
       document.getElementById('stat-wd').textContent      = workingDays;
       document.getElementById('stat-wd-left').textContent = workingDaysLeft;
+      document.getElementById('stat-wd-mob').textContent      = workingDays;
+      document.getElementById('stat-wd-left-mob').textContent = workingDaysLeft;
       updateStats(data);
       populateFilterDropdowns();
       renderTable();
