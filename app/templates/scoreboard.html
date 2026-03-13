@@ -127,7 +127,6 @@
     .office-row td {
       background-color: #12171f;
       color: #c9d1d9;
-      font-size: 0.8rem;
       font-weight: 700;
       letter-spacing: 0.5px;
       padding: 9px 14px;
@@ -136,8 +135,9 @@
       cursor: pointer;
       user-select: none;
     }
+    .office-row td:first-child { font-size: 0.8rem; }
     .office-row:hover td { background-color: #161b22; }
-    .office-total { font-size: 1rem; font-weight: 700; color: #c9d1d9; }
+    .office-total { font-weight: 700; color: #c9d1d9; }
     .chevron { transition: transform 0.2s; display: inline-block; color: #484f58; font-size: 0.7rem; margin-right: 8px; }
     .chevron.open { transform: rotate(90deg); }
 
@@ -145,23 +145,23 @@
     .dept-row td {
       background-color: #161b22;
       color: #c9d1d9;
-      font-size: 0.78rem;
       font-weight: 600;
-      padding: 7px 14px 7px 28px;
+      padding: 7px 14px;
       border-bottom: 1px solid #21262d;
       cursor: pointer;
       user-select: none;
     }
+    .dept-row td:first-child { font-size: 0.78rem; padding-left: 28px; }
     .dept-row:hover td { background-color: #1c2128; }
 
     /* Agent sub-row */
-    .agent-row td { padding: 8px 14px 8px 36px; border-bottom: 1px solid #1a1f27; }
-    .agent-row td:first-child { color: #e0e0e0; font-size: 0.88rem; white-space: nowrap; }
+    .agent-row td { padding: 8px 14px; border-bottom: 1px solid #1a1f27; }
+    .agent-row td:first-child { color: #e0e0e0; font-size: 0.88rem; white-space: nowrap; padding-left: 36px; }
     .office-row td:first-child { white-space: nowrap; }
 
     /* Retention agent row (deeper indent, level 2) */
-    .retention-agent-row td { padding: 8px 14px 8px 52px; border-bottom: 1px solid #1a1f27; }
-    .retention-agent-row td:first-child { color: #e0e0e0; font-size: 0.88rem; white-space: nowrap; }
+    .retention-agent-row td { padding: 8px 14px; border-bottom: 1px solid #1a1f27; }
+    .retention-agent-row td:first-child { color: #e0e0e0; font-size: 0.88rem; white-space: nowrap; padding-left: 52px; }
 
     /* Grand total row */
     .total-row td {
@@ -941,9 +941,7 @@
     if (val === null || val === undefined) return `<span style="color:#484f58;">—</span>`;
     const color = val >= 0 ? '#3fb950' : '#f85149';
     const fw = bold ? '700' : '600';
-    const fmt = Math.abs(val) >= 1000
-      ? (val < 0 ? '-' : '') + '$' + Math.abs(val).toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})
-      : (val < 0 ? '-$' : '$') + Math.abs(val).toFixed(2);
+    const fmt = (val < 0 ? '-' : '') + '$' + Math.round(Math.abs(val)).toLocaleString('en-US');
     return `<span style="color:${color};font-weight:${fw};">${fmt}</span>`;
   }
 
@@ -1104,10 +1102,7 @@
     if (val === null || val === undefined) return `<span style="color:#484f58;">—</span>`;
     const fw = bold ? '700' : '600';
     const color = val <= 0 ? '#3fb950' : '#f85149';
-    const abs = Math.abs(val);
-    const fmt = abs >= 1000
-      ? (val < 0 ? '-' : '') + '$' + Math.round(abs).toLocaleString('en-US')
-      : (val < 0 ? '-$' : '$') + abs.toFixed(2);
+    const fmt = (val < 0 ? '-' : '') + '$' + Math.round(Math.abs(val)).toLocaleString('en-US');
     return `<span style="color:${color};font-weight:${fw};">${fmt}</span>`;
   }
 
@@ -1116,10 +1111,7 @@
     if (val === null || val === undefined) return `<span style="color:#484f58;">—</span>`;
     const fw = bold ? '700' : '600';
     const color = val <= 0 ? '#3fb950' : '#d29922';
-    const abs = Math.abs(val);
-    const fmt = abs >= 1000
-      ? (val < 0 ? '-' : '') + '$' + Math.round(abs).toLocaleString('en-US')
-      : (val < 0 ? '-$' : '$') + abs.toFixed(2);
+    const fmt = (val < 0 ? '-' : '') + '$' + Math.round(Math.abs(val)).toLocaleString('en-US');
     return `<span style="color:${color};font-weight:${fw};">${fmt}</span>`;
   }
 
