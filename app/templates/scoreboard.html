@@ -380,27 +380,6 @@
       </div>
     </div>
     {% endif %}
-    <div class="col-6 col-md-2" id="kpi-daily-net">
-      <div class="kpi-card text-center">
-        <div class="kpi-split" style="display:flex;justify-content:center;align-items:center;gap:14px;">
-          {% if show_sales %}
-          <div>
-            <div class="kpi-value" style="color:#3fb950;" id="stat-daily-net">—</div>
-            <div class="kpi-label">Daily Net</div>
-          </div>
-          {% endif %}
-          {% if show_sales and show_retention %}
-          <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
-          {% endif %}
-          {% if show_retention %}
-          <div>
-            <div class="kpi-value" style="color:#388bfd;" id="stat-daily-net-ret">—</div>
-            <div class="kpi-label">Daily Ret Net</div>
-          </div>
-          {% endif %}
-        </div>
-      </div>
-    </div>
     <div class="col-6 col-md-2" id="kpi-ftd-ftc">
       <div class="kpi-card text-center">
         <div style="display:flex;justify-content:center;align-items:center;gap:10px;">
@@ -428,6 +407,27 @@
             <div class="kpi-value" style="color:#d29922;" id="stat-grand-ftc-rr">—</div>
             <div class="kpi-label">FTC RR</div>
           </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-2" id="kpi-daily-net">
+      <div class="kpi-card text-center">
+        <div class="kpi-split" style="display:flex;justify-content:center;align-items:center;gap:14px;">
+          {% if show_sales %}
+          <div>
+            <div class="kpi-value" style="color:#3fb950;" id="stat-daily-net">—</div>
+            <div class="kpi-label">Daily Net</div>
+          </div>
+          {% endif %}
+          {% if show_sales and show_retention %}
+          <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
+          {% endif %}
+          {% if show_retention %}
+          <div>
+            <div class="kpi-value" style="color:#388bfd;" id="stat-daily-net-ret">—</div>
+            <div class="kpi-label">Daily Ret Net</div>
+          </div>
+          {% endif %}
         </div>
       </div>
     </div>
