@@ -231,6 +231,15 @@
       .kpi-value { font-size:1.1rem; }
       .kpi-split { flex-wrap:nowrap !important; gap:6px !important; }
       .kpi-split .kpi-value { font-size:0.88rem; }
+      #kpi-daily-ftd { order:1; }
+      #kpi-ftd-ftc   { order:2; }
+      #kpi-ftd-rr    { order:3; }
+      #kpi-daily-net { order:4; }
+      #kpi-net       { order:5; }
+      #kpi-net-rr    { order:6; }
+      #kpi-vol       { order:7; }
+      #kpi-vol-rr    { order:8; }
+      #kpi-equity    { order:9; }
       .date-input { width:120px; }
       .cnt-badge { display:none; }
       #row-count, #ret-row-count { display:none; }
@@ -352,10 +361,10 @@
     </div><!-- /filter-body -->
   </div>
 
-  <!-- KPI Cards Row 1: daily metrics -->
-  <div class="row g-2 mb-1">
+  <!-- KPI Cards -->
+  <div class="row g-2 mb-4">
     {% if show_sales %}
-    <div class="col-6 col-md">
+    <div class="col-12 col-md" id="kpi-daily-ftd">
       <div class="kpi-card text-center">
         <div style="display:flex;justify-content:center;align-items:center;gap:14px;">
           <div>
@@ -371,7 +380,7 @@
       </div>
     </div>
     {% endif %}
-    <div class="col-6 col-md">
+    <div class="col-12 col-md" id="kpi-daily-net">
       <div class="kpi-card text-center">
         <div class="kpi-split" style="display:flex;justify-content:center;align-items:center;gap:14px;">
           {% if show_sales %}
@@ -392,17 +401,7 @@
         </div>
       </div>
     </div>
-    <div class="col-6 col-md">
-      <div class="kpi-card text-center">
-        <div class="kpi-value" style="color:#a371f7;" id="stat-end-equity-zeroed">—</div>
-        <div class="kpi-label">End Equity Zeroed</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- KPI Cards Row 2: metrics paired with their RR -->
-  <div class="row g-2 mb-4">
-    <div class="col-6 col-md-2">
+    <div class="col-12 col-md-2" id="kpi-ftd-ftc">
       <div class="kpi-card text-center">
         <div style="display:flex;justify-content:center;align-items:center;gap:10px;">
           <div>
@@ -417,7 +416,7 @@
         </div>
       </div>
     </div>
-    <div class="col-6 col-md-2">
+    <div class="col-12 col-md-2" id="kpi-ftd-rr">
       <div class="kpi-card text-center">
         <div class="kpi-split" style="display:flex;justify-content:center;align-items:center;gap:14px;">
           <div>
@@ -432,28 +431,34 @@
         </div>
       </div>
     </div>
-    <div class="col-6 col-md-2">
+    <div class="col-12 col-md-2" id="kpi-net">
       <div class="kpi-card text-center">
         <div class="kpi-value" style="color:#3fb950;" id="stat-grand-net">—</div>
         <div class="kpi-label">NET $</div>
       </div>
     </div>
-    <div class="col-6 col-md-2">
+    <div class="col-12 col-md-2" id="kpi-net-rr">
       <div class="kpi-card text-center">
         <div class="kpi-value" style="color:#d29922;" id="stat-grand-net-rr">—</div>
         <div class="kpi-label">NET RR</div>
       </div>
     </div>
-    <div class="col-6 col-md-2">
+    <div class="col-6 col-md-2" id="kpi-vol">
       <div class="kpi-card text-center">
         <div class="kpi-value" style="color:#c9d1d9;" id="stat-open-volume">—</div>
         <div class="kpi-label">Open Volume</div>
       </div>
     </div>
-    <div class="col-6 col-md-2">
+    <div class="col-6 col-md-2" id="kpi-vol-rr">
       <div class="kpi-card text-center">
         <div class="kpi-value" style="color:#d29922;" id="stat-open-volume-rr">—</div>
         <div class="kpi-label">Open Volume RR</div>
+      </div>
+    </div>
+    <div class="col-12 col-md" id="kpi-equity">
+      <div class="kpi-card text-center">
+        <div class="kpi-value" style="color:#a371f7;" id="stat-end-equity-zeroed">—</div>
+        <div class="kpi-label">End Equity Zeroed</div>
       </div>
     </div>
   </div>
