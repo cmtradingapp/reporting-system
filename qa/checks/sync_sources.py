@@ -61,7 +61,8 @@ def run_sync_checks(conn, date_from: str, date_to: str, cfg: dict) -> List[QARes
 
     # ── 1. Sync freshness ────────────────────────────────────────────────────
     # sync_log columns: table_name, ran_at (see postgres_conn.py ensure_table)
-    table_names = ["accounts", "transactions", "targets", "dealio_mt4trades", "crm_users"]
+    # Actual table_name values from fetch_and_store.py log_sync() calls:
+    table_names = ["crm_accounts", "transactions", "targets", "dealio_mt4trades", "crm_users"]
     with conn.cursor() as cur:
         for tbl in table_names:
             try:
@@ -127,7 +128,7 @@ def run_sync_checks(conn, date_from: str, date_to: str, cfg: dict) -> List[QARes
                     WHERE l1.value = 'Success'
                       AND bb.decision_time >= %s
                       AND bb.decision_time <  %s
-                      AND bb.server_id = 2
+                      AND bu.server_id = 2
                       AND (bb.normalized_amount / 100) < 10000000
                 """, (date_from, tomorrow_str))
                 mysql_tx_count = int(cur.fetchone()[0] or 0)
@@ -177,7 +178,7 @@ def run_sync_checks(conn, date_from: str, date_to: str, cfg: dict) -> List[QARes
                       AND l2.value = 'Deposit'
                       AND bb.decision_time >= %s
                       AND bb.decision_time <  %s
-                      AND bb.server_id = 2
+                      AND bu.server_id = 2
                       AND (bb.normalized_amount / 100) < 10000000
                 """, (date_from, tomorrow_str))
                 mysql_dep_sum = float(cur.fetchone()[0] or 0)
