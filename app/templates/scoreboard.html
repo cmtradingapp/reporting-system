@@ -61,7 +61,7 @@
       transition: all 0.15s;
     }
     .quick-btn:hover { background-color: #2d333a; color: #c9d1d9; border-color: #484f58; }
-    .quick-btn.active-quick { border-color: #388bfd; color: #388bfd; background-color: rgba(56,139,253,0.1); }
+    .quick-btn.active-quick { background: linear-gradient(135deg,#1a4731,#238636); color: #3fb950; border-color: #238636; }
 
     /* Custom searchable select */
     .cs-wrap { position: relative; display: inline-block; }
@@ -746,16 +746,16 @@
     document.getElementById('stat-open-volume').textContent    = volFmt(data.open_volume);
     document.getElementById('stat-open-volume-rr').textContent = volFmt(data.open_volume_rr);
     document.getElementById('stat-end-equity-zeroed').textContent = Math.round(data.end_equity_zeroed ?? 0).toLocaleString();
-    // Monthly FTD
+    // Monthly FTD — company-wide (matches daily_ftd scope)
     const ftdEl = document.getElementById('stat-total-ftd');
-    if (ftdEl) ftdEl.textContent = (data.total_ftd_count ?? 0).toLocaleString();
-    // Daily actuals for date_to (from backend queries)
+    if (ftdEl) ftdEl.textContent = (data.grand_ftd ?? 0).toLocaleString();
+    // Daily actuals for date_to — all company-wide (match monthly cards above)
     const dailyFtdEl = document.getElementById('stat-daily-ftd');
     if (dailyFtdEl) dailyFtdEl.textContent = (data.daily_ftd ?? 0).toLocaleString();
     const dailyFtcEl = document.getElementById('stat-daily-ftc');
     if (dailyFtcEl) dailyFtcEl.textContent = (data.daily_ftc ?? 0).toLocaleString();
     const dailyNetEl = document.getElementById('stat-daily-net');
-    if (dailyNetEl) dailyNetEl.textContent = netFmt(data.daily_net_sales ?? 0);
+    if (dailyNetEl) dailyNetEl.textContent = netFmt(data.daily_net ?? 0);
   }
 
   function renderTable() {
@@ -1011,6 +1011,7 @@
     btn.addEventListener('click', () => {
       state.year = parseInt(btn.dataset.year);
       activateYear(state.year);
+      setQuickActive(null);
       document.getElementById('date-from').value = firstOfMonth(state.year, state.month);
       document.getElementById('date-to').value   = dateToForMonth(state.year, state.month);
       loadAll();
@@ -1022,6 +1023,7 @@
     btn.addEventListener('click', () => {
       state.month = parseInt(btn.dataset.month);
       activateMonth(state.month);
+      setQuickActive(null);
       document.getElementById('date-from').value = firstOfMonth(state.year, state.month);
       document.getElementById('date-to').value   = dateToForMonth(state.year, state.month);
       loadAll();
@@ -1603,7 +1605,6 @@
   document.getElementById('date-to').value   = todayStr();
   activateYear(state.year);
   activateMonth(state.month);
-  setQuickActive('btn-today');
   updateSortIcons();
   updateRetSortIcons();
   loadAll();

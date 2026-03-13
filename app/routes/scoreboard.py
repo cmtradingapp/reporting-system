@@ -272,7 +272,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
             """, {"date_to": date_to})
             end_equity_zeroed = float(cur.fetchone()[0] or 0)
 
-            # Daily net — Sales (date_to only, same logic as dashboard Q2)
+            # Daily net — company-wide for date_to (same scope as grand_net, matches NET $ card)
             cur.execute("""
                 SELECT COALESCE(SUM(CASE
                     WHEN t.transactiontype IN ('Deposit', 'Withdrawal Cancelled') THEN  t.usdamount
@@ -286,13 +286,22 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
                   AND t.confirmation_time::date = %(date_to)s
                   AND EXTRACT(YEAR FROM t.confirmation_time) >= 2024
                   AND t.vtigeraccountid IS NOT NULL
-                  AND u.department_ = 'Sales'
-                  AND u.team = 'Conversion'
                   AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
-                  AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
-                  AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'
             """, {"date_to": date_to})
-            daily_net_sales = float(cur.fetchone()[0] or 0)
+            daily_net = float(cur.fetchone()[0] or 0)
+
+            # Grand FTD — company-wide count for the full date range (matches daily_ftd scope)
+            cur.execute("""
+                SELECT COUNT(t.mttransactionsid)
+                FROM transactions t
+                WHERE t.transactionapproval = 'Approved'
+                  AND (t.deleted = 0 OR t.deleted IS NULL)
+                  AND t.transactiontype = 'Deposit'
+                  AND t.ftd = 1
+                  AND t.confirmation_time >= %(date_from)s
+                  AND t.confirmation_time <  %(date_to_excl)s
+            """, {"date_from": date_from, "date_to_excl": date_to_exclusive})
+            grand_ftd = int(cur.fetchone()[0] or 0)
 
             # Daily FTD — count for date_to
             cur.execute("""
@@ -357,7 +366,8 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
             "open_volume":          round(open_volume, 2),
             "open_volume_rr":       open_volume_rr,
             "end_equity_zeroed":    round(end_equity_zeroed, 2),
-            "daily_net_sales":      round(daily_net_sales, 2),
+            "grand_ftd":            grand_ftd,
+            "daily_net":            round(daily_net, 2),
             "daily_ftd":            daily_ftd,
             "daily_ftc":            daily_ftc,
             "working_days":         working_days,
