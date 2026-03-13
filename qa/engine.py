@@ -14,6 +14,7 @@ from qa.checks.agent_bonuses import run_bonus_checks
 from qa.checks.dashboard import run_dashboard_checks
 from qa.checks.ftc_date import run_ftcdate_checks
 from qa.checks.sync_sources import run_sync_checks
+from qa.checks.per_agent_crosscheck import run_per_agent_crosscheck
 from qa.history import update_history
 from qa.reporter import write_excel, write_pdf
 
@@ -93,6 +94,16 @@ def run(date_to: Optional[str] = None, reports: Optional[List[str]] = None) -> d
                 "Sync", "Error", "module_error", "Engine",
                 None, None, 0.0, 0.0, STATUS["ERROR"],
                 f"Sync module crashed: {e}"
+            ))
+
+        # Per-agent cross-source validation (MySQL vs PostgreSQL)
+        try:
+            all_results += run_per_agent_crosscheck(conn, date_from, date_to, cfg)
+        except Exception as e:
+            all_results.append(QAResult(
+                "Sync", "Error", "module_error", "Engine",
+                None, None, 0.0, 0.0, STATUS["ERROR"],
+                f"Per-agent crosscheck module crashed: {e}"
             ))
 
     finally:

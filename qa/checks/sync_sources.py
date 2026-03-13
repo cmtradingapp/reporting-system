@@ -128,7 +128,7 @@ def run_sync_checks(conn, date_from: str, date_to: str, cfg: dict) -> List[QARes
                     WHERE l1.value = 'Success'
                       AND bb.decision_time >= %s
                       AND bb.decision_time <  %s
-                      AND bu.server_id = 2
+                      AND bu.is_demo = 0
                       AND (bb.normalized_amount / 100) < 10000000
                 """, (date_from, tomorrow_str))
                 mysql_tx_count = int(cur.fetchone()[0] or 0)
@@ -178,7 +178,7 @@ def run_sync_checks(conn, date_from: str, date_to: str, cfg: dict) -> List[QARes
                       AND l2.value = 'Deposit'
                       AND bb.decision_time >= %s
                       AND bb.decision_time <  %s
-                      AND bu.server_id = 2
+                      AND bu.is_demo = 0
                       AND (bb.normalized_amount / 100) < 10000000
                 """, (date_from, tomorrow_str))
                 mysql_dep_sum = float(cur.fetchone()[0] or 0)
