@@ -427,7 +427,7 @@
         <div class="d-flex justify-content-between align-items-center px-4 py-3" style="border-bottom:1px solid #30363d;">
           <div class="section-title">Sales</div>
           <div class="d-flex align-items-center gap-3">
-            <span class="text-muted small" id="row-count"></span>
+            <span class="small" style="color:#e0e0e0;" id="row-count"></span>
             <button onclick="exportSalesExcel()" class="btn btn-sm" style="background:#1a4731;border:1px solid #238636;color:#3fb950;border-radius:6px;font-size:0.8rem;padding:4px 12px;">
               <i class="bi bi-file-earmark-excel me-1"></i>Export Excel
             </button>
@@ -477,7 +477,7 @@
         <div class="d-flex justify-content-between align-items-center px-4 py-3" style="border-bottom:1px solid #30363d;">
           <div class="section-title" style="border-left-color:#388bfd;">Retention</div>
           <div class="d-flex align-items-center gap-3">
-            <span class="text-muted small" id="ret-row-count"></span>
+            <span class="small" style="color:#e0e0e0;" id="ret-row-count"></span>
             <button onclick="exportRetentionExcel()" class="btn btn-sm" style="background:#0d2137;border:1px solid #1f6feb;color:#388bfd;border-radius:6px;font-size:0.8rem;padding:4px 12px;">
               <i class="bi bi-file-earmark-excel me-1"></i>Export Excel
             </button>
@@ -802,7 +802,6 @@
           <span class="chevron">&#9654;</span>
           <i class="bi bi-building row-icon me-2" style="color:#484f58;font-size:0.75rem;"></i>
           <strong>${escHtml(office.name)}</strong>
-          <span class="text-muted cnt-badge ms-2" style="font-size:0.72rem;font-weight:400;">${office.agents.length} agents</span>
         </td>
         <td class="text-center"><span class="office-total" style="color:#388bfd;">${office.targetTotal.toLocaleString()}</span></td>
         <td class="text-center">${pctHtml(office.ftcRrPctTotal, true)}</td>
@@ -1273,7 +1272,6 @@
           <span class="chevron">&#9654;</span>
           <i class="bi bi-building row-icon me-2" style="color:#484f58;font-size:0.75rem;"></i>
           <strong>${escHtml(office.officeName)}</strong>
-          <span class="text-muted cnt-badge ms-2" style="font-size:0.72rem;font-weight:400;">${office.agentCount} agents</span>
         </td>
         <td class="text-center"><span class="office-total" style="color:#388bfd;">${netHtml(office.tgtNet, true)}</span></td>
         <td class="text-center">${retPctHtml(office.netRrPct, true)}</td>
@@ -1336,7 +1334,6 @@
             <span class="chevron">&#9654;</span>
             <i class="bi bi-diagram-3 row-icon me-2" style="color:#484f58;font-size:0.72rem;"></i>
             ${escHtml(dept.deptName)}
-            <span class="text-muted cnt-badge ms-2" style="font-size:0.68rem;font-weight:400;">${dept.agents.length} agents</span>
           </td>
           <td class="text-center">${netHtml(dept.tgtNet)}</td>
           <td class="text-center">${retPctHtml(dept.netRrPct)}</td>
