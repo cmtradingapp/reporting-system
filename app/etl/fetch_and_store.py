@@ -45,7 +45,6 @@ def run_etl() -> dict:
 
 
 def run_accounts_etl(hours: int = 24) -> dict:
-    ensure_table()
     start = time.time()
     cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
     status = "success"
@@ -71,7 +70,6 @@ def run_accounts_etl(hours: int = 24) -> dict:
 
 
 def run_accounts_full_etl() -> dict:
-    ensure_table()
     start = time.time()
     cutoff = datetime(1970, 1, 1)
     status = "success"
@@ -93,7 +91,6 @@ def run_accounts_full_etl() -> dict:
 
 
 def run_users_etl(hours: int = 24) -> dict:
-    ensure_table()
     start = time.time()
     cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
     status = "success"
@@ -116,7 +113,6 @@ def run_users_etl(hours: int = 24) -> dict:
 
 
 def run_users_full_etl() -> dict:
-    ensure_table()
     start = time.time()
     cutoff = datetime(1970, 1, 1)
     status = "success"
@@ -140,7 +136,6 @@ def run_users_full_etl() -> dict:
 
 
 def run_transactions_etl(hours: int = 24) -> dict:
-    ensure_table()
     start = time.time()
     cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
     status = "success"
@@ -161,7 +156,6 @@ def run_transactions_etl(hours: int = 24) -> dict:
 
 
 def run_trading_accounts_etl(hours: int = 24) -> dict:
-    ensure_table()
     start = time.time()
     cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
     status = "success"
@@ -182,7 +176,6 @@ def run_trading_accounts_etl(hours: int = 24) -> dict:
 
 
 def run_trading_accounts_full_etl() -> dict:
-    ensure_table()
     start = time.time()
     cutoff = datetime(1970, 1, 1)
     status = "success"
@@ -203,7 +196,6 @@ def run_trading_accounts_full_etl() -> dict:
 
 
 def run_dealio_mt4trades_etl(hours: int = 24) -> dict:
-    ensure_table()
     start = time.time()
     cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
     status = "success"
@@ -224,7 +216,6 @@ def run_dealio_mt4trades_etl(hours: int = 24) -> dict:
 
 
 def run_dealio_mt4trades_full_etl() -> dict:
-    ensure_table()
     start = time.time()
     cutoff = datetime(1970, 1, 1)
     status = "success"
@@ -251,7 +242,6 @@ def run_dealio_mt4trades_full_etl() -> dict:
 
 def run_targets_etl() -> dict:
     """Full refresh — report.target has no modification timestamp column."""
-    ensure_table()
     start = time.time()
     cutoff = datetime(1970, 1, 1)  # epoch = full sync marker
     status = "success"
@@ -274,7 +264,6 @@ def run_targets_etl() -> dict:
 
 def run_ftd100_etl() -> dict:
     """Full refresh — TRUNCATE + INSERT computed from transactions + accounts CTEs."""
-    ensure_table()
     start = time.time()
     cutoff = datetime(1970, 1, 1)  # full refresh marker
     status = "success"
@@ -293,7 +282,6 @@ def run_ftd100_etl() -> dict:
 
 
 def run_transactions_full_etl() -> dict:
-    ensure_table()
     start = time.time()
     cutoff = datetime(1970, 1, 1)
     status = "success"
@@ -314,7 +302,6 @@ def run_transactions_full_etl() -> dict:
 
 
 def run_dealio_daily_profit_etl(hours: int = 48) -> dict:
-    ensure_table()
     start = time.time()
     cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
     status = "success"
@@ -335,7 +322,6 @@ def run_dealio_daily_profit_etl(hours: int = 48) -> dict:
 
 
 def run_dealio_daily_profit_full_etl() -> dict:
-    ensure_table()
     start = time.time()
     cutoff = datetime(1970, 1, 1)
     status = "success"
@@ -356,7 +342,6 @@ def run_dealio_daily_profit_full_etl() -> dict:
 
 
 def run_dealio_users_etl(hours: int = 24) -> dict:
-    ensure_table()
     start = time.time()
     cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
     status = "success"
@@ -377,7 +362,6 @@ def run_dealio_users_etl(hours: int = 24) -> dict:
 
 
 def run_dealio_users_full_etl() -> dict:
-    ensure_table()
     start = time.time()
     cutoff = datetime(1970, 1, 1)
     status = "success"
@@ -406,7 +390,6 @@ def run_dealio_users_full_etl() -> dict:
 
 
 def run_dealio_trades_mt4_etl(hours: int = 24) -> dict:
-    ensure_table()
     start = time.time()
     cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
     status = "success"
@@ -427,7 +410,6 @@ def run_dealio_trades_mt4_etl(hours: int = 24) -> dict:
 
 
 def run_dealio_trades_mt4_full_etl() -> dict:
-    ensure_table()
     start = time.time()
     cutoff = datetime(1970, 1, 1)
     status = "success"
