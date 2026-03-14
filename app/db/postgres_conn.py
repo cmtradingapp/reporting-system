@@ -1687,6 +1687,7 @@ def fetch_users_with_targets(role_filter: dict = None) -> pd.DataFrame:
 # ── Dealio Users (from dealio PG replica) ────────────────────────────────────
 
 def upsert_dealio_users(df: pd.DataFrame):
+    import time as _time
     cols = [
         "login", "sourceid", "sourcename", "sourcetype",
         "groupname", "groupcurrency", "name", "email",
@@ -1705,13 +1706,21 @@ def upsert_dealio_users(df: pd.DataFrame):
             {update_set},
             synced_at = NOW()
     """
-    conn = get_connection()
-    try:
-        with conn.cursor() as cur:
-            execute_values(cur, sql, rows)
-        conn.commit()
-    finally:
-        conn.close()
+    for attempt in range(3):
+        conn = get_connection()
+        try:
+            with conn.cursor() as cur:
+                execute_values(cur, sql, rows)
+            conn.commit()
+            return
+        except Exception as e:
+            conn.rollback()
+            if "deadlock" in str(e).lower() and attempt < 2:
+                _time.sleep(5)
+                continue
+            raise
+        finally:
+            conn.close()
 
 
 def fetch_dealio_users_stats() -> dict:
@@ -1743,6 +1752,7 @@ def fetch_dealio_users_stats() -> dict:
 # ── Dealio Trades MT4 (from dealio PG replica) ───────────────────────────────
 
 def upsert_dealio_trades_mt4(df: pd.DataFrame):
+    import time as _time
     cols = [
         "ticket", "source_id", "login", "cmd", "volume",
         "open_time", "close_time", "last_modified", "profit", "computed_profit",
@@ -1761,13 +1771,21 @@ def upsert_dealio_trades_mt4(df: pd.DataFrame):
             {update_set},
             synced_at = NOW()
     """
-    conn = get_connection()
-    try:
-        with conn.cursor() as cur:
-            execute_values(cur, sql, rows)
-        conn.commit()
-    finally:
-        conn.close()
+    for attempt in range(3):
+        conn = get_connection()
+        try:
+            with conn.cursor() as cur:
+                execute_values(cur, sql, rows)
+            conn.commit()
+            return
+        except Exception as e:
+            conn.rollback()
+            if "deadlock" in str(e).lower() and attempt < 2:
+                _time.sleep(5)
+                continue
+            raise
+        finally:
+            conn.close()
 
 
 def fetch_dealio_trades_mt4_stats() -> dict:
