@@ -1,4 +1,6 @@
 import os
+import time as _time
+from concurrent.futures import ThreadPoolExecutor
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -6,6 +8,20 @@ from app.auth.dependencies import get_current_user
 from app.db.postgres_conn import fetch_accounts_stats, fetch_crm_users_stats, fetch_transactions_stats, fetch_targets_stats, fetch_dealio_mt4trades_stats, fetch_trading_accounts_stats, fetch_ftd100_stats, fetch_sync_log, fetch_dealio_daily_profit_stats, fetch_dealio_users_stats, fetch_dealio_trades_mt4_stats
 from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
+
+_stats_cache: dict = {}
+_CACHE_TTL = 60  # seconds
+
+
+def _cached(key: str, fn):
+    now = _time.monotonic()
+    if key in _stats_cache:
+        val, ts = _stats_cache[key]
+        if now - ts < _CACHE_TTL:
+            return val
+    val = fn()
+    _stats_cache[key] = (val, now)
+    return val
 
 _TZ = ZoneInfo("Europe/Nicosia")
 
@@ -47,35 +63,55 @@ async def data_sync_page(request: Request):
         return user
     if user.get("role") != "admin":
         return RedirectResponse(url="/performance", status_code=302)
-    accounts_stats = fetch_accounts_stats()
-    accounts_log = fetch_sync_log("crm_accounts", limit=50)
+    jobs = {
+        "accounts_stats":  lambda: _cached("accounts_stats",  fetch_accounts_stats),
+        "users_stats":     lambda: _cached("users_stats",     fetch_crm_users_stats),
+        "tx_stats":        lambda: _cached("tx_stats",        fetch_transactions_stats),
+        "targets_stats":   lambda: _cached("targets_stats",   fetch_targets_stats),
+        "dealio_stats":    lambda: _cached("dealio_stats",    fetch_dealio_mt4trades_stats),
+        "ta_stats":        lambda: _cached("ta_stats",        fetch_trading_accounts_stats),
+        "ftd100_stats":    lambda: _cached("ftd100_stats",    fetch_ftd100_stats),
+        "ddp_stats":       lambda: _cached("ddp_stats",       fetch_dealio_daily_profit_stats),
+        "du_stats":        lambda: _cached("du_stats",        fetch_dealio_users_stats),
+        "dtm4_stats":      lambda: _cached("dtm4_stats",      fetch_dealio_trades_mt4_stats),
+        "accounts_log":    lambda: fetch_sync_log("crm_accounts",      limit=50),
+        "users_log":       lambda: fetch_sync_log("crm_users",         limit=50),
+        "tx_log":          lambda: fetch_sync_log("transactions",       limit=50),
+        "targets_log":     lambda: fetch_sync_log("targets",           limit=50),
+        "dealio_log":      lambda: fetch_sync_log("dealio_mt4trades",  limit=50),
+        "ta_log":          lambda: fetch_sync_log("trading_accounts",  limit=50),
+        "ftd100_log":      lambda: fetch_sync_log("ftd100_clients",    limit=50),
+        "ddp_log":         lambda: fetch_sync_log("dealio_daily_profit", limit=50),
+        "du_log":          lambda: fetch_sync_log("dealio_users",      limit=50),
+        "dtm4_log":        lambda: fetch_sync_log("dealio_trades_mt4", limit=50),
+    }
 
-    users_stats = fetch_crm_users_stats()
-    users_log = fetch_sync_log("crm_users", limit=50)
+    results = {}
+    with ThreadPoolExecutor(max_workers=10) as pool:
+        futures = {pool.submit(fn): key for key, fn in jobs.items()}
+        for future in futures:
+            results[futures[future]] = future.result()
 
-    tx_stats = fetch_transactions_stats()
-    tx_log = fetch_sync_log("transactions", limit=50)
-
-    targets_stats = fetch_targets_stats()
-    targets_log = fetch_sync_log("targets", limit=50)
-
-    dealio_stats = fetch_dealio_mt4trades_stats()
-    dealio_log = fetch_sync_log("dealio_mt4trades", limit=50)
-
-    ta_stats = fetch_trading_accounts_stats()
-    ta_log = fetch_sync_log("trading_accounts", limit=50)
-
-    ftd100_stats = fetch_ftd100_stats()
-    ftd100_log = fetch_sync_log("ftd100_clients", limit=50)
-
-    ddp_stats = fetch_dealio_daily_profit_stats()
-    ddp_log = fetch_sync_log("dealio_daily_profit", limit=50)
-
-    du_stats = fetch_dealio_users_stats()
-    du_log = fetch_sync_log("dealio_users", limit=50)
-
-    dtm4_stats = fetch_dealio_trades_mt4_stats()
-    dtm4_log = fetch_sync_log("dealio_trades_mt4", limit=50)
+    accounts_stats = results["accounts_stats"]
+    accounts_log   = results["accounts_log"]
+    users_stats    = results["users_stats"]
+    users_log      = results["users_log"]
+    tx_stats       = results["tx_stats"]
+    tx_log         = results["tx_log"]
+    targets_stats  = results["targets_stats"]
+    targets_log    = results["targets_log"]
+    dealio_stats   = results["dealio_stats"]
+    dealio_log     = results["dealio_log"]
+    ta_stats       = results["ta_stats"]
+    ta_log         = results["ta_log"]
+    ftd100_stats   = results["ftd100_stats"]
+    ftd100_log     = results["ftd100_log"]
+    ddp_stats      = results["ddp_stats"]
+    ddp_log        = results["ddp_log"]
+    du_stats       = results["du_stats"]
+    du_log         = results["du_log"]
+    dtm4_stats     = results["dtm4_stats"]
+    dtm4_log       = results["dtm4_log"]
 
     tables = [
         {
