@@ -385,7 +385,15 @@ def run_dealio_users_full_etl() -> dict:
     rows = 0
     try:
         for chunk in get_dealio_users_full():
-            upsert_dealio_users(chunk)
+            for attempt in range(3):
+                try:
+                    upsert_dealio_users(chunk)
+                    break
+                except Exception as e:
+                    if "deadlock" in str(e).lower() and attempt < 2:
+                        time.sleep(5)
+                        continue
+                    raise
             rows += len(chunk)
     except Exception as e:
         status = "error"
