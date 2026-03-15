@@ -308,7 +308,7 @@ async def data_sync_page(request: Request):
                 {"label": "Total Records",    "value": ddps_stats["total_records"],    "color": "text-info",    "icon": "bi-database"},
                 {"label": "Unique Logins",    "value": ddps_stats["unique_logins"],    "color": "text-success", "icon": "bi-person-badge"},
                 {"label": "Total Closed PnL", "value": ddps_stats["total_closed_pnl"], "color": "text-warning", "icon": "bi-currency-dollar"},
-                {"label": "Latest Date",      "value": ddps_stats["latest_date"],      "color": "text-primary", "icon": "bi-calendar-date"},
+                {"label": "Unique Dates",     "value": ddps_stats["unique_dates"],     "color": "text-primary", "icon": "bi-calendar-date"},
             ],
             "sync_log": ddps_log,
             "healthy": _is_healthy(ddps_log, DEALIO_DAILY_PROFITS_SYNC_INTERVAL_HOURS),

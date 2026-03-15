@@ -1885,7 +1885,7 @@ def fetch_dealio_daily_profits_stats() -> dict:
             MAX(synced_at)                            AS last_synced_at,
             COUNT(DISTINCT login)                     AS unique_logins,
             COALESCE(SUM(convertedclosedpnl), 0)      AS total_closed_pnl,
-            MAX(date::date)                           AS latest_date
+            COUNT(DISTINCT date::date)                AS unique_dates
         FROM dealio_daily_profits
     """
     conn = get_connection()
@@ -1898,7 +1898,7 @@ def fetch_dealio_daily_profits_stats() -> dict:
                 "last_synced_at":   row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else "Never",
                 "unique_logins":    row[2] or 0,
                 "total_closed_pnl": int(row[3] or 0),
-                "latest_date":      str(row[4]) if row[4] else "N/A",
+                "unique_dates":     row[4] or 0,
             }
     finally:
         conn.close()
