@@ -177,6 +177,35 @@ def get_dealio_trades_mt4(hours: int = 24) -> pd.DataFrame:
         conn.close()
 
 
+def get_dealio_trades_mt4_missing(start_ticket: int):
+    """Fetch only rows with ticket > start_ticket (to add missing rows without re-syncing everything)."""
+    last_ticket = start_ticket
+    while True:
+        sql = f"""
+            SELECT {_TRADES_COLS}
+            FROM dealio.trades_mt4
+            WHERE ticket > %(last_ticket)s
+              AND cmd IN (0, 1)
+              AND symbol NOT IN %(excluded)s
+            ORDER BY ticket
+            LIMIT {_CHUNK_SIZE}
+        """
+        conn = get_dealio_connection()
+        try:
+            df = pd.read_sql(sql, conn, params={
+                "last_ticket": last_ticket,
+                "excluded": _EXCLUDED_SYMBOLS_TUPLE,
+            })
+        finally:
+            conn.close()
+        if df.empty:
+            break
+        yield df
+        if len(df) < _CHUNK_SIZE:
+            break
+        last_ticket = int(df["ticket"].max())
+
+
 def get_dealio_trades_mt4_full():
     """Full fetch of dealio.trades_mt4 in chunks (cmd 0/1, filtered symbols).
     Reconnects per chunk to avoid SSL timeout on long-running syncs."""
