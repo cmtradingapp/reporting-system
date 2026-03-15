@@ -223,7 +223,7 @@ async def data_sync_page(request: Request):
             "lookback_hours": DEALIO_SYNC_HOURS,
             "primary_key": "ticket",
             "incremental_columns": "last_modified, updated_at",
-            "source": "MSSQL → report.dealio_mt4trades",
+            "source": "Dealio PG → dealio.trades_mt4",
         },
         {
             "key": "ftd100_clients",
@@ -259,7 +259,7 @@ async def data_sync_page(request: Request):
             "lookback_hours": DEALIO_DAILY_PROFIT_SYNC_HOURS,
             "primary_key": "login",
             "incremental_columns": "date",
-            "source": "MSSQL → report.dealio_daily_profit",
+            "source": "Dealio PG → dealio.daily_profits",
         },
         {
             "key": "targets",

@@ -151,7 +151,11 @@ _TRADES_COLS = """
     group_currency,
     source_name,
     source_type,
-    reason
+    reason,
+    notional_value,
+    computed_swap,
+    computed_commission,
+    spread
 """
 
 def get_dealio_trades_mt4(hours: int = 24) -> pd.DataFrame:

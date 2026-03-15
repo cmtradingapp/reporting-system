@@ -78,7 +78,7 @@ async def dashboard_api(request: Request):
             # Get last_mtd date (for display on PnL cards)
             cur.execute("""
                 SELECT MAX(date)::date
-                FROM dealio_daily_profit
+                FROM dealio_daily_profits
                 WHERE EXTRACT(YEAR  FROM date) = EXTRACT(YEAR  FROM CURRENT_DATE)
                   AND EXTRACT(MONTH FROM date) = EXTRACT(MONTH FROM CURRENT_DATE)
             """)
@@ -215,7 +215,7 @@ async def dashboard_api(request: Request):
                 SELECT
                   COUNT(DISTINCT ta.vtigeraccountid) FILTER (WHERE d.open_time::date = CURRENT_DATE) AS daily,
                   COUNT(DISTINCT ta.vtigeraccountid) AS monthly
-                FROM dealio_mt4trades d
+                FROM dealio_trades_mt4 d
                 JOIN trading_accounts ta ON ta.login::bigint = d.login::bigint
                 WHERE d.notional_value > 0
                   AND ta.vtigeraccountid IS NOT NULL
@@ -232,7 +232,7 @@ async def dashboard_api(request: Request):
                 SELECT
                   COALESCE(SUM(d.notional_value) FILTER (WHERE d.open_time::date = CURRENT_DATE), 0) AS daily,
                   COALESCE(SUM(d.notional_value), 0) AS monthly
-                FROM dealio_mt4trades d
+                FROM dealio_trades_mt4 d
                 JOIN trading_accounts ta ON ta.login::bigint = d.login
                 JOIN accounts a ON a.accountid = ta.vtigeraccountid
                 LEFT JOIN crm_users u ON u.id = a.assigned_to
@@ -280,10 +280,10 @@ async def dashboard_api(request: Request):
                         0
                     )
                 ), 0) AS end_equity_zeroed
-                FROM dealio_daily_profit d
+                FROM dealio_daily_profits d
                 JOIN trading_accounts ta  ON ta.login::bigint = d.login
                 JOIN accounts a           ON a.accountid = ta.vtigeraccountid
-                JOIN crm_users u          ON u.id = d.assigned_to
+                JOIN crm_users u          ON u.id = a.assigned_to
                 LEFT JOIN old_bonus_balance ob ON ob.login::bigint = d.login
                 WHERE d.date = (SELECT last_available_date FROM last_date)
             """)
@@ -296,7 +296,7 @@ async def dashboard_api(request: Request):
                        THEN 0
                        ELSE ABS(SUM(CASE WHEN cmd=0 THEN notional_value ELSE -notional_value END))
                   END, 0)
-                FROM dealio_mt4trades
+                FROM dealio_trades_mt4
                 WHERE CAST(close_time AS DATE) = '1970-01-01'
                   AND symbol NOT IN ('ZeroingZAR','ZeroingUSD','ZeroingNGN','ZeroingKES','ZeroingJPY','ZeroingGBP','ZeroingEUR')
             """)
@@ -309,15 +309,23 @@ async def dashboard_api(request: Request):
                 SELECT COALESCE(SUM(
                     COALESCE(convertedclosedpnl, 0) + COALESCE(converteddeltafloatingpnl, 0)
                 ), 0)
-                FROM dealio_daily_profit
+                FROM dealio_daily_profits
                 WHERE date::date = %(last_mtd)s
             """, {"last_mtd": last_mtd_str})
             pnl_daily = round(float(cur.fetchone()[0] or 0), 2)
 
-        # Monthly PnL from MSSQL (history table) — sum of daily closedpnl + deltafloatingpnl
-        from app.db.mssql_conn import get_pnl_cash_monthly
+        # Monthly PnL from local dealio_daily_profits
         try:
-            pnl_monthly = round(get_pnl_cash_monthly(month_start_str, tomorrow_str), 2)
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT COALESCE(SUM(
+                        COALESCE(convertedclosedpnl, 0) + COALESCE(converteddeltafloatingpnl, 0)
+                    ), 0)
+                    FROM dealio_daily_profits
+                    WHERE date::date >= %(month_start)s
+                      AND date::date < %(tomorrow)s
+                """, {"month_start": month_start_str, "tomorrow": tomorrow_str})
+                pnl_monthly = round(float(cur.fetchone()[0] or 0), 2)
         except Exception:
             pnl_monthly = None
 

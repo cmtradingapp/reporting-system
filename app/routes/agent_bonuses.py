@@ -191,7 +191,7 @@ async def agent_bonuses_retention_api(request: Request, date_from: str, date_to:
         ) net ON net.agent_id = u.id
         LEFT JOIN (
             SELECT a.assigned_to AS agent_id, SUM(d.notional_value)::float AS open_volume_usd
-            FROM dealio_mt4trades d
+            FROM dealio_trades_mt4 d
             JOIN trading_accounts ta ON ta.login::bigint = d.login
             JOIN accounts a ON a.accountid = ta.vtigeraccountid
             WHERE d.open_time::date >= %(date_from)s AND d.open_time::date <= %(date_to)s

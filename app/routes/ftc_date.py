@@ -145,7 +145,7 @@ async def ftc_date_api(
         ),
         traders AS (
             SELECT DISTINCT ta.vtigeraccountid AS accountid
-            FROM dealio_mt4trades d
+            FROM dealio_trades_mt4 d
             JOIN trading_accounts ta ON ta.login::bigint = d.login::bigint
             WHERE d.notional_value > 0
               AND ta.vtigeraccountid IS NOT NULL

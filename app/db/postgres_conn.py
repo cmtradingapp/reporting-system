@@ -455,9 +455,17 @@ def ensure_table():
             source_name     TEXT,
             source_type     TEXT,
             reason          INTEGER,
+            notional_value  DOUBLE PRECISION,
+            computed_swap   DOUBLE PRECISION,
+            computed_commission DOUBLE PRECISION,
+            spread          VARCHAR(255),
             synced_at       TIMESTAMPTZ DEFAULT NOW(),
             PRIMARY KEY (source_id, ticket)
         );
+        ALTER TABLE dealio_trades_mt4 ADD COLUMN IF NOT EXISTS notional_value DOUBLE PRECISION;
+        ALTER TABLE dealio_trades_mt4 ADD COLUMN IF NOT EXISTS computed_swap DOUBLE PRECISION;
+        ALTER TABLE dealio_trades_mt4 ADD COLUMN IF NOT EXISTS computed_commission DOUBLE PRECISION;
+        ALTER TABLE dealio_trades_mt4 ADD COLUMN IF NOT EXISTS spread VARCHAR(255);
         CREATE INDEX IF NOT EXISTS idx_dtm4_login         ON dealio_trades_mt4 (login);
         CREATE INDEX IF NOT EXISTS idx_dtm4_open_time     ON dealio_trades_mt4 (open_time);
         CREATE INDEX IF NOT EXISTS idx_dtm4_close_time    ON dealio_trades_mt4 (close_time);
@@ -1789,6 +1797,7 @@ def upsert_dealio_trades_mt4(df: pd.DataFrame):
         "symbol", "core_symbol", "book", "open_price", "close_price",
         "commission", "swaps", "comment", "group_name", "group_currency",
         "source_name", "source_type", "reason",
+        "notional_value", "computed_swap", "computed_commission", "spread",
     ]
     rows = [tuple(_clean(row.get(c)) for c in cols) for _, row in df.iterrows()]
     update_cols = [c for c in cols if c not in ("ticket", "source_id")]

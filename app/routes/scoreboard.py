@@ -215,7 +215,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
             # Open Volume — join via trading_accounts.login, filter year > 2024, no blank accountid, no test agents
             cur.execute("""
                 SELECT COALESCE(SUM(d.notional_value), 0)
-                FROM dealio_mt4trades d
+                FROM dealio_trades_mt4 d
                 JOIN trading_accounts ta ON ta.login::bigint = d.login
                 JOIN accounts a          ON a.accountid = ta.vtigeraccountid
                 LEFT JOIN crm_users u    ON u.id = a.assigned_to
@@ -231,7 +231,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
             cur.execute("""
                 WITH last_date AS (
                     SELECT MAX(date) AS last_available_date
-                    FROM dealio_daily_profit
+                    FROM dealio_daily_profits
                     WHERE EXTRACT(YEAR  FROM date) = EXTRACT(YEAR  FROM %(date_to)s::date)
                       AND EXTRACT(MONTH FROM date) = EXTRACT(MONTH FROM %(date_to)s::date)
                 ),
@@ -263,10 +263,10 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
                         0
                     )
                 ), 0) AS end_equity_zeroed
-                FROM dealio_daily_profit d
+                FROM dealio_daily_profits d
                 JOIN trading_accounts ta  ON ta.login::bigint = d.login
                 JOIN accounts a           ON a.accountid = ta.vtigeraccountid
-                JOIN crm_users u          ON u.id = d.assigned_to
+                JOIN crm_users u          ON u.id = a.assigned_to
                 LEFT JOIN old_bonus_balance ob ON ob.login::bigint = d.login
                 WHERE d.date = (SELECT last_available_date FROM last_date)
             """, {"date_to": date_to})
@@ -443,7 +443,7 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
         ) dep ON dep.agent_id = u.id
         LEFT JOIN (
             SELECT a.assigned_to AS agent_id, SUM(d.notional_value)::float AS open_volume_usd
-            FROM dealio_mt4trades d
+            FROM dealio_trades_mt4 d
             JOIN trading_accounts ta ON ta.login::bigint = d.login
             JOIN accounts a ON a.accountid = ta.vtigeraccountid
             WHERE d.open_time::date >= %(date_from)s AND d.open_time::date <= %(date_to)s
