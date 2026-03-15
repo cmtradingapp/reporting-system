@@ -5,8 +5,9 @@ Source: cmtrading-replicadb.dealio.ai
 Schema: dealio
 
 Tables fetched into local warehouse:
-  - dealio.users        (incremental by lastupdate)
-  - dealio.trades_mt4   (incremental by last_modified; cmd IN (0,1); exclude bad symbols)
+  - dealio.users          (incremental by lastupdate)
+  - dealio.trades_mt4     (incremental by last_modified; cmd IN (0,1); exclude bad symbols)
+  - dealio.daily_profits  (incremental by date)
 
 Live (no local copy):
   - dealio.positions    (open trades — queried directly via get_dealio_connection())
@@ -200,3 +201,79 @@ def get_dealio_trades_mt4_full():
         if len(df) < _CHUNK_SIZE:
             break
         last_ticket = int(df["ticket"].max())
+
+
+# ── dealio.daily_profits ──────────────────────────────────────────────────────
+
+_DAILY_PROFITS_COLS = """
+    date,
+    login,
+    sourceid,
+    sourcename,
+    sourcetype,
+    book,
+    closedpnl,
+    convertedclosedpnl,
+    calculationcurrency,
+    floatingpnl,
+    convertedfloatingpnl,
+    netdeposit,
+    convertednetdeposit,
+    equity,
+    convertedequity,
+    balance,
+    convertedbalance,
+    groupcurrency,
+    conversionratio,
+    equityprevday,
+    groupname,
+    deltafloatingpnl,
+    converteddeltafloatingpnl
+"""
+
+
+def get_dealio_daily_profits(hours: int = 48) -> pd.DataFrame:
+    """Fetch dealio.daily_profits rows with date >= NOW() - N hours."""
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    sql = f"""
+        SELECT {_DAILY_PROFITS_COLS}
+        FROM dealio.daily_profits
+        WHERE date >= %(cutoff)s
+        ORDER BY date, login
+    """
+    conn = get_dealio_connection()
+    try:
+        df = pd.read_sql(sql, conn, params={"cutoff": cutoff})
+        return df
+    finally:
+        conn.close()
+
+
+def get_dealio_daily_profits_full():
+    """Full fetch of dealio.daily_profits in chunks, paginated by (date, login)."""
+    last_date = "1970-01-01"
+    last_login = 0
+    while True:
+        sql = f"""
+            SELECT {_DAILY_PROFITS_COLS}
+            FROM dealio.daily_profits
+            WHERE date::date > %(last_date)s
+               OR (date::date = %(last_date)s AND login > %(last_login)s)
+            ORDER BY date, login
+            LIMIT {_CHUNK_SIZE}
+        """
+        conn = get_dealio_connection()
+        try:
+            df = pd.read_sql(sql, conn, params={
+                "last_date": last_date,
+                "last_login": last_login,
+            })
+        finally:
+            conn.close()
+        if df.empty:
+            break
+        yield df
+        if len(df) < _CHUNK_SIZE:
+            break
+        last_date = str(df["date"].max())[:10]
+        last_login = int(df["login"].max())

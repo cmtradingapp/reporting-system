@@ -464,6 +464,36 @@ def ensure_table():
         CREATE INDEX IF NOT EXISTS idx_dtm4_last_modified ON dealio_trades_mt4 (last_modified);
         CREATE INDEX IF NOT EXISTS idx_dtm4_symbol        ON dealio_trades_mt4 (symbol);
 
+        CREATE TABLE IF NOT EXISTS dealio_daily_profits (
+            date                        TIMESTAMP        NOT NULL,
+            login                       BIGINT           NOT NULL,
+            sourceid                    VARCHAR(50)      NOT NULL,
+            sourcename                  VARCHAR(50),
+            sourcetype                  VARCHAR(50),
+            book                        VARCHAR(50),
+            closedpnl                   DOUBLE PRECISION,
+            convertedclosedpnl          DOUBLE PRECISION,
+            calculationcurrency         VARCHAR(50),
+            floatingpnl                 DOUBLE PRECISION,
+            convertedfloatingpnl        DOUBLE PRECISION,
+            netdeposit                  DOUBLE PRECISION,
+            convertednetdeposit         DOUBLE PRECISION,
+            equity                      DOUBLE PRECISION,
+            convertedequity             DOUBLE PRECISION,
+            balance                     DOUBLE PRECISION,
+            convertedbalance            DOUBLE PRECISION,
+            groupcurrency               VARCHAR(50),
+            conversionratio             DOUBLE PRECISION,
+            equityprevday               DOUBLE PRECISION,
+            groupname                   VARCHAR(50),
+            deltafloatingpnl            DOUBLE PRECISION,
+            converteddeltafloatingpnl   DOUBLE PRECISION,
+            synced_at                   TIMESTAMP DEFAULT NOW(),
+            PRIMARY KEY (date, login, sourceid)
+        );
+        CREATE INDEX IF NOT EXISTS idx_ddps_login ON dealio_daily_profits (login);
+        CREATE INDEX IF NOT EXISTS idx_ddps_date  ON dealio_daily_profits (date);
+
     """
     conn = get_connection()
     try:
@@ -1809,6 +1839,66 @@ def fetch_dealio_trades_mt4_stats() -> dict:
                 "unique_logins":  row[2] or 0,
                 "total_profit":   int(row[3] or 0),
                 "unique_symbols": row[4] or 0,
+            }
+    finally:
+        conn.close()
+
+
+# ── Dealio Daily Profits (from dealio PG replica) ─────────────────────────────
+
+def upsert_dealio_daily_profits(df: pd.DataFrame):
+    cols = [
+        "date", "login", "sourceid", "sourcename", "sourcetype", "book",
+        "closedpnl", "convertedclosedpnl", "calculationcurrency",
+        "floatingpnl", "convertedfloatingpnl", "netdeposit", "convertednetdeposit",
+        "equity", "convertedequity", "balance", "convertedbalance",
+        "groupcurrency", "conversionratio", "equityprevday", "groupname",
+        "deltafloatingpnl", "converteddeltafloatingpnl",
+    ]
+    rows = [tuple(_clean(row.get(c)) for c in cols) for _, row in df.iterrows()]
+    update_cols = [c for c in cols if c not in ("date", "login", "sourceid")]
+    update_set = ", ".join(f"{c} = EXCLUDED.{c}" for c in update_cols)
+    col_list = ", ".join(cols)
+    sql = f"""
+        INSERT INTO dealio_daily_profits ({col_list})
+        VALUES %s
+        ON CONFLICT (date, login, sourceid) DO UPDATE SET
+            {update_set},
+            synced_at = NOW()
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            execute_values(cur, sql, rows)
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def fetch_dealio_daily_profits_stats() -> dict:
+    sql = """
+        SELECT
+            COUNT(*)                                  AS total_records,
+            MAX(synced_at)                            AS last_synced_at,
+            COUNT(DISTINCT login)                     AS unique_logins,
+            COALESCE(SUM(convertedclosedpnl), 0)      AS total_closed_pnl,
+            MAX(date::date)                           AS latest_date
+        FROM dealio_daily_profits
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+            row = cur.fetchone()
+            return {
+                "total_records":    row[0] or 0,
+                "last_synced_at":   row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else "Never",
+                "unique_logins":    row[2] or 0,
+                "total_closed_pnl": int(row[3] or 0),
+                "latest_date":      str(row[4]) if row[4] else "N/A",
             }
     finally:
         conn.close()

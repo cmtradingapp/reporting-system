@@ -21,9 +21,10 @@ from app.routes.dashboard import router as dashboard_router
 from app.routes.last_sync import router as last_sync_router
 from app.routes.client_classification_sync import router as client_classification_sync_router
 from app.routes.dealio_new_sync import router as dealio_new_sync_router
+from app.routes.dealio_daily_profits_sync import router as dealio_daily_profits_sync_router
 from app.db.postgres_conn import ensure_table, ensure_auth_table, seed_admin_user, ensure_client_classification_table
 from app.auth.auth import hash_password
-from app.etl.fetch_and_store import run_accounts_etl, run_users_etl, run_transactions_etl, run_targets_etl, run_dealio_mt4trades_etl, run_trading_accounts_etl, run_ftd100_etl, run_dealio_daily_profit_etl, run_client_classification_etl, run_dealio_users_etl, run_dealio_trades_mt4_etl
+from app.etl.fetch_and_store import run_accounts_etl, run_users_etl, run_transactions_etl, run_targets_etl, run_dealio_mt4trades_etl, run_trading_accounts_etl, run_ftd100_etl, run_dealio_daily_profit_etl, run_client_classification_etl, run_dealio_users_etl, run_dealio_trades_mt4_etl, run_dealio_daily_profits_etl
 import os
 from datetime import datetime, timedelta
 
@@ -36,6 +37,7 @@ DEALIO_USERS_SYNC_HOURS        = int(os.getenv("DEALIO_USERS_SYNC_HOURS", "6"))
 DEALIO_TRADES_MT4_SYNC_HOURS   = int(os.getenv("DEALIO_TRADES_MT4_SYNC_HOURS", "6"))
 TRADING_ACCOUNTS_SYNC_HOURS    = int(os.getenv("TRADING_ACCOUNTS_SYNC_HOURS", "6"))
 DEALIO_DAILY_PROFIT_SYNC_HOURS = int(os.getenv("DEALIO_DAILY_PROFIT_SYNC_HOURS", "48"))
+DEALIO_DAILY_PROFITS_SYNC_HOURS = int(os.getenv("DEALIO_DAILY_PROFITS_SYNC_HOURS", "48"))
 
 scheduler = BackgroundScheduler()
 
@@ -143,6 +145,15 @@ async def lifespan(app: FastAPI):
         start_date=_base + timedelta(seconds=300),
         replace_existing=True,
     )
+    scheduler.add_job(
+        run_dealio_daily_profits_etl,
+        "interval",
+        minutes=SYNC_INTERVAL_MINUTES,
+        kwargs={"hours": DEALIO_DAILY_PROFITS_SYNC_HOURS},
+        id="dealio_daily_profits_sync",
+        start_date=_base + timedelta(seconds=330),
+        replace_existing=True,
+    )
     scheduler.start()
     yield
     scheduler.shutdown()
@@ -175,3 +186,4 @@ app.include_router(dashboard_router)
 app.include_router(last_sync_router)
 app.include_router(client_classification_sync_router)
 app.include_router(dealio_new_sync_router)
+app.include_router(dealio_daily_profits_sync_router)
