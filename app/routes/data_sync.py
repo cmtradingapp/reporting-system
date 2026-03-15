@@ -1,6 +1,8 @@
 import os
 import time as _time
-from concurrent.futures import ThreadPoolExecutor
+import logging
+from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -90,11 +92,24 @@ async def data_sync_page(request: Request):
         "ddps_log":        lambda: fetch_sync_log("dealio_daily_profits", limit=50),
     }
 
+    def _err_stats():
+        d = defaultdict(int)
+        d["last_synced_at"] = "Error"
+        return d
+
     results = {}
     with ThreadPoolExecutor(max_workers=10) as pool:
         futures = {pool.submit(fn): key for key, fn in jobs.items()}
         for future in futures:
-            results[futures[future]] = future.result()
+            key = futures[future]
+            try:
+                results[key] = future.result(timeout=20)
+            except FutureTimeoutError:
+                logging.warning("data_sync job timed out: %s", key)
+                results[key] = [] if key.endswith("_log") else _err_stats()
+            except Exception as exc:
+                logging.warning("data_sync job failed: %s — %s", key, exc)
+                results[key] = [] if key.endswith("_log") else _err_stats()
 
     accounts_stats = results["accounts_stats"]
     accounts_log   = results["accounts_log"]
