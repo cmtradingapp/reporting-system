@@ -8,3 +8,4 @@ services:
     restart: unless-stopped
     volumes:
       - /root/.postgresql:/root/.postgresql:ro
+      - ./app:/app/app:ro
