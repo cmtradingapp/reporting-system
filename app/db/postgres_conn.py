@@ -1827,6 +1827,16 @@ def upsert_dealio_trades_mt4(df: pd.DataFrame):
             conn.close()
 
 
+def truncate_dealio_trades_mt4():
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("TRUNCATE TABLE dealio_trades_mt4")
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def fetch_dealio_trades_mt4_stats() -> dict:
     sql = """
         SELECT

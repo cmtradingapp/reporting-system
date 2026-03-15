@@ -10,9 +10,12 @@ from app.db.postgres_conn import (
     upsert_targets, upsert_dealio_mt4trades, upsert_trading_accounts, log_sync,
     truncate_and_insert_ftd100, upsert_dealio_daily_profit,
     ensure_client_classification_table, upsert_client_classification,
-    upsert_dealio_users, upsert_dealio_trades_mt4,
+    upsert_dealio_users, upsert_dealio_trades_mt4, truncate_dealio_trades_mt4,
     upsert_dealio_daily_profits,
 )
+
+# Global lock: set to True while rebuild is running so the incremental scheduler skips
+_dealio_trades_mt4_rebuilding = False
 
 
 def run_etl() -> dict:
@@ -391,6 +394,9 @@ def run_dealio_users_full_etl() -> dict:
 
 
 def run_dealio_trades_mt4_etl(hours: int = 24) -> dict:
+    global _dealio_trades_mt4_rebuilding
+    if _dealio_trades_mt4_rebuilding:
+        return {"status": "skipped", "reason": "rebuild in progress"}
     start = time.time()
     cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
     status = "success"
@@ -467,6 +473,36 @@ def run_dealio_trades_mt4_missing_etl() -> dict:
         duration_ms = int((time.time() - start) * 1000)
         log_sync("dealio_trades_mt4", cutoff, rows, duration_ms, status, error_msg)
     return {"status": status, "rows_synced": rows, "type": "missing", "start_ticket": max_ticket}
+
+
+def run_dealio_trades_mt4_rebuild_etl() -> dict:
+    """Drop all rows and re-sync everything from source. Blocks incremental scheduler while running."""
+    global _dealio_trades_mt4_rebuilding
+    _dealio_trades_mt4_rebuilding = True
+    start = time.time()
+    cutoff = datetime(1970, 1, 1)
+    status = "success"
+    error_msg = None
+    rows = 0
+    chunk_num = 0
+    try:
+        truncate_dealio_trades_mt4()
+        for chunk in get_dealio_trades_mt4_full():
+            upsert_dealio_trades_mt4(chunk)
+            rows += len(chunk)
+            chunk_num += 1
+            if chunk_num % 10 == 0:
+                elapsed = int((time.time() - start) * 1000)
+                log_sync("dealio_trades_mt4", cutoff, rows, elapsed, "running", f"rebuild: chunk {chunk_num}, {rows} rows so far")
+    except Exception as e:
+        status = "error"
+        error_msg = str(e)
+        raise
+    finally:
+        _dealio_trades_mt4_rebuilding = False
+        duration_ms = int((time.time() - start) * 1000)
+        log_sync("dealio_trades_mt4", cutoff, rows, duration_ms, status, error_msg)
+    return {"status": status, "rows_synced": rows, "type": "rebuild"}
 
 
 def run_dealio_trades_mt4_refresh_notional_etl(hours: int = 2160) -> dict:
