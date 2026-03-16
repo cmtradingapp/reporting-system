@@ -471,16 +471,6 @@
         <div style="font-size:0.6rem;color:#484f58;margin-top:2px;" id="live-eez-updated"></div>
       </div>
     </div>
-    <div class="col-12 col-md-4" id="kpi-live-equity-v2">
-      <div class="kpi-card text-center">
-        <div style="font-size:0.65rem;margin-bottom:2px;">
-          <span style="background:#1a3a4f;color:#58a6ff;border:1px solid #1f6feb;border-radius:4px;padding:1px 6px;font-size:0.6rem;letter-spacing:0.04em;">LIVE V2</span>
-        </div>
-        <div class="kpi-value" style="color:#f0883e;" id="stat-live-equity-zeroed-v2">—</div>
-        <div class="kpi-label">Live EEZ V2</div>
-        <div style="font-size:0.6rem;color:#484f58;margin-top:2px;" id="live-eez-v2-updated"></div>
-      </div>
-    </div>
   </div>
 
   {% if show_sales %}
@@ -743,26 +733,6 @@
     }
   }
 
-  // ── Live EEZ V2 ────────────────────────────────────────────────────────
-  async function loadLiveEquityV2() {
-    const el  = document.getElementById('stat-live-equity-zeroed-v2');
-    const upd = document.getElementById('live-eez-v2-updated');
-    try {
-      const res  = await fetch('/api/live-equity-zeroed-v2');
-      const text = await res.text();
-      let data;
-      try { data = JSON.parse(text); } catch { throw new Error('Server error'); }
-      if (!res.ok) throw new Error(data.detail || 'error');
-      const neg = data.total < 0;
-      const abs = Math.abs(data.total);
-      el.textContent = (neg ? '-$' : '$') + abs.toLocaleString('en-US');
-      upd.textContent = 'as of ' + new Date().toLocaleTimeString();
-    } catch(e) {
-      console.error('loadLiveEquityV2 error:', e);
-      if (el) el.textContent = 'Err: ' + e.message;
-    }
-  }
-
   // ── Combined load ──────────────────────────────────────────────────────
   function loadAll() {
     if (SHOW_SALES)     loadData();
@@ -770,7 +740,6 @@
     try {
       const dt = document.getElementById('date-to') ? document.getElementById('date-to').value : null;
       loadLiveEquity(dt);
-      loadLiveEquityV2();
     } catch(e) { console.error('loadAll live equity error:', e); }
   }
 
@@ -1788,7 +1757,6 @@
     if (document.visibilityState !== 'visible') return;
     const dt = document.getElementById('date-to').value;
     loadLiveEquity(dt);
-    loadLiveEquityV2();
   }, 120000);
 </script>
 
