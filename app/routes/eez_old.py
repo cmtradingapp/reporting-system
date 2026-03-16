@@ -48,7 +48,7 @@ async def eez_old_api(request: Request):
                 SELECT MAX(date::date) FROM dealio_daily_profits
                 WHERE date::date < DATE_TRUNC('month', CURRENT_DATE)
             )
-        )
+        ),
         current_month_logins AS (
             SELECT DISTINCT login
             FROM dealio_daily_profits
