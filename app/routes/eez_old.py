@@ -25,7 +25,7 @@ async def eez_old_api(request: Request):
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
-    _ck = "eez_old_v4"
+    _ck = "eez_old_v5"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -58,7 +58,7 @@ async def eez_old_api(request: Request):
         SELECT
             d.login,
             COALESCE(tf.is_test, 0)                                             AS is_test,
-            ROUND(GREATEST(0, COALESCE(d.convertedequity, 0))::numeric, 2)      AS eez,
+            ROUND(GREATEST(0, COALESCE(d.convertedbalance, 0) + COALESCE(d.convertedfloatingpnl, 0))::numeric, 2) AS eez,
             ROUND(COALESCE(st.daily_start_equity,     0)::numeric, 2)           AS daily_start_equity,
             ROUND(COALESCE(st.daily_start_net_equity, 0)::numeric, 2)           AS daily_start_net_equity
         FROM dealio_daily_profit d
