@@ -692,6 +692,79 @@ def insert_records(df: pd.DataFrame):
         conn.close()
 
 
+def ensure_bonus_transactions_table():
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS bonus_transactions (
+                    mttransactionsid BIGINT PRIMARY KEY,
+                    login            BIGINT,
+                    net_amount       NUMERIC(18, 2),
+                    confirmation_time TIMESTAMP,
+                    synced_at        TIMESTAMP DEFAULT NOW()
+                );
+                CREATE INDEX IF NOT EXISTS idx_bonus_tx_login ON bonus_transactions(login);
+                CREATE INDEX IF NOT EXISTS idx_bonus_tx_conf  ON bonus_transactions(confirmation_time);
+            """)
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def upsert_bonus_transactions(df) -> int:
+    if df is None or len(df) == 0:
+        return 0
+    rows = [
+        (int(r["mttransactionsid"]),
+         int(r["login"]) if r["login"] is not None else None,
+         float(r["net_amount"]) if r["net_amount"] is not None else None,
+         r["confirmation_time"])
+        for _, r in df.iterrows()
+        if r["mttransactionsid"] is not None
+    ]
+    if not rows:
+        return 0
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            execute_values(cur, """
+                INSERT INTO bonus_transactions (mttransactionsid, login, net_amount, confirmation_time, synced_at)
+                VALUES %s
+                ON CONFLICT (mttransactionsid) DO UPDATE SET
+                    login             = EXCLUDED.login,
+                    net_amount        = EXCLUDED.net_amount,
+                    confirmation_time = EXCLUDED.confirmation_time,
+                    synced_at         = NOW()
+            """, rows)
+        conn.commit()
+        return len(rows)
+    finally:
+        conn.close()
+
+
+def fetch_bonus_transactions_stats() -> dict:
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT COUNT(*), MAX(synced_at), COUNT(DISTINCT login),
+                       COALESCE(SUM(net_amount), 0)
+                FROM bonus_transactions
+            """)
+            row = cur.fetchone()
+            return {
+                "total_records":  row[0] or 0,
+                "last_synced_at": str(row[1]) if row[1] else "Never",
+                "unique_logins":  row[2] or 0,
+                "total_net_bonus": float(row[3] or 0),
+            }
+    except Exception:
+        return {"total_records": 0, "last_synced_at": "Never", "unique_logins": 0, "total_net_bonus": 0.0}
+    finally:
+        conn.close()
+
+
 def ensure_auth_table():
     sql = """
         CREATE TABLE IF NOT EXISTS auth_users (

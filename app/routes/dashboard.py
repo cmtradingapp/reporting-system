@@ -264,24 +264,11 @@ async def dashboard_api(request: Request):
                     WHERE EXTRACT(YEAR  FROM date) = EXTRACT(YEAR  FROM CURRENT_DATE)
                       AND EXTRACT(MONTH FROM date) = EXTRACT(MONTH FROM CURRENT_DATE)
                 ),
-                old_bal_bonus AS (
-                    SELECT
-                        t.login,
-                        t.confirmation_time::date AS bonus_date,
-                        SUM(CASE WHEN t.transactiontype = 'Deposit'    AND t.transactiontype IN ('FRF Commission', 'Bonus')                          THEN t.usdamount ELSE 0 END)
-                      - SUM(CASE WHEN t.transactiontype = 'Withdrawal' AND t.transactiontype IN ('FRF Commission Cancelled', 'BonusCancelled') THEN t.usdamount ELSE 0 END)
-                            AS old_bonus_usd
-                    FROM transactions t
-                    WHERE t.transactionapproval = 'Approved'
-                      AND (t.deleted = 0 OR t.deleted IS NULL)
-                      AND ((t.transactiontype = 'Deposit'    AND t.transactiontype IN ('FRF Commission', 'Bonus'))
-                        OR (t.transactiontype = 'Withdrawal' AND t.transactiontype IN ('FRF Commission Cancelled', 'BonusCancelled')))
-                    GROUP BY t.login, t.confirmation_time::date
-                ),
                 old_bonus_balance AS (
-                    SELECT login, SUM(old_bonus_usd) AS old_bonus_balance
-                    FROM old_bal_bonus
-                    WHERE bonus_date <= (SELECT last_available_date FROM last_date)
+                    SELECT login,
+                           SUM(net_amount) AS old_bonus_balance
+                    FROM bonus_transactions
+                    WHERE confirmation_time::date <= (SELECT last_available_date FROM last_date)
                     GROUP BY login
                 )
                 SELECT COALESCE(SUM(

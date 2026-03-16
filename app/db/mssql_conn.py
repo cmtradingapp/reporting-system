@@ -225,6 +225,65 @@ def get_dealio_mt4trades_full():
         yield df
 
 
+def get_bonus_transactions(hours: int = 24) -> pd.DataFrame:
+    """Fetch is_old_bonus transactions modified in the last N hours from MSSQL."""
+    conn = _get_mssql_connection()
+    try:
+        query = f"""
+            SELECT mttransactionsid,
+                   CAST(login AS BIGINT) AS login,
+                   CASE WHEN transactiontype = 'Deposit'    THEN  usdamount
+                        WHEN transactiontype = 'Withdrawal' THEN -usdamount
+                   END AS net_amount,
+                   confirmation_time
+            FROM report.vtiger_mttransactions
+            WHERE ((transactiontype = 'Deposit'    AND transaction_type_name IN ('FRF Commission', 'Bonus'))
+                OR (transactiontype = 'Withdrawal' AND transaction_type_name IN ('FRF Commission Cancelled', 'BonusCancelled')))
+              AND transactionapproval = 'Approved'
+              AND (deleted = 0 OR deleted IS NULL)
+              AND usdamount < 10000000
+              AND server_id = 2
+              AND (modifiedtime        >= DATEADD(hour, -{hours}, GETUTCDATE())
+                OR confirmation_time  >= DATEADD(hour, -{hours}, GETUTCDATE()))
+        """
+        return pd.read_sql(query, conn)
+    finally:
+        conn.close()
+
+
+def get_bonus_transactions_full():
+    """Generator yielding all is_old_bonus transactions from MSSQL in chunks."""
+    last_id = 0
+    while True:
+        conn = _get_mssql_connection()
+        try:
+            query = f"""
+                SELECT TOP {CHUNK_SIZE}
+                       mttransactionsid,
+                       CAST(login AS BIGINT) AS login,
+                       CASE WHEN transactiontype = 'Deposit'    THEN  usdamount
+                            WHEN transactiontype = 'Withdrawal' THEN -usdamount
+                       END AS net_amount,
+                       confirmation_time
+                FROM report.vtiger_mttransactions
+                WHERE ((transactiontype = 'Deposit'    AND transaction_type_name IN ('FRF Commission', 'Bonus'))
+                    OR (transactiontype = 'Withdrawal' AND transaction_type_name IN ('FRF Commission Cancelled', 'BonusCancelled')))
+                  AND transactionapproval = 'Approved'
+                  AND (deleted = 0 OR deleted IS NULL)
+                  AND usdamount < 10000000
+                  AND server_id = 2
+                  AND mttransactionsid > {last_id}
+                ORDER BY mttransactionsid
+            """
+            df = pd.read_sql(query, conn)
+        finally:
+            conn.close()
+        if df.empty:
+            break
+        last_id = int(df["mttransactionsid"].max())
+        yield df
+
+
 def get_transaction_type_names_full():
     """Yields DataFrames of (mttransactionsid, transaction_type_name) from MSSQL in chunks."""
     last_id = 0

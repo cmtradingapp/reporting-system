@@ -2,7 +2,7 @@ import time
 import pandas as pd
 from datetime import datetime, timedelta, timezone
 from app.db.mysql_conn import get_operators, get_users, get_accounts, get_accounts_full, get_crm_users, get_crm_users_full, get_transactions, get_transactions_full, get_trading_accounts, get_trading_accounts_full
-from app.db.mssql_conn import get_targets, get_dealio_mt4trades, get_dealio_mt4trades_full, get_vtiger_users, get_dealio_daily_profit, get_dealio_daily_profit_full, get_client_classification
+from app.db.mssql_conn import get_targets, get_dealio_mt4trades, get_dealio_mt4trades_full, get_vtiger_users, get_dealio_daily_profit, get_dealio_daily_profit_full, get_client_classification, get_bonus_transactions, get_bonus_transactions_full
 from app.db.dealio_conn import get_dealio_users, get_dealio_users_full, get_dealio_trades_mt4, get_dealio_trades_mt4_full, get_dealio_trades_mt4_missing, get_dealio_daily_profits, get_dealio_daily_profits_full
 from app.db.postgres_conn import (
     ensure_table, delete_all_performance, insert_records,
@@ -12,6 +12,7 @@ from app.db.postgres_conn import (
     ensure_client_classification_table, upsert_client_classification,
     upsert_dealio_users, upsert_dealio_trades_mt4, truncate_dealio_trades_mt4,
     upsert_dealio_daily_profits,
+    ensure_bonus_transactions_table, upsert_bonus_transactions,
 )
 
 # Global lock: set to True while rebuild is running so the incremental scheduler skips
@@ -588,4 +589,46 @@ def run_dealio_daily_profits_full_etl() -> dict:
     finally:
         duration_ms = int((time.time() - start) * 1000)
         log_sync("dealio_daily_profits", cutoff, rows, duration_ms, status, error_msg)
+    return {"status": status, "rows_synced": rows, "type": "full"}
+
+
+def run_bonus_transactions_etl(hours: int = 24) -> dict:
+    ensure_bonus_transactions_table()
+    start = time.time()
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    status = "success"
+    error_msg = None
+    rows = 0
+    try:
+        df = get_bonus_transactions(hours=hours)
+        rows = len(df)
+        upsert_bonus_transactions(df)
+    except Exception as e:
+        status = "error"
+        error_msg = str(e)
+        raise
+    finally:
+        duration_ms = int((time.time() - start) * 1000)
+        log_sync("bonus_transactions", cutoff, rows, duration_ms, status, error_msg)
+    return {"status": status, "rows_synced": rows, "lookback_hours": hours}
+
+
+def run_bonus_transactions_full_etl() -> dict:
+    ensure_bonus_transactions_table()
+    start = time.time()
+    cutoff = datetime(1970, 1, 1)
+    status = "success"
+    error_msg = None
+    rows = 0
+    try:
+        for chunk in get_bonus_transactions_full():
+            upsert_bonus_transactions(chunk)
+            rows += len(chunk)
+    except Exception as e:
+        status = "error"
+        error_msg = str(e)
+        raise
+    finally:
+        duration_ms = int((time.time() - start) * 1000)
+        log_sync("bonus_transactions", cutoff, rows, duration_ms, status, error_msg)
     return {"status": status, "rows_synced": rows, "type": "full"}
