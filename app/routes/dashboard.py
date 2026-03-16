@@ -90,19 +90,19 @@ async def dashboard_api(request: Request):
             cur.execute("""
                 SELECT
                   COALESCE(SUM(CASE
-                    WHEN COALESCE(t.transactiontypename, t.transactiontype) IN ('Deposit', 'Withdrawal Cancelled') THEN  t.usdamount
-                    WHEN COALESCE(t.transactiontypename, t.transactiontype) IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
+                    WHEN t.transactiontypename IN ('Deposit', 'Withdrawal Cancelled') THEN  t.usdamount
+                    WHEN t.transactiontypename IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
                   END) FILTER (WHERE t.confirmation_time::date = CURRENT_DATE), 0) AS daily,
                   COALESCE(SUM(CASE
-                    WHEN COALESCE(t.transactiontypename, t.transactiontype) IN ('Deposit', 'Withdrawal Cancelled') THEN  t.usdamount
-                    WHEN COALESCE(t.transactiontypename, t.transactiontype) IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
+                    WHEN t.transactiontypename IN ('Deposit', 'Withdrawal Cancelled') THEN  t.usdamount
+                    WHEN t.transactiontypename IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
                   END), 0) AS monthly
                 FROM transactions t
                 JOIN crm_users u ON u.id = t.original_deposit_owner
                 JOIN accounts a ON a.accountid = t.vtigeraccountid
                 WHERE t.transactionapproval = 'Approved'
                   AND (t.deleted = 0 OR t.deleted IS NULL)
-                  AND COALESCE(t.transactiontypename, t.transactiontype) IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
+                  AND t.transactiontypename IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
                   AND t.confirmation_time >= %(month_start)s
                   AND t.confirmation_time <  %(tomorrow)s
                   AND EXTRACT(YEAR FROM t.confirmation_time) >= 2024
@@ -118,19 +118,19 @@ async def dashboard_api(request: Request):
             cur.execute("""
                 SELECT
                   COALESCE(SUM(CASE
-                    WHEN COALESCE(t.transactiontypename, t.transactiontype) IN ('Deposit', 'Withdrawal Cancelled') THEN  t.usdamount
-                    WHEN COALESCE(t.transactiontypename, t.transactiontype) IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
+                    WHEN t.transactiontypename IN ('Deposit', 'Withdrawal Cancelled') THEN  t.usdamount
+                    WHEN t.transactiontypename IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
                   END) FILTER (WHERE t.confirmation_time::date = CURRENT_DATE), 0) AS daily,
                   COALESCE(SUM(CASE
-                    WHEN COALESCE(t.transactiontypename, t.transactiontype) IN ('Deposit', 'Withdrawal Cancelled') THEN  t.usdamount
-                    WHEN COALESCE(t.transactiontypename, t.transactiontype) IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
+                    WHEN t.transactiontypename IN ('Deposit', 'Withdrawal Cancelled') THEN  t.usdamount
+                    WHEN t.transactiontypename IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
                   END), 0) AS monthly
                 FROM transactions t
                 JOIN crm_users u ON u.id = t.original_deposit_owner
                 JOIN accounts a ON a.accountid = t.vtigeraccountid
                 WHERE t.transactionapproval = 'Approved'
                   AND (t.deleted = 0 OR t.deleted IS NULL)
-                  AND COALESCE(t.transactiontypename, t.transactiontype) IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
+                  AND t.transactiontypename IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
                   AND t.confirmation_time >= %(month_start)s
                   AND t.confirmation_time <  %(tomorrow)s
                   AND EXTRACT(YEAR FROM t.confirmation_time) >= 2024
@@ -150,19 +150,19 @@ async def dashboard_api(request: Request):
             cur.execute("""
                 SELECT
                   COALESCE(SUM(CASE
-                    WHEN COALESCE(t.transactiontypename, t.transactiontype) IN ('Deposit', 'Withdrawal Cancelled') THEN  t.usdamount
-                    WHEN COALESCE(t.transactiontypename, t.transactiontype) IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
+                    WHEN t.transactiontypename IN ('Deposit', 'Withdrawal Cancelled') THEN  t.usdamount
+                    WHEN t.transactiontypename IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
                   END) FILTER (WHERE t.confirmation_time::date = CURRENT_DATE), 0) AS daily,
                   COALESCE(SUM(CASE
-                    WHEN COALESCE(t.transactiontypename, t.transactiontype) IN ('Deposit', 'Withdrawal Cancelled') THEN  t.usdamount
-                    WHEN COALESCE(t.transactiontypename, t.transactiontype) IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
+                    WHEN t.transactiontypename IN ('Deposit', 'Withdrawal Cancelled') THEN  t.usdamount
+                    WHEN t.transactiontypename IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
                   END), 0) AS monthly
                 FROM transactions t
                 JOIN accounts a ON a.accountid = t.vtigeraccountid
                 JOIN crm_users u ON u.id = a.assigned_to
                 WHERE t.transactionapproval = 'Approved'
                   AND (t.deleted = 0 OR t.deleted IS NULL)
-                  AND COALESCE(t.transactiontypename, t.transactiontype) IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
+                  AND t.transactiontypename IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
                   AND t.confirmation_time >= %(month_start)s
                   AND t.confirmation_time <  %(tomorrow)s
                   AND a.is_test_account = 0
@@ -189,7 +189,7 @@ async def dashboard_api(request: Request):
                 JOIN accounts a ON a.accountid = t.vtigeraccountid
                 WHERE t.transactionapproval = 'Approved'
                   AND (t.deleted = 0 OR t.deleted IS NULL)
-                  AND COALESCE(t.transactiontypename, t.transactiontype) = 'Deposit'
+                  AND t.transactiontypename = 'Deposit'
                   AND t.ftd = 1
                   AND t.confirmation_time >= %(month_start)s
                   AND t.confirmation_time <  %(tomorrow)s
@@ -208,7 +208,7 @@ async def dashboard_api(request: Request):
                 JOIN accounts a ON a.accountid = t.vtigeraccountid
                 WHERE t.transactionapproval = 'Approved'
                   AND (t.deleted = 0 OR t.deleted IS NULL)
-                  AND COALESCE(t.transactiontypename, t.transactiontype) = 'Deposit'
+                  AND t.transactiontypename = 'Deposit'
                   AND t.ftd = 1
                   AND a.client_qualification_date >= %(month_start)s
                   AND a.client_qualification_date <  %(tomorrow)s

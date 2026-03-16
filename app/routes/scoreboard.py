@@ -102,7 +102,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
             JOIN accounts a ON a.accountid = t.vtigeraccountid
             WHERE t.transactionapproval = 'Approved'
               AND (t.deleted = 0 OR t.deleted IS NULL)
-              AND COALESCE(t.transactiontypename, t.transactiontype) = 'Deposit'
+              AND t.transactiontypename = 'Deposit'
               AND t.ftd = 1
               AND a.client_qualification_date IS NOT NULL
               AND a.client_qualification_date >= %(date_from)s
@@ -130,14 +130,14 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
             SELECT
                 t.original_deposit_owner                         AS agent_id,
                 SUM(CASE
-                    WHEN COALESCE(t.transactiontypename, t.transactiontype) IN ('Deposit', 'Withdrawal Cancelled') THEN  t.usdamount
-                    WHEN COALESCE(t.transactiontypename, t.transactiontype) IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
+                    WHEN t.transactiontypename IN ('Deposit', 'Withdrawal Cancelled') THEN  t.usdamount
+                    WHEN t.transactiontypename IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
                 END)                                             AS net_usd
             FROM transactions t
             JOIN accounts a ON a.accountid = t.vtigeraccountid
             WHERE t.transactionapproval = 'Approved'
               AND (t.deleted = 0 OR t.deleted IS NULL)
-              AND COALESCE(t.transactiontypename, t.transactiontype) IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
+              AND t.transactiontypename IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
               AND t.confirmation_time >= %(date_from)s
               AND t.confirmation_time <  %(date_to_excl)s
               AND a.is_test_account = 0
@@ -151,7 +151,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
             JOIN accounts a ON a.accountid = t.vtigeraccountid
             WHERE t.transactionapproval = 'Approved'
               AND (t.deleted = 0 OR t.deleted IS NULL)
-              AND COALESCE(t.transactiontypename, t.transactiontype) = 'Deposit'
+              AND t.transactiontypename = 'Deposit'
               AND t.ftd = 1
               AND t.confirmation_time >= %(date_from)s
               AND t.confirmation_time <  %(date_to_excl)s
