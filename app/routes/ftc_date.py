@@ -147,10 +147,12 @@ async def ftc_date_api(
             SELECT DISTINCT ta.vtigeraccountid AS accountid
             FROM dealio_trades_mt4 d
             JOIN trading_accounts ta ON ta.login::bigint = d.login::bigint
+            JOIN accounts a ON a.accountid = ta.vtigeraccountid
             WHERE d.notional_value > 0
               AND ta.vtigeraccountid IS NOT NULL
               AND ta.vtigeraccountid::text != ''
               AND d.open_time::date <= %(end_date)s::date
+              AND a.is_test_account = 0
         ),
         grouped AS (
             SELECT

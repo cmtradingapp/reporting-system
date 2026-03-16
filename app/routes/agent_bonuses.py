@@ -187,6 +187,7 @@ async def agent_bonuses_retention_api(request: Request, date_from: str, date_to:
               AND t.transactiontype IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
               AND t.confirmation_time >= %(date_from)s AND t.confirmation_time < %(date_to_excl)s
               AND COALESCE(t.comment, '') NOT ILIKE '%%bonus%%'
+              AND a.is_test_account = 0
             GROUP BY a.assigned_to
         ) net ON net.agent_id = u.id
         LEFT JOIN (
@@ -197,6 +198,7 @@ async def agent_bonuses_retention_api(request: Request, date_from: str, date_to:
             WHERE d.open_time::date >= %(date_from)s AND d.open_time::date <= %(date_to)s
               AND EXTRACT(YEAR FROM d.open_time) >= 2024
               AND ta.vtigeraccountid IS NOT NULL
+              AND a.is_test_account = 0
             GROUP BY a.assigned_to
         ) vol ON vol.agent_id = u.id
         WHERE u.department_ = 'Retention'
@@ -343,6 +345,7 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
               AND a.client_qualification_date IS NOT NULL
               AND a.client_qualification_date >= %(date_from)s
               AND a.client_qualification_date <  %(date_to_excl)s
+              AND a.is_test_account = 0
             GROUP BY t.original_deposit_owner
         ) ftc ON ftc.agent_id = u.id
         LEFT JOIN (
@@ -366,6 +369,7 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
               AND a.client_qualification_date >= %(date_from)s
               AND a.client_qualification_date <  %(date_to_excl)s
               AND (a.client_qualification_date >= t.confirmation_time::date OR t.ftd = 1)
+              AND a.is_test_account = 0
             GROUP BY t.original_deposit_owner
         ) ftc_net ON ftc_net.agent_id = u.id
         LEFT JOIN (

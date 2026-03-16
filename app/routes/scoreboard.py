@@ -107,6 +107,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
               AND a.client_qualification_date IS NOT NULL
               AND a.client_qualification_date >= %(date_from)s
               AND a.client_qualification_date <  %(date_to_excl)s
+              AND a.is_test_account = 0
             GROUP BY t.original_deposit_owner
         ) ftc ON ftc.agent_id = u.id
         LEFT JOIN (
@@ -133,11 +134,13 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
                     WHEN t.transactiontype IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
                 END)                                             AS net_usd
             FROM transactions t
+            JOIN accounts a ON a.accountid = t.vtigeraccountid
             WHERE t.transactionapproval = 'Approved'
               AND (t.deleted = 0 OR t.deleted IS NULL)
               AND t.transactiontype IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
               AND t.confirmation_time >= %(date_from)s
               AND t.confirmation_time <  %(date_to_excl)s
+              AND a.is_test_account = 0
             GROUP BY t.original_deposit_owner
         ) net ON net.agent_id = u.id
         LEFT JOIN (
@@ -145,12 +148,14 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
                 t.original_deposit_owner          AS agent_id,
                 COUNT(t.mttransactionsid)         AS cnt
             FROM transactions t
+            JOIN accounts a ON a.accountid = t.vtigeraccountid
             WHERE t.transactionapproval = 'Approved'
               AND (t.deleted = 0 OR t.deleted IS NULL)
               AND t.transactiontype = 'Deposit'
               AND t.ftd = 1
               AND t.confirmation_time >= %(date_from)s
               AND t.confirmation_time <  %(date_to_excl)s
+              AND a.is_test_account = 0
             GROUP BY t.original_deposit_owner
         ) ftd_cnt ON ftd_cnt.agent_id = u.id
         WHERE u.department_ = 'Sales'
@@ -190,6 +195,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
                   AND a.client_qualification_date IS NOT NULL
                   AND a.client_qualification_date >= %(date_from)s
                   AND a.client_qualification_date <  %(date_to_excl)s
+                  AND a.is_test_account = 0
             """, {"date_from": date_from, "date_to_excl": date_to_exclusive})
             grand_ftc = int(cur.fetchone()[0] or 0)
 
@@ -201,6 +207,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
                 END), 0)
                 FROM transactions t
                 JOIN crm_users u ON u.id = t.original_deposit_owner
+                JOIN accounts a ON a.accountid = t.vtigeraccountid
                 WHERE t.transactionapproval = 'Approved'
                   AND (t.deleted = 0 OR t.deleted IS NULL)
                   AND t.transactiontype IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
@@ -208,6 +215,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
                   AND t.confirmation_time <  %(date_to_excl)s
                   AND EXTRACT(YEAR FROM t.confirmation_time) >= 2024
                   AND t.vtigeraccountid IS NOT NULL
+                  AND a.is_test_account = 0
                   AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
             """, {"date_from": date_from, "date_to_excl": date_to_exclusive})
             grand_net = float(cur.fetchone()[0] or 0)
@@ -223,6 +231,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
                   AND d.open_time::date <= %(date_to)s
                   AND EXTRACT(YEAR FROM d.open_time) >= 2024
                   AND ta.vtigeraccountid IS NOT NULL
+                  AND a.is_test_account = 0
                   AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
             """, {"date_from": date_from, "date_to": date_to})
             open_volume = float(cur.fetchone()[0] or 0)
@@ -269,6 +278,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
                 JOIN crm_users u          ON u.id = a.assigned_to
                 LEFT JOIN old_bonus_balance ob ON ob.login::bigint = d.login
                 WHERE d.date = (SELECT last_available_date FROM last_date)
+                  AND a.is_test_account = 0
             """, {"date_to": date_to})
             end_equity_zeroed = float(cur.fetchone()[0] or 0)
 
@@ -280,12 +290,14 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
                 END), 0)
                 FROM transactions t
                 JOIN crm_users u ON u.id = t.original_deposit_owner
+                JOIN accounts a ON a.accountid = t.vtigeraccountid
                 WHERE t.transactionapproval = 'Approved'
                   AND (t.deleted = 0 OR t.deleted IS NULL)
                   AND t.transactiontype IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
                   AND t.confirmation_time::date = %(date_to)s
                   AND EXTRACT(YEAR FROM t.confirmation_time) >= 2024
                   AND t.vtigeraccountid IS NOT NULL
+                  AND a.is_test_account = 0
                   AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
             """, {"date_to": date_to})
             daily_net = float(cur.fetchone()[0] or 0)
@@ -294,12 +306,14 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
             cur.execute("""
                 SELECT COUNT(t.mttransactionsid)
                 FROM transactions t
+                JOIN accounts a ON a.accountid = t.vtigeraccountid
                 WHERE t.transactionapproval = 'Approved'
                   AND (t.deleted = 0 OR t.deleted IS NULL)
                   AND t.transactiontype = 'Deposit'
                   AND t.ftd = 1
                   AND t.confirmation_time >= %(date_from)s
                   AND t.confirmation_time <  %(date_to_excl)s
+                  AND a.is_test_account = 0
             """, {"date_from": date_from, "date_to_excl": date_to_exclusive})
             grand_ftd = int(cur.fetchone()[0] or 0)
 
@@ -307,11 +321,13 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
             cur.execute("""
                 SELECT COUNT(t.mttransactionsid)
                 FROM transactions t
+                JOIN accounts a ON a.accountid = t.vtigeraccountid
                 WHERE t.transactionapproval = 'Approved'
                   AND (t.deleted = 0 OR t.deleted IS NULL)
                   AND t.transactiontype = 'Deposit'
                   AND t.ftd = 1
                   AND t.confirmation_time::date = %(date_to)s
+                  AND a.is_test_account = 0
             """, {"date_to": date_to})
             daily_ftd = int(cur.fetchone()[0] or 0)
 
@@ -325,6 +341,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
                   AND t.transactiontype = 'Deposit'
                   AND t.ftd = 1
                   AND a.client_qualification_date::date = %(date_to)s
+                  AND a.is_test_account = 0
             """, {"date_to": date_to})
             daily_ftc = int(cur.fetchone()[0] or 0)
 
@@ -430,6 +447,7 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
               AND t.transactiontype IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
               AND t.confirmation_time >= %(date_from)s AND t.confirmation_time < %(date_to_excl)s
               AND COALESCE(t.comment, '') NOT ILIKE '%%bonus%%'
+              AND a.is_test_account = 0
             GROUP BY a.assigned_to
         ) net ON net.agent_id = u.id
         LEFT JOIN (
@@ -439,6 +457,7 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
               AND t.transactiontype IN ('Deposit','Withdrawal Cancelled')
               AND t.confirmation_time >= %(date_from)s AND t.confirmation_time < %(date_to_excl)s
               AND COALESCE(t.comment, '') NOT ILIKE '%%bonus%%'
+              AND a.is_test_account = 0
             GROUP BY a.assigned_to
         ) dep ON dep.agent_id = u.id
         LEFT JOIN (
@@ -449,6 +468,7 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
             WHERE d.open_time::date >= %(date_from)s AND d.open_time::date <= %(date_to)s
               AND EXTRACT(YEAR FROM d.open_time) >= 2024
               AND ta.vtigeraccountid IS NOT NULL
+              AND a.is_test_account = 0
             GROUP BY a.assigned_to
         ) vol ON vol.agent_id = u.id
         WHERE u.department_ = 'Retention'
@@ -497,6 +517,7 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
                   AND t.transactiontype IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
                   AND t.confirmation_time::date = %(date_to)s
                   AND COALESCE(t.comment, '') NOT ILIKE '%%bonus%%'
+                  AND a.is_test_account = 0
                   AND u.department_ = 'Retention'
                   AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
                   AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'

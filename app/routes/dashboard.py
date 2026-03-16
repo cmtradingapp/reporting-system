@@ -99,6 +99,7 @@ async def dashboard_api(request: Request):
                   END), 0) AS monthly
                 FROM transactions t
                 JOIN crm_users u ON u.id = t.original_deposit_owner
+                JOIN accounts a ON a.accountid = t.vtigeraccountid
                 WHERE t.transactionapproval = 'Approved'
                   AND (t.deleted = 0 OR t.deleted IS NULL)
                   AND t.transactiontype IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
@@ -106,6 +107,7 @@ async def dashboard_api(request: Request):
                   AND t.confirmation_time <  %(tomorrow)s
                   AND EXTRACT(YEAR FROM t.confirmation_time) >= 2024
                   AND t.vtigeraccountid IS NOT NULL
+                  AND a.is_test_account = 0
                   AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
             """, {"month_start": month_start_str, "tomorrow": tomorrow_str})
             row = cur.fetchone()
@@ -125,6 +127,7 @@ async def dashboard_api(request: Request):
                   END), 0) AS monthly
                 FROM transactions t
                 JOIN crm_users u ON u.id = t.original_deposit_owner
+                JOIN accounts a ON a.accountid = t.vtigeraccountid
                 WHERE t.transactionapproval = 'Approved'
                   AND (t.deleted = 0 OR t.deleted IS NULL)
                   AND t.transactiontype IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
@@ -132,6 +135,7 @@ async def dashboard_api(request: Request):
                   AND t.confirmation_time <  %(tomorrow)s
                   AND EXTRACT(YEAR FROM t.confirmation_time) >= 2024
                   AND t.vtigeraccountid IS NOT NULL
+                  AND a.is_test_account = 0
                   AND u.department_ = 'Sales'
                   AND u.team = 'Conversion'
                   AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
@@ -161,6 +165,7 @@ async def dashboard_api(request: Request):
                   AND t.transactiontype IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
                   AND t.confirmation_time >= %(month_start)s
                   AND t.confirmation_time <  %(tomorrow)s
+                  AND a.is_test_account = 0
                   AND COALESCE(t.comment, '') NOT ILIKE '%%bonus%%'
                   AND u.department_ = 'Retention'
                   AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
@@ -181,12 +186,14 @@ async def dashboard_api(request: Request):
                   COUNT(t.mttransactionsid) FILTER (WHERE t.confirmation_time::date = CURRENT_DATE) AS daily,
                   COUNT(t.mttransactionsid) AS monthly
                 FROM transactions t
+                JOIN accounts a ON a.accountid = t.vtigeraccountid
                 WHERE t.transactionapproval = 'Approved'
                   AND (t.deleted = 0 OR t.deleted IS NULL)
                   AND t.transactiontype = 'Deposit'
                   AND t.ftd = 1
                   AND t.confirmation_time >= %(month_start)s
                   AND t.confirmation_time <  %(tomorrow)s
+                  AND a.is_test_account = 0
             """, {"month_start": month_start_str, "tomorrow": tomorrow_str})
             row = cur.fetchone()
             ftd_daily = int(row[0] or 0)
@@ -205,6 +212,7 @@ async def dashboard_api(request: Request):
                   AND t.ftd = 1
                   AND a.client_qualification_date >= %(month_start)s
                   AND a.client_qualification_date <  %(tomorrow)s
+                  AND a.is_test_account = 0
             """, {"month_start": month_start_str, "tomorrow": tomorrow_str})
             row = cur.fetchone()
             ftc_daily = int(row[0] or 0)
@@ -217,11 +225,13 @@ async def dashboard_api(request: Request):
                   COUNT(DISTINCT ta.vtigeraccountid) AS monthly
                 FROM dealio_trades_mt4 d
                 JOIN trading_accounts ta ON ta.login::bigint = d.login::bigint
+                JOIN accounts a ON a.accountid = ta.vtigeraccountid
                 WHERE d.notional_value > 0
                   AND ta.vtigeraccountid IS NOT NULL
                   AND ta.vtigeraccountid::text != ''
                   AND d.open_time::date >= %(month_start)s
                   AND d.open_time::date <= %(today)s
+                  AND a.is_test_account = 0
             """, {"month_start": month_start_str, "today": today_str})
             row = cur.fetchone()
             traders_daily = int(row[0] or 0)
@@ -240,6 +250,7 @@ async def dashboard_api(request: Request):
                   AND d.open_time::date <= %(today)s
                   AND EXTRACT(YEAR FROM d.open_time) >= 2024
                   AND ta.vtigeraccountid IS NOT NULL
+                  AND a.is_test_account = 0
                   AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
             """, {"month_start": month_start_str, "today": today_str})
             row = cur.fetchone()
@@ -250,7 +261,7 @@ async def dashboard_api(request: Request):
             cur.execute("""
                 WITH last_date AS (
                     SELECT MAX(date) AS last_available_date
-                    FROM dealio_daily_profit
+                    FROM dealio_daily_profits
                     WHERE EXTRACT(YEAR  FROM date) = EXTRACT(YEAR  FROM CURRENT_DATE)
                       AND EXTRACT(MONTH FROM date) = EXTRACT(MONTH FROM CURRENT_DATE)
                 ),
@@ -286,6 +297,7 @@ async def dashboard_api(request: Request):
                 JOIN crm_users u          ON u.id = a.assigned_to
                 LEFT JOIN old_bonus_balance ob ON ob.login::bigint = d.login
                 WHERE d.date = (SELECT last_available_date FROM last_date)
+                  AND a.is_test_account = 0
             """)
             end_equity_zeroed = float(cur.fetchone()[0] or 0)
 
@@ -296,9 +308,12 @@ async def dashboard_api(request: Request):
                        THEN 0
                        ELSE ABS(SUM(CASE WHEN cmd=0 THEN notional_value ELSE -notional_value END))
                   END, 0)
-                FROM dealio_trades_mt4
-                WHERE CAST(close_time AS DATE) = '1970-01-01'
-                  AND symbol NOT IN ('ZeroingZAR','ZeroingUSD','ZeroingNGN','ZeroingKES','ZeroingJPY','ZeroingGBP','ZeroingEUR')
+                FROM dealio_trades_mt4 d
+                JOIN trading_accounts ta ON ta.login::bigint = d.login
+                JOIN accounts a ON a.accountid = ta.vtigeraccountid
+                WHERE CAST(d.close_time AS DATE) = '1970-01-01'
+                  AND d.symbol NOT IN ('ZeroingZAR','ZeroingUSD','ZeroingNGN','ZeroingKES','ZeroingJPY','ZeroingGBP','ZeroingEUR')
+                  AND a.is_test_account = 0
             """)
             abs_exposure = float(cur.fetchone()[0] or 0)
 
@@ -309,8 +324,11 @@ async def dashboard_api(request: Request):
                 SELECT COALESCE(SUM(
                     COALESCE(convertedclosedpnl, 0) + COALESCE(converteddeltafloatingpnl, 0)
                 ), 0)
-                FROM dealio_daily_profits
-                WHERE date::date = %(last_mtd)s
+                FROM dealio_daily_profits d
+                JOIN trading_accounts ta ON ta.login::bigint = d.login
+                JOIN accounts a ON a.accountid = ta.vtigeraccountid
+                WHERE d.date::date = %(last_mtd)s
+                  AND a.is_test_account = 0
             """, {"last_mtd": last_mtd_str})
             pnl_daily = round(float(cur.fetchone()[0] or 0), 2)
 
@@ -321,9 +339,12 @@ async def dashboard_api(request: Request):
                     SELECT COALESCE(SUM(
                         COALESCE(convertedclosedpnl, 0) + COALESCE(converteddeltafloatingpnl, 0)
                     ), 0)
-                    FROM dealio_daily_profits
-                    WHERE date::date >= %(month_start)s
-                      AND date::date < %(tomorrow)s
+                    FROM dealio_daily_profits d
+                    JOIN trading_accounts ta ON ta.login::bigint = d.login
+                    JOIN accounts a ON a.accountid = ta.vtigeraccountid
+                    WHERE d.date::date >= %(month_start)s
+                      AND d.date::date < %(tomorrow)s
+                      AND a.is_test_account = 0
                 """, {"month_start": month_start_str, "tomorrow": tomorrow_str})
                 pnl_monthly = round(float(cur.fetchone()[0] or 0), 2)
         except Exception:
