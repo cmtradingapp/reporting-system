@@ -274,7 +274,7 @@ async def dashboard_api(request: Request):
                 SELECT COALESCE(SUM(
                     GREATEST(
                         GREATEST(d.convertedbalance + d.convertedfloatingpnl, 0)
-                            - COALESCE(ob.old_bonus_balance, 0),
+                            - GREATEST(0, COALESCE(ob.old_bonus_balance, 0)),
                         0
                     )
                 ), 0) AS end_equity_zeroed

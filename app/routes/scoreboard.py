@@ -254,7 +254,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
                 SELECT COALESCE(SUM(
                     GREATEST(
                         GREATEST(d.convertedbalance + d.convertedfloatingpnl, 0)
-                            - COALESCE(ob.old_bonus_balance, 0),
+                            - GREATEST(0, COALESCE(ob.old_bonus_balance, 0)),
                         0
                     )
                 ), 0) AS end_equity_zeroed

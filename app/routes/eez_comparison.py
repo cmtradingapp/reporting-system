@@ -25,7 +25,7 @@ async def eez_comparison_api(request: Request):
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
-    _ck = "eez_comparison_v13"
+    _ck = "eez_comparison_v14"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -69,7 +69,7 @@ async def eez_comparison_api(request: Request):
             COALESCE(tf.is_test, 0)                                             AS is_test,
             ROUND(GREATEST(
                 GREATEST(0, COALESCE(d.convertedbalance,0) + COALESCE(d.convertedfloatingpnl,0))
-                    - COALESCE(b.old_bonus_balance, 0),
+                    - GREATEST(0, COALESCE(b.old_bonus_balance, 0)),
                 0)::numeric, 2)                                                  AS eez,
             ROUND(COALESCE(st.daily_start_equity,     0)::numeric, 2)           AS daily_start_equity,
             ROUND(COALESCE(st.daily_start_net_equity, 0)::numeric, 2)           AS daily_start_net_equity
