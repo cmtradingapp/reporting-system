@@ -25,7 +25,7 @@ async def eez_old_api(request: Request):
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
-    _ck = "eez_old_v3"
+    _ck = "eez_old_v4"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -33,7 +33,7 @@ async def eez_old_api(request: Request):
     sql = """
         WITH last_date AS (
             SELECT MAX(date::date) AS last_dt
-            FROM dealio_daily_profits
+            FROM dealio_daily_profit
             WHERE EXTRACT(YEAR  FROM date) = EXTRACT(YEAR  FROM CURRENT_DATE)
               AND EXTRACT(MONTH FROM date) = EXTRACT(MONTH FROM CURRENT_DATE)
         ),
@@ -49,9 +49,9 @@ async def eez_old_api(request: Request):
                 ds.login,
                 GREATEST(0, COALESCE(ds.convertedequity, 0))                                          AS daily_start_equity,
                 GREATEST(0, COALESCE(ds.convertedbalance, 0) + COALESCE(ds.convertedfloatingpnl, 0)) AS daily_start_net_equity
-            FROM dealio_daily_profits ds
+            FROM dealio_daily_profit ds
             WHERE ds.date::date = (
-                SELECT MAX(date::date) FROM dealio_daily_profits
+                SELECT MAX(date::date) FROM dealio_daily_profit
                 WHERE date::date < DATE_TRUNC('month', CURRENT_DATE)
             )
         )
@@ -61,7 +61,7 @@ async def eez_old_api(request: Request):
             ROUND(GREATEST(0, COALESCE(d.convertedequity, 0))::numeric, 2)      AS eez,
             ROUND(COALESCE(st.daily_start_equity,     0)::numeric, 2)           AS daily_start_equity,
             ROUND(COALESCE(st.daily_start_net_equity, 0)::numeric, 2)           AS daily_start_net_equity
-        FROM dealio_daily_profits d
+        FROM dealio_daily_profit d
         LEFT JOIN test_flags tf ON tf.login = d.login
         LEFT JOIN daily_start st ON st.login = d.login
         WHERE d.date::date = (SELECT last_dt FROM last_date)
