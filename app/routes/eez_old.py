@@ -55,9 +55,18 @@ async def debug_login(login: int, request: Request):
                 ORDER BY COUNT(*) DESC
             """, (login,))
             all_types = [{"type": r[0], "count": r[1], "total_usd": float(r[2] or 0)} for r in cur.fetchall()]
+            cur.execute("""
+                SELECT transactiontype, usdamount, confirmation_time::date, comment, transactionapproval
+                FROM transactions
+                WHERE login::bigint = %s
+                  AND transactionapproval = 'Approved'
+                ORDER BY usdamount DESC
+                LIMIT 30
+            """, (login,))
+            deposits_with_comments = [{"type": r[0], "amount": float(r[1] or 0), "date": str(r[2]), "comment": r[3], "approval": r[4]} for r in cur.fetchall()]
     finally:
         conn.close()
-    return JSONResponse(content={"login": login, "old_table": old, "new_table": new, "bonus_transactions": bonus_txns, "bonus_total_applied": bonus_total, "all_transaction_types": all_types})
+    return JSONResponse(content={"login": login, "old_table": old, "new_table": new, "bonus_transactions": bonus_txns, "bonus_total_applied": bonus_total, "all_transaction_types": all_types, "approved_deposits_with_comments": deposits_with_comments})
 
 
 @router.get("/eez-old", response_class=HTMLResponse)
