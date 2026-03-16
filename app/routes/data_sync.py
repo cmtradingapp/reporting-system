@@ -91,6 +91,7 @@ async def data_sync_page(request: Request):
         "du_log":          lambda: fetch_sync_log("dealio_users",      limit=50),
         "dtm4_log":        lambda: fetch_sync_log("dealio_trades_mt4", limit=50),
         "ddps_log":        lambda: fetch_sync_log("dealio_daily_profits", limit=50),
+        "bonus_log":       lambda: fetch_sync_log("bonus_transactions",  limit=50),
     }
 
     def _err_stats():
@@ -135,6 +136,7 @@ async def data_sync_page(request: Request):
     ddps_stats     = results["ddps_stats"]
     ddps_log       = results["ddps_log"]
     bonus_stats    = results["bonus_stats"]
+    bonus_log      = results["bonus_log"]
 
     tables = [
         {
@@ -326,7 +328,7 @@ async def data_sync_page(request: Request):
                 {"label": "Unique Logins",   "value": bonus_stats["unique_logins"],   "color": "text-success", "icon": "bi-person-badge"},
                 {"label": "Total Net Bonus", "value": bonus_stats["total_net_bonus"], "color": "text-warning", "icon": "bi-currency-dollar"},
             ],
-            "sync_log": [],
+            "sync_log": bonus_log,
             "healthy": bonus_stats["total_records"] > 0,
             "sync_interval_hours": "N/A",
             "lookback_hours": "All",
