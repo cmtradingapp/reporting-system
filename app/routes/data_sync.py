@@ -322,10 +322,9 @@ async def data_sync_page(request: Request):
             "label": "bonus_transactions",
             "last_synced_at": bonus_stats["last_synced_at"],
             "stat_cards": [
-                {"label": "Total Records",    "value": bonus_stats["total_records"],   "color": "text-info",    "icon": "bi-database"},
-                {"label": "Unique Logins",    "value": bonus_stats["unique_logins"],   "color": "text-success", "icon": "bi-person-badge"},
-                {"label": "Total Net Bonus",  "value": bonus_stats["total_net_bonus"], "color": "text-warning", "icon": "bi-currency-dollar"},
-                {"label": "Source",           "value": "MSSQL",                        "color": "text-primary", "icon": "bi-server"},
+                {"label": "Total Records",   "value": bonus_stats["total_records"],   "color": "text-info",    "icon": "bi-database"},
+                {"label": "Unique Logins",   "value": bonus_stats["unique_logins"],   "color": "text-success", "icon": "bi-person-badge"},
+                {"label": "Total Net Bonus", "value": bonus_stats["total_net_bonus"], "color": "text-warning", "icon": "bi-currency-dollar"},
             ],
             "sync_log": [],
             "healthy": bonus_stats["total_records"] > 0,
