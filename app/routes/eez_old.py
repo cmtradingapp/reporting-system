@@ -25,13 +25,19 @@ async def eez_old_api(request: Request):
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
-    _ck = "eez_old_v2"
+    _ck = "eez_old_v3"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
 
     sql = """
-        WITH test_flags AS (
+        WITH last_date AS (
+            SELECT MAX(date::date) AS last_dt
+            FROM dealio_daily_profits
+            WHERE EXTRACT(YEAR  FROM date) = EXTRACT(YEAR  FROM CURRENT_DATE)
+              AND EXTRACT(MONTH FROM date) = EXTRACT(MONTH FROM CURRENT_DATE)
+        ),
+        test_flags AS (
             SELECT ta.login::bigint AS login,
                    MAX(a.is_test_account) AS is_test
             FROM trading_accounts ta
@@ -48,12 +54,6 @@ async def eez_old_api(request: Request):
                 SELECT MAX(date::date) FROM dealio_daily_profits
                 WHERE date::date < DATE_TRUNC('month', CURRENT_DATE)
             )
-        ),
-        current_month_logins AS (
-            SELECT DISTINCT login
-            FROM dealio_daily_profits
-            WHERE EXTRACT(YEAR  FROM date) = EXTRACT(YEAR  FROM CURRENT_DATE)
-              AND EXTRACT(MONTH FROM date) = EXTRACT(MONTH FROM CURRENT_DATE)
         )
         SELECT
             d.login,
@@ -61,10 +61,10 @@ async def eez_old_api(request: Request):
             ROUND(GREATEST(0, COALESCE(d.convertedequity, 0))::numeric, 2)      AS eez,
             ROUND(COALESCE(st.daily_start_equity,     0)::numeric, 2)           AS daily_start_equity,
             ROUND(COALESCE(st.daily_start_net_equity, 0)::numeric, 2)           AS daily_start_net_equity
-        FROM dealio_daily_profit d
-        INNER JOIN current_month_logins cml ON cml.login = d.login
+        FROM dealio_daily_profits d
         LEFT JOIN test_flags tf ON tf.login = d.login
         LEFT JOIN daily_start st ON st.login = d.login
+        WHERE d.date::date = (SELECT last_dt FROM last_date)
         ORDER BY eez DESC
     """
 
