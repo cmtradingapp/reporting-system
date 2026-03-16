@@ -111,22 +111,12 @@ def _live_calc(d) -> dict:
               )
             GROUP BY d.login::bigint
         """
-        # Step 4: total old bonus per login (is_old_bonus logic matching Power BI)
+        # Step 4: total old bonus per login from bonus_transactions table
         sql_bonus = """
-            SELECT ta.login::bigint,
-                   SUM(CASE WHEN t.transactiontype = 'Deposit'    AND t.transactiontype IN ('FRF Commission', 'Bonus')                          THEN t.usdamount
-                            WHEN t.transactiontype = 'Withdrawal' AND t.transactiontype IN ('FRF Commission Cancelled', 'BonusCancelled') THEN -t.usdamount
-                            ELSE 0 END) AS total_bonus
-            FROM transactions t
-            JOIN accounts a ON a.accountid = t.vtigeraccountid
-            JOIN trading_accounts ta ON ta.vtigeraccountid = a.accountid
-            WHERE t.transactionapproval = 'Approved'
-              AND (t.deleted = 0 OR t.deleted IS NULL)
-              AND ((t.transactiontype = 'Deposit'    AND t.transactiontype IN ('FRF Commission', 'Bonus'))
-                OR (t.transactiontype = 'Withdrawal' AND t.transactiontype IN ('FRF Commission Cancelled', 'BonusCancelled')))
-              AND ta.login::bigint = ANY(%(logins)s)
-              AND a.is_test_account = 0
-            GROUP BY ta.login::bigint
+            SELECT login, SUM(net_amount) AS total_bonus
+            FROM bonus_transactions
+            WHERE login = ANY(%(logins)s)
+            GROUP BY login
         """
         with conn.cursor() as cur:
             cur.execute(sql_nd, {"logins": logins})

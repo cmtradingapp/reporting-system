@@ -490,7 +490,9 @@
     const upd   = document.getElementById('dash-live-eez-updated');
     try {
       const res  = await fetch('/api/live-equity-zeroed');
-      const data = await res.json();
+      const text = await res.text();
+      let data;
+      try { data = JSON.parse(text); } catch { throw new Error('Server error'); }
       if (!res.ok) throw new Error(data.detail || 'error');
       const neg = data.total < 0;
       const abs = Math.abs(data.total);

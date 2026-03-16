@@ -713,7 +713,9 @@
     try {
       const url = dateTo ? `/api/live-equity-zeroed?date=${dateTo}` : '/api/live-equity-zeroed';
       const res  = await fetch(url);
-      const data = await res.json();
+      const text = await res.text();
+      let data;
+      try { data = JSON.parse(text); } catch { throw new Error('Server error'); }
       if (!res.ok) throw new Error(data.detail || 'error');
       const neg = data.total < 0;
       const abs = Math.abs(data.total);
