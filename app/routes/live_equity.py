@@ -6,6 +6,7 @@ from app.db.dealio_conn import get_dealio_users_comp
 from app import cache
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
+import traceback
 
 _TZ = ZoneInfo("Europe/Nicosia")
 
@@ -39,6 +40,7 @@ async def live_equity_zeroed(request: Request, date: str = None):
         else:
             result = _historical_calc(d)
     except Exception as e:
+        traceback.print_exc()
         return JSONResponse(status_code=500, content={"detail": str(e)})
 
     cache.set(_ck, result)
