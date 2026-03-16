@@ -503,7 +503,8 @@
         upd.textContent = '';
       }
     } catch(e) {
-      el.textContent = 'Error';
+      console.error('loadLiveEquity error:', e);
+      if (el) el.textContent = 'Err: ' + e.message;
     }
   }
 

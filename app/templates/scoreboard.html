@@ -726,7 +726,8 @@
         upd.textContent = '';
       }
     } catch(e) {
-      el.textContent = 'Error';
+      console.error('loadLiveEquity error:', e);
+      if (el) el.textContent = 'Err: ' + e.message;
     }
   }
 
@@ -734,8 +735,10 @@
   function loadAll() {
     if (SHOW_SALES)     loadData();
     if (SHOW_RETENTION) loadRetentionData();
-    const dt = document.getElementById('date-to').value;
-    loadLiveEquity(dt);
+    try {
+      const dt = document.getElementById('date-to') ? document.getElementById('date-to').value : null;
+      loadLiveEquity(dt);
+    } catch(e) { console.error('loadAll live equity error:', e); }
   }
 
   // ── API fetch + render (Sales) ─────────────────────────────────────────
