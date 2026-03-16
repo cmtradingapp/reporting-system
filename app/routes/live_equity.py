@@ -94,6 +94,72 @@ def _historical_calc(d) -> dict:
         conn.close()
 
 
+@router.get("/api/live-equity-zeroed-v2")
+async def live_equity_zeroed_v2(request: Request):
+    user = await get_current_user(request)
+    if isinstance(user, RedirectResponse):
+        return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+
+    _ck = "live_eez_v2_simple"
+    _hit = cache.get(_ck)
+    if _hit is not None:
+        return JSONResponse(content=_hit)
+
+    try:
+        result = _live_calc_v2()
+    except Exception as e:
+        traceback.print_exc()
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+
+    cache.set(_ck, result)
+    return JSONResponse(content=result)
+
+
+def _live_calc_v2() -> dict:
+    """V2: compprevequity - compcredit - bonus, clamped at 0, non-test only."""
+    dealio_users = get_dealio_users_comp()
+    if not dealio_users:
+        return {"total": 0, "is_live": True}
+
+    logins = [int(r[0]) for r in dealio_users]
+
+    conn = get_connection()
+    try:
+        sql_bonus = """
+            SELECT login, GREATEST(0, SUM(net_amount)) AS total_bonus
+            FROM bonus_transactions
+            WHERE login = ANY(%(logins)s)
+            GROUP BY login
+        """
+        sql_test = """
+            SELECT ta.login::bigint
+            FROM trading_accounts ta
+            JOIN accounts a ON a.accountid = ta.vtigeraccountid
+            WHERE ta.login::bigint = ANY(%(logins)s)
+              AND a.is_test_account = 1
+        """
+        with conn.cursor() as cur:
+            cur.execute(sql_bonus, {"logins": logins})
+            bonus_map = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
+            cur.execute(sql_test, {"logins": logins})
+            test_logins = {int(r[0]) for r in cur.fetchall()}
+    finally:
+        conn.close()
+
+    grand_total = 0.0
+    for row in dealio_users:
+        login          = int(row[0])
+        compprevequity = float(row[1])
+        compcredit     = float(row[2])
+        if login in test_logins:
+            continue
+        bonus = bonus_map.get(login, 0.0)
+        val = max(0.0, compprevequity - compcredit - bonus)
+        grand_total += val
+
+    return {"total": round(grand_total), "is_live": True}
+
+
 def _live_calc(d) -> dict:
     """Live Group A/B calculation using Dealio PG + local PG."""
     # Step 1: get users with compprevequity > 0 from Dealio PG
