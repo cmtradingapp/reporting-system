@@ -1,5 +1,9 @@
-from fastapi import APIRouter, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, Request
+from fastapi.responses import JSONResponse
 from app.etl.fetch_and_store import run_transactions_etl, run_transactions_full_etl, run_bonus_transactions_etl, run_bonus_transactions_full_etl
+from app.auth.dependencies import get_current_user
+from app.db.mssql_conn import _get_mssql_connection
+from fastapi.responses import RedirectResponse
 
 router = APIRouter()
 
@@ -24,3 +28,33 @@ def sync_bonus_transactions(hours: int = 24):
 def sync_bonus_transactions_full(background_tasks: BackgroundTasks):
     background_tasks.add_task(run_bonus_transactions_full_etl)
     return {"status": "started"}
+
+
+@router.get("/api/debug-bonus-sample")
+async def debug_bonus_sample(request: Request):
+    user = await get_current_user(request)
+    if isinstance(user, RedirectResponse):
+        return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+    conn = _get_mssql_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT TOP 5
+                    mttransactionsid, login, transactiontype, transaction_type_name,
+                    transactionapproval, usdamount, deleted, server_id, confirmation_time
+                FROM report.vtiger_mttransactions
+                WHERE transaction_type_name IN ('FRF Commission', 'Bonus', 'FRF Commission Cancelled', 'BonusCancelled')
+                ORDER BY mttransactionsid DESC
+            """)
+            cols = [d[0] for d in cur.description]
+            rows = [dict(zip(cols, [str(v) for v in r])) for r in cur.fetchall()]
+            cur.execute("""
+                SELECT COUNT(*) FROM report.vtiger_mttransactions
+                WHERE transaction_type_name IN ('FRF Commission', 'Bonus', 'FRF Commission Cancelled', 'BonusCancelled')
+            """)
+            total = cur.fetchone()[0]
+        return JSONResponse(content={"total_matching": total, "sample": rows})
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+    finally:
+        conn.close()

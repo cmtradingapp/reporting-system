@@ -241,8 +241,6 @@ def get_bonus_transactions(hours: int = 24) -> pd.DataFrame:
                 OR (transactiontype = 'Withdrawal' AND transaction_type_name IN ('FRF Commission Cancelled', 'BonusCancelled')))
               AND transactionapproval = 'Approved'
               AND (deleted = 0 OR deleted IS NULL)
-              AND usdamount < 10000000
-              AND server_id = 2
               AND (modifiedtime        >= DATEADD(hour, -{hours}, GETUTCDATE())
                 OR confirmation_time  >= DATEADD(hour, -{hours}, GETUTCDATE()))
         """
@@ -270,8 +268,6 @@ def get_bonus_transactions_full():
                     OR (transactiontype = 'Withdrawal' AND transaction_type_name IN ('FRF Commission Cancelled', 'BonusCancelled')))
                   AND transactionapproval = 'Approved'
                   AND (deleted = 0 OR deleted IS NULL)
-                  AND usdamount < 10000000
-                  AND server_id = 2
                   AND mttransactionsid > {last_id}
                 ORDER BY mttransactionsid
             """
