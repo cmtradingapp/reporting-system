@@ -102,7 +102,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
             JOIN accounts a ON a.accountid = t.vtigeraccountid
             WHERE t.transactionapproval = 'Approved'
               AND (t.deleted = 0 OR t.deleted IS NULL)
-              AND t.transactiontypename = 'Deposit'
+              AND t.transactiontypenamename = 'Deposit'
               AND t.ftd = 1
               AND a.client_qualification_date IS NOT NULL
               AND a.client_qualification_date >= %(date_from)s
@@ -130,14 +130,14 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
             SELECT
                 t.original_deposit_owner                         AS agent_id,
                 SUM(CASE
-                    WHEN t.transactiontypename IN ('Deposit', 'Withdrawal Cancelled') THEN  t.usdamount
-                    WHEN t.transactiontypename IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
+                    WHEN t.transactiontypenamename IN ('Deposit', 'Withdrawal Cancelled') THEN  t.usdamount
+                    WHEN t.transactiontypenamename IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
                 END)                                             AS net_usd
             FROM transactions t
             JOIN accounts a ON a.accountid = t.vtigeraccountid
             WHERE t.transactionapproval = 'Approved'
               AND (t.deleted = 0 OR t.deleted IS NULL)
-              AND t.transactiontypename IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
+              AND t.transactiontypenamename IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
               AND t.confirmation_time >= %(date_from)s
               AND t.confirmation_time <  %(date_to_excl)s
               AND a.is_test_account = 0
@@ -151,7 +151,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
             JOIN accounts a ON a.accountid = t.vtigeraccountid
             WHERE t.transactionapproval = 'Approved'
               AND (t.deleted = 0 OR t.deleted IS NULL)
-              AND t.transactiontypename = 'Deposit'
+              AND t.transactiontypenamename = 'Deposit'
               AND t.ftd = 1
               AND t.confirmation_time >= %(date_from)s
               AND t.confirmation_time <  %(date_to_excl)s
@@ -190,7 +190,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
                 JOIN accounts a ON a.accountid = t.vtigeraccountid
                 WHERE t.transactionapproval = 'Approved'
                   AND (t.deleted = 0 OR t.deleted IS NULL)
-                  AND t.transactiontype = 'Deposit'
+                  AND t.transactiontypename = 'Deposit'
                   AND t.ftd = 1
                   AND a.client_qualification_date IS NOT NULL
                   AND a.client_qualification_date >= %(date_from)s
@@ -202,15 +202,15 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
             # Grand NET $ — all departments, year > 2024, no blank accountid, no test agents
             cur.execute("""
                 SELECT COALESCE(SUM(CASE
-                    WHEN t.transactiontype IN ('Deposit', 'Withdrawal Cancelled') THEN  t.usdamount
-                    WHEN t.transactiontype IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
+                    WHEN t.transactiontypename IN ('Deposit', 'Withdrawal Cancelled') THEN  t.usdamount
+                    WHEN t.transactiontypename IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
                 END), 0)
                 FROM transactions t
                 JOIN crm_users u ON u.id = t.original_deposit_owner
                 JOIN accounts a ON a.accountid = t.vtigeraccountid
                 WHERE t.transactionapproval = 'Approved'
                   AND (t.deleted = 0 OR t.deleted IS NULL)
-                  AND t.transactiontype IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
+                  AND t.transactiontypename IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
                   AND t.confirmation_time >= %(date_from)s
                   AND t.confirmation_time <  %(date_to_excl)s
                   AND EXTRACT(YEAR FROM t.confirmation_time) >= 2024
@@ -248,13 +248,13 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
                     SELECT
                         t.login,
                         t.confirmation_time::date AS bonus_date,
-                        SUM(CASE WHEN t.transactiontypename IN ('FRF Commission', 'Bonus')                          THEN t.usdamount ELSE 0 END)
-                      - SUM(CASE WHEN t.transactiontypename IN ('FRF Commission Cancelled', 'BonusCancelled') THEN t.usdamount ELSE 0 END)
+                        SUM(CASE WHEN t.transactiontypenamename IN ('FRF Commission', 'Bonus')                          THEN t.usdamount ELSE 0 END)
+                      - SUM(CASE WHEN t.transactiontypenamename IN ('FRF Commission Cancelled', 'BonusCancelled') THEN t.usdamount ELSE 0 END)
                             AS old_bonus_usd
                     FROM transactions t
                     WHERE t.transactionapproval = 'Approved'
                       AND (t.deleted = 0 OR t.deleted IS NULL)
-                      AND t.transactiontypename IN ('FRF Commission', 'Bonus', 'FRF Commission Cancelled', 'BonusCancelled')
+                      AND t.transactiontypenamename IN ('FRF Commission', 'Bonus', 'FRF Commission Cancelled', 'BonusCancelled')
                     GROUP BY t.login, t.confirmation_time::date
                 ),
                 old_bonus_balance AS (
@@ -285,15 +285,15 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
             # Daily net — company-wide for date_to (same scope as grand_net, matches NET $ card)
             cur.execute("""
                 SELECT COALESCE(SUM(CASE
-                    WHEN t.transactiontype IN ('Deposit', 'Withdrawal Cancelled') THEN  t.usdamount
-                    WHEN t.transactiontype IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
+                    WHEN t.transactiontypename IN ('Deposit', 'Withdrawal Cancelled') THEN  t.usdamount
+                    WHEN t.transactiontypename IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
                 END), 0)
                 FROM transactions t
                 JOIN crm_users u ON u.id = t.original_deposit_owner
                 JOIN accounts a ON a.accountid = t.vtigeraccountid
                 WHERE t.transactionapproval = 'Approved'
                   AND (t.deleted = 0 OR t.deleted IS NULL)
-                  AND t.transactiontype IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
+                  AND t.transactiontypename IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
                   AND t.confirmation_time::date = %(date_to)s
                   AND EXTRACT(YEAR FROM t.confirmation_time) >= 2024
                   AND t.vtigeraccountid IS NOT NULL
@@ -309,7 +309,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
                 JOIN accounts a ON a.accountid = t.vtigeraccountid
                 WHERE t.transactionapproval = 'Approved'
                   AND (t.deleted = 0 OR t.deleted IS NULL)
-                  AND t.transactiontype = 'Deposit'
+                  AND t.transactiontypename = 'Deposit'
                   AND t.ftd = 1
                   AND t.confirmation_time >= %(date_from)s
                   AND t.confirmation_time <  %(date_to_excl)s
@@ -324,7 +324,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
                 JOIN accounts a ON a.accountid = t.vtigeraccountid
                 WHERE t.transactionapproval = 'Approved'
                   AND (t.deleted = 0 OR t.deleted IS NULL)
-                  AND t.transactiontype = 'Deposit'
+                  AND t.transactiontypename = 'Deposit'
                   AND t.ftd = 1
                   AND t.confirmation_time::date = %(date_to)s
                   AND a.is_test_account = 0
@@ -338,7 +338,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
                 JOIN accounts a ON a.accountid = t.vtigeraccountid
                 WHERE t.transactionapproval = 'Approved'
                   AND (t.deleted = 0 OR t.deleted IS NULL)
-                  AND t.transactiontype = 'Deposit'
+                  AND t.transactiontypename = 'Deposit'
                   AND t.ftd = 1
                   AND a.client_qualification_date::date = %(date_to)s
                   AND a.is_test_account = 0
@@ -439,14 +439,14 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
         ) tgt ON tgt.agent_id = u.id
         LEFT JOIN (
             SELECT a.assigned_to AS agent_id,
-                   SUM(CASE WHEN t.transactiontype IN ('Deposit','Withdrawal Cancelled') THEN t.usdamount
-                            WHEN t.transactiontype IN ('Withdrawal','Deposit Cancelled')  THEN -t.usdamount END) AS net_usd
+                   SUM(CASE WHEN t.transactiontypename IN ('Deposit','Withdrawal Cancelled') THEN t.usdamount
+                            WHEN t.transactiontypename IN ('Withdrawal','Deposit Cancelled')  THEN -t.usdamount END) AS net_usd
             FROM transactions t
             JOIN accounts a ON a.accountid = t.vtigeraccountid
             WHERE t.transactionapproval = 'Approved' AND (t.deleted = 0 OR t.deleted IS NULL)
-              AND t.transactiontype IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
+              AND t.transactiontypename IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
               AND t.confirmation_time >= %(date_from)s AND t.confirmation_time < %(date_to_excl)s
-              AND (t.transactiontypename IS NULL OR t.transactiontypename NOT IN ('FRF Commission','Bonus','FRF Commission Cancelled','BonusCancelled'))
+              AND (t.transactiontypenamename IS NULL OR t.transactiontypenamename NOT IN ('FRF Commission','Bonus','FRF Commission Cancelled','BonusCancelled'))
               AND a.is_test_account = 0
             GROUP BY a.assigned_to
         ) net ON net.agent_id = u.id
@@ -454,9 +454,9 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
             SELECT a.assigned_to AS agent_id, SUM(t.usdamount)::float AS deposit_usd
             FROM transactions t JOIN accounts a ON a.accountid = t.vtigeraccountid
             WHERE t.transactionapproval = 'Approved' AND (t.deleted = 0 OR t.deleted IS NULL)
-              AND t.transactiontype IN ('Deposit','Withdrawal Cancelled')
+              AND t.transactiontypename IN ('Deposit','Withdrawal Cancelled')
               AND t.confirmation_time >= %(date_from)s AND t.confirmation_time < %(date_to_excl)s
-              AND (t.transactiontypename IS NULL OR t.transactiontypename NOT IN ('FRF Commission','Bonus','FRF Commission Cancelled','BonusCancelled'))
+              AND (t.transactiontypenamename IS NULL OR t.transactiontypenamename NOT IN ('FRF Commission','Bonus','FRF Commission Cancelled','BonusCancelled'))
               AND a.is_test_account = 0
             GROUP BY a.assigned_to
         ) dep ON dep.agent_id = u.id
@@ -506,17 +506,17 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
             # Daily net retention — date_to only (same logic as dashboard Q3)
             cur.execute("""
                 SELECT COALESCE(SUM(CASE
-                    WHEN t.transactiontype IN ('Deposit', 'Withdrawal Cancelled') THEN  t.usdamount
-                    WHEN t.transactiontype IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
+                    WHEN t.transactiontypename IN ('Deposit', 'Withdrawal Cancelled') THEN  t.usdamount
+                    WHEN t.transactiontypename IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
                 END), 0)
                 FROM transactions t
                 JOIN accounts a ON a.accountid = t.vtigeraccountid
                 JOIN crm_users u ON u.id = a.assigned_to
                 WHERE t.transactionapproval = 'Approved'
                   AND (t.deleted = 0 OR t.deleted IS NULL)
-                  AND t.transactiontype IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
+                  AND t.transactiontypename IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
                   AND t.confirmation_time::date = %(date_to)s
-                  AND (t.transactiontypename IS NULL OR t.transactiontypename NOT IN ('FRF Commission','Bonus','FRF Commission Cancelled','BonusCancelled'))
+                  AND (t.transactiontypenamename IS NULL OR t.transactiontypenamename NOT IN ('FRF Commission','Bonus','FRF Commission Cancelled','BonusCancelled'))
                   AND a.is_test_account = 0
                   AND u.department_ = 'Retention'
                   AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'

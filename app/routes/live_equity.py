@@ -86,8 +86,8 @@ def _live_calc(d) -> dict:
         # Step 2: lifetime net deposits per login
         sql_nd = """
             SELECT ta.login::bigint,
-                   SUM(CASE WHEN t.transactiontype IN ('Deposit', 'Withdrawal Cancelled') THEN t.usdamount ELSE 0 END) -
-                   SUM(CASE WHEN t.transactiontype IN ('Withdrawal', 'Deposit Cancelled') THEN t.usdamount ELSE 0 END) AS lifetime_nd
+                   SUM(CASE WHEN t.transactiontypename IN ('Deposit', 'Withdrawal Cancelled') THEN t.usdamount ELSE 0 END) -
+                   SUM(CASE WHEN t.transactiontypename IN ('Withdrawal', 'Deposit Cancelled') THEN t.usdamount ELSE 0 END) AS lifetime_nd
             FROM transactions t
             JOIN accounts a ON a.accountid = t.vtigeraccountid
             JOIN trading_accounts ta ON ta.vtigeraccountid = a.accountid

@@ -166,7 +166,6 @@ async def dashboard_api(request: Request):
                   AND t.confirmation_time >= %(month_start)s
                   AND t.confirmation_time <  %(tomorrow)s
                   AND a.is_test_account = 0
-                  AND (t.transactiontypename IS NULL OR t.transactiontypename NOT IN ('FRF Commission','Bonus','FRF Commission Cancelled','BonusCancelled'))
                   AND u.department_ = 'Retention'
                   AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
                   AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
