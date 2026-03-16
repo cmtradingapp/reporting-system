@@ -27,9 +27,29 @@ async def debug_login(login: int, request: Request):
                 FROM dealio_daily_profits WHERE login = %s ORDER BY date DESC LIMIT 5
             """, (login,))
             new = [{"date": str(r[0]), "bal": float(r[1] or 0), "flt": float(r[2] or 0), "eq": float(r[3] or 0)} for r in cur.fetchall()]
+            cur.execute("""
+                SELECT transactiontype, usdamount, confirmation_time::date, transactionapproval, deleted
+                FROM transactions
+                WHERE login::bigint = %s
+                  AND transactiontype IN ('FRF Commission','Bonus','FRF Commission Cancelled','BonusCancelled')
+                ORDER BY confirmation_time DESC
+                LIMIT 20
+            """, (login,))
+            bonus_txns = [{"type": r[0], "amount": float(r[1] or 0), "date": str(r[2]), "approval": r[3], "deleted": r[4]} for r in cur.fetchall()]
+            cur.execute("""
+                SELECT SUM(CASE WHEN transactiontype IN ('FRF Commission','Bonus') THEN usdamount ELSE 0 END)
+                     - SUM(CASE WHEN transactiontype IN ('FRF Commission Cancelled','BonusCancelled') THEN usdamount ELSE 0 END)
+                  AS bonus_total
+                FROM transactions
+                WHERE login::bigint = %s
+                  AND transactionapproval = 'Approved'
+                  AND (deleted = 0 OR deleted IS NULL)
+                  AND transactiontype IN ('FRF Commission','Bonus','FRF Commission Cancelled','BonusCancelled')
+            """, (login,))
+            bonus_total = float(cur.fetchone()[0] or 0)
     finally:
         conn.close()
-    return JSONResponse(content={"login": login, "old_table": old, "new_table": new})
+    return JSONResponse(content={"login": login, "old_table": old, "new_table": new, "bonus_transactions": bonus_txns, "bonus_total_applied": bonus_total})
 
 
 @router.get("/eez-old", response_class=HTMLResponse)
