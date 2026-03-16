@@ -25,7 +25,7 @@ async def eez_old_api(request: Request):
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
-    _ck = "eez_old_v5"
+    _ck = "eez_old_v6"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -36,6 +36,18 @@ async def eez_old_api(request: Request):
             FROM dealio_daily_profit
             WHERE EXTRACT(YEAR  FROM date) = EXTRACT(YEAR  FROM CURRENT_DATE)
               AND EXTRACT(MONTH FROM date) = EXTRACT(MONTH FROM CURRENT_DATE)
+        ),
+        bonus_bal AS (
+            SELECT t.login::bigint AS login,
+                   SUM(CASE WHEN t.transactiontype = 'Deposit'    THEN t.usdamount ELSE 0 END)
+                 - SUM(CASE WHEN t.transactiontype = 'Withdrawal' THEN t.usdamount ELSE 0 END) AS old_bonus_balance
+            FROM transactions t
+            WHERE t.transactionapproval = 'Approved'
+              AND (t.deleted = 0 OR t.deleted IS NULL)
+              AND LOWER(t.comment) LIKE '%%bonus%%'
+              AND t.transactiontype IN ('Deposit','Withdrawal')
+              AND t.confirmation_time::date <= (SELECT last_dt FROM last_date)
+            GROUP BY t.login::bigint
         ),
         test_flags AS (
             SELECT ta.login::bigint AS login,
@@ -58,10 +70,14 @@ async def eez_old_api(request: Request):
         SELECT
             d.login,
             COALESCE(tf.is_test, 0)                                             AS is_test,
-            ROUND(GREATEST(0, COALESCE(d.convertedbalance, 0) + COALESCE(d.convertedfloatingpnl, 0))::numeric, 2) AS eez,
+            ROUND(GREATEST(
+                GREATEST(0, COALESCE(d.convertedbalance,0) + COALESCE(d.convertedfloatingpnl,0))
+                    - COALESCE(b.old_bonus_balance, 0),
+                0)::numeric, 2)                                                  AS eez,
             ROUND(COALESCE(st.daily_start_equity,     0)::numeric, 2)           AS daily_start_equity,
             ROUND(COALESCE(st.daily_start_net_equity, 0)::numeric, 2)           AS daily_start_net_equity
         FROM dealio_daily_profit d
+        LEFT JOIN bonus_bal b  ON b.login  = d.login
         LEFT JOIN test_flags tf ON tf.login = d.login
         LEFT JOIN daily_start st ON st.login = d.login
         WHERE d.date::date = (SELECT last_dt FROM last_date)
