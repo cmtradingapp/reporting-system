@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>EEZ Comparison</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet"/>
+  <style>
+    body { background-color: #0f1117; color: #e0e0e0; font-family: 'Segoe UI', sans-serif; display: flex; min-height: 100vh; }
+    .sidebar { width: 220px; min-height: 100vh; background-color: #161b22; border-right: 1px solid #30363d; display: flex; flex-direction: column; position: fixed; top: 0; left: 0; bottom: 0; z-index: 100; }
+    .sidebar-brand { padding: 20px 20px 16px; border-bottom: 1px solid #30363d; font-weight: 700; font-size: 1rem; color: #e0e0e0; }
+    .sidebar-nav { padding: 12px 0; flex: 1; }
+    .sidebar-link { display: flex; align-items: center; gap: 10px; padding: 10px 20px; color: #8b949e; text-decoration: none; font-size: 0.9rem; transition: background 0.15s, color 0.15s; border-left: 3px solid transparent; }
+    .sidebar-link:hover { background-color: #21262d; color: #e0e0e0; }
+    .sidebar-link.active { color: #3fb950; border-left-color: #3fb950; background-color: rgba(63,185,80,0.08); }
+    .main-content { margin-left: 220px; flex: 1; min-width: 0; }
+    .card { background-color: #161b22; border: 1px solid #30363d; border-radius: 12px; }
+    .kpi-card { background-color: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 20px; text-align: center; }
+    .kpi-value { font-size: 1.6rem; font-weight: 700; }
+    .kpi-label { font-size: 0.78rem; color: #8b949e; text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
+    .table { color: #e0e0e0; }
+    .table thead th { background-color: #21262d; color: #8b949e; border-color: #30363d; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; white-space: nowrap; cursor: pointer; user-select: none; }
+    .table thead th:hover { color: #c9d1d9; }
+    .table tbody tr { border-color: #21262d; }
+    .table tbody tr:hover { background-color: #21262d; }
+    .table td { border-color: #21262d; vertical-align: middle; font-size: 0.85rem; }
+    .badge-old { background: rgba(88,166,255,0.15); color: #58a6ff; border: 1px solid #58a6ff; border-radius: 4px; padding: 1px 6px; font-size: 0.7rem; }
+    .badge-new { background: rgba(63,185,80,0.15); color: #3fb950; border: 1px solid #3fb950; border-radius: 4px; padding: 1px 6px; font-size: 0.7rem; }
+    .badge-both { background: rgba(139,148,158,0.15); color: #8b949e; border: 1px solid #30363d; border-radius: 4px; padding: 1px 6px; font-size: 0.7rem; }
+    .diff-pos { color: #3fb950; }
+    .diff-neg { color: #f85149; }
+    .diff-zero { color: #8b949e; }
+    .section-title { font-size: 1.1rem; font-weight: 600; color: #c9d1d9; border-left: 3px solid #238636; padding-left: 12px; }
+    .sidebar-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:99; }
+    .sidebar-overlay.show { display:block; }
+    .sidebar-toggle { display:none; position:fixed; top:12px; left:12px; z-index:300; background:#161b22; border:1px solid #30363d; color:#e0e0e0; border-radius:8px; padding:7px 10px; cursor:pointer; font-size:1.1rem; line-height:1; }
+    .mob-topbar { display:none; }
+    @media (max-width: 767px) {
+      body { display:block; }
+      .sidebar-toggle { display:block; }
+      .sidebar { transform:translateX(-240px); transition:transform 0.25s ease; }
+      .sidebar.open { transform:translateX(0); box-shadow:4px 0 20px rgba(0,0,0,0.6); }
+      .mob-topbar { display:flex; align-items:center; justify-content:center; position:fixed; top:0; left:0; right:0; height:48px; background:#161b22; border-bottom:1px solid #30363d; z-index:150; }
+      .mob-topbar-title { font-size:0.92rem; font-weight:700; color:#e0e0e0; padding:0 44px; }
+      .main-content { margin-left:0 !important; padding-top:48px; }
+      .table-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="mob-topbar"><span class="mob-topbar-title">EEZ Comparison</span></div>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+<button class="sidebar-toggle" id="sidebar-toggle"><i class="bi bi-list"></i></button>
+
+<div class="sidebar">
+  <div class="sidebar-brand"><i class="bi bi-bar-chart-fill text-success me-2"></i>Reporting System</div>
+  <nav class="sidebar-nav">
+    <a href="/performance" class="sidebar-link"><i class="bi bi-trophy"></i>Performance Report</a>
+    <a href="/agent-bonuses" class="sidebar-link"><i class="bi bi-cash-stack"></i>Agent Bonuses</a>
+    {% if current_user.role == 'admin' %}
+    <a href="/dashboard" class="sidebar-link"><i class="bi bi-speedometer2"></i>Dashboard</a>
+    <a href="/ftc-date" class="sidebar-link"><i class="bi bi-calendar2-check"></i>FTC Date</a>
+    <a href="/data-sync" class="sidebar-link"><i class="bi bi-database"></i>Data Sync</a>
+    <a href="/holidays" class="sidebar-link"><i class="bi bi-calendar-x"></i>Holidays</a>
+    <a href="/eez-comparison" class="sidebar-link active"><i class="bi bi-arrow-left-right"></i>EEZ Comparison</a>
+    {% endif %}
+  </nav>
+  <div style="padding:14px 20px;border-top:1px solid #30363d;">
+    <div style="font-size:0.68rem;color:#8b949e;margin-bottom:2px;">Signed in as</div>
+    <div style="font-weight:600;font-size:0.82rem;color:#e0e0e0;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ current_user.full_name }}</div>
+    <div style="font-size:0.7rem;color:#3fb950;margin-bottom:8px;">{{ current_user.role | replace('_', ' ') | title }}</div>
+    <div style="display:flex;gap:12px;align-items:center;">
+      <a href="/admin/users" style="color:#8b949e;text-decoration:none;font-size:1.05rem;" title="Admin Users"><i class="bi bi-people-fill"></i></a>
+      <a href="/logout" style="color:#f85149;text-decoration:none;font-size:1.05rem;" title="Logout"><i class="bi bi-box-arrow-right"></i></a>
+    </div>
+  </div>
+</div>
+
+<div class="main-content">
+<div class="container-fluid px-4 py-4">
+
+  <div class="mb-3 d-none d-md-block">
+    <h4 class="fw-bold text-white mb-0">EEZ Comparison</h4>
+    <p class="text-muted small mb-0">Old (MSSQL equity) vs New (balance + floating − bonus) per login — current month</p>
+  </div>
+
+  <!-- Summary KPIs -->
+  <div class="row g-3 mb-4" id="kpi-row">
+    <div class="col-6 col-md-3">
+      <div class="kpi-card">
+        <div class="kpi-value" style="color:#58a6ff;" id="kpi-old">—</div>
+        <div class="kpi-label">Total Old EEZ</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="kpi-card">
+        <div class="kpi-value" style="color:#3fb950;" id="kpi-new">—</div>
+        <div class="kpi-label">Total New EEZ</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="kpi-card">
+        <div class="kpi-value" id="kpi-diff">—</div>
+        <div class="kpi-label">Difference (New − Old)</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="kpi-card">
+        <div class="kpi-value" style="color:#e0e0e0;" id="kpi-count">—</div>
+        <div class="kpi-label">Logins (shown)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="card p-3 mb-3">
+    <div class="d-flex flex-wrap gap-3 align-items-center">
+      <input type="text" id="search-login" class="form-control form-control-sm"
+             style="width:180px;background:#0f1117;border-color:#30363d;color:#e0e0e0;"
+             placeholder="Search login…"/>
+      <div class="form-check form-switch mb-0">
+        <input class="form-check-input" type="checkbox" id="hide-test" checked/>
+        <label class="form-check-label text-muted small" for="hide-test">Hide test accounts</label>
+      </div>
+      <div class="form-check form-switch mb-0">
+        <input class="form-check-input" type="checkbox" id="hide-zero" checked/>
+        <label class="form-check-label text-muted small" for="hide-zero">Hide zero-diff rows</label>
+      </div>
+      <select id="filter-presence" class="form-select form-select-sm"
+              style="width:140px;background:#0f1117;border-color:#30363d;color:#e0e0e0;">
+        <option value="all">All presence</option>
+        <option value="both">Both</option>
+        <option value="new_only">New only</option>
+        <option value="old_only">Old only</option>
+      </select>
+      <span class="text-muted small ms-auto" id="row-count-label"></span>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="card p-0">
+    <div class="table-scroll">
+      <table class="table table-sm mb-0" id="eez-table">
+        <thead>
+          <tr>
+            <th onclick="sortTable('login')">Login <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+            <th onclick="sortTable('eez_old')">Old EEZ <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+            <th onclick="sortTable('eez_new')">New EEZ <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+            <th onclick="sortTable('diff')">Diff <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+            <th onclick="sortTable('new_balance')">Balance <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+            <th onclick="sortTable('new_floating')">Floating <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+            <th onclick="sortTable('bonus_deducted')">Bonus Ded. <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+            <th onclick="sortTable('raw_equity')">Raw Equity <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+            <th>Presence</th>
+          </tr>
+        </thead>
+        <tbody id="eez-tbody">
+          <tr><td colspan="9" class="text-center text-muted py-4">
+            <div class="spinner-border spinner-border-sm text-secondary me-2"></div>Loading…
+          </td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+</div><!-- /main-content -->
+
+<script>
+  let allRows = [];
+  let sortKey = 'diff';
+  let sortDir = -1; // -1 = desc
+
+  const fmt = v => v == null ? '—' : (v < 0 ? '-$' + Math.abs(v).toLocaleString('en-US', {minimumFractionDigits:2,maximumFractionDigits:2}) : '$' + v.toLocaleString('en-US', {minimumFractionDigits:2,maximumFractionDigits:2}));
+  const fmtInt = v => v == null ? '—' : '$' + Math.round(v).toLocaleString('en-US');
+
+  function diffClass(v) {
+    if (v > 0.005) return 'diff-pos';
+    if (v < -0.005) return 'diff-neg';
+    return 'diff-zero';
+  }
+
+  function presenceBadge(p) {
+    if (p === 'new_only') return '<span class="badge-new">new only</span>';
+    if (p === 'old_only') return '<span class="badge-old">old only</span>';
+    return '<span class="badge-both">both</span>';
+  }
+
+  function applyFilters() {
+    const q = document.getElementById('search-login').value.trim().toLowerCase();
+    const hideTest = document.getElementById('hide-test').checked;
+    const hideZero = document.getElementById('hide-zero').checked;
+    const presenceFilter = document.getElementById('filter-presence').value;
+
+    let filtered = allRows.filter(r => {
+      if (hideTest && r.is_test) return false;
+      if (q && !String(r.login).includes(q)) return false;
+      if (hideZero && Math.abs(r.diff) < 0.005) return false;
+      if (presenceFilter !== 'all' && r.presence !== presenceFilter) return false;
+      return true;
+    });
+
+    filtered.sort((a, b) => {
+      const av = a[sortKey] ?? 0, bv = b[sortKey] ?? 0;
+      return sortDir * (av > bv ? 1 : av < bv ? -1 : 0);
+    });
+
+    const tbody = document.getElementById('eez-tbody');
+    if (!filtered.length) {
+      tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">No rows match filters.</td></tr>';
+      document.getElementById('kpi-count').textContent = '0';
+      document.getElementById('row-count-label').textContent = '';
+      return;
+    }
+
+    document.getElementById('kpi-count').textContent = filtered.length.toLocaleString();
+    document.getElementById('row-count-label').textContent = filtered.length.toLocaleString() + ' rows';
+
+    tbody.innerHTML = filtered.map(r => `
+      <tr>
+        <td><code style="color:#c9d1d9;">${r.login ?? '—'}</code></td>
+        <td style="color:#58a6ff;">${fmt(r.eez_old)}</td>
+        <td style="color:#3fb950;">${fmt(r.eez_new)}</td>
+        <td class="${diffClass(r.diff)}">${fmt(r.diff)}</td>
+        <td>${fmt(r.new_balance)}</td>
+        <td class="${r.new_floating < 0 ? 'diff-neg' : ''}">${fmt(r.new_floating)}</td>
+        <td>${r.bonus_deducted > 0 ? '<span style="color:#e3b341;">' + fmt(r.bonus_deducted) + '</span>' : fmt(r.bonus_deducted)}</td>
+        <td style="color:#8b949e;">${fmt(r.raw_equity)}</td>
+        <td>${presenceBadge(r.presence)}</td>
+      </tr>`).join('');
+  }
+
+  function sortTable(key) {
+    if (sortKey === key) { sortDir *= -1; }
+    else { sortKey = key; sortDir = -1; }
+    applyFilters();
+  }
+
+  async function loadData() {
+    try {
+      const res = await fetch('/api/eez-comparison');
+      if (!res.ok) { throw new Error('HTTP ' + res.status); }
+      const d = await res.json();
+      allRows = d.rows || [];
+
+      document.getElementById('kpi-old').textContent = fmtInt(d.total_old);
+      document.getElementById('kpi-new').textContent = fmtInt(d.total_new);
+      const diffEl = document.getElementById('kpi-diff');
+      diffEl.textContent = fmtInt(d.diff);
+      diffEl.className = 'kpi-value ' + diffClass(d.diff);
+
+      applyFilters();
+    } catch(e) {
+      document.getElementById('eez-tbody').innerHTML = `<tr><td colspan="9" class="text-center text-danger py-4">Error: ${e.message}</td></tr>`;
+    }
+  }
+
+  document.getElementById('search-login').addEventListener('input', applyFilters);
+  document.getElementById('hide-test').addEventListener('change', applyFilters);
+  document.getElementById('hide-zero').addEventListener('change', applyFilters);
+  document.getElementById('filter-presence').addEventListener('change', applyFilters);
+
+  // Mobile sidebar toggle
+  (function(){
+    var toggle = document.getElementById('sidebar-toggle');
+    var sb = document.querySelector('.sidebar');
+    var overlay = document.getElementById('sidebar-overlay');
+    if (!toggle) return;
+    toggle.addEventListener('click', function(){ sb.classList.toggle('open'); overlay.classList.toggle('show'); });
+    overlay.addEventListener('click', function(){ sb.classList.remove('open'); overlay.classList.remove('show'); });
+  })();
+
+  loadData();
+</script>
+</body>
+</html>
