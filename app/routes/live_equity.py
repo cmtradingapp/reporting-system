@@ -29,7 +29,7 @@ async def live_equity_zeroed(request: Request, date: str = None):
             return JSONResponse(status_code=400, content={"detail": "Invalid date"})
 
     is_current_month = (d.year == today.year and d.month == today.month)
-    _ck = f"live_eez_v2:{d}"
+    _ck = f"live_eez_v3:{d}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -48,18 +48,40 @@ async def live_equity_zeroed(request: Request, date: str = None):
 
 
 def _historical_calc(d) -> dict:
-    """Use dealio_daily_profits for past months (same logic as existing EEZ)."""
+    """Use dealio_daily_profits with same EEZ formula as eez_comparison page."""
     sql = """
-        SELECT COALESCE(SUM(GREATEST(0, dp.equity)), 0)
-        FROM dealio_daily_profits dp
-        JOIN trading_accounts ta ON ta.login::bigint = dp.login::bigint
-        JOIN accounts a ON a.accountid = ta.vtigeraccountid
-        WHERE dp.date::date = (
-            SELECT MAX(dp2.date::date)
-            FROM dealio_daily_profits dp2
-            WHERE dp2.date::date <= %(d)s
+        WITH bonus_bal AS (
+            SELECT login,
+                   SUM(net_amount) AS old_bonus_balance
+            FROM bonus_transactions
+            WHERE confirmation_time::date <= %(d)s
+            GROUP BY login
+        ),
+        test_flags AS (
+            SELECT ta.login::bigint AS login,
+                   MAX(a.is_test_account) AS is_test
+            FROM trading_accounts ta
+            JOIN accounts a ON a.accountid = ta.vtigeraccountid
+            GROUP BY ta.login::bigint
+        ),
+        latest_equity AS (
+            SELECT DISTINCT ON (login)
+                login, convertedbalance, convertedfloatingpnl
+            FROM dealio_daily_profits
+            WHERE date::date <= %(d)s
+            ORDER BY login, date DESC
         )
-          AND a.is_test_account = 0
+        SELECT COALESCE(SUM(
+            GREATEST(
+                GREATEST(0, COALESCE(d.convertedbalance,0) + COALESCE(d.convertedfloatingpnl,0))
+                    - GREATEST(0, COALESCE(b.old_bonus_balance, 0)),
+                0
+            )
+        ), 0) AS total_eez
+        FROM latest_equity d
+        LEFT JOIN bonus_bal b  ON b.login = d.login
+        LEFT JOIN test_flags tf ON tf.login = d.login
+        WHERE COALESCE(tf.is_test, 0) = 0
     """
     conn = get_connection()
     try:
