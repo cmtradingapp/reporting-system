@@ -25,7 +25,7 @@ async def eez_old_api(request: Request):
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
-    _ck = "eez_old_v1"
+    _ck = "eez_old_v2"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -49,6 +49,12 @@ async def eez_old_api(request: Request):
                 WHERE date::date < DATE_TRUNC('month', CURRENT_DATE)
             )
         )
+        current_month_logins AS (
+            SELECT DISTINCT login
+            FROM dealio_daily_profits
+            WHERE EXTRACT(YEAR  FROM date) = EXTRACT(YEAR  FROM CURRENT_DATE)
+              AND EXTRACT(MONTH FROM date) = EXTRACT(MONTH FROM CURRENT_DATE)
+        )
         SELECT
             d.login,
             COALESCE(tf.is_test, 0)                                             AS is_test,
@@ -56,6 +62,7 @@ async def eez_old_api(request: Request):
             ROUND(COALESCE(st.daily_start_equity,     0)::numeric, 2)           AS daily_start_equity,
             ROUND(COALESCE(st.daily_start_net_equity, 0)::numeric, 2)           AS daily_start_net_equity
         FROM dealio_daily_profit d
+        INNER JOIN current_month_logins cml ON cml.login = d.login
         LEFT JOIN test_flags tf ON tf.login = d.login
         LEFT JOIN daily_start st ON st.login = d.login
         ORDER BY eez DESC
