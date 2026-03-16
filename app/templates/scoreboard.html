@@ -461,6 +461,16 @@
         <div class="kpi-label">End Equity Zeroed</div>
       </div>
     </div>
+    <div class="col-12 col-md-4" id="kpi-live-equity">
+      <div class="kpi-card text-center">
+        <div style="font-size:0.65rem;margin-bottom:2px;">
+          <span id="live-eez-badge" style="display:none;background:#1a4731;color:#3fb950;border:1px solid #238636;border-radius:4px;padding:1px 6px;font-size:0.6rem;letter-spacing:0.04em;">LIVE</span>
+        </div>
+        <div class="kpi-value" style="color:#58a6ff;" id="stat-live-equity-zeroed">—</div>
+        <div class="kpi-label">Live End Equity Zeroed</div>
+        <div style="font-size:0.6rem;color:#484f58;margin-top:2px;" id="live-eez-updated"></div>
+      </div>
+    </div>
   </div>
 
   {% if show_sales %}
@@ -695,10 +705,37 @@
     document.getElementById('date-to').value = state.dateTo;
   }
 
+  // ── Live End Equity Zeroed ─────────────────────────────────────────────
+  async function loadLiveEquity(dateTo) {
+    const el    = document.getElementById('stat-live-equity-zeroed');
+    const badge = document.getElementById('live-eez-badge');
+    const upd   = document.getElementById('live-eez-updated');
+    try {
+      const url = dateTo ? `/api/live-equity-zeroed?date=${dateTo}` : '/api/live-equity-zeroed';
+      const res  = await fetch(url);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'error');
+      const neg = data.total < 0;
+      const abs = Math.abs(data.total);
+      el.textContent = (neg ? '-$' : '$') + abs.toLocaleString('en-US');
+      if (data.is_live) {
+        badge.style.display = '';
+        upd.textContent = 'as of ' + new Date().toLocaleTimeString();
+      } else {
+        badge.style.display = 'none';
+        upd.textContent = '';
+      }
+    } catch(e) {
+      el.textContent = 'Error';
+    }
+  }
+
   // ── Combined load ──────────────────────────────────────────────────────
   function loadAll() {
     if (SHOW_SALES)     loadData();
     if (SHOW_RETENTION) loadRetentionData();
+    const dt = document.getElementById('date-to').value;
+    loadLiveEquity(dt);
   }
 
   // ── API fetch + render (Sales) ─────────────────────────────────────────
@@ -1708,6 +1745,13 @@
   // Auto-refresh every 2 minutes when page is visible
   setInterval(function() {
     if (document.visibilityState === 'visible') { updateSyncBar(); }
+  }, 120000);
+
+  // Auto-refresh live equity every 2 minutes
+  setInterval(function() {
+    if (document.visibilityState !== 'visible') return;
+    const dt = document.getElementById('date-to').value;
+    loadLiveEquity(dt);
   }, 120000);
 </script>
 

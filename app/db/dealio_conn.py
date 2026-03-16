@@ -310,3 +310,21 @@ def get_dealio_daily_profits_full():
             break
         last_date = str(df["date"].max())[:10]
         last_login = int(df["login"].max())
+
+
+# ── Live equity helpers ───────────────────────────────────────────────────────
+
+def get_dealio_users_comp():
+    """Fetch login, compprevequity, compcredit for users with compprevequity > 0."""
+    sql = """
+        SELECT login, compprevequity, compcredit
+        FROM dealio.users
+        WHERE compprevequity > 0
+    """
+    conn = get_dealio_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+            return cur.fetchall()
+    finally:
+        conn.close()
