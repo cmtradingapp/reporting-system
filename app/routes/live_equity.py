@@ -29,7 +29,7 @@ async def live_equity_zeroed(request: Request, date: str = None):
             return JSONResponse(status_code=400, content={"detail": "Invalid date"})
 
     is_current_month = (d.year == today.year and d.month == today.month)
-    _ck = f"live_eez_v3:{d}"
+    _ck = f"live_eez_v4:{d}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -161,8 +161,7 @@ def _live_calc_v2() -> dict:
 
 
 def _live_calc(d) -> dict:
-    """Live Group A/B calculation using Dealio PG + local PG."""
-    # Step 1: get users with compprevequity > 0 from Dealio PG
+    """Live: compprevequity - compcredit - GREATEST(0, bonus), non-test only."""
     dealio_users = get_dealio_users_comp()
     if not dealio_users:
         return {"total": 0, "is_live": True, "date": str(d)}
@@ -171,71 +170,36 @@ def _live_calc(d) -> dict:
 
     conn = get_connection()
     try:
-        # Step 2: lifetime net deposits per login
-        sql_nd = """
-            SELECT ta.login::bigint,
-                   SUM(CASE WHEN t.transactiontype IN ('Deposit', 'Withdrawal Cancelled') THEN t.usdamount ELSE 0 END) -
-                   SUM(CASE WHEN t.transactiontype IN ('Withdrawal', 'Deposit Cancelled') THEN t.usdamount ELSE 0 END) AS lifetime_nd
-            FROM transactions t
-            JOIN accounts a ON a.accountid = t.vtigeraccountid
-            JOIN trading_accounts ta ON ta.vtigeraccountid = a.accountid
-            WHERE t.transactionapproval = 'Approved'
-              AND (t.deleted = 0 OR t.deleted IS NULL)
-              AND ta.login::bigint = ANY(%(logins)s)
-              AND a.is_test_account = 0
-            GROUP BY ta.login::bigint
-        """
-        # Step 3: trade PnL per login (local dealio_trades_mt4, symbols already filtered by ETL)
-        sql_pnl = """
-            SELECT d.login::bigint,
-                   SUM(COALESCE(d.computed_profit, 0) + COALESCE(d.computed_swap, 0) + COALESCE(d.computed_commission, 0)) AS trade_pnl
-            FROM dealio_trades_mt4 d
-            WHERE d.login::bigint = ANY(%(logins)s)
-              AND EXISTS (
-                  SELECT 1 FROM trading_accounts ta
-                  JOIN accounts a ON a.accountid = ta.vtigeraccountid
-                  WHERE ta.login::bigint = d.login::bigint
-                    AND a.is_test_account = 0
-              )
-            GROUP BY d.login::bigint
-        """
-        # Step 4: total old bonus per login from bonus_transactions table
         sql_bonus = """
-            SELECT login, SUM(net_amount) AS total_bonus
+            SELECT login, GREATEST(0, SUM(net_amount)) AS total_bonus
             FROM bonus_transactions
             WHERE login = ANY(%(logins)s)
             GROUP BY login
         """
+        sql_test = """
+            SELECT ta.login::bigint
+            FROM trading_accounts ta
+            JOIN accounts a ON a.accountid = ta.vtigeraccountid
+            WHERE ta.login::bigint = ANY(%(logins)s)
+              AND a.is_test_account = 1
+        """
         with conn.cursor() as cur:
-            cur.execute(sql_nd, {"logins": logins})
-            nd_rows = cur.fetchall()
-            cur.execute(sql_pnl, {"logins": logins})
-            pnl_rows = cur.fetchall()
             cur.execute(sql_bonus, {"logins": logins})
-            bonus_rows = cur.fetchall()
+            bonus_map = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
+            cur.execute(sql_test, {"logins": logins})
+            test_logins = {int(r[0]) for r in cur.fetchall()}
     finally:
         conn.close()
-
-    nd_map    = {int(r[0]): float(r[1] or 0) for r in nd_rows}
-    pnl_map   = {int(r[0]): float(r[1] or 0) for r in pnl_rows}
-    bonus_map = {int(r[0]): float(r[1] or 0) for r in bonus_rows}
 
     grand_total = 0.0
     for row in dealio_users:
         login          = int(row[0])
         compprevequity = float(row[1])
         compcredit     = float(row[2])
-
-        if login in bonus_map:
-            # Group B: has bonus transactions
-            nd          = nd_map.get(login, 0.0)
-            pnl         = pnl_map.get(login, 0.0)
-            total_bonus = bonus_map[login]
-            val = max(0.0, nd + pnl - compcredit - total_bonus)
-        else:
-            # Group A: no bonus transactions
-            val = max(0.0, compprevequity - compcredit)
-
+        if login in test_logins:
+            continue
+        bonus = bonus_map.get(login, 0.0)
+        val = max(0.0, compprevequity - compcredit - bonus)
         grand_total += val
 
     return {"total": round(grand_total), "is_live": True, "date": str(d)}
