@@ -7,7 +7,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from app.auth.dependencies import get_current_user
-from app.db.postgres_conn import fetch_accounts_stats, fetch_crm_users_stats, fetch_transactions_stats, fetch_targets_stats, fetch_dealio_mt4trades_stats, fetch_trading_accounts_stats, fetch_ftd100_stats, fetch_sync_log, fetch_dealio_daily_profit_stats, fetch_dealio_users_stats, fetch_dealio_trades_mt4_stats, fetch_dealio_daily_profits_stats
+from app.db.postgres_conn import fetch_accounts_stats, fetch_crm_users_stats, fetch_transactions_stats, fetch_targets_stats, fetch_dealio_mt4trades_stats, fetch_trading_accounts_stats, fetch_ftd100_stats, fetch_sync_log, fetch_dealio_daily_profit_stats, fetch_dealio_users_stats, fetch_dealio_trades_mt4_stats, fetch_dealio_daily_profits_stats, fetch_bonus_transactions_stats
 from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 
@@ -79,6 +79,7 @@ async def data_sync_page(request: Request):
         "du_stats":        lambda: _cached("du_stats",        fetch_dealio_users_stats),
         "dtm4_stats":      lambda: _cached("dtm4_stats",      fetch_dealio_trades_mt4_stats),
         "ddps_stats":      lambda: _cached("ddps_stats",      fetch_dealio_daily_profits_stats),
+        "bonus_stats":     lambda: _cached("bonus_stats",     fetch_bonus_transactions_stats),
         "accounts_log":    lambda: fetch_sync_log("crm_accounts",      limit=50),
         "users_log":       lambda: fetch_sync_log("crm_users",         limit=50),
         "tx_log":          lambda: fetch_sync_log("transactions",       limit=50),
@@ -133,6 +134,7 @@ async def data_sync_page(request: Request):
     dtm4_log       = results["dtm4_log"]
     ddps_stats     = results["ddps_stats"]
     ddps_log       = results["ddps_log"]
+    bonus_stats    = results["bonus_stats"]
 
     tables = [
         {
@@ -314,6 +316,24 @@ async def data_sync_page(request: Request):
             "primary_key": "ticket",
             "incremental_columns": "last_modified",
             "source": "Dealio PG → dealio.trades_mt4",
+        },
+        {
+            "key": "bonus_transactions",
+            "label": "bonus_transactions",
+            "last_synced_at": bonus_stats["last_synced_at"],
+            "stat_cards": [
+                {"label": "Total Records",    "value": bonus_stats["total_records"],   "color": "text-info",    "icon": "bi-database"},
+                {"label": "Unique Logins",    "value": bonus_stats["unique_logins"],   "color": "text-success", "icon": "bi-person-badge"},
+                {"label": "Total Net Bonus",  "value": bonus_stats["total_net_bonus"], "color": "text-warning", "icon": "bi-currency-dollar"},
+                {"label": "Source",           "value": "MSSQL",                        "color": "text-primary", "icon": "bi-server"},
+            ],
+            "sync_log": [],
+            "healthy": bonus_stats["total_records"] > 0,
+            "sync_interval_hours": "N/A",
+            "lookback_hours": "All",
+            "primary_key": "mttransactionsid",
+            "incremental_columns": "confirmation_time",
+            "source": "MSSQL → report.vtiger_mttransactions (is_old_bonus)",
         },
         {
             "key": "dealio_daily_profits",
