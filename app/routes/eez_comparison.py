@@ -50,28 +50,6 @@ async def eez_comparison_api(request: Request):
               AND t.confirmation_time::date <= (SELECT last_dt FROM last_date)
             GROUP BY t.login::bigint
         ),
-        old_data AS (
-            SELECT
-                d.login,
-                COALESCE(d.convertedequity, d.equity, 0)                              AS equity_val,
-                GREATEST(0, COALESCE(d.convertedequity, d.equity, 0))                 AS eez_old
-            FROM dealio_daily_profit d
-        ),
-        new_data AS (
-            SELECT
-                d.login,
-                d.convertedbalance,
-                d.convertedfloatingpnl,
-                COALESCE(b.total_bonus, 0)                                             AS bonus_deducted,
-                GREATEST(
-                    GREATEST(d.convertedbalance + d.convertedfloatingpnl, 0)
-                        - COALESCE(b.total_bonus, 0),
-                    0
-                )                                                                      AS eez_new
-            FROM dealio_daily_profits d
-            LEFT JOIN bonus_bal b ON b.login = d.login
-            WHERE d.date::date = (SELECT last_dt FROM last_date)
-        ),
         test_flags AS (
             SELECT ta.login::bigint AS login,
                    MAX(a.is_test_account) AS is_test
@@ -80,24 +58,20 @@ async def eez_comparison_api(request: Request):
             GROUP BY ta.login::bigint
         )
         SELECT
-            COALESCE(o.login, n.login)                                                  AS login,
-            COALESCE(tf.is_test, 0)                                                     AS is_test,
-            ROUND(COALESCE(o.eez_old,       0)::numeric, 2)                             AS eez_old,
-            ROUND(COALESCE(n.eez_new,       0)::numeric, 2)                             AS eez_new,
-            ROUND((COALESCE(n.eez_new,0) - COALESCE(o.eez_old,0))::numeric, 2)         AS diff,
-            ROUND(COALESCE(o.equity_val,    0)::numeric, 2)                             AS raw_equity,
-            ROUND(COALESCE(n.convertedbalance,    0)::numeric, 2)                       AS new_balance,
-            ROUND(COALESCE(n.convertedfloatingpnl,0)::numeric, 2)                       AS new_floating,
-            ROUND(COALESCE(n.bonus_deducted,0)::numeric, 2)                             AS bonus_deducted,
-            CASE
-                WHEN o.login IS NULL THEN 'new_only'
-                WHEN n.login IS NULL THEN 'old_only'
-                ELSE 'both'
-            END                                                                          AS presence
-        FROM old_data o
-        FULL OUTER JOIN new_data n ON n.login = o.login
-        LEFT JOIN test_flags tf ON tf.login = COALESCE(o.login, n.login)
-        ORDER BY ABS(COALESCE(n.eez_new,0) - COALESCE(o.eez_old,0)) DESC
+            d.login,
+            COALESCE(tf.is_test, 0)                                             AS is_test,
+            ROUND(
+                GREATEST(
+                    GREATEST(d.convertedbalance + d.convertedfloatingpnl, 0)
+                        - COALESCE(b.total_bonus, 0),
+                    0
+                )::numeric, 2
+            )                                                                    AS eez
+        FROM dealio_daily_profits d
+        LEFT JOIN bonus_bal b ON b.login = d.login
+        LEFT JOIN test_flags tf ON tf.login = d.login
+        WHERE d.date::date = (SELECT last_dt FROM last_date)
+        ORDER BY eez DESC
     """
 
     conn = get_connection()
@@ -105,31 +79,24 @@ async def eez_comparison_api(request: Request):
         with conn.cursor() as cur:
             cur.execute(sql)
             rows = cur.fetchall()
-            cols = [d[0] for d in cur.description]
+            cols = [desc[0] for desc in cur.description]
     except Exception as e:
         return JSONResponse(status_code=500, content={"detail": str(e)})
     finally:
         conn.close()
 
     data = []
-    total_old = total_new = 0.0
+    total = 0.0
     for r in rows:
         row = dict(zip(cols, r))
-        row = {k: float(v) if v is not None else 0 for k, v in row.items()
-               if k not in ("presence", "login")} | {
-            "login":    int(row["login"]) if row["login"] is not None else None,
-            "presence": row["presence"],
-            "is_test":  int(row["is_test"]),
-        }
-        total_old += row["eez_old"]
-        total_new += row["eez_new"]
-        data.append(row)
+        eez = float(row["eez"] or 0)
+        data.append({
+            "login":   int(row["login"]) if row["login"] is not None else None,
+            "is_test": int(row["is_test"]),
+            "eez":     eez,
+        })
+        total += eez
 
-    result = {
-        "rows":      data,
-        "total_old": round(total_old, 2),
-        "total_new": round(total_new, 2),
-        "diff":      round(total_new - total_old, 2),
-    }
+    result = {"rows": data, "total": round(total, 2)}
     cache.set(_ck, result)
     return JSONResponse(content=result)
