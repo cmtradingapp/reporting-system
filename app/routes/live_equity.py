@@ -86,8 +86,8 @@ def _live_calc(d) -> dict:
         # Step 2: lifetime net deposits per login
         sql_nd = """
             SELECT ta.login::bigint,
-                   SUM(CASE WHEN t.transactiontypename IN ('Deposit', 'Withdrawal Cancelled') THEN t.usdamount ELSE 0 END) -
-                   SUM(CASE WHEN t.transactiontypename IN ('Withdrawal', 'Deposit Cancelled') THEN t.usdamount ELSE 0 END) AS lifetime_nd
+                   SUM(CASE WHEN t.transactiontype IN ('Deposit', 'Withdrawal Cancelled') THEN t.usdamount ELSE 0 END) -
+                   SUM(CASE WHEN t.transactiontype IN ('Withdrawal', 'Deposit Cancelled') THEN t.usdamount ELSE 0 END) AS lifetime_nd
             FROM transactions t
             JOIN accounts a ON a.accountid = t.vtigeraccountid
             JOIN trading_accounts ta ON ta.vtigeraccountid = a.accountid
@@ -114,16 +114,16 @@ def _live_calc(d) -> dict:
         # Step 4: total old bonus per login (is_old_bonus logic matching Power BI)
         sql_bonus = """
             SELECT ta.login::bigint,
-                   SUM(CASE WHEN t.transactiontype = 'Deposit'    AND t.transactiontypename IN ('FRF Commission', 'Bonus')                          THEN t.usdamount
-                            WHEN t.transactiontype = 'Withdrawal' AND t.transactiontypename IN ('FRF Commission Cancelled', 'BonusCancelled') THEN -t.usdamount
+                   SUM(CASE WHEN t.transactiontype = 'Deposit'    AND t.transactiontype IN ('FRF Commission', 'Bonus')                          THEN t.usdamount
+                            WHEN t.transactiontype = 'Withdrawal' AND t.transactiontype IN ('FRF Commission Cancelled', 'BonusCancelled') THEN -t.usdamount
                             ELSE 0 END) AS total_bonus
             FROM transactions t
             JOIN accounts a ON a.accountid = t.vtigeraccountid
             JOIN trading_accounts ta ON ta.vtigeraccountid = a.accountid
             WHERE t.transactionapproval = 'Approved'
               AND (t.deleted = 0 OR t.deleted IS NULL)
-              AND ((t.transactiontype = 'Deposit'    AND t.transactiontypename IN ('FRF Commission', 'Bonus'))
-                OR (t.transactiontype = 'Withdrawal' AND t.transactiontypename IN ('FRF Commission Cancelled', 'BonusCancelled')))
+              AND ((t.transactiontype = 'Deposit'    AND t.transactiontype IN ('FRF Commission', 'Bonus'))
+                OR (t.transactiontype = 'Withdrawal' AND t.transactiontype IN ('FRF Commission Cancelled', 'BonusCancelled')))
               AND ta.login::bigint = ANY(%(logins)s)
               AND a.is_test_account = 0
             GROUP BY ta.login::bigint

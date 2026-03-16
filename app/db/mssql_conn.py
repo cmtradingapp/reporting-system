@@ -223,3 +223,47 @@ def get_dealio_mt4trades_full():
         df = _normalize_dealio_cols(df)
         last_ticket = int(df["ticket"].max())
         yield df
+
+
+def get_transaction_type_names_full():
+    """Yields DataFrames of (mttransactionsid, transaction_type_name) from MSSQL in chunks."""
+    last_id = 0
+    while True:
+        conn = _get_mssql_connection()
+        try:
+            query = f"""
+                SELECT TOP {CHUNK_SIZE} mttransactionsid, transaction_type_name
+                FROM report.vtiger_mttransactions
+                WHERE mttransactionsid > {last_id}
+                ORDER BY mttransactionsid
+            """
+            df = pd.read_sql(query, conn)
+        finally:
+            conn.close()
+        if df.empty:
+            break
+        last_id = int(df["mttransactionsid"].max())
+        yield df
+
+
+def get_transaction_type_names_for_ids(ids: list) -> pd.DataFrame:
+    """Fetch transaction_type_name from MSSQL for specific mttransactionsids."""
+    ids = [int(i) for i in ids if i is not None]
+    if not ids:
+        return pd.DataFrame(columns=["mttransactionsid", "transaction_type_name"])
+    # Split into chunks of 2000 to avoid SQL IN clause limits
+    results = []
+    for i in range(0, len(ids), 2000):
+        chunk_ids = ids[i:i + 2000]
+        id_str = ",".join(str(i) for i in chunk_ids)
+        conn = _get_mssql_connection()
+        try:
+            query = f"""
+                SELECT mttransactionsid, transaction_type_name
+                FROM report.vtiger_mttransactions
+                WHERE mttransactionsid IN ({id_str})
+            """
+            results.append(pd.read_sql(query, conn))
+        finally:
+            conn.close()
+    return pd.concat(results, ignore_index=True) if results else pd.DataFrame(columns=["mttransactionsid", "transaction_type_name"])

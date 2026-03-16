@@ -149,7 +149,7 @@ async def agent_bonuses_retention_api(request: Request, date_from: str, date_to:
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"bon_ret_v2:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"bon_ret_v3:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -179,12 +179,12 @@ async def agent_bonuses_retention_api(request: Request, date_from: str, date_to:
         ) tgt ON tgt.agent_id = u.id
         LEFT JOIN (
             SELECT a.assigned_to AS agent_id,
-                   SUM(CASE WHEN t.transactiontypename IN ('Deposit','Withdrawal Cancelled') THEN t.usdamount
-                            WHEN t.transactiontypename IN ('Withdrawal','Deposit Cancelled')  THEN -t.usdamount END) AS net_usd
+                   SUM(CASE WHEN t.transactiontype IN ('Deposit','Withdrawal Cancelled') THEN t.usdamount
+                            WHEN t.transactiontype IN ('Withdrawal','Deposit Cancelled')  THEN -t.usdamount END) AS net_usd
             FROM transactions t
             JOIN accounts a ON a.accountid = t.vtigeraccountid
             WHERE t.transactionapproval = 'Approved' AND (t.deleted = 0 OR t.deleted IS NULL)
-              AND t.transactiontypename IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
+              AND t.transactiontype IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
               AND t.confirmation_time >= %(date_from)s AND t.confirmation_time < %(date_to_excl)s
               AND a.is_test_account = 0
             GROUP BY a.assigned_to
@@ -303,7 +303,7 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"bon_sales_v2:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"bon_sales_v3:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -339,7 +339,7 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
             JOIN accounts a ON a.accountid = t.vtigeraccountid
             WHERE t.transactionapproval = 'Approved'
               AND (t.deleted = 0 OR t.deleted IS NULL)
-              AND t.transactiontypename = 'Deposit'
+              AND t.transactiontype = 'Deposit'
               AND t.ftd = 1
               AND a.client_qualification_date IS NOT NULL
               AND a.client_qualification_date >= %(date_from)s
@@ -357,13 +357,13 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
         ) f100 ON f100.agent_id = u.id
         LEFT JOIN (
             SELECT t.original_deposit_owner AS agent_id,
-                   SUM(CASE WHEN t.transactiontypename IN ('Deposit','Withdrawal Cancelled') THEN  t.usdamount
-                            WHEN t.transactiontypename IN ('Withdrawal','Deposit Cancelled')  THEN -t.usdamount END)::float AS net_usd
+                   SUM(CASE WHEN t.transactiontype IN ('Deposit','Withdrawal Cancelled') THEN  t.usdamount
+                            WHEN t.transactiontype IN ('Withdrawal','Deposit Cancelled')  THEN -t.usdamount END)::float AS net_usd
             FROM transactions t
             JOIN accounts a ON a.accountid = t.vtigeraccountid
             WHERE t.transactionapproval = 'Approved'
               AND (t.deleted = 0 OR t.deleted IS NULL)
-              AND t.transactiontypename IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
+              AND t.transactiontype IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
               AND a.client_qualification_date IS NOT NULL
               AND a.client_qualification_date >= %(date_from)s
               AND a.client_qualification_date <  %(date_to_excl)s

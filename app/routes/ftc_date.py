@@ -114,8 +114,8 @@ async def ftc_date_api(
         tx_per_account AS (
             SELECT
                 t.vtigeraccountid AS accountid,
-                SUM(CASE WHEN t.transactiontypename IN ('Deposit', 'Withdrawal Cancelled') THEN t.usdamount ELSE 0 END) AS deposit_usd,
-                SUM(CASE WHEN t.transactiontypename IN ('Withdrawal', 'Deposit Cancelled') THEN t.usdamount ELSE 0 END) AS withdrawal_usd
+                SUM(CASE WHEN t.transactiontype IN ('Deposit', 'Withdrawal Cancelled') THEN t.usdamount ELSE 0 END) AS deposit_usd,
+                SUM(CASE WHEN t.transactiontype IN ('Withdrawal', 'Deposit Cancelled') THEN t.usdamount ELSE 0 END) AS withdrawal_usd
             FROM transactions t
             WHERE t.transactionapproval = 'Approved'
               AND (t.deleted = 0 OR t.deleted IS NULL)
@@ -125,7 +125,7 @@ async def ftc_date_api(
             SELECT DISTINCT t.vtigeraccountid AS accountid
             FROM transactions t
             JOIN accounts a ON a.accountid = t.vtigeraccountid
-            WHERE t.transactiontypename = 'Deposit'
+            WHERE t.transactiontype = 'Deposit'
               AND t.transactionapproval = 'Approved'
               AND (t.deleted = 0 OR t.deleted IS NULL)
               AND a.client_qualification_date IS NOT NULL
@@ -137,7 +137,7 @@ async def ftc_date_api(
             SELECT DISTINCT t.vtigeraccountid AS accountid
             FROM transactions t
             JOIN accounts a ON a.accountid = t.vtigeraccountid
-            WHERE t.transactiontypename = 'Withdrawal'
+            WHERE t.transactiontype = 'Withdrawal'
               AND t.transactionapproval = 'Approved'
               AND (t.deleted = 0 OR t.deleted IS NULL)
               AND COALESCE(t.confirmation_time, t.created_time)::date <= %(end_date)s::date

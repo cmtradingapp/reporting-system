@@ -1127,6 +1127,32 @@ def upsert_transactions(df: pd.DataFrame):
         conn.close()
 
 
+def update_transactiontypename(df) -> int:
+    """Batch UPDATE transactiontypename for rows matched by mttransactionsid. Returns rows updated."""
+    if df is None or len(df) == 0:
+        return 0
+    rows = [
+        (str(r["transaction_type_name"]) if r["transaction_type_name"] is not None else None,
+         int(r["mttransactionsid"]))
+        for _, r in df.iterrows()
+        if r["mttransactionsid"] is not None
+    ]
+    if not rows:
+        return 0
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            execute_values(cur, """
+                UPDATE transactions SET transactiontypename = data.ttn
+                FROM (VALUES %s) AS data(ttn, id)
+                WHERE transactions.mttransactionsid = data.id::bigint
+            """, rows, template="(%s, %s)")
+        conn.commit()
+        return len(rows)
+    finally:
+        conn.close()
+
+
 def fetch_transactions_stats() -> dict:
     sql = """
         SELECT
