@@ -295,7 +295,8 @@ def get_transactions(hours: int = 24) -> pd.DataFrame:
                     NULL                                                            AS transaction_promo,
                     NULL                                                            AS assisted_by,
                     NULL                                                            AS deleted,
-                    bb.is_frd
+                    bb.is_frd,
+                    vt.transaction_type_name                                        AS transactiontypename
                 FROM crmdb.broker_banking bb
                 JOIN crmdb.v_ant_broker_user bu ON bb.broker_user_id = bu.id
                 LEFT JOIN (SELECT * FROM crmdb.autolut WHERE type = 'TransactionMethod') l
@@ -304,6 +305,7 @@ def get_transactions(hours: int = 24) -> pd.DataFrame:
                     ON l1.`key` = bb.status
                 LEFT JOIN (SELECT * FROM crmdb.autolut WHERE type = 'BrokerBankingType') l2
                     ON l2.`key` = bb.type
+                LEFT JOIN crmdb.vtiger_mttransactions vt ON vt.mttransactionsid = bb.id
             ) t
             WHERE usdamount < 10000000
               AND server_id = 2
@@ -405,7 +407,8 @@ def get_transactions_full():
                     NULL                                                            AS transaction_promo,
                     NULL                                                            AS assisted_by,
                     NULL                                                            AS deleted,
-                    bb.is_frd
+                    bb.is_frd,
+                    vt.transaction_type_name                                        AS transactiontypename
                 FROM crmdb.broker_banking bb
                 JOIN crmdb.v_ant_broker_user bu ON bb.broker_user_id = bu.id
                 LEFT JOIN (SELECT * FROM crmdb.autolut WHERE type = 'TransactionMethod') l
@@ -414,6 +417,7 @@ def get_transactions_full():
                     ON l1.`key` = bb.status
                 LEFT JOIN (SELECT * FROM crmdb.autolut WHERE type = 'BrokerBankingType') l2
                     ON l2.`key` = bb.type
+                LEFT JOIN crmdb.vtiger_mttransactions vt ON vt.mttransactionsid = bb.id
             ) t
             WHERE usdamount < 10000000
               AND server_id = 2

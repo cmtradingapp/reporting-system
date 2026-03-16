@@ -145,6 +145,8 @@ def ensure_table():
         ALTER TABLE crm_users ADD COLUMN IF NOT EXISTS agent_name   VARCHAR(255);
         ALTER TABLE crm_users ADD COLUMN IF NOT EXISTS department_  VARCHAR(20);
 
+        ALTER TABLE transactions ADD COLUMN IF NOT EXISTS transactiontypename VARCHAR(100);
+
         CREATE TABLE IF NOT EXISTS transactions (
             mttransactionsid            BIGINT          PRIMARY KEY,
             tradingaccountsid           BIGINT,
@@ -1103,7 +1105,7 @@ def upsert_transactions(df: pd.DataFrame):
         "payment_method", "compliance_status", "ftd_owner", "email", "created_time",
         "modifiedtime", "psp_transaction_id", "finance_status", "session_id", "gateway_name",
         "payment_subtype", "legacy_mtt", "fee_type", "fee", "fee_included",
-        "transaction_promo", "assisted_by", "deleted", "is_frd",
+        "transaction_promo", "assisted_by", "deleted", "is_frd", "transactiontypename",
     ]
     rows = [tuple(_clean(row.get(c)) for c in cols) for _, row in df.iterrows()]
     update_cols = [c for c in cols if c != "mttransactionsid"]

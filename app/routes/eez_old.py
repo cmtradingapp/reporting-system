@@ -85,7 +85,7 @@ async def eez_old_api(request: Request):
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
-    _ck = "eez_old_v9"
+    _ck = "eez_old_v10"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -99,14 +99,14 @@ async def eez_old_api(request: Request):
         ),
         bonus_bal AS (
             SELECT t.login::bigint AS login,
-                   SUM(CASE WHEN t.transactiontype IN ('FRF Commission','Bonus')
+                   SUM(CASE WHEN t.transactiontypename IN ('FRF Commission','Bonus')
                             THEN t.usdamount ELSE 0 END)
-                 - SUM(CASE WHEN t.transactiontype IN ('FRF Commission Cancelled','BonusCancelled')
+                 - SUM(CASE WHEN t.transactiontypename IN ('FRF Commission Cancelled','BonusCancelled')
                             THEN t.usdamount ELSE 0 END) AS old_bonus_balance
             FROM transactions t
             WHERE t.transactionapproval = 'Approved'
               AND (t.deleted = 0 OR t.deleted IS NULL)
-              AND t.transactiontype IN ('FRF Commission','Bonus','FRF Commission Cancelled','BonusCancelled')
+              AND t.transactiontypename IN ('FRF Commission','Bonus','FRF Commission Cancelled','BonusCancelled')
               AND t.confirmation_time::date <= (SELECT last_dt FROM last_date)
             GROUP BY t.login::bigint
         ),
