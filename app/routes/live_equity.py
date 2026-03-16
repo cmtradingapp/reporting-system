@@ -118,7 +118,7 @@ def _live_calc(d) -> dict:
             FROM transactions t
             JOIN accounts a ON a.accountid = t.vtigeraccountid
             JOIN trading_accounts ta ON ta.vtigeraccountid = a.accountid
-            WHERE LOWER(t.comment) LIKE '%bonus%'
+            WHERE LOWER(t.comment) LIKE '%%bonus%%'
               AND t.transactionapproval = 'Approved'
               AND (t.deleted = 0 OR t.deleted IS NULL)
               AND ta.login::bigint = ANY(%(logins)s)
