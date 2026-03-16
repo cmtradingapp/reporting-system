@@ -715,11 +715,12 @@ def ensure_bonus_transactions_table():
 def upsert_bonus_transactions(df) -> int:
     if df is None or len(df) == 0:
         return 0
+    import pandas as pd
     rows = [
         (int(r["mttransactionsid"]),
          int(r["login"]) if r["login"] is not None else None,
          float(r["net_amount"]) if r["net_amount"] is not None else None,
-         r["confirmation_time"])
+         None if pd.isnull(r["confirmation_time"]) else r["confirmation_time"])
         for _, r in df.iterrows()
         if r["mttransactionsid"] is not None
     ]
