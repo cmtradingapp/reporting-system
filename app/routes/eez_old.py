@@ -47,9 +47,17 @@ async def debug_login(login: int, request: Request):
                   AND transactiontype IN ('FRF Commission','Bonus','FRF Commission Cancelled','BonusCancelled')
             """, (login,))
             bonus_total = float(cur.fetchone()[0] or 0)
+            cur.execute("""
+                SELECT transactiontype, COUNT(*), SUM(usdamount)
+                FROM transactions
+                WHERE login::bigint = %s
+                GROUP BY transactiontype
+                ORDER BY COUNT(*) DESC
+            """, (login,))
+            all_types = [{"type": r[0], "count": r[1], "total_usd": float(r[2] or 0)} for r in cur.fetchall()]
     finally:
         conn.close()
-    return JSONResponse(content={"login": login, "old_table": old, "new_table": new, "bonus_transactions": bonus_txns, "bonus_total_applied": bonus_total})
+    return JSONResponse(content={"login": login, "old_table": old, "new_table": new, "bonus_transactions": bonus_txns, "bonus_total_applied": bonus_total, "all_transaction_types": all_types})
 
 
 @router.get("/eez-old", response_class=HTMLResponse)
