@@ -248,13 +248,13 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
                     SELECT
                         t.login,
                         t.confirmation_time::date AS bonus_date,
-                        SUM(CASE WHEN t.transactiontype IN ('FRF Commission', 'Bonus')                          THEN t.usdamount ELSE 0 END)
-                      - SUM(CASE WHEN t.transactiontype IN ('FRF Commission Cancelled', 'BonusCancelled') THEN t.usdamount ELSE 0 END)
+                        SUM(CASE WHEN t.transactiontypename IN ('FRF Commission', 'Bonus')                          THEN t.usdamount ELSE 0 END)
+                      - SUM(CASE WHEN t.transactiontypename IN ('FRF Commission Cancelled', 'BonusCancelled') THEN t.usdamount ELSE 0 END)
                             AS old_bonus_usd
                     FROM transactions t
                     WHERE t.transactionapproval = 'Approved'
                       AND (t.deleted = 0 OR t.deleted IS NULL)
-                      AND t.transactiontype IN ('FRF Commission', 'Bonus', 'FRF Commission Cancelled', 'BonusCancelled')
+                      AND t.transactiontypename IN ('FRF Commission', 'Bonus', 'FRF Commission Cancelled', 'BonusCancelled')
                     GROUP BY t.login, t.confirmation_time::date
                 ),
                 old_bonus_balance AS (
@@ -446,7 +446,7 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
             WHERE t.transactionapproval = 'Approved' AND (t.deleted = 0 OR t.deleted IS NULL)
               AND t.transactiontype IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
               AND t.confirmation_time >= %(date_from)s AND t.confirmation_time < %(date_to_excl)s
-              AND COALESCE(t.comment, '') NOT ILIKE '%%bonus%%'
+              AND (t.transactiontypename IS NULL OR t.transactiontypename NOT IN ('FRF Commission','Bonus','FRF Commission Cancelled','BonusCancelled'))
               AND a.is_test_account = 0
             GROUP BY a.assigned_to
         ) net ON net.agent_id = u.id
@@ -456,7 +456,7 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
             WHERE t.transactionapproval = 'Approved' AND (t.deleted = 0 OR t.deleted IS NULL)
               AND t.transactiontype IN ('Deposit','Withdrawal Cancelled')
               AND t.confirmation_time >= %(date_from)s AND t.confirmation_time < %(date_to_excl)s
-              AND COALESCE(t.comment, '') NOT ILIKE '%%bonus%%'
+              AND (t.transactiontypename IS NULL OR t.transactiontypename NOT IN ('FRF Commission','Bonus','FRF Commission Cancelled','BonusCancelled'))
               AND a.is_test_account = 0
             GROUP BY a.assigned_to
         ) dep ON dep.agent_id = u.id
@@ -516,7 +516,7 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
                   AND (t.deleted = 0 OR t.deleted IS NULL)
                   AND t.transactiontype IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
                   AND t.confirmation_time::date = %(date_to)s
-                  AND COALESCE(t.comment, '') NOT ILIKE '%%bonus%%'
+                  AND (t.transactiontypename IS NULL OR t.transactiontypename NOT IN ('FRF Commission','Bonus','FRF Commission Cancelled','BonusCancelled'))
                   AND a.is_test_account = 0
                   AND u.department_ = 'Retention'
                   AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'

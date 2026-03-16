@@ -186,7 +186,7 @@ async def agent_bonuses_retention_api(request: Request, date_from: str, date_to:
             WHERE t.transactionapproval = 'Approved' AND (t.deleted = 0 OR t.deleted IS NULL)
               AND t.transactiontype IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
               AND t.confirmation_time >= %(date_from)s AND t.confirmation_time < %(date_to_excl)s
-              AND COALESCE(t.comment, '') NOT ILIKE '%%bonus%%'
+              AND (t.transactiontypename IS NULL OR t.transactiontypename NOT IN ('FRF Commission','Bonus','FRF Commission Cancelled','BonusCancelled'))
               AND a.is_test_account = 0
             GROUP BY a.assigned_to
         ) net ON net.agent_id = u.id

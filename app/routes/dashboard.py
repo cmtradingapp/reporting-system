@@ -269,13 +269,13 @@ async def dashboard_api(request: Request):
                     SELECT
                         t.login,
                         t.confirmation_time::date AS bonus_date,
-                        SUM(CASE WHEN t.transactiontype IN ('FRF Commission', 'Bonus') THEN t.usdamount ELSE 0 END)
-                      - SUM(CASE WHEN t.transactiontype IN ('FRF Commission Cancelled', 'BonusCancelled') THEN t.usdamount ELSE 0 END)
+                        SUM(CASE WHEN t.transactiontypename IN ('FRF Commission', 'Bonus') THEN t.usdamount ELSE 0 END)
+                      - SUM(CASE WHEN t.transactiontypename IN ('FRF Commission Cancelled', 'BonusCancelled') THEN t.usdamount ELSE 0 END)
                             AS old_bonus_usd
                     FROM transactions t
                     WHERE t.transactionapproval = 'Approved'
                       AND (t.deleted = 0 OR t.deleted IS NULL)
-                      AND t.transactiontype IN ('FRF Commission', 'Bonus', 'FRF Commission Cancelled', 'BonusCancelled')
+                      AND t.transactiontypename IN ('FRF Commission', 'Bonus', 'FRF Commission Cancelled', 'BonusCancelled')
                     GROUP BY t.login, t.confirmation_time::date
                 ),
                 old_bonus_balance AS (
