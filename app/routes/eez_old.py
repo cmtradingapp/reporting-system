@@ -9,6 +9,29 @@ router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
 
+@router.get("/api/debug-login/{login}")
+async def debug_login(login: int, request: Request):
+    user = await get_current_user(request)
+    if isinstance(user, RedirectResponse):
+        return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT date::date, convertedbalance, convertedfloatingpnl, convertedequity
+                FROM dealio_daily_profit WHERE login = %s ORDER BY date DESC LIMIT 5
+            """, (login,))
+            old = [{"date": str(r[0]), "bal": float(r[1] or 0), "flt": float(r[2] or 0), "eq": float(r[3] or 0)} for r in cur.fetchall()]
+            cur.execute("""
+                SELECT date::date, convertedbalance, convertedfloatingpnl, convertedequity
+                FROM dealio_daily_profits WHERE login = %s ORDER BY date DESC LIMIT 5
+            """, (login,))
+            new = [{"date": str(r[0]), "bal": float(r[1] or 0), "flt": float(r[2] or 0), "eq": float(r[3] or 0)} for r in cur.fetchall()]
+    finally:
+        conn.close()
+    return JSONResponse(content={"login": login, "old_table": old, "new_table": new})
+
+
 @router.get("/eez-old", response_class=HTMLResponse)
 async def eez_old_page(request: Request):
     user = await get_current_user(request)
