@@ -729,7 +729,7 @@ def upsert_bonus_transactions(df) -> int:
     try:
         with conn.cursor() as cur:
             execute_values(cur, """
-                INSERT INTO bonus_transactions (mttransactionsid, login, net_amount, confirmation_time, synced_at)
+                INSERT INTO bonus_transactions (mttransactionsid, login, net_amount, confirmation_time)
                 VALUES %s
                 ON CONFLICT (mttransactionsid) DO UPDATE SET
                     login             = EXCLUDED.login,
