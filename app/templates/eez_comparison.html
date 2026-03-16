@@ -109,7 +109,11 @@
         <input class="form-check-input" type="checkbox" id="hide-zero" checked/>
         <label class="form-check-label text-muted small" for="hide-zero">Hide zero EEZ</label>
       </div>
-      <span class="text-muted small ms-auto" id="row-count-label"></span>
+      <button onclick="exportCSV()" class="btn btn-sm ms-auto"
+              style="background:#238636;border:none;color:#fff;padding:4px 14px;">
+        <i class="bi bi-file-earmark-excel me-1"></i>Export Excel
+      </button>
+      <span class="text-muted small" id="row-count-label"></span>
     </div>
   </div>
 
@@ -195,6 +199,29 @@
     } catch(e) {
       document.getElementById('eez-tbody').innerHTML = `<tr><td colspan="3" class="text-center text-danger py-4">Error: ${e.message}</td></tr>`;
     }
+  }
+
+  function exportCSV() {
+    const q = document.getElementById('search-login').value.trim();
+    const hideTest = document.getElementById('hide-test').checked;
+    const hideZero = document.getElementById('hide-zero').checked;
+    let filtered = allRows.filter(r => {
+      if (hideTest && r.is_test) return false;
+      if (q && !String(r.login).includes(q)) return false;
+      if (hideZero && r.eez === 0) return false;
+      return true;
+    });
+    filtered.sort((a, b) => {
+      const av = a[sortKey] ?? 0, bv = b[sortKey] ?? 0;
+      return sortDir * (av > bv ? 1 : av < bv ? -1 : 0);
+    });
+    const lines = ['Login,End Equity Zeroed'];
+    filtered.forEach(r => lines.push(`${r.login},${r.eez}`));
+    const blob = new Blob([lines.join('\r\n')], {type: 'text/csv'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'eez_march.csv';
+    a.click();
   }
 
   document.getElementById('search-login').addEventListener('input', applyFilters);
