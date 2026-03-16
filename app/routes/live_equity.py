@@ -29,7 +29,7 @@ async def live_equity_zeroed(request: Request, date: str = None):
             return JSONResponse(status_code=400, content={"detail": "Invalid date"})
 
     is_current_month = (d.year == today.year and d.month == today.month)
-    _ck = f"live_eez:{d}"
+    _ck = f"live_eez_v2:{d}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -111,16 +111,19 @@ def _live_calc(d) -> dict:
               )
             GROUP BY d.login::bigint
         """
-        # Step 4: total bonus per login (transactions with 'bonus' in comment)
+        # Step 4: total old bonus per login (is_old_bonus logic matching Power BI)
         sql_bonus = """
             SELECT ta.login::bigint,
-                   SUM(t.usdamount) AS total_bonus
+                   SUM(CASE WHEN t.transactiontype = 'Deposit'    AND t.transactiontypename IN ('FRF Commission', 'Bonus')                          THEN t.usdamount
+                            WHEN t.transactiontype = 'Withdrawal' AND t.transactiontypename IN ('FRF Commission Cancelled', 'BonusCancelled') THEN -t.usdamount
+                            ELSE 0 END) AS total_bonus
             FROM transactions t
             JOIN accounts a ON a.accountid = t.vtigeraccountid
             JOIN trading_accounts ta ON ta.vtigeraccountid = a.accountid
-            WHERE LOWER(t.comment) LIKE '%%bonus%%'
-              AND t.transactionapproval = 'Approved'
+            WHERE t.transactionapproval = 'Approved'
               AND (t.deleted = 0 OR t.deleted IS NULL)
+              AND ((t.transactiontype = 'Deposit'    AND t.transactiontypename IN ('FRF Commission', 'Bonus'))
+                OR (t.transactiontype = 'Withdrawal' AND t.transactiontypename IN ('FRF Commission Cancelled', 'BonusCancelled')))
               AND ta.login::bigint = ANY(%(logins)s)
               AND a.is_test_account = 0
             GROUP BY ta.login::bigint
