@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from app.auth.dependencies import get_current_user
 from app.db.postgres_conn import get_connection
-from app.db.dealio_conn import get_dealio_users_comp
+from app.db.dealio_conn import get_dealio_users_comp, get_dealio_users_balance
 from app import cache
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
@@ -29,7 +29,7 @@ async def live_equity_zeroed(request: Request, date: str = None):
             return JSONResponse(status_code=400, content={"detail": "Invalid date"})
 
     is_current_month = (d.year == today.year and d.month == today.month)
-    _ck = f"live_eez_v4:{d}"
+    _ck = f"live_eez_v5:{d}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -95,45 +95,75 @@ def _historical_calc(d) -> dict:
 
 
 def _live_calc(d) -> dict:
-    """Live: compprevequity - compcredit - GREATEST(0, bonus), non-test only."""
-    dealio_users = get_dealio_users_comp()
-    if not dealio_users:
+    """Live EEZ: (compprevbalance + floating_pnl) - bonus, clamped to 0."""
+    bal_rows = get_dealio_users_balance()
+    if not bal_rows:
         return {"total": 0, "is_live": True, "date": str(d)}
 
-    logins = [int(r[0]) for r in dealio_users]
+    logins   = [int(r[0]) for r in bal_rows]
+    bal_map  = {int(r[0]): float(r[1] or 0) for r in bal_rows}
 
     conn = get_connection()
     try:
-        sql_bonus = """
-            SELECT login, GREATEST(0, SUM(net_amount)) AS total_bonus
-            FROM bonus_transactions
-            WHERE login = ANY(%(logins)s)
-            GROUP BY login
-        """
-        sql_test = """
+        sql_valid = """
             SELECT ta.login::bigint
             FROM trading_accounts ta
             JOIN accounts a ON a.accountid = ta.vtigeraccountid
             WHERE ta.login::bigint = ANY(%(logins)s)
-              AND a.is_test_account = 1
+              AND ta.equity > 0
+              AND ta.balance != 0
+              AND a.is_test_account = 0
+        """
+        sql_pnl = """
+            SELECT t.login,
+                   SUM(COALESCE(t.computed_commission, 0)
+                     + COALESCE(t.computed_profit, 0)
+                     + COALESCE(t.computed_swap, 0)) AS floatingpnl
+            FROM dealio_trades_mt4 t
+            JOIN trading_accounts ta ON ta.login::bigint = t.login
+            JOIN accounts a ON a.accountid = ta.vtigeraccountid
+            WHERE t.close_time = '1970-01-01 00:00:00'
+              AND t.cmd < 2
+              AND ta.equity > 0
+              AND ta.balance != 0
+              AND a.is_test_account = 0
+            GROUP BY t.login
+        """
+        sql_bonus = """
+            SELECT t.login::bigint,
+                   SUM(CASE
+                       WHEN t.transactiontype IN ('Deposit', 'Credit in')     THEN t.usdamount
+                       WHEN t.transactiontype IN ('Withdrawal', 'Credit out') THEN -t.usdamount
+                       ELSE 0
+                   END) AS bonus
+            FROM transactions t
+            JOIN trading_accounts ta ON ta.login = t.login
+            JOIN accounts a ON a.accountid = ta.vtigeraccountid
+            WHERE ta.equity > 0
+              AND ta.balance != 0
+              AND t.transactionapproval = 'Approved'
+              AND LOWER(t.comment) LIKE '%bonus%'
+              AND (t.deleted = 0 OR t.deleted IS NULL)
+              AND a.is_test_account = 0
+            GROUP BY t.login
         """
         with conn.cursor() as cur:
-            cur.execute(sql_bonus, {"logins": logins})
+            cur.execute(sql_valid, {"logins": logins})
+            valid_logins = {int(r[0]) for r in cur.fetchall()}
+            cur.execute(sql_pnl)
+            pnl_map = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
+            cur.execute(sql_bonus)
             bonus_map = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
-            cur.execute(sql_test, {"logins": logins})
-            test_logins = {int(r[0]) for r in cur.fetchall()}
     finally:
         conn.close()
 
     grand_total = 0.0
-    for row in dealio_users:
-        login          = int(row[0])
-        compprevequity = float(row[1])
-        compcredit     = float(row[2])
-        if login in test_logins:
+    for login, bal in bal_map.items():
+        if login not in valid_logins:
             continue
+        pnl   = pnl_map.get(login, 0.0)
         bonus = bonus_map.get(login, 0.0)
-        val = max(0.0, compprevequity - compcredit - bonus)
-        grand_total += val
+        eez   = max(0.0, bal + pnl - bonus)
+        grand_total += eez
 
     return {"total": round(grand_total), "is_live": True, "date": str(d)}

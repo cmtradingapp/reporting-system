@@ -328,3 +328,19 @@ def get_dealio_users_comp():
             return cur.fetchall()
     finally:
         conn.close()
+
+
+def get_dealio_users_balance():
+    """Fetch (login, compprevbalance) from live dealio.users for EEZ calculation."""
+    sql = """
+        SELECT login, compprevbalance
+        FROM dealio.users
+        WHERE compprevbalance > 0
+    """
+    conn = get_dealio_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+            return cur.fetchall()
+    finally:
+        conn.close()
