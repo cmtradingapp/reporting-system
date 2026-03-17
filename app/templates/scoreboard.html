@@ -479,8 +479,10 @@
       <div class="card p-0" style="overflow:hidden;">
         <div class="d-flex justify-content-between align-items-center px-4 py-3" style="border-bottom:1px solid #30363d;">
           <div class="section-title">Sales</div>
-          <div class="d-flex align-items-center gap-3">
+          <div class="d-flex align-items-center gap-2 flex-wrap">
             <span class="small" style="color:#e0e0e0;" id="row-count"></span>
+            <button onclick="expandAllSales()" class="btn btn-sm" style="background:#21262d;border:1px solid #30363d;color:#8b949e;border-radius:6px;font-size:0.8rem;padding:4px 10px;"><i class="bi bi-arrows-expand me-1"></i>Expand All</button>
+            <button onclick="collapseAllSales()" class="btn btn-sm" style="background:#21262d;border:1px solid #30363d;color:#8b949e;border-radius:6px;font-size:0.8rem;padding:4px 10px;"><i class="bi bi-arrows-collapse me-1"></i>Collapse All</button>
             <button onclick="exportSalesExcel()" class="btn btn-sm" style="background:#1a4731;border:1px solid #238636;color:#3fb950;border-radius:6px;font-size:0.8rem;padding:4px 12px;">
               <i class="bi bi-file-earmark-excel me-1"></i>Export Excel
             </button>
@@ -529,8 +531,10 @@
       <div class="card p-0" style="overflow:hidden;">
         <div class="d-flex justify-content-between align-items-center px-4 py-3" style="border-bottom:1px solid #30363d;">
           <div class="section-title" style="border-left-color:#388bfd;">Retention</div>
-          <div class="d-flex align-items-center gap-3">
+          <div class="d-flex align-items-center gap-2 flex-wrap">
             <span class="small" style="color:#e0e0e0;" id="ret-row-count"></span>
+            <button onclick="expandAllRetention()" class="btn btn-sm" style="background:#21262d;border:1px solid #30363d;color:#8b949e;border-radius:6px;font-size:0.8rem;padding:4px 10px;"><i class="bi bi-arrows-expand me-1"></i>Expand All</button>
+            <button onclick="collapseAllRetention()" class="btn btn-sm" style="background:#21262d;border:1px solid #30363d;color:#8b949e;border-radius:6px;font-size:0.8rem;padding:4px 10px;"><i class="bi bi-arrows-collapse me-1"></i>Collapse All</button>
             <button onclick="exportRetentionExcel()" class="btn btn-sm" style="background:#0d2137;border:1px solid #1f6feb;color:#388bfd;border-radius:6px;font-size:0.8rem;padding:4px 12px;">
               <i class="bi bi-file-earmark-excel me-1"></i>Export Excel
             </button>
@@ -1574,6 +1578,61 @@
 
     document.getElementById('ret-row-count').textContent = `${totalOffices} offices · ${totalAgents} agents`;
     applyMobileColOrder();
+  }
+
+  // ── Expand / Collapse All – Sales ─────────────────────────────────────
+  function expandAllSales() {
+    const tbody = document.getElementById('table-body');
+    tbody.querySelectorAll('tr.office-row').forEach(offTr => {
+      const chevron  = offTr.querySelector('.chevron');
+      const officeId = offTr.dataset.officeId;
+      if (!chevron.classList.contains('open')) {
+        chevron.classList.add('open');
+        tbody.querySelectorAll(`tr[data-parent-office="${officeId}"]`).forEach(r => r.style.display = '');
+      }
+    });
+  }
+  function collapseAllSales() {
+    const tbody = document.getElementById('table-body');
+    tbody.querySelectorAll('tr.office-row').forEach(offTr => {
+      const chevron  = offTr.querySelector('.chevron');
+      const officeId = offTr.dataset.officeId;
+      if (chevron.classList.contains('open')) {
+        chevron.classList.remove('open');
+        tbody.querySelectorAll(`tr[data-parent-office="${officeId}"]`).forEach(r => r.style.display = 'none');
+      }
+    });
+  }
+
+  // ── Expand / Collapse All – Retention ─────────────────────────────────
+  function expandAllRetention() {
+    const tbody = document.getElementById('retention-tbody');
+    tbody.querySelectorAll('tr.office-row').forEach(offTr => {
+      const chevron  = offTr.querySelector('.chevron');
+      const officeId = offTr.dataset.officeId;
+      chevron.classList.add('open');
+      tbody.querySelectorAll(`tr.dept-row[data-parent-office="${officeId}"]`).forEach(deptTr => {
+        deptTr.style.display = '';
+        const deptChevron = deptTr.querySelector('.chevron');
+        const deptId = deptTr.dataset.deptId;
+        if (deptChevron) deptChevron.classList.add('open');
+        tbody.querySelectorAll(`tr[data-parent-dept="${deptId}"]`).forEach(r => r.style.display = '');
+      });
+    });
+  }
+  function collapseAllRetention() {
+    const tbody = document.getElementById('retention-tbody');
+    tbody.querySelectorAll('tr.office-row').forEach(offTr => {
+      const chevron  = offTr.querySelector('.chevron');
+      const officeId = offTr.dataset.officeId;
+      chevron.classList.remove('open');
+      tbody.querySelectorAll(`tr[data-parent-office="${officeId}"]`).forEach(r => {
+        r.style.display = 'none';
+        if (r.classList.contains('dept-row')) {
+          r.querySelector('.chevron')?.classList.remove('open');
+        }
+      });
+    });
   }
 
   // ── Export Sales to Excel ──────────────────────────────────────────────
