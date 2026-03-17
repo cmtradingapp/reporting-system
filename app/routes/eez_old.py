@@ -9,48 +9,6 @@ router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
 
-@router.get("/api/debug-table-diff")
-async def debug_table_diff():
-    conn = get_connection()
-    try:
-        with conn.cursor() as cur:
-            # Old table: total rows and date distribution
-            cur.execute("SELECT COUNT(*) FROM dealio_daily_profit")
-            old_total_rows = cur.fetchone()[0]
-
-            cur.execute("SELECT date::date, COUNT(*) FROM dealio_daily_profit GROUP BY date::date ORDER BY date::date DESC LIMIT 10")
-            old_dates = [{"date": str(r[0]), "count": r[1]} for r in cur.fetchall()]
-
-            # New table: total rows and date distribution
-            cur.execute("SELECT COUNT(*) FROM dealio_daily_profits")
-            new_total_rows = cur.fetchone()[0]
-
-            cur.execute("SELECT date::date, COUNT(*) FROM dealio_daily_profits GROUP BY date::date ORDER BY date::date DESC LIMIT 10")
-            new_dates = [{"date": str(r[0]), "count": r[1]} for r in cur.fetchall()]
-
-            # Old table: how many logins have date > 2026-03-15 (would be excluded)
-            cur.execute("SELECT COUNT(*) FROM dealio_daily_profit WHERE date::date > '2026-03-15'")
-            old_excluded = cur.fetchone()[0]
-
-            cur.execute("SELECT COUNT(*) FROM dealio_daily_profit WHERE date::date <= '2026-03-15'")
-            old_included = cur.fetchone()[0]
-
-    finally:
-        conn.close()
-    return JSONResponse(content={
-        "old_table": {
-            "total_rows": old_total_rows,
-            "excluded_after_mar15": old_excluded,
-            "included_on_or_before_mar15": old_included,
-            "date_distribution": old_dates,
-        },
-        "new_table": {
-            "total_rows": new_total_rows,
-            "date_distribution": new_dates,
-        },
-    })
-
-
 @router.get("/api/debug-login/{login}")
 async def debug_login(login: int, request: Request):
     user = await get_current_user(request)
