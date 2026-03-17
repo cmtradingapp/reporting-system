@@ -1470,8 +1470,8 @@ def truncate_and_insert_ftd100() -> int:
                 a.client_qualification_date,
                 SUM(
                     CASE
-                        WHEN t.transactiontypename IN ('Deposit', 'Withdrawal Cancelled') THEN t.usdamount
-                        WHEN t.transactiontypename IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
+                        WHEN t.transactiontype IN ('Deposit', 'Withdrawal Cancelled') THEN t.usdamount
+                        WHEN t.transactiontype IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
                         ELSE 0
                     END
                 ) OVER (
@@ -1486,7 +1486,7 @@ def truncate_and_insert_ftd100() -> int:
             FROM transactions t
             JOIN accounts a ON a.accountid = t.vtigeraccountid
             WHERE t.transactionapproval = 'Approved'
-              AND t.transactiontypename IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
+              AND t.transactiontype IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
               AND (t.deleted = 0 OR t.deleted IS NULL)
               AND a.is_test_account = 0
         ),
