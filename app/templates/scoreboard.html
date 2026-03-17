@@ -251,6 +251,7 @@
       .agent-row td:first-child { padding-left:18px !important; }
       .retention-agent-row td:first-child { padding-left:26px !important; }
       h4.fw-bold { display:none; }
+      .tbl-action-btn { padding:5px 7px !important; font-size:0.75rem !important; }
     }
   </style>
 </head>
@@ -475,10 +476,10 @@
           <div class="section-title">Sales</div>
           <div class="d-flex align-items-center gap-2 flex-wrap">
             <span class="small" style="color:#e0e0e0;" id="row-count"></span>
-            <button onclick="expandAllSales()" class="btn btn-sm" style="background:#21262d;border:1px solid #30363d;color:#8b949e;border-radius:6px;font-size:0.8rem;padding:4px 10px;"><i class="bi bi-arrows-expand me-1"></i>Expand All</button>
-            <button onclick="collapseAllSales()" class="btn btn-sm" style="background:#21262d;border:1px solid #30363d;color:#8b949e;border-radius:6px;font-size:0.8rem;padding:4px 10px;"><i class="bi bi-arrows-collapse me-1"></i>Collapse All</button>
-            <button onclick="exportSalesExcel()" class="btn btn-sm" style="background:#1a4731;border:1px solid #238636;color:#3fb950;border-radius:6px;font-size:0.8rem;padding:4px 12px;">
-              <i class="bi bi-file-earmark-excel me-1"></i>Export Excel
+            <button onclick="expandAllSales()" title="Expand All" class="btn btn-sm tbl-action-btn" style="background:#21262d;border:1px solid #30363d;color:#8b949e;border-radius:6px;font-size:0.8rem;padding:4px 10px;"><i class="bi bi-arrows-expand"></i><span class="d-none d-md-inline ms-1">Expand All</span></button>
+            <button onclick="collapseAllSales()" title="Collapse All" class="btn btn-sm tbl-action-btn" style="background:#21262d;border:1px solid #30363d;color:#8b949e;border-radius:6px;font-size:0.8rem;padding:4px 10px;"><i class="bi bi-arrows-collapse"></i><span class="d-none d-md-inline ms-1">Collapse All</span></button>
+            <button onclick="exportSalesExcel()" title="Export Excel" class="btn btn-sm tbl-action-btn" style="background:#1a4731;border:1px solid #238636;color:#3fb950;border-radius:6px;font-size:0.8rem;padding:4px 12px;">
+              <i class="bi bi-file-earmark-excel"></i><span class="d-none d-md-inline ms-1">Export Excel</span>
             </button>
           </div>
         </div>
@@ -528,10 +529,10 @@
           <div class="section-title" style="border-left-color:#388bfd;">Retention</div>
           <div class="d-flex align-items-center gap-2 flex-wrap">
             <span class="small" style="color:#e0e0e0;" id="ret-row-count"></span>
-            <button onclick="expandAllRetention()" class="btn btn-sm" style="background:#21262d;border:1px solid #30363d;color:#8b949e;border-radius:6px;font-size:0.8rem;padding:4px 10px;"><i class="bi bi-arrows-expand me-1"></i>Expand All</button>
-            <button onclick="collapseAllRetention()" class="btn btn-sm" style="background:#21262d;border:1px solid #30363d;color:#8b949e;border-radius:6px;font-size:0.8rem;padding:4px 10px;"><i class="bi bi-arrows-collapse me-1"></i>Collapse All</button>
-            <button onclick="exportRetentionExcel()" class="btn btn-sm" style="background:#0d2137;border:1px solid #1f6feb;color:#388bfd;border-radius:6px;font-size:0.8rem;padding:4px 12px;">
-              <i class="bi bi-file-earmark-excel me-1"></i>Export Excel
+            <button onclick="expandAllRetention()" title="Expand All" class="btn btn-sm tbl-action-btn" style="background:#21262d;border:1px solid #30363d;color:#8b949e;border-radius:6px;font-size:0.8rem;padding:4px 10px;"><i class="bi bi-arrows-expand"></i><span class="d-none d-md-inline ms-1">Expand All</span></button>
+            <button onclick="collapseAllRetention()" title="Collapse All" class="btn btn-sm tbl-action-btn" style="background:#21262d;border:1px solid #30363d;color:#8b949e;border-radius:6px;font-size:0.8rem;padding:4px 10px;"><i class="bi bi-arrows-collapse"></i><span class="d-none d-md-inline ms-1">Collapse All</span></button>
+            <button onclick="exportRetentionExcel()" title="Export Excel" class="btn btn-sm tbl-action-btn" style="background:#0d2137;border:1px solid #1f6feb;color:#388bfd;border-radius:6px;font-size:0.8rem;padding:4px 12px;">
+              <i class="bi bi-file-earmark-excel"></i><span class="d-none d-md-inline ms-1">Export Excel</span>
             </button>
           </div>
         </div>
