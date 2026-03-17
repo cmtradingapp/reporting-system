@@ -455,12 +455,6 @@
         <div class="kpi-label">Open Volume RR</div>
       </div>
     </div>
-    <div class="col-12 col-md-4" id="kpi-equity">
-      <div class="kpi-card text-center">
-        <div class="kpi-value" style="color:#a371f7;" id="stat-end-equity-zeroed">—</div>
-        <div class="kpi-label">End Equity Zeroed</div>
-      </div>
-    </div>
     <div class="col-12 col-md-4" id="kpi-live-equity">
       <div class="kpi-card text-center">
         <div style="font-size:0.65rem;margin-bottom:2px;">
@@ -810,7 +804,6 @@
     document.getElementById('stat-grand-net-rr').textContent   = netFmt(data.grand_net_rr);
     document.getElementById('stat-open-volume').textContent    = volFmt(data.open_volume);
     document.getElementById('stat-open-volume-rr').textContent = volFmt(data.open_volume_rr);
-    document.getElementById('stat-end-equity-zeroed').textContent = Math.round(data.end_equity_zeroed ?? 0).toLocaleString();
     // Monthly FTD — company-wide (matches daily_ftd scope)
     const ftdEl = document.getElementById('stat-total-ftd');
     if (ftdEl) ftdEl.textContent = (data.grand_ftd ?? 0).toLocaleString();

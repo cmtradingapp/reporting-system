@@ -352,13 +352,6 @@
         <div class="col-12 col-sm-6">
           <div class="kpi-card text-center">
             <div><span class="variant-badge snapshot-badge">Snapshot</span></div>
-            <div class="kpi-value text-snapshot" id="eez-val">—</div>
-            <div class="kpi-label">End Equity Zeroed</div>
-          </div>
-        </div>
-        <div class="col-12 col-sm-6">
-          <div class="kpi-card text-center">
-            <div><span class="variant-badge snapshot-badge">Snapshot</span></div>
             <div class="kpi-value text-snapshot" id="abs-val">—</div>
             <div class="kpi-label">ABS Exposure</div>
           </div>
@@ -466,7 +459,6 @@
       document.getElementById('pnl-month-label').textContent = data.month_start + ' → ' + pnlDate;
 
       // Snapshots
-      document.getElementById('eez-val').textContent = fmtMoney(data.end_equity_zeroed);
       document.getElementById('abs-val').textContent = fmtMoney(data.abs_exposure);
 
       // Timestamp
