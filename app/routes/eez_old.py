@@ -9,56 +9,6 @@ router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
 
-@router.get("/api/debug-eez-compare")
-async def debug_eez_compare(d: str = "2026-03-15"):
-    sql_template = """
-        WITH bonus_bal AS (
-            SELECT login, SUM(net_amount) AS old_bonus_balance
-            FROM bonus_transactions
-            WHERE confirmation_time::date <= %(d)s
-            GROUP BY login
-        ),
-        test_flags AS (
-            SELECT ta.login::bigint AS login, MAX(a.is_test_account) AS is_test
-            FROM trading_accounts ta
-            JOIN accounts a ON a.accountid = ta.vtigeraccountid
-            GROUP BY ta.login::bigint
-        ),
-        latest_equity AS (
-            SELECT DISTINCT ON (login) login, convertedbalance, convertedfloatingpnl
-            FROM {table}
-            WHERE date::date <= %(d)s
-            ORDER BY login, date DESC
-        )
-        SELECT COALESCE(SUM(
-            GREATEST(
-                GREATEST(0, COALESCE(d.convertedbalance,0) + COALESCE(d.convertedfloatingpnl,0))
-                    - GREATEST(0, COALESCE(b.old_bonus_balance, 0)),
-                0
-            )
-        ), 0) AS total_eez
-        FROM latest_equity d
-        LEFT JOIN bonus_bal b  ON b.login = d.login
-        LEFT JOIN test_flags tf ON tf.login = d.login
-        WHERE COALESCE(tf.is_test, 0) = 0
-    """
-    conn = get_connection()
-    try:
-        with conn.cursor() as cur:
-            cur.execute(sql_template.format(table="dealio_daily_profit"),  {"d": d})
-            old_total = float(cur.fetchone()[0] or 0)
-            cur.execute(sql_template.format(table="dealio_daily_profits"), {"d": d})
-            new_total = float(cur.fetchone()[0] or 0)
-    finally:
-        conn.close()
-    return JSONResponse(content={
-        "date": d,
-        "old_table_eez": round(old_total, 2),
-        "new_table_eez": round(new_total, 2),
-        "difference":    round(new_total - old_total, 2),
-    })
-
-
 @router.get("/api/debug-login/{login}")
 async def debug_login(login: int, request: Request):
     user = await get_current_user(request)
