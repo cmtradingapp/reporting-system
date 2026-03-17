@@ -502,14 +502,15 @@
               <tr>
                 <th>Office / Agent</th>
                 <th class="text-center" style="min-width:100px;" data-sort="targetTotal">Target FTC <i class="bi sort-icon" id="sort-icon-targetTotal"></i></th>
-                <th class="text-center" style="min-width:90px;" data-sort="ftcRrPctTotal">FTC RR % <i class="bi sort-icon" id="sort-icon-ftcRrPctTotal"></i></th>
-                <th class="text-center" style="min-width:130px;" data-sort="missingTo100RrTotal">Missing to 100% RR <i class="bi sort-icon" id="sort-icon-missingTo100RrTotal"></i></th>
                 <th class="text-center" style="min-width:70px;" data-sort="ftdCountTotal">FTD <i class="bi sort-icon" id="sort-icon-ftdCountTotal"></i></th>
                 <th class="text-center" style="min-width:90px;" data-sort="ftd100Total">FTD100 <i class="bi sort-icon" id="sort-icon-ftd100Total"></i></th>
                 <th class="text-center" style="min-width:80px;" data-sort="total">FTC <i class="bi sort-icon" id="sort-icon-total"></i></th>
-                <th class="text-center" style="min-width:105px;" data-sort="ftd100RrPctTotal">FTD100 RR % <i class="bi sort-icon" id="sort-icon-ftd100RrPctTotal"></i></th>
-                <th class="text-center" style="min-width:90px;" data-sort="ftcRrTotal">FTC RR <i class="bi sort-icon" id="sort-icon-ftcRrTotal"></i></th>
                 <th class="text-center" style="min-width:100px;" data-sort="ftd100RrTotal">FTD100 RR <i class="bi sort-icon" id="sort-icon-ftd100RrTotal"></i></th>
+                <th class="text-center" style="min-width:90px;" data-sort="ftcRrTotal">FTC RR <i class="bi sort-icon" id="sort-icon-ftcRrTotal"></i></th>
+                <th class="text-center" style="min-width:155px;" data-sort="missingTo100RrFtd100Total">Missing to 100% RR <i class="bi sort-icon" id="sort-icon-missingTo100RrFtd100Total"></i></th>
+                <th class="text-center" style="min-width:165px;" data-sort="missingTo100RrTotal">Missing to 100% RR FTC <i class="bi sort-icon" id="sort-icon-missingTo100RrTotal"></i></th>
+                <th class="text-center" style="min-width:105px;" data-sort="ftd100RrPctTotal">FTD100 RR % <i class="bi sort-icon" id="sort-icon-ftd100RrPctTotal"></i></th>
+                <th class="text-center" style="min-width:90px;" data-sort="ftcRrPctTotal">FTC RR % <i class="bi sort-icon" id="sort-icon-ftcRrPctTotal"></i></th>
                 <th class="text-center" style="min-width:115px;" data-sort="ftd100TgtPctTotal">Target FTD100 % <i class="bi sort-icon" id="sort-icon-ftd100TgtPctTotal"></i></th>
                 <th class="text-center" style="min-width:105px;" data-sort="ftcTgtPctTotal">Target FTC % <i class="bi sort-icon" id="sort-icon-ftcTgtPctTotal"></i></th>
                 <th class="text-center" style="min-width:100px;" data-sort="netDepositsTotal">NET $ <i class="bi sort-icon" id="sort-icon-netDepositsTotal"></i></th>
@@ -775,11 +776,12 @@
         const ftd100_rr_pct   = r.target_ftc > 0 ? Math.round(ftd100_rr / r.target_ftc * 100) : null;
         const need_on_target   = workingDays > 0 ? r.target_ftc * workingDaysPassed / workingDays : 0;
         const missing_to_100   = r.target_ftc - r.ftc;
-        const missing_to_100rr = need_on_target - r.ftc;
+        const missing_to_100rr       = need_on_target - r.ftc;
+        const missing_to_100rr_ftd100 = need_on_target - r.ftd100;
         const per_wd           = workingDaysLeft > 0 ? missing_to_100 / workingDaysLeft : 0;
         return { ...r, ftc_rr, ftc_tgt_pct, ftc_rr_pct, ftd100_rr, ftd100_tgt_pct, ftd100_rr_pct,
                  net_deposits: r.net_deposits ?? 0, ftd_count: r.ftd_count ?? 0,
-                 need_on_target, missing_to_100, missing_to_100rr, per_wd };
+                 need_on_target, missing_to_100, missing_to_100rr, missing_to_100rr_ftd100, per_wd };
       });
       document.getElementById('stat-wd').textContent      = workingDays;
       document.getElementById('stat-wd-left').textContent = workingDaysLeft;
@@ -859,9 +861,10 @@
       netDepositsTotal:    agents.reduce((s, a) => s + a.net_deposits,    0),
       ftdCountTotal:       agents.reduce((s, a) => s + a.ftd_count,       0),
       needOnTargetTotal:   agents.reduce((s, a) => s + a.need_on_target,  0),
-      missingTo100Total:   agents.reduce((s, a) => s + a.missing_to_100,  0),
-      missingTo100RrTotal: agents.reduce((s, a) => s + a.missing_to_100rr,0),
-      perWdTotal:          agents.reduce((s, a) => s + a.per_wd,          0),
+      missingTo100Total:        agents.reduce((s, a) => s + a.missing_to_100,           0),
+      missingTo100RrTotal:      agents.reduce((s, a) => s + a.missing_to_100rr,         0),
+      missingTo100RrFtd100Total:agents.reduce((s, a) => s + a.missing_to_100rr_ftd100,  0),
+      perWdTotal:               agents.reduce((s, a) => s + a.per_wd,                   0),
     })).sort((a, b) => {
       const av = a[sortState.col] ?? 0;
       const bv = b[sortState.col] ?? 0;
@@ -878,8 +881,9 @@
     let grandFtdCount      = 0;
     let grandNeedOnTarget  = 0;
     let grandMissing100    = 0;
-    let grandMissing100Rr  = 0;
-    let grandPerWd         = 0;
+    let grandMissing100Rr       = 0;
+    let grandMissing100RrFtd100 = 0;
+    let grandPerWd              = 0;
     let agentCount = 0;
 
     offices.forEach((office, oi) => {
@@ -892,8 +896,9 @@
       grandFtdCount      += office.ftdCountTotal;
       grandNeedOnTarget  += office.needOnTargetTotal;
       grandMissing100    += office.missingTo100Total;
-      grandMissing100Rr  += office.missingTo100RrTotal;
-      grandPerWd         += office.perWdTotal;
+      grandMissing100Rr       += office.missingTo100RrTotal;
+      grandMissing100RrFtd100 += office.missingTo100RrFtd100Total;
+      grandPerWd              += office.perWdTotal;
       const officeId = 'office-' + oi;
       // Office row (collapsed by default)
       const offTr = document.createElement('tr');
@@ -906,14 +911,15 @@
           <strong>${escHtml(office.name)}</strong>
         </td>
         <td class="text-center"><span class="office-total" style="color:#388bfd;">${office.targetTotal.toLocaleString()}</span></td>
-        <td class="text-center">${pctHtml(office.ftcRrPctTotal, true)}</td>
-        <td class="text-center">${diffHtml(office.missingTo100RrTotal, true)}</td>
         <td class="text-center"><span class="office-total" style="color:#388bfd;">${office.ftdCountTotal.toLocaleString()}</span></td>
         <td class="text-center"><span class="office-total" style="color:#388bfd;">${office.ftd100Total.toLocaleString()}</span></td>
         <td class="text-center"><span class="office-total" style="color:#388bfd;">${office.total.toLocaleString()}</span></td>
-        <td class="text-center">${pctHtml(office.ftd100RrPctTotal, true)}</td>
-        <td class="text-center"><span class="office-total" style="color:#d29922;">${office.ftcRrTotal.toLocaleString()}</span></td>
         <td class="text-center"><span class="office-total" style="color:#d29922;">${office.ftd100RrTotal.toLocaleString()}</span></td>
+        <td class="text-center"><span class="office-total" style="color:#d29922;">${office.ftcRrTotal.toLocaleString()}</span></td>
+        <td class="text-center">${diffHtml(office.missingTo100RrFtd100Total, true)}</td>
+        <td class="text-center">${diffHtml(office.missingTo100RrTotal, true)}</td>
+        <td class="text-center">${pctHtml(office.ftd100RrPctTotal, true)}</td>
+        <td class="text-center">${pctHtml(office.ftcRrPctTotal, true)}</td>
         <td class="text-center">${pctHtml(office.ftd100TgtPctTotal, true)}</td>
         <td class="text-center">${pctHtml(office.ftcTgtPctTotal, true)}</td>
         <td class="text-center">${netHtml(office.netDepositsTotal, true)}</td>
@@ -932,7 +938,8 @@
         netDepositsTotal: 'net_deposits',
         ftdCountTotal: 'ftd_count',
         needOnTargetTotal: 'need_on_target', missingTo100Total: 'missing_to_100',
-        missingTo100RrTotal: 'missing_to_100rr', perWdTotal: 'per_wd',
+        missingTo100RrTotal: 'missing_to_100rr', missingTo100RrFtd100Total: 'missing_to_100rr_ftd100',
+        perWdTotal: 'per_wd',
       }[sortState.col] || 'ftc';
       const sortedAgents = [...office.agents].sort((a, b) => {
         const av = a[agentSortKey] ?? 0;
@@ -962,10 +969,11 @@
         const f100RrPct    = pctHtml(r.ftd100_rr_pct);
         const netDepHtml      = netHtml(r.net_deposits);
         const ftdCountHtml    = r.ftd_count > 0 ? `<span style="color:#388bfd;font-weight:600;">${r.ftd_count}</span>` : `<span style="color:#484f58;">—</span>`;
-        const needOnTgtHtml   = diffHtml(r.need_on_target);
-        const missing100Html  = diffHtml(r.missing_to_100);
-        const missing100RrHtml= diffHtml(r.missing_to_100rr);
-        const perWdAgentHtml  = perWdHtml(r.per_wd);
+        const needOnTgtHtml      = diffHtml(r.need_on_target);
+        const missing100Html     = diffHtml(r.missing_to_100);
+        const missing100RrHtml   = diffHtml(r.missing_to_100rr);
+        const missing100RrFtd100Html = diffHtml(r.missing_to_100rr_ftd100);
+        const perWdAgentHtml     = perWdHtml(r.per_wd);
 
         const tr = document.createElement('tr');
         tr.className = 'agent-row';
@@ -974,14 +982,15 @@
         tr.innerHTML = `
           <td>${escHtml(r.agent_name)}</td>
           <td class="text-center">${tgtHtml}</td>
-          <td class="text-center">${rrPctHtml}</td>
-          <td class="text-center">${missing100RrHtml}</td>
           <td class="text-center">${ftdCountHtml}</td>
           <td class="text-center">${f100Html}</td>
           <td class="text-center">${ftcHtml}</td>
-          <td class="text-center">${f100RrPct}</td>
-          <td class="text-center">${rrHtml}</td>
           <td class="text-center">${f100RrHtml}</td>
+          <td class="text-center">${rrHtml}</td>
+          <td class="text-center">${missing100RrFtd100Html}</td>
+          <td class="text-center">${missing100RrHtml}</td>
+          <td class="text-center">${f100RrPct}</td>
+          <td class="text-center">${rrPctHtml}</td>
           <td class="text-center">${f100TgtPct}</td>
           <td class="text-center">${ftcTgtPctHtml}</td>
           <td class="text-center">${netDepHtml}</td>
@@ -1004,7 +1013,7 @@
 
     if (offices.length === 0) {
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td colspan="17" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No data for this period</td>`;
+      tr.innerHTML = `<td colspan="18" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No data for this period</td>`;
       tbody.appendChild(tr);
     } else {
       const totalTr = document.createElement('tr');
@@ -1012,14 +1021,15 @@
       totalTr.innerHTML = `
         <td>Total</td>
         <td class="text-center"><span style="color:#388bfd;font-weight:700;">${grandTargetTotal.toLocaleString()}</span></td>
-        <td class="text-center">${pctHtml(grandTargetTotal > 0 ? Math.round(grandFtcRr / grandTargetTotal * 100) : null, true)}</td>
-        <td class="text-center">${diffHtml(grandMissing100Rr, true)}</td>
         <td class="text-center"><span style="color:#388bfd;font-weight:700;">${grandFtdCount.toLocaleString()}</span></td>
         <td class="text-center"><span style="color:#388bfd;font-weight:700;">${grandFtd100.toLocaleString()}</span></td>
         <td class="text-center"><span style="color:#388bfd;font-weight:700;">${grandTotal.toLocaleString()}</span></td>
-        <td class="text-center">${pctHtml(grandTargetTotal > 0 ? Math.round(grandFtd100Rr / grandTargetTotal * 100) : null, true)}</td>
-        <td class="text-center"><span style="color:#d29922;font-weight:700;">${grandFtcRr.toLocaleString()}</span></td>
         <td class="text-center"><span style="color:#d29922;font-weight:700;">${grandFtd100Rr.toLocaleString()}</span></td>
+        <td class="text-center"><span style="color:#d29922;font-weight:700;">${grandFtcRr.toLocaleString()}</span></td>
+        <td class="text-center">${diffHtml(grandMissing100RrFtd100, true)}</td>
+        <td class="text-center">${diffHtml(grandMissing100Rr, true)}</td>
+        <td class="text-center">${pctHtml(grandTargetTotal > 0 ? Math.round(grandFtd100Rr / grandTargetTotal * 100) : null, true)}</td>
+        <td class="text-center">${pctHtml(grandTargetTotal > 0 ? Math.round(grandFtcRr / grandTargetTotal * 100) : null, true)}</td>
         <td class="text-center">${pctHtml(grandTargetTotal > 0 ? Math.round(grandFtd100   / grandTargetTotal * 100) : null, true)}</td>
         <td class="text-center">${pctHtml(grandTargetTotal > 0 ? Math.round(grandTotal / grandTargetTotal * 100) : null, true)}</td>
         <td class="text-center">${netHtml(grandNetDeposits, true)}</td>
@@ -1642,23 +1652,24 @@
       r.ftc > 0 || r.target_ftc > 0 || r.ftd100 > 0 || r.net_deposits !== 0 || r.ftd_count > 0
     );
     const headers = [
-      'Office', 'Agent', 'Target FTC', 'FTC RR %', 'Missing to 100% RR',
-      'FTD', 'FTD100', 'FTC', 'FTD100 RR %', 'FTC RR', 'FTD100 RR',
-      'Target FTD100 %', 'Target FTC %', 'NET $',
+      'Office', 'Agent', 'Target FTC', 'FTD', 'FTD100', 'FTC', 'FTD100 RR', 'FTC RR',
+      'Missing to 100% RR', 'Missing to 100% RR FTC',
+      'FTD100 RR %', 'FTC RR %', 'Target FTD100 %', 'Target FTC %', 'NET $',
       'Need to be on Target (100% RR)', 'Missing to Reach 100%', 'Per Working Day'
     ];
     const rows = filtered.map(r => [
       r.office_name,
       r.agent_name,
       r.target_ftc,
-      r.ftc_rr_pct ?? '',
-      Math.round(r.missing_to_100rr),
       r.ftd_count,
       r.ftd100,
       r.ftc,
-      r.ftd100_rr_pct ?? '',
-      r.ftc_rr,
       r.ftd100_rr,
+      r.ftc_rr,
+      Math.round(r.missing_to_100rr_ftd100),
+      Math.round(r.missing_to_100rr),
+      r.ftd100_rr_pct ?? '',
+      r.ftc_rr_pct ?? '',
       r.ftd100_tgt_pct ?? '',
       r.ftc_tgt_pct ?? '',
       Math.round(r.net_deposits * 100) / 100,
@@ -1752,15 +1763,15 @@
   }
   function applyMobileColOrder() {
     if (window.innerWidth >= 768) return;
-    // Sales: move FTC (index 6) → pos 1, then FTC RR % (now at index 3) → pos 2
+    // Sales: move FTC (index 4) → pos 1, then FTC RR % (now at index 10 after first move) → pos 2
     const st = document.getElementById('scoreboard-table');
     if (st && !st.dataset.mobReordered) {
-      _moveCol(st.querySelector('thead tr'), 6, 1);
-      _moveCol(st.querySelector('thead tr'), 3, 2);
+      _moveCol(st.querySelector('thead tr'), 4, 1);
+      _moveCol(st.querySelector('thead tr'), 10, 2);
       st.dataset.mobReordered = '1';
     }
     if (st) Array.from(st.querySelectorAll('tbody tr, tfoot tr')).forEach(r => {
-      if (r.children.length > 6) { _moveCol(r, 6, 1); _moveCol(r, 3, 2); }
+      if (r.children.length > 10) { _moveCol(r, 4, 1); _moveCol(r, 10, 2); }
     });
     // Retention: move NET $ (index 5) → pos 1, then NET RR % (now at index 3) → pos 2
     const rt = document.getElementById('retention-table');
