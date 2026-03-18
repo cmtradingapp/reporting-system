@@ -72,7 +72,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"perf_v6:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"perf_v7:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -246,34 +246,11 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
                       AND EXTRACT(MONTH FROM date) = EXTRACT(MONTH FROM %(date_to)s::date)
                     ORDER BY login, date DESC
                 ),
-                bonus_from_tx AS (
-                    SELECT login::bigint AS login,
-                           SUM(CASE
-                               WHEN transactiontype IN ('Deposit', 'Credit in')     THEN  usdamount
-                               WHEN transactiontype IN ('Withdrawal', 'Credit out') THEN -usdamount
-                               ELSE 0
-                           END) AS old_bonus_balance
-                    FROM transactions
-                    WHERE transactionapproval = 'Approved'
-                      AND LOWER(comment) LIKE '%%bonus%%'
-                      AND (deleted = 0 OR deleted IS NULL)
-                      AND confirmation_time::date <= %(date_to)s::date
-                    GROUP BY login::bigint
-                ),
-                bonus_bt AS (
+                old_bonus_balance AS (
                     SELECT login, SUM(net_amount) AS old_bonus_balance
                     FROM bonus_transactions
                     WHERE confirmation_time::date <= %(date_to)s::date
                     GROUP BY login
-                ),
-                old_bonus_balance AS (
-                    SELECT
-                        COALESCE(tx.login, bt.login) AS login,
-                        CASE WHEN tx.login IS NOT NULL THEN tx.old_bonus_balance
-                             ELSE bt.old_bonus_balance
-                        END AS old_bonus_balance
-                    FROM bonus_from_tx tx
-                    FULL OUTER JOIN bonus_bt bt ON bt.login = tx.login
                 )
                 SELECT COALESCE(SUM(
                     GREATEST(

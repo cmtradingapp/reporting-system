@@ -653,34 +653,11 @@ def run_daily_equity_zeroed_snapshot(snapshot_date: str = None) -> dict:
             WHERE date::date = %(snapshot_date)s
             ORDER BY login, date DESC
         ),
-        bonus_from_tx AS (
-            SELECT login::bigint AS login,
-                   SUM(CASE
-                       WHEN transactiontype IN ('Deposit', 'Credit in')     THEN  usdamount
-                       WHEN transactiontype IN ('Withdrawal', 'Credit out') THEN -usdamount
-                       ELSE 0
-                   END) AS bonus_balance
-            FROM transactions
-            WHERE transactionapproval = 'Approved'
-              AND LOWER(comment) LIKE '%%bonus%%'
-              AND (deleted = 0 OR deleted IS NULL)
-              AND confirmation_time::date <= %(snapshot_date)s
-            GROUP BY login::bigint
-        ),
-        bonus_bt AS (
+        bonus_bal AS (
             SELECT login, SUM(net_amount) AS bonus_balance
             FROM bonus_transactions
             WHERE confirmation_time::date <= %(snapshot_date)s
             GROUP BY login
-        ),
-        bonus_bal AS (
-            SELECT
-                COALESCE(tx.login, bt.login) AS login,
-                CASE WHEN tx.login IS NOT NULL THEN tx.bonus_balance
-                     ELSE bt.bonus_balance
-                END AS bonus_balance
-            FROM bonus_from_tx tx
-            FULL OUTER JOIN bonus_bt bt ON bt.login = tx.login
         ),
         test_flags AS (
             SELECT ta.login::bigint AS login, MAX(a.is_test_account) AS is_test

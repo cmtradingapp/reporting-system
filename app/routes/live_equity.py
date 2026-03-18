@@ -29,7 +29,7 @@ async def live_equity_zeroed(request: Request, date: str = None):
             return JSONResponse(status_code=400, content={"detail": "Invalid date"})
 
     is_current_month = (d.year == today.year and d.month == today.month)
-    _ck = f"live_eez_v11:{d}"
+    _ck = f"live_eez_v12:{d}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -50,34 +50,11 @@ async def live_equity_zeroed(request: Request, date: str = None):
 def _historical_calc(d) -> dict:
     """Use dealio_daily_profits with same EEZ formula as eez_comparison page."""
     sql = """
-        WITH bonus_from_tx AS (
-            SELECT login::bigint AS login,
-                   SUM(CASE
-                       WHEN transactiontype IN ('Deposit', 'Credit in')     THEN  usdamount
-                       WHEN transactiontype IN ('Withdrawal', 'Credit out') THEN -usdamount
-                       ELSE 0
-                   END) AS old_bonus_balance
-            FROM transactions
-            WHERE transactionapproval = 'Approved'
-              AND LOWER(comment) LIKE '%%bonus%%'
-              AND (deleted = 0 OR deleted IS NULL)
-              AND confirmation_time::date <= %(d)s
-            GROUP BY login::bigint
-        ),
-        bonus_bt AS (
+        WITH bonus_bal AS (
             SELECT login, SUM(net_amount) AS old_bonus_balance
             FROM bonus_transactions
             WHERE confirmation_time::date <= %(d)s
             GROUP BY login
-        ),
-        bonus_bal AS (
-            SELECT
-                COALESCE(tx.login, bt.login) AS login,
-                CASE WHEN tx.login IS NOT NULL THEN tx.old_bonus_balance
-                     ELSE bt.old_bonus_balance
-                END AS old_bonus_balance
-            FROM bonus_from_tx tx
-            FULL OUTER JOIN bonus_bt bt ON bt.login = tx.login
         ),
         test_flags AS (
             SELECT ta.login::bigint AS login,
@@ -162,24 +139,6 @@ def _live_calc(d) -> dict:
             GROUP BY t.login
         """
         sql_bonus = """
-            SELECT t.login::bigint,
-                   SUM(CASE
-                       WHEN t.transactiontype IN ('Deposit', 'Credit in')     THEN t.usdamount
-                       WHEN t.transactiontype IN ('Withdrawal', 'Credit out') THEN -t.usdamount
-                       ELSE 0
-                   END) AS bonus
-            FROM transactions t
-            JOIN trading_accounts ta ON ta.login = t.login
-            JOIN accounts a ON a.accountid = ta.vtigeraccountid
-            WHERE ta.equity > 0
-              AND ta.balance != 0
-              AND t.transactionapproval = 'Approved'
-              AND LOWER(t.comment) LIKE '%bonus%'
-              AND (t.deleted = 0 OR t.deleted IS NULL)
-              AND a.is_test_account = 0
-            GROUP BY t.login
-        """
-        sql_bonus_bt = """
             SELECT login, SUM(net_amount) AS bonus
             FROM bonus_transactions
             GROUP BY login
@@ -191,8 +150,6 @@ def _live_calc(d) -> dict:
             pnl_map = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
             cur.execute(sql_bonus)
             bonus_map = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
-            cur.execute(sql_bonus_bt)
-            bonus_bt_map = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
     finally:
         conn.close()
 
@@ -201,7 +158,7 @@ def _live_calc(d) -> dict:
         if login not in valid_logins:
             continue
         pnl   = pnl_map.get(login, 0.0)
-        bonus = bonus_map[login] if login in bonus_map else bonus_bt_map.get(login, 0.0)
+        bonus = bonus_map.get(login, 0.0)
         eez   = max(0.0, bal + pnl - bonus)
         grand_total += eez
 

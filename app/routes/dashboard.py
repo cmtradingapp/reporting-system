@@ -47,7 +47,7 @@ async def dashboard_api(request: Request):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
     today = datetime.now(_TZ).date()
-    _ck = f"dashboard_v2:{today.isoformat()}"
+    _ck = f"dashboard_v3:{today.isoformat()}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -266,34 +266,11 @@ async def dashboard_api(request: Request):
                       AND EXTRACT(MONTH FROM date) = EXTRACT(MONTH FROM CURRENT_DATE)
                     ORDER BY login, date DESC
                 ),
-                bonus_from_tx AS (
-                    SELECT login::bigint AS login,
-                           SUM(CASE
-                               WHEN transactiontype IN ('Deposit', 'Credit in')     THEN  usdamount
-                               WHEN transactiontype IN ('Withdrawal', 'Credit out') THEN -usdamount
-                               ELSE 0
-                           END) AS old_bonus_balance
-                    FROM transactions
-                    WHERE transactionapproval = 'Approved'
-                      AND LOWER(comment) LIKE '%bonus%'
-                      AND (deleted = 0 OR deleted IS NULL)
-                      AND confirmation_time::date <= CURRENT_DATE
-                    GROUP BY login::bigint
-                ),
-                bonus_bt AS (
+                old_bonus_balance AS (
                     SELECT login, SUM(net_amount) AS old_bonus_balance
                     FROM bonus_transactions
                     WHERE confirmation_time::date <= CURRENT_DATE
                     GROUP BY login
-                ),
-                old_bonus_balance AS (
-                    SELECT
-                        COALESCE(tx.login, bt.login) AS login,
-                        CASE WHEN tx.login IS NOT NULL THEN tx.old_bonus_balance
-                             ELSE bt.old_bonus_balance
-                        END AS old_bonus_balance
-                    FROM bonus_from_tx tx
-                    FULL OUTER JOIN bonus_bt bt ON bt.login = tx.login
                 )
                 SELECT COALESCE(SUM(
                     GREATEST(
