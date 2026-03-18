@@ -674,8 +674,8 @@ def run_daily_equity_zeroed_snapshot(snapshot_date: str = None) -> dict:
             )::numeric, 2) AS end_equity_zeroed
         FROM latest_equity le
         LEFT JOIN bonus_bal b  ON b.login = le.login
-        LEFT JOIN test_flags tf ON tf.login = le.login
-        WHERE COALESCE(tf.is_test, 0) = 0
+        JOIN test_flags tf ON tf.login = le.login
+        WHERE tf.is_test = 0
     """
 
     conn = _pg_conn()

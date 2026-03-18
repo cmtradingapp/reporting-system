@@ -29,7 +29,7 @@ async def live_equity_zeroed(request: Request, date: str = None):
             return JSONResponse(status_code=400, content={"detail": "Invalid date"})
 
     is_current_month = (d.year == today.year and d.month == today.month)
-    _ck = f"live_eez_v7:{d}"
+    _ck = f"live_eez_v8:{d}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -80,8 +80,8 @@ def _historical_calc(d) -> dict:
         ), 0) AS total_eez
         FROM latest_equity d
         LEFT JOIN bonus_bal b  ON b.login = d.login
-        LEFT JOIN test_flags tf ON tf.login = d.login
-        WHERE COALESCE(tf.is_test, 0) = 0
+        JOIN test_flags tf ON tf.login = d.login
+        WHERE tf.is_test = 0
     """
     conn = get_connection()
     try:
