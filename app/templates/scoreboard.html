@@ -474,6 +474,14 @@
         <div style="font-size:0.6rem;color:#484f58;margin-top:2px;" id="start-eez-date"></div>
       </div>
     </div>
+    <div class="col-12 col-md-2" id="kpi-pnl-cash">
+      <div class="kpi-card text-center">
+        <div style="font-size:0.65rem;margin-bottom:2px;">&nbsp;</div>
+        <div class="kpi-value" id="stat-pnl-cash">—</div>
+        <div class="kpi-label">PnL Cash</div>
+        <div style="font-size:0.6rem;color:#484f58;margin-top:2px;">Start EEZ − Live EEZ − Net Dep</div>
+      </div>
+    </div>
   </div>
 
   {% if show_sales %}
@@ -715,11 +723,12 @@
 
   // ── Live End Equity Zeroed ─────────────────────────────────────────────
   async function loadLiveEquity(dateTo) {
-    const el      = document.getElementById('stat-live-equity-zeroed');
-    const badge   = document.getElementById('live-eez-badge');
-    const upd     = document.getElementById('live-eez-updated');
-    const startEl = document.getElementById('stat-start-equity-zeroed');
-    const startDt = document.getElementById('start-eez-date');
+    const el       = document.getElementById('stat-live-equity-zeroed');
+    const badge    = document.getElementById('live-eez-badge');
+    const upd      = document.getElementById('live-eez-updated');
+    const startEl  = document.getElementById('stat-start-equity-zeroed');
+    const startDt  = document.getElementById('start-eez-date');
+    const pnlEl    = document.getElementById('stat-pnl-cash');
     try {
       const url = dateTo ? `/api/live-equity-zeroed?date=${dateTo}` : '/api/live-equity-zeroed';
       const res  = await fetch(url);
@@ -727,9 +736,11 @@
       let data;
       try { data = JSON.parse(text); } catch { throw new Error('Server error'); }
       if (!res.ok) throw new Error(data.detail || 'error');
+
       const neg = data.total < 0;
       const abs = Math.abs(data.total);
       el.textContent = (neg ? '-$' : '$') + abs.toLocaleString('en-US');
+
       if (data.is_live) {
         badge.style.display = '';
         upd.textContent = 'as of ' + new Date().toLocaleTimeString();
@@ -737,6 +748,7 @@
         badge.style.display = 'none';
         upd.textContent = '';
       }
+
       if (startEl) {
         if (data.start_equity_zeroed != null) {
           const sNeg = data.start_equity_zeroed < 0;
@@ -745,6 +757,18 @@
           if (startDt) startDt.textContent = 'prev day end';
         } else {
           startEl.textContent = '—';
+        }
+      }
+
+      if (pnlEl) {
+        if (data.pnl_cash != null) {
+          const pNeg = data.pnl_cash < 0;
+          const pAbs = Math.abs(data.pnl_cash);
+          pnlEl.textContent = (pNeg ? '-$' : '$') + pAbs.toLocaleString('en-US');
+          pnlEl.style.color = pNeg ? '#f85149' : '#3fb950';
+        } else {
+          pnlEl.textContent = '—';
+          pnlEl.style.color = '#8b949e';
         }
       }
     } catch(e) {

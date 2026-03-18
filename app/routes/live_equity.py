@@ -29,7 +29,7 @@ async def live_equity_zeroed(request: Request, date: str = None):
             return JSONResponse(status_code=400, content={"detail": "Invalid date"})
 
     is_current_month = (d.year == today.year and d.month == today.month)
-    _ck = f"live_eez_v6:{d}"
+    _ck = f"live_eez_v7:{d}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -96,7 +96,7 @@ def _historical_calc(d) -> dict:
             """, {"d": str(d)})
             start_row = cur.fetchone()
             start_eez = float(start_row[0] or 0)
-        return {"total": round(total), "start_equity_zeroed": round(start_eez), "is_live": False, "date": str(d)}
+        return {"total": round(total), "start_equity_zeroed": round(start_eez), "pnl_cash": None, "net_deposits_today": None, "is_live": False, "date": str(d)}
     finally:
         conn.close()
 
@@ -182,7 +182,34 @@ def _live_calc(d) -> dict:
                 WHERE day = %(d)s::date - INTERVAL '1 day'
             """, {"d": str(d)})
             start_eez = float(cur.fetchone()[0] or 0)
+
+            cur.execute("""
+                SELECT COALESCE(SUM(CASE
+                    WHEN t.transactiontype IN ('Deposit', 'Withdrawal Cancelled') THEN  t.usdamount
+                    WHEN t.transactiontype IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
+                END), 0)
+                FROM transactions t
+                JOIN crm_users u ON u.id = t.original_deposit_owner
+                JOIN accounts a  ON a.accountid = t.vtigeraccountid
+                WHERE t.transactionapproval = 'Approved'
+                  AND (t.deleted = 0 OR t.deleted IS NULL)
+                  AND t.transactiontype IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
+                  AND t.confirmation_time::date = %(d)s::date
+                  AND EXTRACT(YEAR FROM t.confirmation_time) >= 2024
+                  AND t.vtigeraccountid IS NOT NULL
+                  AND a.is_test_account = 0
+                  AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
+            """, {"d": str(d)})
+            net_deposits_today = float(cur.fetchone()[0] or 0)
     finally:
         conn2.close()
 
-    return {"total": round(grand_total), "start_equity_zeroed": round(start_eez), "is_live": True, "date": str(d)}
+    pnl_cash = round(start_eez - grand_total - net_deposits_today)
+    return {
+        "total":              round(grand_total),
+        "start_equity_zeroed": round(start_eez),
+        "net_deposits_today": round(net_deposits_today),
+        "pnl_cash":           pnl_cash,
+        "is_live":            True,
+        "date":               str(d),
+    }
