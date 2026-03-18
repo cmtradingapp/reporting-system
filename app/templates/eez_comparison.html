@@ -85,7 +85,13 @@
     <div class="col-6 col-md-3">
       <div class="kpi-card">
         <div class="kpi-value" style="color:#3fb950;" id="kpi-total">—</div>
-        <div class="kpi-label">Total EEZ</div>
+        <div class="kpi-label">Total End EEZ</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="kpi-card">
+        <div class="kpi-value" style="color:#8b949e;" id="kpi-total-start">—</div>
+        <div class="kpi-label">Total Start EEZ (prev day)</div>
       </div>
     </div>
     <div class="col-6 col-md-3">
@@ -127,12 +133,13 @@
             <th onclick="sortTable('login')"># <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
             <th onclick="sortTable('login')">Login <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
             <th onclick="sortTable('eez')">End Equity Zeroed <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+            <th onclick="sortTable('start_equity_zeroed')" title="Previous day's End EEZ from daily snapshot">Start Equity Zeroed <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
             <th onclick="sortTable('daily_start_equity')" title="GREATEST(0, convertedequity) — last day of prev month">Daily Start Equity <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
             <th onclick="sortTable('daily_start_net_equity')" title="GREATEST(0, balance + floating) — last day of prev month">Daily Start Net Equity <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
           </tr>
         </thead>
         <tbody id="eez-tbody">
-          <tr><td colspan="5" class="text-center text-muted py-4">
+          <tr><td colspan="6" class="text-center text-muted py-4">
             <div class="spinner-border spinner-border-sm text-secondary me-2"></div>Loading…
           </td></tr>
         </tbody>
@@ -168,12 +175,13 @@
     });
 
     document.getElementById('kpi-total').textContent = '$' + Math.round(filtered.reduce((s,r)=>s+r.eez,0)).toLocaleString('en-US');
+    document.getElementById('kpi-total-start').textContent = '$' + Math.round(filtered.reduce((s,r)=>s+(r.start_equity_zeroed||0),0)).toLocaleString('en-US');
     document.getElementById('kpi-count').textContent = filtered.length.toLocaleString();
     document.getElementById('row-count-label').textContent = filtered.length.toLocaleString() + ' rows';
 
     const tbody = document.getElementById('eez-tbody');
     if (!filtered.length) {
-      tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">No rows match filters.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No rows match filters.</td></tr>';
       return;
     }
 
@@ -182,6 +190,7 @@
         <td class="text-muted">${i + 1}</td>
         <td><code style="color:#c9d1d9;">${r.login ?? '—'}</code></td>
         <td style="color:#3fb950;">${fmt(r.eez)}</td>
+        <td style="color:#8b949e;">${fmt(r.start_equity_zeroed)}</td>
         <td style="color:#58a6ff;">${fmt(r.daily_start_equity)}</td>
         <td style="color:#e3b341;">${fmt(r.daily_start_net_equity)}</td>
       </tr>`).join('');
@@ -220,8 +229,8 @@
       const av = a[sortKey] ?? 0, bv = b[sortKey] ?? 0;
       return sortDir * (av > bv ? 1 : av < bv ? -1 : 0);
     });
-    const lines = ['Login,End Equity Zeroed,Daily Start Equity,Daily Start Net Equity'];
-    filtered.forEach(r => lines.push(`${r.login},${r.eez},${r.daily_start_equity},${r.daily_start_net_equity}`));
+    const lines = ['Login,End Equity Zeroed,Start Equity Zeroed,Daily Start Equity,Daily Start Net Equity'];
+    filtered.forEach(r => lines.push(`${r.login},${r.eez},${r.start_equity_zeroed},${r.daily_start_equity},${r.daily_start_net_equity}`));
     const blob = new Blob([lines.join('\r\n')], {type: 'text/csv'});
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);

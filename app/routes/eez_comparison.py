@@ -25,7 +25,7 @@ async def eez_comparison_api(request: Request):
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
-    _ck = "eez_comparison_v16"
+    _ck = "eez_comparison_v17"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -44,6 +44,12 @@ async def eez_comparison_api(request: Request):
             FROM trading_accounts ta
             JOIN accounts a ON a.accountid = ta.vtigeraccountid
             GROUP BY ta.login::bigint
+        ),
+        start_eez AS (
+            SELECT login,
+                   end_equity_zeroed AS start_equity_zeroed
+            FROM daily_equity_zeroed
+            WHERE day = CURRENT_DATE - INTERVAL '1 day'
         ),
         daily_start AS (
             SELECT
@@ -72,11 +78,13 @@ async def eez_comparison_api(request: Request):
                     - GREATEST(0, COALESCE(b.old_bonus_balance, 0)),
                 0)::numeric, 2)                                                  AS eez,
             ROUND(COALESCE(st.daily_start_equity,     0)::numeric, 2)           AS daily_start_equity,
-            ROUND(COALESCE(st.daily_start_net_equity, 0)::numeric, 2)           AS daily_start_net_equity
+            ROUND(COALESCE(st.daily_start_net_equity, 0)::numeric, 2)           AS daily_start_net_equity,
+            ROUND(COALESCE(se.start_equity_zeroed,    0)::numeric, 2)           AS start_equity_zeroed
         FROM latest_equity d
-        LEFT JOIN bonus_bal b  ON b.login  = d.login
+        LEFT JOIN bonus_bal b   ON b.login  = d.login
         LEFT JOIN test_flags tf ON tf.login = d.login
         LEFT JOIN daily_start st ON st.login = d.login
+        LEFT JOIN start_eez se  ON se.login  = d.login
         WHERE COALESCE(tf.is_test, 0) = 0
         ORDER BY eez DESC
     """
@@ -94,17 +102,21 @@ async def eez_comparison_api(request: Request):
 
     data = []
     total = 0.0
+    total_start = 0.0
     for r in rows:
         row = dict(zip(cols, r))
         eez = float(row["eez"] or 0)
+        start_eez = float(row["start_equity_zeroed"] or 0)
         data.append({
             "login":                  int(row["login"]) if row["login"] is not None else None,
             "eez":                    eez,
             "daily_start_equity":     float(row["daily_start_equity"] or 0),
             "daily_start_net_equity": float(row["daily_start_net_equity"] or 0),
+            "start_equity_zeroed":    start_eez,
         })
         total += eez
+        total_start += start_eez
 
-    result = {"rows": data, "total": round(total, 2)}
+    result = {"rows": data, "total": round(total, 2), "total_start": round(total_start, 2)}
     cache.set(_ck, result)
     return JSONResponse(content=result)
