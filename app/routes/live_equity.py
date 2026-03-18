@@ -29,7 +29,7 @@ async def live_equity_zeroed(request: Request, date: str = None):
             return JSONResponse(status_code=400, content={"detail": "Invalid date"})
 
     is_current_month = (d.year == today.year and d.month == today.month)
-    _ck = f"live_eez_v5:{d}"
+    _ck = f"live_eez_v6:{d}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -88,8 +88,15 @@ def _historical_calc(d) -> dict:
         with conn.cursor() as cur:
             cur.execute(sql, {"d": str(d)})
             row = cur.fetchone()
-        total = float(row[0] or 0)
-        return {"total": round(total), "is_live": False, "date": str(d)}
+            total = float(row[0] or 0)
+            cur.execute("""
+                SELECT COALESCE(SUM(end_equity_zeroed), 0)
+                FROM daily_equity_zeroed
+                WHERE day = %(d)s::date - INTERVAL '1 day'
+            """, {"d": str(d)})
+            start_row = cur.fetchone()
+            start_eez = float(start_row[0] or 0)
+        return {"total": round(total), "start_equity_zeroed": round(start_eez), "is_live": False, "date": str(d)}
     finally:
         conn.close()
 
@@ -166,4 +173,16 @@ def _live_calc(d) -> dict:
         eez   = max(0.0, bal + pnl - bonus)
         grand_total += eez
 
-    return {"total": round(grand_total), "is_live": True, "date": str(d)}
+    conn2 = get_connection()
+    try:
+        with conn2.cursor() as cur:
+            cur.execute("""
+                SELECT COALESCE(SUM(end_equity_zeroed), 0)
+                FROM daily_equity_zeroed
+                WHERE day = %(d)s::date - INTERVAL '1 day'
+            """, {"d": str(d)})
+            start_eez = float(cur.fetchone()[0] or 0)
+    finally:
+        conn2.close()
+
+    return {"total": round(grand_total), "start_equity_zeroed": round(start_eez), "is_live": True, "date": str(d)}
