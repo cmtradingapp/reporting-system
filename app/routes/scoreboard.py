@@ -72,7 +72,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"perf_v8:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"perf_v10:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -253,11 +253,14 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
                     GROUP BY login
                 )
                 SELECT COALESCE(SUM(
-                    GREATEST(
-                        GREATEST(d.convertedbalance + d.convertedfloatingpnl, 0)
-                            - COALESCE(ob.old_bonus_balance, 0),
-                        0
-                    )
+                    CASE
+                        WHEN COALESCE(d.convertedbalance, 0) + COALESCE(d.convertedfloatingpnl, 0) <= 0 THEN 0
+                        ELSE GREATEST(
+                            COALESCE(d.convertedbalance, 0) + COALESCE(d.convertedfloatingpnl, 0)
+                                - COALESCE(ob.old_bonus_balance, 0),
+                            0
+                        )
+                    END
                 ), 0) AS end_equity_zeroed
                 FROM latest_equity d
                 JOIN trading_accounts ta  ON ta.login::bigint = d.login
@@ -265,6 +268,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
                 JOIN crm_users u          ON u.id = a.assigned_to
                 LEFT JOIN old_bonus_balance ob ON ob.login::bigint = d.login
                 WHERE a.is_test_account = 0
+                  AND (ta.deleted = 0 OR ta.deleted IS NULL)
             """, {"date_to": date_to})
             end_equity_zeroed = float(cur.fetchone()[0] or 0)
 

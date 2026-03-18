@@ -47,7 +47,7 @@ async def dashboard_api(request: Request):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
     today = datetime.now(_TZ).date()
-    _ck = f"dashboard_v4:{today.isoformat()}"
+    _ck = f"dashboard_v6:{today.isoformat()}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -273,11 +273,14 @@ async def dashboard_api(request: Request):
                     GROUP BY login
                 )
                 SELECT COALESCE(SUM(
-                    GREATEST(
-                        GREATEST(d.convertedbalance + d.convertedfloatingpnl, 0)
-                            - COALESCE(ob.old_bonus_balance, 0),
-                        0
-                    )
+                    CASE
+                        WHEN COALESCE(d.convertedbalance, 0) + COALESCE(d.convertedfloatingpnl, 0) <= 0 THEN 0
+                        ELSE GREATEST(
+                            COALESCE(d.convertedbalance, 0) + COALESCE(d.convertedfloatingpnl, 0)
+                                - COALESCE(ob.old_bonus_balance, 0),
+                            0
+                        )
+                    END
                 ), 0) AS end_equity_zeroed
                 FROM latest_equity d
                 JOIN trading_accounts ta  ON ta.login::bigint = d.login
@@ -285,6 +288,7 @@ async def dashboard_api(request: Request):
                 JOIN crm_users u          ON u.id = a.assigned_to
                 LEFT JOIN old_bonus_balance ob ON ob.login::bigint = d.login
                 WHERE a.is_test_account = 0
+                  AND (ta.deleted = 0 OR ta.deleted IS NULL)
             """)
             end_equity_zeroed = float(cur.fetchone()[0] or 0)
 

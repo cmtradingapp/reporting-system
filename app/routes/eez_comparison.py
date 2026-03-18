@@ -25,7 +25,7 @@ async def eez_comparison_api(request: Request):
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
-    _ck = "eez_comparison_v19"
+    _ck = "eez_comparison_v20"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -39,6 +39,7 @@ async def eez_comparison_api(request: Request):
                    MAX(a.is_test_account) AS is_test
             FROM trading_accounts ta
             JOIN accounts a ON a.accountid = ta.vtigeraccountid
+            WHERE (ta.deleted = 0 OR ta.deleted IS NULL)
             GROUP BY ta.login::bigint
         )
         SELECT

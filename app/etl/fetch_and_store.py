@@ -663,15 +663,19 @@ def run_daily_equity_zeroed_snapshot(snapshot_date: str = None) -> dict:
             SELECT ta.login::bigint AS login, MAX(a.is_test_account) AS is_test
             FROM trading_accounts ta
             JOIN accounts a ON a.accountid = ta.vtigeraccountid
+            WHERE (ta.deleted = 0 OR ta.deleted IS NULL)
             GROUP BY ta.login::bigint
         )
         SELECT
             le.login,
-            ROUND(GREATEST(
-                GREATEST(0, COALESCE(le.convertedbalance, 0) + COALESCE(le.convertedfloatingpnl, 0))
-                    - COALESCE(b.bonus_balance, 0),
-                0
-            )::numeric, 2) AS end_equity_zeroed
+            ROUND(CASE
+                WHEN COALESCE(le.convertedbalance, 0) + COALESCE(le.convertedfloatingpnl, 0) <= 0 THEN 0
+                ELSE GREATEST(
+                    COALESCE(le.convertedbalance, 0) + COALESCE(le.convertedfloatingpnl, 0)
+                        - COALESCE(b.bonus_balance, 0),
+                    0
+                )
+            END::numeric, 2) AS end_equity_zeroed
         FROM latest_equity le
         LEFT JOIN bonus_bal b  ON b.login = le.login
         JOIN test_flags tf ON tf.login = le.login

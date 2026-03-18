@@ -29,7 +29,7 @@ async def live_equity_zeroed(request: Request, date: str = None):
             return JSONResponse(status_code=400, content={"detail": "Invalid date"})
 
     is_current_month = (d.year == today.year and d.month == today.month)
-    _ck = f"live_eez_v13:{d}"
+    _ck = f"live_eez_v15:{d}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -61,6 +61,7 @@ def _historical_calc(d) -> dict:
                    MAX(a.is_test_account) AS is_test
             FROM trading_accounts ta
             JOIN accounts a ON a.accountid = ta.vtigeraccountid
+            WHERE (ta.deleted = 0 OR ta.deleted IS NULL)
             GROUP BY ta.login::bigint
         ),
         latest_equity AS (
@@ -71,11 +72,14 @@ def _historical_calc(d) -> dict:
             ORDER BY login, date DESC
         )
         SELECT COALESCE(SUM(
-            GREATEST(
-                GREATEST(0, COALESCE(d.convertedbalance,0) + COALESCE(d.convertedfloatingpnl,0))
-                    - COALESCE(b.old_bonus_balance, 0),
-                0
-            )
+            CASE
+                WHEN COALESCE(d.convertedbalance,0) + COALESCE(d.convertedfloatingpnl,0) <= 0 THEN 0
+                ELSE GREATEST(
+                    COALESCE(d.convertedbalance,0) + COALESCE(d.convertedfloatingpnl,0)
+                        - COALESCE(b.old_bonus_balance, 0),
+                    0
+                )
+            END
         ), 0) AS total_eez
         FROM latest_equity d
         LEFT JOIN bonus_bal b  ON b.login = d.login
@@ -93,7 +97,9 @@ def _historical_calc(d) -> dict:
                 FROM daily_equity_zeroed
                 WHERE day = %(d)s::date - INTERVAL '1 day'
                   AND login IN (
-                      SELECT login::bigint FROM trading_accounts WHERE vtigeraccountid IS NOT NULL
+                      SELECT login::bigint FROM trading_accounts
+                      WHERE vtigeraccountid IS NOT NULL
+                        AND (deleted = 0 OR deleted IS NULL)
                   )
             """, {"d": str(d)})
             start_row = cur.fetchone()
@@ -122,6 +128,7 @@ def _live_calc(d) -> dict:
               AND ta.equity > 0
               AND ta.balance != 0
               AND a.is_test_account = 0
+              AND (ta.deleted = 0 OR ta.deleted IS NULL)
         """
         sql_pnl = """
             SELECT t.login,
@@ -136,6 +143,7 @@ def _live_calc(d) -> dict:
               AND ta.equity > 0
               AND ta.balance != 0
               AND a.is_test_account = 0
+              AND (ta.deleted = 0 OR ta.deleted IS NULL)
             GROUP BY t.login
         """
         sql_bonus = """
@@ -159,7 +167,7 @@ def _live_calc(d) -> dict:
             continue
         pnl   = pnl_map.get(login, 0.0)
         bonus = bonus_map.get(login, 0.0)
-        eez   = max(0.0, bal + pnl - bonus)
+        eez   = max(0.0, bal + pnl - bonus) if (bal + pnl) > 0 else 0.0
         grand_total += eez
 
     conn2 = get_connection()
@@ -170,7 +178,9 @@ def _live_calc(d) -> dict:
                 FROM daily_equity_zeroed
                 WHERE day = %(d)s::date - INTERVAL '1 day'
                   AND login IN (
-                      SELECT login::bigint FROM trading_accounts WHERE vtigeraccountid IS NOT NULL
+                      SELECT login::bigint FROM trading_accounts
+                      WHERE vtigeraccountid IS NOT NULL
+                        AND (deleted = 0 OR deleted IS NULL)
                   )
             """, {"d": str(d)})
             start_eez = float(cur.fetchone()[0] or 0)
