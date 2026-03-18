@@ -669,7 +669,7 @@ def run_daily_equity_zeroed_snapshot(snapshot_date: str = None) -> dict:
             le.login,
             ROUND(GREATEST(
                 GREATEST(0, COALESCE(le.convertedbalance, 0) + COALESCE(le.convertedfloatingpnl, 0))
-                    - GREATEST(0, COALESCE(b.bonus_balance, 0)),
+                    - COALESCE(b.bonus_balance, 0),
                 0
             )::numeric, 2) AS end_equity_zeroed
         FROM latest_equity le

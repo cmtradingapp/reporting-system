@@ -47,7 +47,7 @@ async def dashboard_api(request: Request):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
     today = datetime.now(_TZ).date()
-    _ck = f"dashboard_v3:{today.isoformat()}"
+    _ck = f"dashboard_v4:{today.isoformat()}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -275,7 +275,7 @@ async def dashboard_api(request: Request):
                 SELECT COALESCE(SUM(
                     GREATEST(
                         GREATEST(d.convertedbalance + d.convertedfloatingpnl, 0)
-                            - GREATEST(0, COALESCE(ob.old_bonus_balance, 0)),
+                            - COALESCE(ob.old_bonus_balance, 0),
                         0
                     )
                 ), 0) AS end_equity_zeroed

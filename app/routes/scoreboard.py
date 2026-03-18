@@ -72,7 +72,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"perf_v7:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"perf_v8:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -255,7 +255,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
                 SELECT COALESCE(SUM(
                     GREATEST(
                         GREATEST(d.convertedbalance + d.convertedfloatingpnl, 0)
-                            - GREATEST(0, COALESCE(ob.old_bonus_balance, 0)),
+                            - COALESCE(ob.old_bonus_balance, 0),
                         0
                     )
                 ), 0) AS end_equity_zeroed

@@ -29,7 +29,7 @@ async def live_equity_zeroed(request: Request, date: str = None):
             return JSONResponse(status_code=400, content={"detail": "Invalid date"})
 
     is_current_month = (d.year == today.year and d.month == today.month)
-    _ck = f"live_eez_v12:{d}"
+    _ck = f"live_eez_v13:{d}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -73,7 +73,7 @@ def _historical_calc(d) -> dict:
         SELECT COALESCE(SUM(
             GREATEST(
                 GREATEST(0, COALESCE(d.convertedbalance,0) + COALESCE(d.convertedfloatingpnl,0))
-                    - GREATEST(0, COALESCE(b.old_bonus_balance, 0)),
+                    - COALESCE(b.old_bonus_balance, 0),
                 0
             )
         ), 0) AS total_eez
