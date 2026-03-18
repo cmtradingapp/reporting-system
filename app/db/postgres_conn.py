@@ -706,6 +706,7 @@ def ensure_bonus_transactions_table():
                 );
                 CREATE INDEX IF NOT EXISTS idx_bonus_tx_login ON bonus_transactions(login);
                 CREATE INDEX IF NOT EXISTS idx_bonus_tx_conf  ON bonus_transactions(confirmation_time);
+                ALTER TABLE bonus_transactions ADD COLUMN IF NOT EXISTS manual_override BOOLEAN DEFAULT FALSE;
             """)
         conn.commit()
     finally:
@@ -734,7 +735,7 @@ def upsert_bonus_transactions(df) -> int:
                 VALUES %s
                 ON CONFLICT (mttransactionsid) DO UPDATE SET
                     login             = EXCLUDED.login,
-                    net_amount        = EXCLUDED.net_amount,
+                    net_amount        = CASE WHEN bonus_transactions.manual_override THEN bonus_transactions.net_amount ELSE EXCLUDED.net_amount END,
                     confirmation_time = EXCLUDED.confirmation_time,
                     synced_at         = NOW()
             """, rows)
