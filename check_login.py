@@ -8,7 +8,7 @@ try:
     with conn.cursor() as cur:
         # trading_accounts info
         cur.execute("""
-            SELECT login, vtigeraccountid, balance, equity, is_test_account
+            SELECT ta.login, ta.vtigeraccountid, ta.balance, ta.equity, a.is_test_account
             FROM trading_accounts ta
             LEFT JOIN accounts a ON a.accountid = ta.vtigeraccountid
             WHERE ta.login = %s
