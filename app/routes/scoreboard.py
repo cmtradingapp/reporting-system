@@ -72,7 +72,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"perf_v4:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"perf_v5:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -236,19 +236,21 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
             """, {"date_from": date_from, "date_to": date_to})
             open_volume = float(cur.fetchone()[0] or 0)
 
-            # End Equity Zeroed — last available date in the selected month/year
+            # End Equity Zeroed — latest available date per login in the selected month/year
             cur.execute("""
-                WITH last_date AS (
-                    SELECT MAX(date) AS last_available_date
+                WITH latest_equity AS (
+                    SELECT DISTINCT ON (login)
+                        login, convertedbalance, convertedfloatingpnl
                     FROM dealio_daily_profits
                     WHERE EXTRACT(YEAR  FROM date) = EXTRACT(YEAR  FROM %(date_to)s::date)
                       AND EXTRACT(MONTH FROM date) = EXTRACT(MONTH FROM %(date_to)s::date)
+                    ORDER BY login, date DESC
                 ),
                 old_bonus_balance AS (
                     SELECT login,
                            SUM(net_amount) AS old_bonus_balance
                     FROM bonus_transactions
-                    WHERE confirmation_time::date <= (SELECT last_available_date FROM last_date)
+                    WHERE confirmation_time::date <= %(date_to)s::date
                     GROUP BY login
                 )
                 SELECT COALESCE(SUM(
@@ -258,13 +260,12 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
                         0
                     )
                 ), 0) AS end_equity_zeroed
-                FROM dealio_daily_profits d
+                FROM latest_equity d
                 JOIN trading_accounts ta  ON ta.login::bigint = d.login
                 JOIN accounts a           ON a.accountid = ta.vtigeraccountid
                 JOIN crm_users u          ON u.id = a.assigned_to
                 LEFT JOIN old_bonus_balance ob ON ob.login::bigint = d.login
-                WHERE d.date = (SELECT last_available_date FROM last_date)
-                  AND a.is_test_account = 0
+                WHERE a.is_test_account = 0
             """, {"date_to": date_to})
             end_equity_zeroed = float(cur.fetchone()[0] or 0)
 

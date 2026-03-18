@@ -258,17 +258,19 @@ async def dashboard_api(request: Request):
 
             # Q8 — End Equity Zeroed (snapshot)
             cur.execute("""
-                WITH last_date AS (
-                    SELECT MAX(date) AS last_available_date
+                WITH latest_equity AS (
+                    SELECT DISTINCT ON (login)
+                        login, convertedbalance, convertedfloatingpnl
                     FROM dealio_daily_profits
                     WHERE EXTRACT(YEAR  FROM date) = EXTRACT(YEAR  FROM CURRENT_DATE)
                       AND EXTRACT(MONTH FROM date) = EXTRACT(MONTH FROM CURRENT_DATE)
+                    ORDER BY login, date DESC
                 ),
                 old_bonus_balance AS (
                     SELECT login,
                            SUM(net_amount) AS old_bonus_balance
                     FROM bonus_transactions
-                    WHERE confirmation_time::date <= (SELECT last_available_date FROM last_date)
+                    WHERE confirmation_time::date <= CURRENT_DATE
                     GROUP BY login
                 )
                 SELECT COALESCE(SUM(
@@ -278,13 +280,12 @@ async def dashboard_api(request: Request):
                         0
                     )
                 ), 0) AS end_equity_zeroed
-                FROM dealio_daily_profits d
+                FROM latest_equity d
                 JOIN trading_accounts ta  ON ta.login::bigint = d.login
                 JOIN accounts a           ON a.accountid = ta.vtigeraccountid
                 JOIN crm_users u          ON u.id = a.assigned_to
                 LEFT JOIN old_bonus_balance ob ON ob.login::bigint = d.login
-                WHERE d.date = (SELECT last_available_date FROM last_date)
-                  AND a.is_test_account = 0
+                WHERE a.is_test_account = 0
             """)
             end_equity_zeroed = float(cur.fetchone()[0] or 0)
 
