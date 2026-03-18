@@ -25,7 +25,7 @@ async def eez_comparison_api(request: Request):
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
-    _ck = "eez_comparison_v15"
+    _ck = "eez_comparison_v16"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -77,6 +77,7 @@ async def eez_comparison_api(request: Request):
         LEFT JOIN bonus_bal b  ON b.login  = d.login
         LEFT JOIN test_flags tf ON tf.login = d.login
         LEFT JOIN daily_start st ON st.login = d.login
+        WHERE COALESCE(tf.is_test, 0) = 0
         ORDER BY eez DESC
     """
 
@@ -96,16 +97,13 @@ async def eez_comparison_api(request: Request):
     for r in rows:
         row = dict(zip(cols, r))
         eez = float(row["eez"] or 0)
-        is_test = int(row["is_test"])
         data.append({
             "login":                  int(row["login"]) if row["login"] is not None else None,
-            "is_test":                is_test,
             "eez":                    eez,
             "daily_start_equity":     float(row["daily_start_equity"] or 0),
             "daily_start_net_equity": float(row["daily_start_net_equity"] or 0),
         })
-        if not is_test:
-            total += eez
+        total += eez
 
     result = {"rows": data, "total": round(total, 2)}
     cache.set(_ck, result)
