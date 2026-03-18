@@ -6,52 +6,42 @@ LOGIN = 141300595
 conn = get_connection()
 try:
     with conn.cursor() as cur:
-        # Source 1: transactions table (used in _live_calc)
+        # Show bonus_transactions columns
         cur.execute("""
-            SELECT
-                t.transactiontype,
-                t.usdamount,
-                t.comment,
-                t.transactionapproval,
-                t.deleted,
-                t.confirmation_time,
-                CASE
-                    WHEN t.transactiontype IN ('Deposit', 'Credit in')     THEN  t.usdamount
-                    WHEN t.transactiontype IN ('Withdrawal', 'Credit out') THEN -t.usdamount
-                    ELSE 0
-                END AS contribution
-            FROM transactions t
-            WHERE t.login = %(login)s
-              AND t.transactionapproval = 'Approved'
-              AND LOWER(t.comment) LIKE '%%bonus%%'
-              AND (t.deleted = 0 OR t.deleted IS NULL)
-            ORDER BY t.confirmation_time
-        """, {"login": str(LOGIN)})
-        rows = cur.fetchall()
-        print("=== transactions (bonus rows) ===")
-        total = 0.0
-        for r in rows:
-            print(f"  type={r[0]}, amount={r[1]}, comment={r[2][:50] if r[2] else None}, contrib={r[5]}")
-            total += float(r[5] or 0)
-        print(f"  TOTAL from transactions: {total}")
+            SELECT column_name, data_type
+            FROM information_schema.columns
+            WHERE table_name = 'bonus_transactions'
+            ORDER BY ordinal_position
+        """)
+        print("=== bonus_transactions columns ===")
+        for r in cur.fetchall():
+            print(f"  {r[0]} ({r[1]})")
 
-        # Source 2: bonus_transactions table (used in snapshot ETL)
+        # Source 1: transactions table
         cur.execute("""
-            SELECT
-                transactiontype,
-                net_amount,
-                comment,
-                confirmation_time
-            FROM bonus_transactions
-            WHERE login = %(login)s
-            ORDER BY confirmation_time
-        """, {"login": str(LOGIN)})
-        rows2 = cur.fetchall()
-        print("\n=== bonus_transactions ===")
-        total2 = 0.0
-        for r in rows2:
-            print(f"  type={r[0]}, net_amount={r[1]}, comment={r[2][:50] if r[2] else None}")
-            total2 += float(r[1] or 0)
-        print(f"  TOTAL from bonus_transactions: {total2}")
+            SELECT SUM(CASE
+                WHEN transactiontype IN ('Deposit', 'Credit in')     THEN  usdamount
+                WHEN transactiontype IN ('Withdrawal', 'Credit out') THEN -usdamount
+                ELSE 0
+            END)
+            FROM transactions
+            WHERE login = %s
+              AND transactionapproval = 'Approved'
+              AND LOWER(comment) LIKE '%%bonus%%'
+              AND (deleted = 0 OR deleted IS NULL)
+        """, (str(LOGIN),))
+        print(f"\ntransactions bonus total: {cur.fetchone()[0]}")
+
+        # Source 2: bonus_transactions - sum net_amount
+        cur.execute("SELECT SUM(net_amount) FROM bonus_transactions WHERE login = %s", (str(LOGIN),))
+        print(f"bonus_transactions net_amount total: {cur.fetchone()[0]}")
+
+        # Show all rows for this login
+        cur.execute("SELECT * FROM bonus_transactions WHERE login = %s ORDER BY confirmation_time", (str(LOGIN),))
+        rows = cur.fetchall()
+        cols = [d[0] for d in cur.description]
+        print(f"\nbonus_transactions rows ({len(rows)}):")
+        for r in rows:
+            print(dict(zip(cols, r)))
 finally:
     conn.close()
