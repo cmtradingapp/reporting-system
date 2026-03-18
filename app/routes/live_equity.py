@@ -29,7 +29,7 @@ async def live_equity_zeroed(request: Request, date: str = None):
             return JSONResponse(status_code=400, content={"detail": "Invalid date"})
 
     is_current_month = (d.year == today.year and d.month == today.month)
-    _ck = f"live_eez_v8:{d}"
+    _ck = f"live_eez_v9:{d}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -93,6 +93,9 @@ def _historical_calc(d) -> dict:
                 SELECT COALESCE(SUM(end_equity_zeroed), 0)
                 FROM daily_equity_zeroed
                 WHERE day = %(d)s::date - INTERVAL '1 day'
+                  AND login IN (
+                      SELECT login::bigint FROM trading_accounts WHERE vtigeraccountid IS NOT NULL
+                  )
             """, {"d": str(d)})
             start_row = cur.fetchone()
             start_eez = float(start_row[0] or 0)
@@ -180,6 +183,9 @@ def _live_calc(d) -> dict:
                 SELECT COALESCE(SUM(end_equity_zeroed), 0)
                 FROM daily_equity_zeroed
                 WHERE day = %(d)s::date - INTERVAL '1 day'
+                  AND login IN (
+                      SELECT login::bigint FROM trading_accounts WHERE vtigeraccountid IS NOT NULL
+                  )
             """, {"d": str(d)})
             start_eez = float(cur.fetchone()[0] or 0)
 

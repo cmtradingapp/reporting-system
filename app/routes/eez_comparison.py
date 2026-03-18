@@ -25,7 +25,7 @@ async def eez_comparison_api(request: Request):
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
-    _ck = "eez_comparison_v18"
+    _ck = "eez_comparison_v19"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -50,9 +50,9 @@ async def eez_comparison_api(request: Request):
         LEFT JOIN daily_equity_zeroed s
             ON s.login = e.login
             AND s.day  = e.day - INTERVAL '1 day'
-        LEFT JOIN test_flags tf ON tf.login = e.login
+        JOIN test_flags tf ON tf.login = e.login
         WHERE e.day = (SELECT day FROM latest_day)
-          AND COALESCE(tf.is_test, 0) = 0
+          AND tf.is_test = 0
         ORDER BY e.end_equity_zeroed DESC
     """
 
