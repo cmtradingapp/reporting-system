@@ -159,7 +159,7 @@ async def dashboard_api(request: Request):
                   END), 0) AS monthly
                 FROM transactions t
                 JOIN accounts a ON a.accountid = t.vtigeraccountid
-                JOIN crm_users u ON u.id = a.assigned_to
+                JOIN crm_users u ON u.id = t.original_deposit_owner
                 WHERE t.transactionapproval = 'Approved'
                   AND (t.deleted = 0 OR t.deleted IS NULL)
                   AND t.transactiontype IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
