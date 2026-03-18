@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>EEZ — March</title>
+  <title>EEZ Comparison</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet"/>
   <style>
@@ -43,7 +43,7 @@
 </head>
 <body>
 
-<div class="mob-topbar"><span class="mob-topbar-title">EEZ — March</span></div>
+<div class="mob-topbar"><span class="mob-topbar-title">EEZ Comparison</span></div>
 <div class="sidebar-overlay" id="sidebar-overlay"></div>
 <button class="sidebar-toggle" id="sidebar-toggle"><i class="bi bi-list"></i></button>
 
@@ -76,16 +76,26 @@
 <div class="container-fluid px-4 py-4">
 
   <div class="mb-3 d-none d-md-block">
-    <h4 class="fw-bold text-white mb-0">End Equity Zeroed — March</h4>
-    <p class="text-muted small mb-0">Per-login EEZ from new <code>dealio_daily_profits</code> table — current month</p>
+    <h4 class="fw-bold text-white mb-0">EEZ Comparison</h4>
+    <p class="text-muted small mb-0">End &amp; Start Equity Zeroed per login — snapshot from <span id="snapshot-date-label">—</span></p>
   </div>
 
   <!-- KPIs -->
   <div class="row g-3 mb-4">
     <div class="col-6 col-md-3">
       <div class="kpi-card">
-        <div class="kpi-value" style="color:#3fb950;" id="kpi-total">—</div>
-        <div class="kpi-label">Total End EEZ</div>
+        <div style="font-size:0.65rem;margin-bottom:2px;">
+          <span id="live-badge" style="display:none;background:#1a4731;color:#3fb950;border:1px solid #238636;border-radius:4px;padding:1px 6px;font-size:0.6rem;letter-spacing:0.04em;">LIVE</span>
+        </div>
+        <div class="kpi-value" style="color:#58a6ff;" id="kpi-live-eez">—</div>
+        <div class="kpi-label">Live End Equity Zeroed</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="kpi-card">
+        <div class="kpi-value" style="color:#8b949e;" id="kpi-total-end">—</div>
+        <div class="kpi-label">Snapshot End EEZ</div>
+        <div style="font-size:0.6rem;color:#484f58;margin-top:2px;" id="kpi-total-end-date"></div>
       </div>
     </div>
     <div class="col-6 col-md-3">
@@ -109,10 +119,6 @@
              style="width:180px;background:#0f1117;border-color:#30363d;color:#e0e0e0;"
              placeholder="Search login…"/>
       <div class="form-check form-switch mb-0">
-        <input class="form-check-input" type="checkbox" id="hide-test" checked/>
-        <label class="form-check-label text-muted small" for="hide-test">Hide test accounts</label>
-      </div>
-      <div class="form-check form-switch mb-0">
         <input class="form-check-input" type="checkbox" id="hide-zero" checked/>
         <label class="form-check-label text-muted small" for="hide-zero">Hide zero EEZ</label>
       </div>
@@ -130,16 +136,14 @@
       <table class="table table-sm mb-0">
         <thead>
           <tr>
-            <th onclick="sortTable('login')"># <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+            <th>#</th>
             <th onclick="sortTable('login')">Login <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
-            <th onclick="sortTable('eez')">End Equity Zeroed <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
-            <th onclick="sortTable('start_equity_zeroed')" title="Previous day's End EEZ from daily snapshot">Start Equity Zeroed <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
-            <th onclick="sortTable('daily_start_equity')" title="GREATEST(0, convertedequity) — last day of prev month">Daily Start Equity <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
-            <th onclick="sortTable('daily_start_net_equity')" title="GREATEST(0, balance + floating) — last day of prev month">Daily Start Net Equity <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+            <th onclick="sortTable('end_equity_zeroed')">End Equity Zeroed <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+            <th onclick="sortTable('start_equity_zeroed')">Start Equity Zeroed <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
           </tr>
         </thead>
         <tbody id="eez-tbody">
-          <tr><td colspan="6" class="text-center text-muted py-4">
+          <tr><td colspan="4" class="text-center text-muted py-4">
             <div class="spinner-border spinner-border-sm text-secondary me-2"></div>Loading…
           </td></tr>
         </tbody>
@@ -152,20 +156,19 @@
 
 <script>
   let allRows = [];
-  let sortKey = 'eez';
+  let sortKey = 'end_equity_zeroed';
   let sortDir = -1;
+  let snapshotDate = null;
 
   const fmt = v => v == null ? '—' : '$' + v.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
 
   function applyFilters() {
     const q = document.getElementById('search-login').value.trim();
-    const hideTest = document.getElementById('hide-test').checked;
     const hideZero = document.getElementById('hide-zero').checked;
 
     let filtered = allRows.filter(r => {
-      if (hideTest && r.is_test) return false;
       if (q && !String(r.login).includes(q)) return false;
-      if (hideZero && r.eez === 0) return false;
+      if (hideZero && r.end_equity_zeroed === 0) return false;
       return true;
     });
 
@@ -174,14 +177,14 @@
       return sortDir * (av > bv ? 1 : av < bv ? -1 : 0);
     });
 
-    document.getElementById('kpi-total').textContent = '$' + Math.round(filtered.reduce((s,r)=>s+r.eez,0)).toLocaleString('en-US');
+    document.getElementById('kpi-total-end').textContent   = '$' + Math.round(filtered.reduce((s,r)=>s+r.end_equity_zeroed,0)).toLocaleString('en-US');
     document.getElementById('kpi-total-start').textContent = '$' + Math.round(filtered.reduce((s,r)=>s+(r.start_equity_zeroed||0),0)).toLocaleString('en-US');
     document.getElementById('kpi-count').textContent = filtered.length.toLocaleString();
     document.getElementById('row-count-label').textContent = filtered.length.toLocaleString() + ' rows';
 
     const tbody = document.getElementById('eez-tbody');
     if (!filtered.length) {
-      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No rows match filters.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">No rows match filters.</td></tr>';
       return;
     }
 
@@ -189,10 +192,8 @@
       <tr>
         <td class="text-muted">${i + 1}</td>
         <td><code style="color:#c9d1d9;">${r.login ?? '—'}</code></td>
-        <td style="color:#3fb950;">${fmt(r.eez)}</td>
+        <td style="color:#58a6ff;">${fmt(r.end_equity_zeroed)}</td>
         <td style="color:#8b949e;">${fmt(r.start_equity_zeroed)}</td>
-        <td style="color:#58a6ff;">${fmt(r.daily_start_equity)}</td>
-        <td style="color:#e3b341;">${fmt(r.daily_start_net_equity)}</td>
       </tr>`).join('');
   }
 
@@ -202,44 +203,61 @@
     applyFilters();
   }
 
+  async function loadLiveEez() {
+    try {
+      const res  = await fetch('/api/live-equity-zeroed');
+      const text = await res.text();
+      const data = JSON.parse(text);
+      const el   = document.getElementById('kpi-live-eez');
+      const badge = document.getElementById('live-badge');
+      const neg = data.total < 0;
+      const abs = Math.abs(data.total);
+      el.textContent = (neg ? '-$' : '$') + abs.toLocaleString('en-US');
+      if (data.is_live) badge.style.display = '';
+    } catch(e) {
+      document.getElementById('kpi-live-eez').textContent = 'Err';
+    }
+  }
+
   async function loadData() {
     try {
       const res = await fetch('/api/eez-comparison');
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const d = await res.json();
       allRows = d.rows || [];
-      document.getElementById('kpi-total').textContent = '$' + Math.round(d.total).toLocaleString('en-US');
+      snapshotDate = d.snapshot_date;
+      if (snapshotDate) {
+        document.getElementById('snapshot-date-label').textContent = snapshotDate;
+        document.getElementById('kpi-total-end-date').textContent = snapshotDate;
+      }
       applyFilters();
     } catch(e) {
-      document.getElementById('eez-tbody').innerHTML = `<tr><td colspan="5" class="text-center text-danger py-4">Error: ${e.message}</td></tr>`;
+      document.getElementById('eez-tbody').innerHTML = `<tr><td colspan="4" class="text-center text-danger py-4">Error: ${e.message}</td></tr>`;
     }
   }
 
   function exportCSV() {
     const q = document.getElementById('search-login').value.trim();
-    const hideTest = document.getElementById('hide-test').checked;
     const hideZero = document.getElementById('hide-zero').checked;
     let filtered = allRows.filter(r => {
-      if (hideTest && r.is_test) return false;
       if (q && !String(r.login).includes(q)) return false;
-      if (hideZero && r.eez === 0) return false;
+      if (hideZero && r.end_equity_zeroed === 0) return false;
       return true;
     });
     filtered.sort((a, b) => {
       const av = a[sortKey] ?? 0, bv = b[sortKey] ?? 0;
       return sortDir * (av > bv ? 1 : av < bv ? -1 : 0);
     });
-    const lines = ['Login,End Equity Zeroed,Start Equity Zeroed,Daily Start Equity,Daily Start Net Equity'];
-    filtered.forEach(r => lines.push(`${r.login},${r.eez},${r.start_equity_zeroed},${r.daily_start_equity},${r.daily_start_net_equity}`));
+    const lines = ['Login,End Equity Zeroed,Start Equity Zeroed'];
+    filtered.forEach(r => lines.push(`${r.login},${r.end_equity_zeroed},${r.start_equity_zeroed}`));
     const blob = new Blob([lines.join('\r\n')], {type: 'text/csv'});
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'eez_march.csv';
+    a.download = 'eez_comparison.csv';
     a.click();
   }
 
   document.getElementById('search-login').addEventListener('input', applyFilters);
-  document.getElementById('hide-test').addEventListener('change', applyFilters);
   document.getElementById('hide-zero').addEventListener('change', applyFilters);
 
   (function(){
@@ -251,6 +269,7 @@
     overlay.addEventListener('click', function(){ sb.classList.remove('open'); overlay.classList.remove('show'); });
   })();
 
+  loadLiveEez();
   loadData();
 </script>
 </body>

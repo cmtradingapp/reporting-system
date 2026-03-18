@@ -25,18 +25,14 @@ async def eez_comparison_api(request: Request):
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
-    _ck = "eez_comparison_v17"
+    _ck = "eez_comparison_v18"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
 
     sql = """
-        WITH bonus_bal AS (
-            SELECT login,
-                   SUM(net_amount) AS old_bonus_balance
-            FROM bonus_transactions
-            WHERE confirmation_time::date <= CURRENT_DATE
-            GROUP BY login
+        WITH latest_day AS (
+            SELECT MAX(day) AS day FROM daily_equity_zeroed
         ),
         test_flags AS (
             SELECT ta.login::bigint AS login,
@@ -44,49 +40,20 @@ async def eez_comparison_api(request: Request):
             FROM trading_accounts ta
             JOIN accounts a ON a.accountid = ta.vtigeraccountid
             GROUP BY ta.login::bigint
-        ),
-        start_eez AS (
-            SELECT login,
-                   end_equity_zeroed AS start_equity_zeroed
-            FROM daily_equity_zeroed
-            WHERE day = CURRENT_DATE - INTERVAL '1 day'
-        ),
-        daily_start AS (
-            SELECT
-                ds.login,
-                GREATEST(0, COALESCE(ds.convertedequity, 0))                                          AS daily_start_equity,
-                GREATEST(0, COALESCE(ds.convertedbalance, 0) + COALESCE(ds.convertedfloatingpnl, 0)) AS daily_start_net_equity
-            FROM dealio_daily_profits ds
-            WHERE ds.date::date = (
-                SELECT MAX(date::date) FROM dealio_daily_profits
-                WHERE date::date < DATE_TRUNC('month', CURRENT_DATE)
-            )
-        ),
-        latest_equity AS (
-            SELECT DISTINCT ON (login)
-                login, convertedbalance, convertedfloatingpnl, convertedequity
-            FROM dealio_daily_profits
-            WHERE EXTRACT(YEAR  FROM date) = EXTRACT(YEAR  FROM CURRENT_DATE)
-              AND EXTRACT(MONTH FROM date) = EXTRACT(MONTH FROM CURRENT_DATE)
-            ORDER BY login, date DESC
         )
         SELECT
-            d.login,
-            COALESCE(tf.is_test, 0)                                             AS is_test,
-            ROUND(GREATEST(
-                GREATEST(0, COALESCE(d.convertedbalance,0) + COALESCE(d.convertedfloatingpnl,0))
-                    - GREATEST(0, COALESCE(b.old_bonus_balance, 0)),
-                0)::numeric, 2)                                                  AS eez,
-            ROUND(COALESCE(st.daily_start_equity,     0)::numeric, 2)           AS daily_start_equity,
-            ROUND(COALESCE(st.daily_start_net_equity, 0)::numeric, 2)           AS daily_start_net_equity,
-            ROUND(COALESCE(se.start_equity_zeroed,    0)::numeric, 2)           AS start_equity_zeroed
-        FROM latest_equity d
-        LEFT JOIN bonus_bal b   ON b.login  = d.login
-        LEFT JOIN test_flags tf ON tf.login = d.login
-        LEFT JOIN daily_start st ON st.login = d.login
-        LEFT JOIN start_eez se  ON se.login  = d.login
-        WHERE COALESCE(tf.is_test, 0) = 0
-        ORDER BY eez DESC
+            e.login,
+            COALESCE(e.end_equity_zeroed, 0)  AS end_equity_zeroed,
+            COALESCE(s.end_equity_zeroed, 0)  AS start_equity_zeroed,
+            (SELECT day FROM latest_day)       AS snapshot_date
+        FROM daily_equity_zeroed e
+        LEFT JOIN daily_equity_zeroed s
+            ON s.login = e.login
+            AND s.day  = e.day - INTERVAL '1 day'
+        LEFT JOIN test_flags tf ON tf.login = e.login
+        WHERE e.day = (SELECT day FROM latest_day)
+          AND COALESCE(tf.is_test, 0) = 0
+        ORDER BY e.end_equity_zeroed DESC
     """
 
     conn = get_connection()
@@ -101,22 +68,28 @@ async def eez_comparison_api(request: Request):
         conn.close()
 
     data = []
-    total = 0.0
+    total_end = 0.0
     total_start = 0.0
+    snapshot_date = None
     for r in rows:
         row = dict(zip(cols, r))
-        eez = float(row["eez"] or 0)
+        end_eez   = float(row["end_equity_zeroed"] or 0)
         start_eez = float(row["start_equity_zeroed"] or 0)
+        if snapshot_date is None and row["snapshot_date"]:
+            snapshot_date = str(row["snapshot_date"])
         data.append({
-            "login":                  int(row["login"]) if row["login"] is not None else None,
-            "eez":                    eez,
-            "daily_start_equity":     float(row["daily_start_equity"] or 0),
-            "daily_start_net_equity": float(row["daily_start_net_equity"] or 0),
-            "start_equity_zeroed":    start_eez,
+            "login":               int(row["login"]) if row["login"] is not None else None,
+            "end_equity_zeroed":   end_eez,
+            "start_equity_zeroed": start_eez,
         })
-        total += eez
+        total_end   += end_eez
         total_start += start_eez
 
-    result = {"rows": data, "total": round(total, 2), "total_start": round(total_start, 2)}
+    result = {
+        "rows":          data,
+        "total_end":     round(total_end, 2),
+        "total_start":   round(total_start, 2),
+        "snapshot_date": snapshot_date,
+    }
     cache.set(_ck, result)
     return JSONResponse(content=result)
