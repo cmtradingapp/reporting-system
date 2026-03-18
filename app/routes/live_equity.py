@@ -29,7 +29,7 @@ async def live_equity_zeroed(request: Request, date: str = None):
             return JSONResponse(status_code=400, content={"detail": "Invalid date"})
 
     is_current_month = (d.year == today.year and d.month == today.month)
-    _ck = f"live_eez_v9:{d}"
+    _ck = f"live_eez_v10:{d}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -157,6 +157,11 @@ def _live_calc(d) -> dict:
               AND a.is_test_account = 0
             GROUP BY t.login
         """
+        sql_bonus_bt = """
+            SELECT login, SUM(net_amount) AS bonus
+            FROM bonus_transactions
+            GROUP BY login
+        """
         with conn.cursor() as cur:
             cur.execute(sql_valid, {"logins": logins})
             valid_logins = {int(r[0]) for r in cur.fetchall()}
@@ -164,6 +169,8 @@ def _live_calc(d) -> dict:
             pnl_map = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
             cur.execute(sql_bonus)
             bonus_map = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
+            cur.execute(sql_bonus_bt)
+            bonus_bt_map = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
     finally:
         conn.close()
 
@@ -172,7 +179,7 @@ def _live_calc(d) -> dict:
         if login not in valid_logins:
             continue
         pnl   = pnl_map.get(login, 0.0)
-        bonus = bonus_map.get(login, 0.0)
+        bonus = bonus_map[login] if login in bonus_map else bonus_bt_map.get(login, 0.0)
         eez   = max(0.0, bal + pnl - bonus)
         grand_total += eez
 
