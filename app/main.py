@@ -25,9 +25,9 @@ from app.routes.dealio_daily_profits_sync import router as dealio_daily_profits_
 from app.routes.live_equity import router as live_equity_router
 from app.routes.eez_comparison import router as eez_comparison_router
 from app.routes.eez_old import router as eez_old_router
-from app.db.postgres_conn import ensure_table, ensure_auth_table, seed_admin_user, ensure_client_classification_table, ensure_bonus_transactions_table
+from app.db.postgres_conn import ensure_table, ensure_auth_table, seed_admin_user, ensure_client_classification_table, ensure_bonus_transactions_table, ensure_daily_equity_zeroed_table
 from app.auth.auth import hash_password
-from app.etl.fetch_and_store import run_accounts_etl, run_users_etl, run_transactions_etl, run_targets_etl, run_dealio_mt4trades_etl, run_trading_accounts_etl, run_ftd100_etl, run_dealio_daily_profit_etl, run_client_classification_etl, run_dealio_users_etl, run_dealio_trades_mt4_etl, run_dealio_daily_profits_etl, run_bonus_transactions_etl
+from app.etl.fetch_and_store import run_accounts_etl, run_users_etl, run_transactions_etl, run_targets_etl, run_dealio_mt4trades_etl, run_trading_accounts_etl, run_ftd100_etl, run_dealio_daily_profit_etl, run_client_classification_etl, run_dealio_users_etl, run_dealio_trades_mt4_etl, run_dealio_daily_profits_etl, run_bonus_transactions_etl, run_daily_equity_zeroed_snapshot
 import os
 from datetime import datetime, timedelta
 
@@ -51,6 +51,7 @@ async def lifespan(app: FastAPI):
     ensure_auth_table()
     ensure_client_classification_table()
     ensure_bonus_transactions_table()
+    ensure_daily_equity_zeroed_table()
     seed_admin_user(hash_password('Admin123!'))
     _base = datetime.utcnow()
     scheduler.add_job(
@@ -165,6 +166,14 @@ async def lifespan(app: FastAPI):
         kwargs={"hours": 6},
         id="bonus_transactions_sync",
         start_date=_base + timedelta(seconds=360),
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        run_daily_equity_zeroed_snapshot,
+        "cron",
+        hour=0,
+        minute=5,
+        id="daily_equity_zeroed_snapshot",
         replace_existing=True,
     )
     scheduler.start()

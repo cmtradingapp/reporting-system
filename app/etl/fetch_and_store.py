@@ -13,7 +13,9 @@ from app.db.postgres_conn import (
     upsert_dealio_users, upsert_dealio_trades_mt4, truncate_dealio_trades_mt4,
     upsert_dealio_daily_profits,
     ensure_bonus_transactions_table, upsert_bonus_transactions,
+    ensure_daily_equity_zeroed_table, upsert_daily_equity_zeroed,
 )
+from app.db.postgres_conn import get_connection as _pg_conn
 
 # Global lock: set to True while rebuild is running so the incremental scheduler skips
 _dealio_trades_mt4_rebuilding = False
@@ -632,3 +634,57 @@ def run_bonus_transactions_full_etl() -> dict:
         duration_ms = int((time.time() - start) * 1000)
         log_sync("bonus_transactions", cutoff, rows, duration_ms, status, error_msg)
     return {"status": status, "rows_synced": rows, "type": "full"}
+
+
+def run_daily_equity_zeroed_snapshot(snapshot_date: str = None) -> dict:
+    """
+    Query per-login EEZ from the local warehouse for snapshot_date (default: yesterday),
+    upsert into daily_equity_zeroed, and backfill start_equity_zeroed.
+    """
+    from datetime import date, timedelta
+    if snapshot_date is None:
+        snapshot_date = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
+
+    sql = """
+        WITH latest_equity AS (
+            SELECT DISTINCT ON (login)
+                login, convertedbalance, convertedfloatingpnl
+            FROM dealio_daily_profits
+            WHERE date::date = %(snapshot_date)s
+            ORDER BY login, date DESC
+        ),
+        bonus_bal AS (
+            SELECT login, SUM(net_amount) AS bonus_balance
+            FROM bonus_transactions
+            WHERE confirmation_time::date <= %(snapshot_date)s
+            GROUP BY login
+        ),
+        test_flags AS (
+            SELECT ta.login::bigint AS login, MAX(a.is_test_account) AS is_test
+            FROM trading_accounts ta
+            JOIN accounts a ON a.accountid = ta.vtigeraccountid
+            GROUP BY ta.login::bigint
+        )
+        SELECT
+            le.login,
+            ROUND(GREATEST(
+                GREATEST(0, COALESCE(le.convertedbalance, 0) + COALESCE(le.convertedfloatingpnl, 0))
+                    - GREATEST(0, COALESCE(b.bonus_balance, 0)),
+                0
+            )::numeric, 2) AS end_equity_zeroed
+        FROM latest_equity le
+        LEFT JOIN bonus_bal b  ON b.login = le.login
+        LEFT JOIN test_flags tf ON tf.login = le.login
+        WHERE COALESCE(tf.is_test, 0) = 0
+    """
+
+    conn = _pg_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql, {"snapshot_date": snapshot_date})
+            rows = cur.fetchall()
+    finally:
+        conn.close()
+
+    upsert_daily_equity_zeroed(rows, snapshot_date)
+    return {"status": "success", "snapshot_date": snapshot_date, "rows": len(rows)}

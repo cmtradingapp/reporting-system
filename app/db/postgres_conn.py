@@ -1999,6 +1999,66 @@ def upsert_dealio_daily_profits(df: pd.DataFrame):
         conn.close()
 
 
+def ensure_daily_equity_zeroed_table():
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS daily_equity_zeroed (
+                    id                  SERIAL PRIMARY KEY,
+                    login               INTEGER NOT NULL,
+                    day                 DATE NOT NULL,
+                    end_equity_zeroed   NUMERIC(18, 2),
+                    start_equity_zeroed NUMERIC(18, 2),
+                    created_at          TIMESTAMP DEFAULT NOW(),
+                    UNIQUE(login, day)
+                );
+                CREATE INDEX IF NOT EXISTS idx_daily_equity_zeroed_login_day
+                    ON daily_equity_zeroed (login, day);
+            """)
+            conn.commit()
+    finally:
+        conn.close()
+
+
+def upsert_daily_equity_zeroed(rows: list[tuple], snapshot_date: str):
+    """
+    Upsert (login, end_equity_zeroed) for snapshot_date, then backfill
+    start_equity_zeroed from the previous calendar day's record.
+
+    rows: list of (login, end_equity_zeroed)
+    snapshot_date: 'YYYY-MM-DD' string
+    """
+    if not rows:
+        return
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            # Upsert end_equity_zeroed
+            execute_values(cur, """
+                INSERT INTO daily_equity_zeroed (login, day, end_equity_zeroed)
+                VALUES %s
+                ON CONFLICT (login, day) DO UPDATE
+                    SET end_equity_zeroed = EXCLUDED.end_equity_zeroed,
+                        created_at        = NOW()
+            """, [(login, snapshot_date, eez) for login, eez in rows])
+
+            # Backfill start_equity_zeroed = previous calendar day's end_equity_zeroed
+            cur.execute("""
+                UPDATE daily_equity_zeroed t
+                SET start_equity_zeroed = prev.end_equity_zeroed
+                FROM daily_equity_zeroed prev
+                WHERE prev.login = t.login
+                  AND prev.day   = t.day - INTERVAL '1 day'
+                  AND t.day      = %(snapshot_date)s
+            """, {"snapshot_date": snapshot_date})
+
+            conn.commit()
+    finally:
+        conn.close()
+
+
 def fetch_dealio_daily_profits_stats() -> dict:
     sql = """
         SELECT
