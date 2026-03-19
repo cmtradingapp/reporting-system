@@ -1061,6 +1061,9 @@ def fetch_last_sync() -> str:
 
 
 def log_sync(table_name: str, cutoff_used, rows_affected: int, duration_ms: int, status: str, error_message: str = None):
+    from datetime import datetime
+    if cutoff_used is None:
+        cutoff_used = datetime(1970, 1, 1)
     sql = """
         INSERT INTO sync_log (table_name, cutoff_used, rows_affected, duration_ms, status, error_message)
         VALUES (%s, %s, %s, %s, %s, %s)
