@@ -419,5 +419,3 @@ def get_dealio_floating_pnl_for_logins(logins: list):
             return cur.fetchall()
     finally:
         conn.close()
-    finally:
-        conn.close()
