@@ -2024,10 +2024,11 @@ def ensure_daily_equity_zeroed_table():
 
 def upsert_daily_equity_zeroed(rows: list[tuple], snapshot_date: str):
     """
-    Upsert (login, end_equity_zeroed) for snapshot_date, then backfill
-    start_equity_zeroed from the previous calendar day's record.
+    Upsert (login, end_equity_zeroed, start_equity_zeroed) for snapshot_date.
+    start_equity_zeroed is independently calculated from snapshot_date - 1
+    using the same EEZ formula (not derived from end_equity_zeroed).
 
-    rows: list of (login, end_equity_zeroed)
+    rows: list of (login, end_equity_zeroed, start_equity_zeroed)
     snapshot_date: 'YYYY-MM-DD' string
     """
     if not rows:
@@ -2036,24 +2037,14 @@ def upsert_daily_equity_zeroed(rows: list[tuple], snapshot_date: str):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            # Upsert end_equity_zeroed
             execute_values(cur, """
-                INSERT INTO daily_equity_zeroed (login, day, end_equity_zeroed)
+                INSERT INTO daily_equity_zeroed (login, day, end_equity_zeroed, start_equity_zeroed)
                 VALUES %s
                 ON CONFLICT (login, day) DO UPDATE
-                    SET end_equity_zeroed = EXCLUDED.end_equity_zeroed,
-                        created_at        = NOW()
-            """, [(login, snapshot_date, eez) for login, eez in rows])
-
-            # Backfill start_equity_zeroed = previous calendar day's end_equity_zeroed
-            cur.execute("""
-                UPDATE daily_equity_zeroed t
-                SET start_equity_zeroed = prev.end_equity_zeroed
-                FROM daily_equity_zeroed prev
-                WHERE prev.login = t.login
-                  AND prev.day   = t.day - INTERVAL '1 day'
-                  AND t.day      = %(snapshot_date)s
-            """, {"snapshot_date": snapshot_date})
+                    SET end_equity_zeroed   = EXCLUDED.end_equity_zeroed,
+                        start_equity_zeroed = EXCLUDED.start_equity_zeroed,
+                        created_at          = NOW()
+            """, [(login, snapshot_date, end_eez, start_eez) for login, end_eez, start_eez in rows])
 
             conn.commit()
     finally:

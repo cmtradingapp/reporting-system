@@ -638,25 +638,29 @@ def run_bonus_transactions_full_etl() -> dict:
 
 def run_daily_equity_zeroed_snapshot(snapshot_date: str = None) -> dict:
     """
-    Query per-login EEZ from the local warehouse for snapshot_date (default: yesterday),
-    upsert into daily_equity_zeroed, and backfill start_equity_zeroed.
+    Calculate end_equity_zeroed (for snapshot_date) and start_equity_zeroed
+    (independently calculated from snapshot_date - 1 using the same EEZ formula),
+    then upsert both into daily_equity_zeroed.
     """
-    from datetime import date, timedelta
+    from datetime import date, timedelta, datetime as dt
     if snapshot_date is None:
         snapshot_date = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
 
-    sql = """
+    prev_date = (dt.strptime(snapshot_date, "%Y-%m-%d").date() - timedelta(days=1)).strftime("%Y-%m-%d")
+
+    # Reusable EEZ query — parameterised by %(d)s so it works for both snapshot_date and prev_date
+    sql_eez = """
         WITH latest_equity AS (
             SELECT DISTINCT ON (login)
                 login, convertedbalance, convertedfloatingpnl
             FROM dealio_daily_profits
-            WHERE date::date = %(snapshot_date)s
+            WHERE date::date = %(d)s
             ORDER BY login, date DESC
         ),
         bonus_bal AS (
             SELECT login, SUM(net_amount) AS bonus_balance
             FROM bonus_transactions
-            WHERE confirmation_time::date <= %(snapshot_date)s
+            WHERE confirmation_time::date <= %(d)s
             GROUP BY login
         ),
         test_flags AS (
@@ -675,7 +679,7 @@ def run_daily_equity_zeroed_snapshot(snapshot_date: str = None) -> dict:
                         - COALESCE(b.bonus_balance, 0),
                     0
                 )
-            END::numeric, 2) AS end_equity_zeroed
+            END::numeric, 2) AS eez
         FROM latest_equity le
         LEFT JOIN bonus_bal b  ON b.login = le.login
         JOIN test_flags tf ON tf.login = le.login
@@ -685,10 +689,17 @@ def run_daily_equity_zeroed_snapshot(snapshot_date: str = None) -> dict:
     conn = _pg_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute(sql, {"snapshot_date": snapshot_date})
-            rows = cur.fetchall()
+            # End EEZ: snapshot_date
+            cur.execute(sql_eez, {"d": snapshot_date})
+            end_rows = cur.fetchall()
+            # Start EEZ: snapshot_date - 1 (same formula, date shifted back 1 day)
+            cur.execute(sql_eez, {"d": prev_date})
+            start_rows = cur.fetchall()
     finally:
         conn.close()
 
-    upsert_daily_equity_zeroed(rows, snapshot_date)
-    return {"status": "success", "snapshot_date": snapshot_date, "rows": len(rows)}
+    start_map = {login: eez for login, eez in start_rows}
+    combined = [(login, end_eez, start_map.get(login)) for login, end_eez in end_rows]
+
+    upsert_daily_equity_zeroed(combined, snapshot_date)
+    return {"status": "success", "snapshot_date": snapshot_date, "rows": len(combined)}
