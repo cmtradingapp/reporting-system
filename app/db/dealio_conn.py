@@ -384,3 +384,40 @@ def get_dealio_users_balance():
             return cur.fetchall()
     finally:
         conn.close()
+
+
+def get_dealio_balance_for_logins(logins: list):
+    """Fetch (login, compprevbalance) from dealio.users for a specific list of logins."""
+    conn = get_dealio_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT login, compprevbalance FROM dealio.users WHERE login = ANY(%s)",
+                (logins,)
+            )
+            return cur.fetchall()
+    finally:
+        conn.close()
+
+
+def get_dealio_floating_pnl_for_logins(logins: list):
+    """Fetch floating PnL from dealio.trades_mt4 (open trades) for a specific list of logins."""
+    conn = get_dealio_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT login,
+                       SUM(COALESCE(computed_commission, 0)
+                         + COALESCE(computed_profit, 0)
+                         + COALESCE(computed_swap, 0)) AS floatingpnl
+                FROM dealio.trades_mt4
+                WHERE login = ANY(%s)
+                  AND close_time = '1970-01-01 00:00:00'
+                  AND cmd < 2
+                GROUP BY login
+            """, (logins,))
+            return cur.fetchall()
+    finally:
+        conn.close()
+    finally:
+        conn.close()

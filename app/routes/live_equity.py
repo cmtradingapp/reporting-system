@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from app.auth.dependencies import get_current_user
 from app.db.postgres_conn import get_connection
-from app.db.dealio_conn import get_dealio_users_comp, get_dealio_users_balance
+from app.db.dealio_conn import get_dealio_users_comp, get_dealio_users_balance, get_dealio_balance_for_logins, get_dealio_floating_pnl_for_logins
 from app import cache
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
@@ -29,7 +29,7 @@ async def live_equity_zeroed(request: Request, date: str = None):
             return JSONResponse(status_code=400, content={"detail": "Invalid date"})
 
     is_current_month = (d.year == today.year and d.month == today.month)
-    _ck = f"live_eez_v15:{d}"
+    _ck = f"live_eez_v16:{d}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -110,60 +110,44 @@ def _historical_calc(d) -> dict:
 
 
 def _live_calc(d) -> dict:
-    """Live EEZ: (compprevbalance + floating_pnl) - bonus, clamped to 0."""
-    bal_rows = get_dealio_users_balance()
-    if not bal_rows:
-        return {"total": 0, "is_live": True, "date": str(d)}
+    """Live EEZ: logins from local trading_accounts, balance from dealio replica,
+    floating PnL from dealio replica trades_mt4, bonus from local bonus_transactions."""
 
-    logins   = [int(r[0]) for r in bal_rows]
-    bal_map  = {int(r[0]): float(r[1] or 0) for r in bal_rows}
-
+    # Step 1: valid logins + bonus from local DB
     conn = get_connection()
     try:
-        sql_valid = """
-            SELECT ta.login::bigint
-            FROM trading_accounts ta
-            JOIN accounts a ON a.accountid = ta.vtigeraccountid
-            WHERE ta.login::bigint = ANY(%(logins)s)
-              AND ta.equity > 0
-              AND ta.balance != 0
-              AND a.is_test_account = 0
-              AND (ta.deleted = 0 OR ta.deleted IS NULL)
-        """
-        sql_pnl = """
-            SELECT t.login,
-                   SUM(COALESCE(t.computed_commission, 0)
-                     + COALESCE(t.computed_profit, 0)
-                     + COALESCE(t.computed_swap, 0)) AS floatingpnl
-            FROM dealio_trades_mt4 t
-            JOIN trading_accounts ta ON ta.login::bigint = t.login
-            JOIN accounts a ON a.accountid = ta.vtigeraccountid
-            WHERE t.close_time = '1970-01-01 00:00:00'
-              AND t.cmd < 2
-              AND ta.equity > 0
-              AND ta.balance != 0
-              AND a.is_test_account = 0
-              AND (ta.deleted = 0 OR ta.deleted IS NULL)
-            GROUP BY t.login
-        """
-        sql_bonus = """
-            SELECT login, SUM(net_amount) AS bonus
-            FROM bonus_transactions
-            GROUP BY login
-        """
         with conn.cursor() as cur:
-            cur.execute(sql_valid, {"logins": logins})
-            valid_logins = {int(r[0]) for r in cur.fetchall()}
-            cur.execute(sql_pnl)
-            pnl_map = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
-            cur.execute(sql_bonus)
+            cur.execute("""
+                SELECT ta.login::bigint
+                FROM trading_accounts ta
+                JOIN accounts a ON a.accountid = ta.vtigeraccountid
+                WHERE ta.equity > 0
+                  AND ta.balance != 0
+                  AND a.is_test_account = 0
+                  AND (ta.deleted = 0 OR ta.deleted IS NULL)
+            """)
+            valid_logins = [int(r[0]) for r in cur.fetchall()]
+            cur.execute("SELECT login, SUM(net_amount) FROM bonus_transactions GROUP BY login")
             bonus_map = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
     finally:
         conn.close()
 
+    if not valid_logins:
+        return {"total": 0, "is_live": True, "date": str(d)}
+
+    # Step 2: compprevbalance from dealio replica
+    bal_rows = get_dealio_balance_for_logins(valid_logins)
+    bal_map  = {int(r[0]): float(r[1] or 0) for r in bal_rows if r[1]}
+
+    # Step 3: floating PnL from dealio replica trades_mt4
+    pnl_rows = get_dealio_floating_pnl_for_logins(valid_logins)
+    pnl_map  = {int(r[0]): float(r[1] or 0) for r in pnl_rows}
+
+    # Step 4: EEZ formula
     grand_total = 0.0
-    for login, bal in bal_map.items():
-        if login not in valid_logins:
+    for login in valid_logins:
+        bal = bal_map.get(login, 0.0)
+        if bal <= 0:
             continue
         pnl   = pnl_map.get(login, 0.0)
         bonus = bonus_map.get(login, 0.0)
