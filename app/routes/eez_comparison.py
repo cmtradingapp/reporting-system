@@ -25,7 +25,7 @@ async def eez_comparison_api(request: Request):
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
-    _ck = "eez_comparison_v21"
+    _ck = "eez_comparison_v22"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -35,7 +35,6 @@ async def eez_comparison_api(request: Request):
             SELECT MAX(day) AS day FROM daily_equity_zeroed
         ),
         month_start AS (
-            -- Last day of previous month = start of current month
             SELECT (date_trunc('month', MAX(day))::date - INTERVAL '1 day')::date AS day
             FROM daily_equity_zeroed
         ),
@@ -46,16 +45,44 @@ async def eez_comparison_api(request: Request):
             JOIN accounts a ON a.accountid = ta.vtigeraccountid
             WHERE (ta.deleted = 0 OR ta.deleted IS NULL)
             GROUP BY ta.login::bigint
+        ),
+        -- Most recent equity for each login on or before end of previous month
+        start_equity AS (
+            SELECT DISTINCT ON (login)
+                login, convertedbalance, convertedfloatingpnl
+            FROM dealio_daily_profits
+            WHERE date::date <= (SELECT day FROM month_start)
+            ORDER BY login, date DESC
+        ),
+        start_bonus AS (
+            SELECT login, SUM(net_amount) AS bonus_balance
+            FROM bonus_transactions
+            WHERE confirmation_time::date <= (SELECT day FROM month_start)
+            GROUP BY login
+        ),
+        start_eez AS (
+            SELECT
+                se.login,
+                ROUND(CASE
+                    WHEN COALESCE(se.convertedbalance, 0) + COALESCE(se.convertedfloatingpnl, 0) <= 0 THEN 0
+                    ELSE GREATEST(
+                        COALESCE(se.convertedbalance, 0) + COALESCE(se.convertedfloatingpnl, 0)
+                            - COALESCE(sb.bonus_balance, 0),
+                        0
+                    )
+                END::numeric, 2) AS start_equity_zeroed
+            FROM start_equity se
+            LEFT JOIN start_bonus sb ON sb.login = se.login
+            JOIN test_flags tf ON tf.login = se.login
+            WHERE tf.is_test = 0
         )
         SELECT
             e.login,
-            COALESCE(e.end_equity_zeroed, 0)  AS end_equity_zeroed,
-            COALESCE(s.end_equity_zeroed, 0)  AS start_equity_zeroed,
-            (SELECT day FROM latest_day)       AS snapshot_date
+            COALESCE(e.end_equity_zeroed, 0)   AS end_equity_zeroed,
+            COALESCE(s.start_equity_zeroed, 0) AS start_equity_zeroed,
+            (SELECT day FROM latest_day)        AS snapshot_date
         FROM daily_equity_zeroed e
-        LEFT JOIN daily_equity_zeroed s
-            ON s.login = e.login
-            AND s.day  = (SELECT day FROM month_start)
+        LEFT JOIN start_eez s ON s.login = e.login
         JOIN test_flags tf ON tf.login = e.login
         WHERE e.day = (SELECT day FROM latest_day)
           AND tf.is_test = 0
