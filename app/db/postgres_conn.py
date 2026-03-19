@@ -1493,6 +1493,7 @@ def truncate_and_insert_ftd100() -> int:
               AND t.transactiontype IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
               AND (t.deleted = 0 OR t.deleted IS NULL)
               AND a.is_test_account = 0
+              AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%bonus%'
         ),
         agg AS (
             SELECT

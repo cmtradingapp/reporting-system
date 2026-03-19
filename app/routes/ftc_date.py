@@ -119,6 +119,7 @@ async def ftc_date_api(
             FROM transactions t
             WHERE t.transactionapproval = 'Approved'
               AND (t.deleted = 0 OR t.deleted IS NULL)
+              AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
             GROUP BY t.vtigeraccountid
         ),
         rdp AS (

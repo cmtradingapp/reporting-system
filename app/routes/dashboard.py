@@ -109,6 +109,7 @@ async def dashboard_api(request: Request):
                   AND t.vtigeraccountid IS NOT NULL
                   AND a.is_test_account = 0
                   AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
+                  AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
             """, {"month_start": month_start_str, "tomorrow": tomorrow_str})
             row = cur.fetchone()
             nd_daily = float(row[0] or 0)
@@ -141,6 +142,7 @@ async def dashboard_api(request: Request):
                   AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
                   AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
                   AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'
+                  AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
             """, {"month_start": month_start_str, "tomorrow": tomorrow_str})
             row = cur.fetchone()
             nd_sales_daily = float(row[0] or 0)
@@ -174,6 +176,7 @@ async def dashboard_api(request: Request):
                   AND TRIM(COALESCE(u.department, '')) NOT ILIKE '%%Conversion%%'
                   AND TRIM(COALESCE(u.department, '')) NOT ILIKE '%%Support%%'
                   AND TRIM(COALESCE(u.department, '')) NOT ILIKE '%%General%%'
+                  AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
             """, {"month_start": month_start_str, "tomorrow": tomorrow_str})
             row = cur.fetchone()
             nd_ret_daily = float(row[0] or 0)

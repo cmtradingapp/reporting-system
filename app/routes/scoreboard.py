@@ -141,6 +141,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
               AND t.confirmation_time >= %(date_from)s
               AND t.confirmation_time <  %(date_to_excl)s
               AND a.is_test_account = 0
+              AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
             GROUP BY t.original_deposit_owner
         ) net ON net.agent_id = u.id
         LEFT JOIN (
@@ -217,6 +218,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
                   AND t.vtigeraccountid IS NOT NULL
                   AND a.is_test_account = 0
                   AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
+                  AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
             """, {"date_from": date_from, "date_to_excl": date_to_exclusive})
             grand_net = float(cur.fetchone()[0] or 0)
 
@@ -289,6 +291,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
                   AND t.vtigeraccountid IS NOT NULL
                   AND a.is_test_account = 0
                   AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
+                  AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
             """, {"date_to": date_to})
             daily_net = float(cur.fetchone()[0] or 0)
 
@@ -437,6 +440,7 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
               AND t.transactiontype IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
               AND t.confirmation_time >= %(date_from)s AND t.confirmation_time < %(date_to_excl)s
               AND a.is_test_account = 0
+              AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
             GROUP BY t.original_deposit_owner
         ) net ON net.agent_id = u.id
         LEFT JOIN (
@@ -446,6 +450,7 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
               AND t.transactiontype IN ('Deposit','Withdrawal Cancelled')
               AND t.confirmation_time >= %(date_from)s AND t.confirmation_time < %(date_to_excl)s
               AND a.is_test_account = 0
+              AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
             GROUP BY t.original_deposit_owner
         ) dep ON dep.agent_id = u.id
         LEFT JOIN (
@@ -513,6 +518,7 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
                   AND TRIM(COALESCE(u.department, '')) NOT ILIKE '%%Conversion%%'
                   AND TRIM(COALESCE(u.department, '')) NOT ILIKE '%%Support%%'
                   AND TRIM(COALESCE(u.department, '')) NOT ILIKE '%%General%%'
+                  AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
             """, {"date_to": date_to})
             daily_net_retention = float(cur.fetchone()[0] or 0)
 

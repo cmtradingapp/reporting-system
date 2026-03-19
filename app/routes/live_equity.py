@@ -201,6 +201,7 @@ def _live_calc(d) -> dict:
                   AND t.vtigeraccountid IS NOT NULL
                   AND a.is_test_account = 0
                   AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
+                  AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
             """, {"d": str(d)})
             net_deposits_today = float(cur.fetchone()[0] or 0)
     finally:
