@@ -733,6 +733,7 @@ _TRADING_ACCOUNTS_SELECT = """
     LEFT JOIN v_ant_users u ON u.id = bu.user_id
     WHERE bu.trade_group_string NOT LIKE '%test%'
       AND bu.is_demo != 1
+      AND bu.is_deleted = 0
 """
 
 
