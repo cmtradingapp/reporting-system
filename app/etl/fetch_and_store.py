@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime, timedelta, timezone
 from app.db.mysql_conn import get_operators, get_users, get_accounts, get_accounts_full, get_crm_users, get_crm_users_full, get_transactions, get_transactions_full, get_trading_accounts, get_trading_accounts_full
 from app.db.mssql_conn import get_targets, get_dealio_mt4trades, get_dealio_mt4trades_full, get_vtiger_users, get_dealio_daily_profit, get_dealio_daily_profit_full, get_client_classification, get_bonus_transactions, get_bonus_transactions_full
-from app.db.dealio_conn import get_dealio_users, get_dealio_users_full, get_dealio_trades_mt4, get_dealio_trades_mt4_full, get_dealio_trades_mt4_missing, get_dealio_daily_profits, get_dealio_daily_profits_full
+from app.db.dealio_conn import get_dealio_users, get_dealio_users_full, get_dealio_trades_mt4, get_dealio_trades_mt4_full, get_dealio_trades_mt4_missing, get_dealio_daily_profits, get_dealio_daily_profits_full, get_dealio_daily_profits_daterange
 from app.db.postgres_conn import (
     ensure_table, delete_all_performance, insert_records,
     upsert_users, upsert_accounts, cleanup_accounts, upsert_crm_users, truncate_crm_users, upsert_transactions,
@@ -567,6 +567,26 @@ def run_dealio_daily_profits_etl(hours: int = 48) -> dict:
         duration_ms = int((time.time() - start) * 1000)
         log_sync("dealio_daily_profits", cutoff, rows, duration_ms, status, error_msg)
     return {"status": status, "rows_synced": rows, "lookback_hours": hours}
+
+
+def run_dealio_daily_profits_daterange_etl(date_from: str, date_to: str) -> dict:
+    start = time.time()
+    cutoff = datetime.strptime(date_from, "%Y-%m-%d")
+    status = "success"
+    error_msg = None
+    rows = 0
+    try:
+        for chunk in get_dealio_daily_profits_daterange(date_from, date_to):
+            upsert_dealio_daily_profits(chunk)
+            rows += len(chunk)
+    except Exception as e:
+        status = "error"
+        error_msg = str(e)
+        raise
+    finally:
+        duration_ms = int((time.time() - start) * 1000)
+        log_sync("dealio_daily_profits", cutoff, rows, duration_ms, status, error_msg)
+    return {"status": status, "rows_synced": rows, "date_from": date_from, "date_to": date_to}
 
 
 def run_dealio_daily_profits_full_etl() -> dict:

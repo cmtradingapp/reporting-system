@@ -282,6 +282,40 @@ def get_dealio_daily_profits(hours: int = 48) -> pd.DataFrame:
         conn.close()
 
 
+def get_dealio_daily_profits_daterange(date_from: str, date_to: str):
+    """Fetch dealio.daily_profits for a specific date range in chunks."""
+    last_date = date_from
+    last_login = 0
+    while True:
+        sql = f"""
+            SELECT {_DAILY_PROFITS_COLS}
+            FROM dealio.daily_profits
+            WHERE date::date >= %(date_from)s
+              AND date::date <= %(date_to)s
+              AND (date::date > %(last_date)s
+                   OR (date::date = %(last_date)s AND login > %(last_login)s))
+            ORDER BY date, login
+            LIMIT {_CHUNK_SIZE}
+        """
+        conn = get_dealio_connection()
+        try:
+            df = pd.read_sql(sql, conn, params={
+                "date_from": date_from,
+                "date_to": date_to,
+                "last_date": last_date,
+                "last_login": last_login,
+            })
+        finally:
+            conn.close()
+        if df.empty:
+            break
+        yield df
+        if len(df) < _CHUNK_SIZE:
+            break
+        last_date = str(df["date"].max())[:10]
+        last_login = int(df["login"].max())
+
+
 def get_dealio_daily_profits_full():
     """Full fetch of dealio.daily_profits in chunks, paginated by (date, login)."""
     last_date = "1970-01-01"
