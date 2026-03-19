@@ -386,6 +386,20 @@ def get_dealio_users_balance():
         conn.close()
 
 
+def get_dealio_equity_credit_for_logins(logins: list):
+    """Fetch (login, compprevequity, compcredit) from dealio.users for Group A logins."""
+    conn = get_dealio_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT login, compprevequity, compcredit FROM dealio.users WHERE login = ANY(%s)",
+                (logins,)
+            )
+            return cur.fetchall()
+    finally:
+        conn.close()
+
+
 def get_dealio_balance_for_logins(logins: list):
     """Fetch (login, compprevbalance) from dealio.users for a specific list of logins."""
     conn = get_dealio_connection()
