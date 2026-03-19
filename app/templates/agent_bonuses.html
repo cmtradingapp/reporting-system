@@ -1687,7 +1687,8 @@
     const FKEY = 'ab_filter_open';
     const fbody = document.getElementById('filter-body');
     const fchev = document.getElementById('filter-chevron');
-    if (localStorage.getItem(FKEY) === '0') {
+    const isTablet = window.innerWidth >= 768 && window.innerWidth <= 1024;
+    if (isTablet || localStorage.getItem(FKEY) === '0') {
       fbody.style.display = 'none';
       fchev.style.transform = 'rotate(180deg)';
     }

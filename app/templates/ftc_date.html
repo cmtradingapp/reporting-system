@@ -404,7 +404,8 @@
     const FKEY = 'ftc_filter_open';
     const fbody = document.getElementById('ftc-filter-body');
     const fchev = document.getElementById('ftc-filter-chevron');
-    if (localStorage.getItem(FKEY) !== '1') {
+    const isTablet = window.innerWidth >= 768 && window.innerWidth <= 1024;
+    if (isTablet || localStorage.getItem(FKEY) !== '1') {
       fbody.style.display = 'none';
       fchev.style.transform = 'rotate(180deg)';
     }
