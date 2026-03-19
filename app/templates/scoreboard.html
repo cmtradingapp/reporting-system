@@ -241,6 +241,7 @@
       #kpi-vol       { order:7; }
       #kpi-vol-rr    { order:8; }
       #kpi-live-equity { order:10; }
+      #kpi-live-equity-alt { order:11; }
       .date-input { width:120px; }
       .cnt-badge { display:none; }
       #row-count, #ret-row-count { display:none; }
@@ -483,6 +484,12 @@
       <div class="kpi-card text-center">
         <div class="kpi-value" style="color:#58a6ff;" id="stat-live-equity-zeroed">—</div>
         <div class="kpi-label"><span id="live-eez-badge" style="display:none;background:#1a4731;color:#3fb950;border:1px solid #238636;border-radius:4px;padding:1px 5px;font-size:0.55rem;letter-spacing:0.04em;margin-right:3px;vertical-align:middle;">LIVE</span>Live End EEZ<span id="live-eez-updated" style="display:block;font-size:0.55rem;color:#484f58;font-weight:400;text-transform:none;letter-spacing:0;margin-top:1px;"></span></div>
+      </div>
+    </div>
+    <div class="col-6 col-md-2" id="kpi-live-equity-alt">
+      <div class="kpi-card text-center">
+        <div class="kpi-value" style="color:#58a6ff;" id="stat-live-equity-alt">—</div>
+        <div class="kpi-label"><span style="display:none;background:#1a4731;color:#3fb950;border:1px solid #238636;border-radius:4px;padding:1px 5px;font-size:0.55rem;letter-spacing:0.04em;margin-right:3px;vertical-align:middle;" id="live-eez-alt-badge">LIVE</span>Live EEZ Alt</div>
       </div>
     </div>
     <div class="col-6 col-md-2" id="kpi-pnl-cash">
@@ -778,6 +785,20 @@
         } else {
           pnlEl.textContent = '—';
           pnlEl.style.color = '#8b949e';
+        }
+      }
+
+      const altEl    = document.getElementById('stat-live-equity-alt');
+      const altBadge = document.getElementById('live-eez-alt-badge');
+      if (altEl) {
+        if (data.total_alt != null) {
+          const aNeg = data.total_alt < 0;
+          const aAbs = Math.abs(data.total_alt);
+          altEl.textContent = (aNeg ? '-$' : '$') + aAbs.toLocaleString('en-US');
+          if (altBadge) altBadge.style.display = data.is_live ? '' : 'none';
+        } else {
+          altEl.textContent = '—';
+          if (altBadge) altBadge.style.display = 'none';
         }
       }
     } catch(e) {
