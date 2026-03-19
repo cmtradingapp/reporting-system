@@ -25,7 +25,7 @@ async def eez_comparison_api(request: Request):
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
-    _ck = "eez_comparison_v20"
+    _ck = "eez_comparison_v21"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -33,6 +33,11 @@ async def eez_comparison_api(request: Request):
     sql = """
         WITH latest_day AS (
             SELECT MAX(day) AS day FROM daily_equity_zeroed
+        ),
+        month_start AS (
+            -- Last day of previous month = start of current month
+            SELECT (date_trunc('month', MAX(day))::date - INTERVAL '1 day')::date AS day
+            FROM daily_equity_zeroed
         ),
         test_flags AS (
             SELECT ta.login::bigint AS login,
@@ -50,7 +55,7 @@ async def eez_comparison_api(request: Request):
         FROM daily_equity_zeroed e
         LEFT JOIN daily_equity_zeroed s
             ON s.login = e.login
-            AND s.day  = e.day - INTERVAL '1 day'
+            AND s.day  = (SELECT day FROM month_start)
         JOIN test_flags tf ON tf.login = e.login
         WHERE e.day = (SELECT day FROM latest_day)
           AND tf.is_test = 0
