@@ -4,7 +4,7 @@ import time
 _lock = threading.Lock()
 _store: dict = {}  # key -> (data, expires_at_unix)
 
-TTL = 90  # seconds
+TTL = 300  # seconds (5 min — matches ETL sync interval)
 
 
 def get(key: str):

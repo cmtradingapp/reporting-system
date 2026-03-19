@@ -40,17 +40,8 @@ async def dashboard_page(request: Request):
     return templates.TemplateResponse("dashboard.html", {"request": request, "current_user": user})
 
 
-@router.get("/api/dashboard")
-async def dashboard_api(request: Request):
-    user = await get_current_user(request)
-    if isinstance(user, RedirectResponse):
-        return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
-
-    today = datetime.now(_TZ).date()
-    _ck = f"dashboard_v6:{today.isoformat()}"
-    _hit = cache.get(_ck)
-    if _hit is not None:
-        return JSONResponse(content=_hit)
+def _dashboard_calc(today: date_type) -> dict:
+    """Run all dashboard queries and return the result dict. Raises on error."""
     month_start = today.replace(day=1)
     month_end = last_day_of_month(today)
     tomorrow = today + timedelta(days=1)
@@ -311,9 +302,7 @@ async def dashboard_api(request: Request):
             """)
             abs_exposure = float(cur.fetchone()[0] or 0)
 
-            # Q10 — Daily PnL: sum of closed + delta floating from PostgreSQL snapshot
-            # dealio_daily_profit has PRIMARY KEY (login) — one row per account, current day only
-            # closedpnl + deltafloatingpnl = trading PnL for that day, no history needed
+            # Q10 — Daily PnL
             cur.execute("""
                 SELECT COALESCE(SUM(
                     COALESCE(convertedclosedpnl, 0) + COALESCE(converteddeltafloatingpnl, 0)
@@ -326,7 +315,7 @@ async def dashboard_api(request: Request):
             """, {"last_mtd": last_mtd_str})
             pnl_daily = round(float(cur.fetchone()[0] or 0), 2)
 
-        # Monthly PnL from local dealio_daily_profits
+        # Monthly PnL
         try:
             with conn.cursor() as cur:
                 cur.execute("""
@@ -350,7 +339,7 @@ async def dashboard_api(request: Request):
         def rr_int(val):
             return round(val / safe_wdp * wd_total)
 
-        _result = {
+        return {
             "date":                 today_str,
             "month_start":          month_start_str,
             "working_days":         wd_total,
@@ -371,9 +360,25 @@ async def dashboard_api(request: Request):
                 "pnl_date": last_mtd_str,
             },
         }
+    finally:
+        conn.close()
+
+
+@router.get("/api/dashboard")
+async def dashboard_api(request: Request):
+    user = await get_current_user(request)
+    if isinstance(user, RedirectResponse):
+        return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+
+    today = datetime.now(_TZ).date()
+    _ck = f"dashboard_v6:{today.isoformat()}"
+    _hit = cache.get(_ck)
+    if _hit is not None:
+        return JSONResponse(content=_hit)
+
+    try:
+        _result = _dashboard_calc(today)
         cache.set(_ck, _result)
         return JSONResponse(content=_result)
     except Exception as e:
         return JSONResponse(status_code=500, content={"detail": str(e)})
-    finally:
-        conn.close()

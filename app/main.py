@@ -17,19 +17,42 @@ from app.routes.dealio_daily_profit_sync import router as dealio_daily_profit_sy
 from app.routes.holidays import router as holidays_router
 from app.routes.auth import router as auth_router
 from app.routes.users_mgmt import router as users_mgmt_router
-from app.routes.dashboard import router as dashboard_router
+from app.routes.dashboard import router as dashboard_router, _dashboard_calc
 from app.routes.last_sync import router as last_sync_router
 from app.routes.client_classification_sync import router as client_classification_sync_router
 from app.routes.dealio_new_sync import router as dealio_new_sync_router
 from app.routes.dealio_daily_profits_sync import router as dealio_daily_profits_sync_router
-from app.routes.live_equity import router as live_equity_router
+from app.routes.live_equity import router as live_equity_router, _live_calc
 from app.routes.eez_comparison import router as eez_comparison_router
 from app.routes.eez_old import router as eez_old_router
 from app.db.postgres_conn import ensure_table, ensure_auth_table, seed_admin_user, ensure_client_classification_table, ensure_bonus_transactions_table, ensure_daily_equity_zeroed_table
 from app.auth.auth import hash_password
 from app.etl.fetch_and_store import run_accounts_etl, run_users_etl, run_transactions_etl, run_targets_etl, run_dealio_mt4trades_etl, run_trading_accounts_etl, run_ftd100_etl, run_dealio_daily_profit_etl, run_client_classification_etl, run_dealio_users_etl, run_dealio_trades_mt4_etl, run_dealio_daily_profits_etl, run_bonus_transactions_etl, run_daily_equity_zeroed_snapshot
+from app import cache
 import os
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+
+_TZ = ZoneInfo("Europe/Nicosia")
+
+
+def warm_cache():
+    """Pre-populate cache for dashboard and live EEZ so users never hit cold queries."""
+    today = datetime.now(_TZ).date()
+
+    _ck = f"dashboard_v6:{today.isoformat()}"
+    if cache.get(_ck) is None:
+        try:
+            cache.set(_ck, _dashboard_calc(today))
+        except Exception as e:
+            print(f"[warm_cache] dashboard: {e}")
+
+    _ck = f"live_eez_v16:{today}"
+    if cache.get(_ck) is None:
+        try:
+            cache.set(_ck, _live_calc(today))
+        except Exception as e:
+            print(f"[warm_cache] live_eez: {e}")
 
 SYNC_INTERVAL_MINUTES          = int(os.getenv("SYNC_INTERVAL_MINUTES", "5"))
 ACCOUNTS_SYNC_HOURS            = int(os.getenv("ACCOUNTS_SYNC_HOURS", "6"))
@@ -174,6 +197,14 @@ async def lifespan(app: FastAPI):
         hour=0,
         minute=5,
         id="daily_equity_zeroed_snapshot",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        warm_cache,
+        "interval",
+        minutes=4,
+        id="cache_warmer",
+        start_date=_base + timedelta(seconds=30),
         replace_existing=True,
     )
     scheduler.start()
