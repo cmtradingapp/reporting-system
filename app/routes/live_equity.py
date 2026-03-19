@@ -133,8 +133,8 @@ def _live_calc(d) -> dict:
                 return {"total": 0, "start_equity_zeroed": 0, "net_deposits_today": 0, "pnl_cash": 0, "is_live": True, "date": str(d)}
 
             cur.execute(
-                "SELECT login, SUM(net_amount) FROM bonus_transactions WHERE login = ANY(%s) GROUP BY login",
-                (valid_logins,)
+                "SELECT login, SUM(net_amount) FROM bonus_transactions WHERE login = ANY(%s) AND confirmation_time::date <= %(d)s GROUP BY login",
+                (valid_logins, str(d))
             )
             bonus_map = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
 
