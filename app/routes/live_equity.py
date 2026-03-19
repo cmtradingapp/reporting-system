@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from app.auth.dependencies import get_current_user
 from app.db.postgres_conn import get_connection
-from app.db.dealio_conn import get_dealio_compbalance_for_logins, get_dealio_floating_pnl_for_logins
+from app.db.dealio_conn import get_dealio_equity_credit_for_logins
 from app import cache
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
@@ -110,11 +110,10 @@ def _historical_calc(d) -> dict:
 
 
 def _live_calc(d) -> dict:
-    """Live EEZ: MAX(0, compbalance + floating_pnl - bonus) per login.
-    compbalance = live computed balance from dealio replica.
-    floating_pnl = open trades PnL from dealio replica.
+    """Live EEZ: MAX(0, compprevequity - compcredit - bonus) per login.
+    compprevequity - compcredit = live equity excluding credit, from dealio replica.
     bonus = cumulative bonus from local bonus_transactions.
-    pnl_cash = Live EEZ - Start EEZ - Net Deposits (CEO formula).
+    pnl_cash = Live EEZ - Start EEZ - Net Deposits - Today Bonuses.
     """
 
     conn = get_connection()
@@ -180,15 +179,11 @@ def _live_calc(d) -> dict:
     finally:
         conn.close()
 
-    bal_map = {int(r[0]): float(r[1] or 0) for r in get_dealio_compbalance_for_logins(valid_logins)}
-    pnl_map = {int(r[0]): float(r[1] or 0) for r in get_dealio_floating_pnl_for_logins(valid_logins)}
-
     grand_total = 0.0
-    for login in valid_logins:
-        bal   = bal_map.get(login, 0.0)
-        pnl   = pnl_map.get(login, 0.0)
-        bonus = bonus_map.get(login, 0.0)
-        grand_total += max(0.0, bal + pnl - bonus)
+    for login, equity, credit in get_dealio_equity_credit_for_logins(valid_logins):
+        bonus = bonus_map.get(int(login), 0.0)
+        val = float(equity or 0) - float(credit or 0) - bonus
+        grand_total += max(0.0, val)
 
     pnl_cash = round(grand_total - start_eez - net_deposits_today - today_bonuses)
     return {
