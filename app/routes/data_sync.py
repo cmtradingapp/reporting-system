@@ -7,7 +7,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from app.auth.dependencies import get_current_user
-from app.db.postgres_conn import fetch_accounts_stats, fetch_crm_users_stats, fetch_transactions_stats, fetch_targets_stats, fetch_dealio_mt4trades_stats, fetch_trading_accounts_stats, fetch_ftd100_stats, fetch_sync_log, fetch_dealio_daily_profit_stats, fetch_dealio_users_stats, fetch_dealio_trades_mt4_stats, fetch_dealio_daily_profits_stats, fetch_bonus_transactions_stats
+from app.db.postgres_conn import fetch_accounts_stats, fetch_crm_users_stats, fetch_transactions_stats, fetch_targets_stats, fetch_trading_accounts_stats, fetch_ftd100_stats, fetch_sync_log, fetch_dealio_users_stats, fetch_dealio_trades_mt4_stats, fetch_dealio_daily_profits_stats, fetch_bonus_transactions_stats
 from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 
@@ -72,10 +72,8 @@ async def data_sync_page(request: Request):
         "users_stats":     lambda: _cached("users_stats",     fetch_crm_users_stats),
         "tx_stats":        lambda: _cached("tx_stats",        fetch_transactions_stats),
         "targets_stats":   lambda: _cached("targets_stats",   fetch_targets_stats),
-        "dealio_stats":    lambda: _cached("dealio_stats",    fetch_dealio_mt4trades_stats),
         "ta_stats":        lambda: _cached("ta_stats",        fetch_trading_accounts_stats),
         "ftd100_stats":    lambda: _cached("ftd100_stats",    fetch_ftd100_stats),
-        "ddp_stats":       lambda: _cached("ddp_stats",       fetch_dealio_daily_profit_stats),
         "du_stats":        lambda: _cached("du_stats",        fetch_dealio_users_stats),
         "dtm4_stats":      lambda: _cached("dtm4_stats",      fetch_dealio_trades_mt4_stats),
         "ddps_stats":      lambda: _cached("ddps_stats",      fetch_dealio_daily_profits_stats),
@@ -84,10 +82,8 @@ async def data_sync_page(request: Request):
         "users_log":       lambda: fetch_sync_log("crm_users",         limit=50),
         "tx_log":          lambda: fetch_sync_log("transactions",       limit=50),
         "targets_log":     lambda: fetch_sync_log("targets",           limit=50),
-        "dealio_log":      lambda: fetch_sync_log("dealio_mt4trades",  limit=50),
         "ta_log":          lambda: fetch_sync_log("trading_accounts",  limit=50),
         "ftd100_log":      lambda: fetch_sync_log("ftd100_clients",    limit=50),
-        "ddp_log":         lambda: fetch_sync_log("dealio_daily_profit", limit=50),
         "du_log":          lambda: fetch_sync_log("dealio_users",      limit=50),
         "dtm4_log":        lambda: fetch_sync_log("dealio_trades_mt4", limit=50),
         "ddps_log":        lambda: fetch_sync_log("dealio_daily_profits", limit=50),
@@ -121,14 +117,10 @@ async def data_sync_page(request: Request):
     tx_log         = results["tx_log"]
     targets_stats  = results["targets_stats"]
     targets_log    = results["targets_log"]
-    dealio_stats   = results["dealio_stats"]
-    dealio_log     = results["dealio_log"]
     ta_stats       = results["ta_stats"]
     ta_log         = results["ta_log"]
     ftd100_stats   = results["ftd100_stats"]
     ftd100_log     = results["ftd100_log"]
-    ddp_stats      = results["ddp_stats"]
-    ddp_log        = results["ddp_log"]
     du_stats       = results["du_stats"]
     du_log         = results["du_log"]
     dtm4_stats     = results["dtm4_stats"]
@@ -212,24 +204,6 @@ async def data_sync_page(request: Request):
             "source": "MySQL → v_ant_broker_user + v_ant_users",
         },
         {
-            "key": "dealio_mt4trades",
-            "label": "dealio_mt4trades",
-            "last_synced_at": dealio_stats["last_synced_at"],
-            "stat_cards": [
-                {"label": "Total Records",   "value": dealio_stats["total_records"],  "color": "text-info",    "icon": "bi-database"},
-                {"label": "Unique Logins",   "value": dealio_stats["unique_logins"],  "color": "text-success", "icon": "bi-person-badge"},
-                {"label": "Total Volume",    "value": dealio_stats["total_volume"],   "color": "text-warning", "icon": "bi-graph-up"},
-                {"label": "Total Profit",    "value": dealio_stats["total_profit"],   "color": "text-primary", "icon": "bi-currency-dollar"},
-            ],
-            "sync_log": dealio_log,
-            "healthy": _is_healthy(dealio_log, DEALIO_SYNC_INTERVAL_HOURS),
-            "sync_interval_hours": DEALIO_SYNC_INTERVAL_HOURS,
-            "lookback_hours": DEALIO_SYNC_HOURS,
-            "primary_key": "ticket",
-            "incremental_columns": "last_modified, updated_at",
-            "source": "Dealio PG → dealio.trades_mt4",
-        },
-        {
             "key": "ftd100_clients",
             "label": "ftd100_clients",
             "last_synced_at": ftd100_stats["last_synced_at"],
@@ -246,24 +220,6 @@ async def data_sync_page(request: Request):
             "primary_key": "accountid",
             "incremental_columns": "N/A — full refresh (running total requires full recalc)",
             "source": "PostgreSQL → transactions + accounts (CTE)",
-        },
-        {
-            "key": "dealio_daily_profit",
-            "label": "dealio_daily_profit",
-            "last_synced_at": ddp_stats["last_synced_at"],
-            "stat_cards": [
-                {"label": "Total Records",     "value": ddp_stats["total_records"],     "color": "text-info",    "icon": "bi-database"},
-                {"label": "Unique Logins",     "value": ddp_stats["unique_logins"],     "color": "text-success", "icon": "bi-person-badge"},
-                {"label": "Total Closed PnL",  "value": ddp_stats["total_closed_pnl"],  "color": "text-warning", "icon": "bi-graph-up"},
-                {"label": "Total Net Deposit", "value": ddp_stats["total_net_deposit"], "color": "text-primary", "icon": "bi-currency-dollar"},
-            ],
-            "sync_log": ddp_log,
-            "healthy": _is_healthy(ddp_log, DEALIO_DAILY_PROFIT_SYNC_INTERVAL_HOURS),
-            "sync_interval_hours": DEALIO_DAILY_PROFIT_SYNC_INTERVAL_HOURS,
-            "lookback_hours": DEALIO_DAILY_PROFIT_SYNC_HOURS,
-            "primary_key": "login",
-            "incremental_columns": "date",
-            "source": "Dealio PG → dealio.daily_profits",
         },
         {
             "key": "targets",
