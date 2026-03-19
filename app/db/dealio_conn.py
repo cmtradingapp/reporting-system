@@ -414,6 +414,20 @@ def get_dealio_balance_for_logins(logins: list):
         conn.close()
 
 
+def get_dealio_compbalance_for_logins(logins: list):
+    """Fetch (login, compbalance) from dealio.users — live computed balance."""
+    conn = get_dealio_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT login, compbalance FROM dealio.users WHERE login = ANY(%s)",
+                (logins,)
+            )
+            return cur.fetchall()
+    finally:
+        conn.close()
+
+
 def get_dealio_floating_pnl_for_logins(logins: list):
     """Fetch floating PnL from dealio.trades_mt4 (open trades) for a specific list of logins."""
     conn = get_dealio_connection()

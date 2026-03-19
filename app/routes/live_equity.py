@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from app.auth.dependencies import get_current_user
 from app.db.postgres_conn import get_connection
-from app.db.dealio_conn import get_dealio_users_comp, get_dealio_users_balance, get_dealio_equity_credit_for_logins, get_dealio_balance_for_logins, get_dealio_floating_pnl_for_logins
+from app.db.dealio_conn import get_dealio_compbalance_for_logins, get_dealio_floating_pnl_for_logins
 from app import cache
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
@@ -110,13 +110,13 @@ def _historical_calc(d) -> dict:
 
 
 def _live_calc(d) -> dict:
-    """Live EEZ split into two groups:
-    Group A (no bonus): MAX(0, compprevequity - compcredit)
-    Group B (has bonus): MAX(0, compprevbalance + floating_pnl - bonus)
-    Both use dealio replica for equity/balance/pnl values.
+    """Live EEZ: MAX(0, compbalance + floating_pnl - bonus) per login.
+    compbalance = live computed balance from dealio replica.
+    floating_pnl = open trades PnL from dealio replica.
+    bonus = cumulative bonus from local bonus_transactions.
+    pnl_cash = Live EEZ - Start EEZ - Net Deposits (CEO formula).
     """
 
-    # Step 1: valid logins from local trading_accounts
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -131,52 +131,14 @@ def _live_calc(d) -> dict:
             valid_logins = [int(r[0]) for r in cur.fetchall()]
 
             if not valid_logins:
-                return {"total": 0, "is_live": True, "date": str(d)}
+                return {"total": 0, "start_equity_zeroed": 0, "net_deposits_today": 0, "pnl_cash": 0, "is_live": True, "date": str(d)}
 
-            # Split: Group B = logins with bonus transactions
             cur.execute(
-                "SELECT DISTINCT login FROM bonus_transactions WHERE login = ANY(%s)",
+                "SELECT login, SUM(net_amount) FROM bonus_transactions WHERE login = ANY(%s) GROUP BY login",
                 (valid_logins,)
             )
-            group_b_set = {int(r[0]) for r in cur.fetchall()}
+            bonus_map = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
 
-            group_a = [l for l in valid_logins if l not in group_b_set]
-            group_b = [l for l in valid_logins if l in group_b_set]
-
-            # Bonus amounts for Group B
-            bonus_map = {}
-            if group_b:
-                cur.execute(
-                    "SELECT login, SUM(net_amount) FROM bonus_transactions WHERE login = ANY(%s) GROUP BY login",
-                    (group_b,)
-                )
-                bonus_map = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
-    finally:
-        conn.close()
-
-    # Group A: compprevequity - compcredit from dealio replica
-    group_a_eez = 0.0
-    if group_a:
-        for login, equity, credit in get_dealio_equity_credit_for_logins(group_a):
-            val = float(equity or 0) - float(credit or 0)
-            group_a_eez += max(0.0, val)
-
-    # Group B: compprevbalance + floating_pnl - bonus from dealio replica
-    group_b_eez = 0.0
-    if group_b:
-        bal_map = {int(r[0]): float(r[1] or 0) for r in get_dealio_balance_for_logins(group_b)}
-        pnl_map = {int(r[0]): float(r[1] or 0) for r in get_dealio_floating_pnl_for_logins(group_b)}
-        for login in group_b:
-            bal   = bal_map.get(login, 0.0)
-            pnl   = pnl_map.get(login, 0.0)
-            bonus = bonus_map.get(login, 0.0)
-            group_b_eez += max(0.0, bal + pnl - bonus)
-
-    grand_total = group_a_eez + group_b_eez
-
-    conn2 = get_connection()
-    try:
-        with conn2.cursor() as cur:
             cur.execute("""
                 SELECT COALESCE(SUM(end_equity_zeroed), 0)
                 FROM daily_equity_zeroed
@@ -208,15 +170,32 @@ def _live_calc(d) -> dict:
                   AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
             """, {"d": str(d)})
             net_deposits_today = float(cur.fetchone()[0] or 0)
-    finally:
-        conn2.close()
 
-    pnl_cash = round(start_eez - grand_total - net_deposits_today)
+            cur.execute("""
+                SELECT COALESCE(SUM(net_amount), 0)
+                FROM bonus_transactions
+                WHERE confirmation_time::date = %(d)s
+            """, {"d": str(d)})
+            today_bonuses = float(cur.fetchone()[0] or 0)
+    finally:
+        conn.close()
+
+    bal_map = {int(r[0]): float(r[1] or 0) for r in get_dealio_compbalance_for_logins(valid_logins)}
+    pnl_map = {int(r[0]): float(r[1] or 0) for r in get_dealio_floating_pnl_for_logins(valid_logins)}
+
+    grand_total = 0.0
+    for login in valid_logins:
+        bal   = bal_map.get(login, 0.0)
+        pnl   = pnl_map.get(login, 0.0)
+        bonus = bonus_map.get(login, 0.0)
+        grand_total += max(0.0, bal + pnl - bonus)
+
+    pnl_cash = round(grand_total - start_eez - net_deposits_today - today_bonuses)
     return {
-        "total":              round(grand_total),
+        "total":               round(grand_total),
         "start_equity_zeroed": round(start_eez),
-        "net_deposits_today": round(net_deposits_today),
-        "pnl_cash":           pnl_cash,
-        "is_live":            True,
-        "date":               str(d),
+        "net_deposits_today":  round(net_deposits_today),
+        "pnl_cash":            pnl_cash,
+        "is_live":             True,
+        "date":                str(d),
     }
