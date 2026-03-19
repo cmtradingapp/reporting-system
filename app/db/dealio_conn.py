@@ -284,17 +284,17 @@ def get_dealio_daily_profits(hours: int = 48) -> pd.DataFrame:
 
 def get_dealio_daily_profits_daterange(date_from: str, date_to: str):
     """Fetch dealio.daily_profits for a specific date range in chunks."""
-    last_date = date_from
+    last_date = f"{date_from} 00:00:00"
     last_login = 0
+    last_sourceid = ""
     while True:
         sql = f"""
             SELECT {_DAILY_PROFITS_COLS}
             FROM dealio.daily_profits
             WHERE date::date >= %(date_from)s
               AND date::date <= %(date_to)s
-              AND (date::date > %(last_date)s
-                   OR (date::date = %(last_date)s AND login > %(last_login)s))
-            ORDER BY date, login
+              AND (date, login, sourceid) > (%(last_date)s::timestamptz, %(last_login)s, %(last_sourceid)s)
+            ORDER BY date, login, sourceid
             LIMIT {_CHUNK_SIZE}
         """
         conn = get_dealio_connection()
@@ -304,6 +304,7 @@ def get_dealio_daily_profits_daterange(date_from: str, date_to: str):
                 "date_to": date_to,
                 "last_date": last_date,
                 "last_login": last_login,
+                "last_sourceid": last_sourceid,
             })
         finally:
             conn.close()
@@ -312,21 +313,24 @@ def get_dealio_daily_profits_daterange(date_from: str, date_to: str):
         yield df
         if len(df) < _CHUNK_SIZE:
             break
-        last_date = str(df["date"].max())[:10]
-        last_login = int(df["login"].max())
+        last_date = str(df.iloc[-1]["date"])
+        last_login = int(df.iloc[-1]["login"])
+        last_sourceid = str(df.iloc[-1]["sourceid"])
 
 
 def get_dealio_daily_profits_full():
-    """Full fetch of dealio.daily_profits in chunks, paginated by (date, login)."""
-    last_date = "1970-01-01"
+    """Full fetch of dealio.daily_profits in chunks.
+    Paginated by (date, login, sourceid) — the full PK — so no rows are
+    skipped when multiple sourceids exist for the same (date, login)."""
+    last_date = "1970-01-01 00:00:00"
     last_login = 0
+    last_sourceid = ""
     while True:
         sql = f"""
             SELECT {_DAILY_PROFITS_COLS}
             FROM dealio.daily_profits
-            WHERE date::date > %(last_date)s
-               OR (date::date = %(last_date)s AND login > %(last_login)s)
-            ORDER BY date, login
+            WHERE (date, login, sourceid) > (%(last_date)s::timestamptz, %(last_login)s, %(last_sourceid)s)
+            ORDER BY date, login, sourceid
             LIMIT {_CHUNK_SIZE}
         """
         conn = get_dealio_connection()
@@ -334,6 +338,7 @@ def get_dealio_daily_profits_full():
             df = pd.read_sql(sql, conn, params={
                 "last_date": last_date,
                 "last_login": last_login,
+                "last_sourceid": last_sourceid,
             })
         finally:
             conn.close()
@@ -342,8 +347,9 @@ def get_dealio_daily_profits_full():
         yield df
         if len(df) < _CHUNK_SIZE:
             break
-        last_date = str(df["date"].max())[:10]
-        last_login = int(df["login"].max())
+        last_date = str(df.iloc[-1]["date"])
+        last_login = int(df.iloc[-1]["login"])
+        last_sourceid = str(df.iloc[-1]["sourceid"])
 
 
 # ── Live equity helpers ───────────────────────────────────────────────────────
