@@ -428,8 +428,9 @@ def get_dealio_floating_pnl_for_logins(logins: list):
                 WHERE login = ANY(%s)
                   AND close_time = '1970-01-01 00:00:00'
                   AND cmd < 2
+                  AND symbol NOT IN %s
                 GROUP BY login
-            """, (logins,))
+            """, (logins, _EXCLUDED_SYMBOLS_TUPLE))
             return cur.fetchall()
     finally:
         conn.close()
