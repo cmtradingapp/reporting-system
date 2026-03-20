@@ -29,7 +29,7 @@ async def live_equity_zeroed(request: Request, date: str = None):
             return JSONResponse(status_code=400, content={"detail": "Invalid date"})
 
     is_current_month = (d.year == today.year and d.month == today.month)
-    _ck = f"live_eez_v17:{d}"
+    _ck = f"live_eez_v18:{d}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -242,20 +242,16 @@ def _live_calc(d) -> dict:
     finally:
         conn.close()
 
-    # Fixed formula: max(0, live_equity - GREATEST(0, cumulative_bonus))
-    # live_equity = compprevequity (balance + floating PnL) from dealio replica
-    # Matches historical formula exactly — avoids double-counting bonus baked into start_eez
+    # Fixed formula: MAX(0, compprevequity - compcredit - GREATEST(0, cumulative_bonus))
+    # Must use equity_logins (ta.equity > 0) — using all valid_logins includes dormant
+    # accounts with stale compprevequity values that inflate the total.
     grand_total = 0.0
-    for login, equity, credit in get_dealio_equity_credit_for_logins(valid_logins):
-        bonus = max(0.0, bonus_map.get(int(login), 0.0))
-        grand_total += max(0.0, float(equity or 0) - bonus)
-
-    # Alt: MAX(0, compprevequity - compcredit - cumulative_bonus) for equity>0 logins
-    alt_total = 0.0
     if equity_logins:
         for login, equity, credit in get_dealio_equity_credit_for_logins(equity_logins):
-            bonus = alt_bonus_map.get(int(login), 0.0)
-            alt_total += max(0.0, float(equity or 0) - float(credit or 0) - bonus)
+            bonus = max(0.0, alt_bonus_map.get(int(login), 0.0))
+            grand_total += max(0.0, float(equity or 0) - float(credit or 0) - bonus)
+
+    alt_total = grand_total  # same formula, kept for backwards compat
 
     pnl_cash = round(grand_total - start_eez_total - net_deposits_today - today_bonuses)
     return {
