@@ -246,18 +246,6 @@ def _live_calc(d) -> dict:
             """, {"d": str(d)})
             today_bonuses = float(cur.fetchone()[0] or 0)
 
-            # EOD floating PnL for yesterday (from local dealio_daily_profits)
-            cur.execute("""
-                SELECT COALESCE(SUM(COALESCE(d.convertedfloatingpnl, 0)), 0)
-                FROM (
-                    SELECT DISTINCT ON (login) login, convertedfloatingpnl
-                    FROM dealio_daily_profits
-                    WHERE date::date = %(d)s::date - INTERVAL '1 day'
-                    ORDER BY login, date DESC
-                ) d
-                WHERE d.login = ANY(%(logins)s)
-            """, {"d": str(d), "logins": equity_logins})
-            eod_floating_yesterday = float(cur.fetchone()[0] or 0)
     finally:
         conn.close()
 
@@ -274,8 +262,35 @@ def _live_calc(d) -> dict:
             daily_end_net_equity += max(0.0, net_eq)
 
     # Daily PnL: delta_floating + today_closed_pnl
-    current_floating = sum(float(r[1] or 0) for r in get_dealio_floating_pnl_for_logins(equity_logins))
+    # IMPORTANT: eod_floating_yesterday must use the SAME login set as current_floating
+    # (only logins with currently open positions). Using all equity_logins creates a
+    # mismatch: accounts that closed positions inflate the delta.
+    open_pnl_rows    = get_dealio_floating_pnl_for_logins(equity_logins)
+    current_floating = sum(float(r[1] or 0) for r in open_pnl_rows)
+    open_logins      = [int(r[0]) for r in open_pnl_rows]
+
     today_closed_pnl = sum(float(r[1] or 0) for r in get_dealio_closed_pnl_for_logins_date(equity_logins, str(d)))
+
+    # Query eod_floating_yesterday only for currently-open logins
+    eod_floating_yesterday = 0.0
+    if open_logins:
+        conn2 = get_connection()
+        try:
+            with conn2.cursor() as cur:
+                cur.execute("""
+                    SELECT COALESCE(SUM(COALESCE(d.convertedfloatingpnl, 0)), 0)
+                    FROM (
+                        SELECT DISTINCT ON (login) login, convertedfloatingpnl
+                        FROM dealio_daily_profits
+                        WHERE date::date = %(d)s::date - INTERVAL '1 day'
+                        ORDER BY login, date DESC
+                    ) d
+                    WHERE d.login = ANY(%(logins)s)
+                """, {"d": str(d), "logins": open_logins})
+                eod_floating_yesterday = float(cur.fetchone()[0] or 0)
+        finally:
+            conn2.close()
+
     delta_floating   = current_floating - eod_floating_yesterday
     daily_pnl        = round(delta_floating + today_closed_pnl)
 
