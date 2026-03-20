@@ -200,14 +200,6 @@ def _live_calc(d) -> dict:
             """, {"d": str(d)})
             net_deposits_today = float(cur.fetchone()[0] or 0)
 
-            # Today's new bonuses (for pnl_cash)
-            cur.execute("""
-                SELECT COALESCE(SUM(net_amount), 0)
-                FROM bonus_transactions
-                WHERE confirmation_time::date = %(d)s
-            """, {"d": str(d)})
-            today_bonuses = float(cur.fetchone()[0] or 0)
-
             # Logins with equity > 0 from live trading_accounts
             cur.execute("""
                 SELECT ta.login::bigint
@@ -240,7 +232,7 @@ def _live_calc(d) -> dict:
             bonus = max(0.0, bonus_map.get(int(login), 0.0))
             grand_total += max(0.0, float(equity or 0) - float(credit or 0) - bonus)
 
-    pnl_cash = round(grand_total - start_eez_total - net_deposits_today - today_bonuses)
+    pnl_cash = round(start_eez_total - grand_total - net_deposits_today)
     return {
         "total":               round(grand_total),
         "start_equity_zeroed": round(start_eez_total),
