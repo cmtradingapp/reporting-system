@@ -64,7 +64,8 @@ async def live_equity_zeroed(request: Request, date: str = None):
         traceback.print_exc()
         return JSONResponse(status_code=500, content={"detail": str(e)})
 
-    cache.set(_ck, result)
+    if result.get("is_live", False):
+        cache.set(_ck, result)
     return JSONResponse(content=result)
 
 
