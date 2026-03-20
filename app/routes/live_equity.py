@@ -13,10 +13,10 @@ _TZ = ZoneInfo("Europe/Nicosia")
 
 router = APIRouter()
 
-_RETRYABLE_ERRORS = ("conflict with recovery", "ssl syscall error", "eof detected")
+_RETRYABLE_ERRORS = ("conflict with recovery", "ssl syscall error", "eof detected", "timeout expired")
 
-def _with_retry(fn, *args, retries=3, delay=1.5):
-    """Retry fn on transient dealio replica errors (replication conflict, SSL drop)."""
+def _with_retry(fn, *args, retries=4, delay=2.0):
+    """Retry fn on transient dealio replica errors (replication conflict, SSL drop, timeout)."""
     for attempt in range(retries):
         try:
             return fn(*args)
@@ -51,7 +51,13 @@ async def live_equity_zeroed(request: Request, date: str = None):
 
     try:
         if is_current_month:
-            result = _with_retry(_live_calc, d)
+            try:
+                result = _with_retry(_live_calc, d)
+            except Exception as live_err:
+                # Dealio unreachable — fall back to historical (local postgres only)
+                traceback.print_exc()
+                result = _historical_calc(d)
+                result["dealio_error"] = str(live_err)
         else:
             result = _with_retry(_historical_calc, d)
     except Exception as e:
