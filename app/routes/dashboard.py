@@ -256,14 +256,14 @@ def _dashboard_calc(today: date_type) -> dict:
                     SELECT DISTINCT ON (login)
                         login, convertedbalance, convertedfloatingpnl
                     FROM dealio_daily_profits
-                    WHERE EXTRACT(YEAR  FROM date) = EXTRACT(YEAR  FROM CURRENT_DATE)
-                      AND EXTRACT(MONTH FROM date) = EXTRACT(MONTH FROM CURRENT_DATE)
+                    WHERE date >= date_trunc('month', CURRENT_DATE)
+                      AND date <  date_trunc('month', CURRENT_DATE) + INTERVAL '1 month'
                     ORDER BY login, date DESC
                 ),
                 old_bonus_balance AS (
                     SELECT login, SUM(net_amount) AS old_bonus_balance
                     FROM bonus_transactions
-                    WHERE confirmation_time::date <= CURRENT_DATE
+                    WHERE confirmation_time < CURRENT_DATE + INTERVAL '1 day'
                     GROUP BY login
                 )
                 SELECT COALESCE(SUM(
@@ -310,7 +310,8 @@ def _dashboard_calc(today: date_type) -> dict:
                 FROM dealio_daily_profits d
                 JOIN trading_accounts ta ON ta.login::bigint = d.login
                 JOIN accounts a ON a.accountid = ta.vtigeraccountid
-                WHERE d.date::date = %(last_mtd)s
+                WHERE d.date >= %(last_mtd)s::date
+                  AND d.date <  %(last_mtd)s::date + INTERVAL '1 day'
                   AND a.is_test_account = 0
             """, {"last_mtd": last_mtd_str})
             pnl_daily = round(float(cur.fetchone()[0] or 0), 2)
@@ -325,8 +326,8 @@ def _dashboard_calc(today: date_type) -> dict:
                     FROM dealio_daily_profits d
                     JOIN trading_accounts ta ON ta.login::bigint = d.login
                     JOIN accounts a ON a.accountid = ta.vtigeraccountid
-                    WHERE d.date::date >= %(month_start)s
-                      AND d.date::date < %(tomorrow)s
+                    WHERE d.date >= %(month_start)s::date
+                      AND d.date <  %(tomorrow)s::date
                       AND a.is_test_account = 0
                 """, {"month_start": month_start_str, "tomorrow": tomorrow_str})
                 pnl_monthly = round(float(cur.fetchone()[0] or 0), 2)

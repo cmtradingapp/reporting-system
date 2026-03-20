@@ -244,14 +244,14 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
                     SELECT DISTINCT ON (login)
                         login, convertedbalance, convertedfloatingpnl
                     FROM dealio_daily_profits
-                    WHERE EXTRACT(YEAR  FROM date) = EXTRACT(YEAR  FROM %(date_to)s::date)
-                      AND EXTRACT(MONTH FROM date) = EXTRACT(MONTH FROM %(date_to)s::date)
+                    WHERE date >= date_trunc('month', %(date_to)s::date)
+                      AND date <  date_trunc('month', %(date_to)s::date) + INTERVAL '1 month'
                     ORDER BY login, date DESC
                 ),
                 old_bonus_balance AS (
                     SELECT login, SUM(net_amount) AS old_bonus_balance
                     FROM bonus_transactions
-                    WHERE confirmation_time::date <= %(date_to)s::date
+                    WHERE confirmation_time < %(date_to)s::date + INTERVAL '1 day'
                     GROUP BY login
                 )
                 SELECT COALESCE(SUM(
