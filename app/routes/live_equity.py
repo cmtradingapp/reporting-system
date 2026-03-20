@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from app.auth.dependencies import get_current_user
 from app.db.postgres_conn import get_connection
-from app.db.dealio_conn import get_dealio_floating_pnl_for_logins, get_dealio_equity_credit_for_logins, get_dealio_closed_pnl_for_logins_date
+from app.db.dealio_conn import get_dealio_floating_pnl_for_logins, get_dealio_compbalance_credit_for_logins, get_dealio_closed_pnl_for_logins_date
 from app import cache
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
@@ -43,7 +43,7 @@ async def live_equity_zeroed(request: Request, date: str = None):
             return JSONResponse(status_code=400, content={"detail": "Invalid date"})
 
     is_current_month = (d.year == today.year and d.month == today.month)
-    _ck = f"live_eez_v19:{d}"
+    _ck = f"live_eez_v20:{d}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -124,9 +124,9 @@ def _historical_calc(d) -> dict:
 
 
 def _live_calc(d) -> dict:
-    """Live EEZ: MAX(0, compprevequity - compcredit - GREATEST(0, cumulative_bonus)).
+    """Live EEZ (Method B): MAX(0, compbalance + live_floating - compcredit - cumulative_bonus).
+    compbalance is USD-converted and includes today's closed PnL (balance updates when trades close).
     Only includes logins where ta.equity > 0 (avoids stale dealio values for dormant accounts).
-    cumulative_bonus = SUM(net_amount) from bonus_transactions up to today.
     """
 
     conn = get_connection()
@@ -263,25 +263,26 @@ def _live_calc(d) -> dict:
     finally:
         conn.close()
 
-    # EEZ: MAX(0, compprevequity - compcredit - GREATEST(0, cumulative_bonus))
-    # Daily end net equity: MAX(0, compprevequity - compcredit) — raw, no bonus deduction
-    # Both computed in one dealio pass for efficiency.
+    # Fetch floating first — needed for both Method B EEZ and daily_pnl calc.
+    # IMPORTANT: eod_floating_yesterday must use the SAME login set (open_logins only)
+    # to avoid mismatch when accounts close all positions.
+    floating_rows    = get_dealio_floating_pnl_for_logins(equity_logins)
+    floating_map     = {int(r[0]): float(r[1] or 0) for r in floating_rows}
+    current_floating = sum(floating_map.values())
+    open_logins      = list(floating_map.keys())
+
+    # EEZ (Method B): MAX(0, compbalance + live_floating - compcredit - bonus)
+    # compbalance includes today's closed PnL; live_floating covers open positions.
+    # Daily end net equity: same without bonus deduction.
     grand_total = 0.0
     daily_end_net_equity = 0.0
     if equity_logins:
-        for login, equity, credit in get_dealio_equity_credit_for_logins(equity_logins):
-            net_eq = float(equity or 0) - float(credit or 0)
+        for login, balance, credit in get_dealio_compbalance_credit_for_logins(equity_logins):
+            flt    = floating_map.get(int(login), 0.0)
+            net_eq = float(balance or 0) + flt - float(credit or 0)
             bonus  = max(0.0, bonus_map.get(int(login), 0.0))
             grand_total          += max(0.0, net_eq - bonus)
             daily_end_net_equity += max(0.0, net_eq)
-
-    # Daily PnL: delta_floating + today_closed_pnl
-    # IMPORTANT: eod_floating_yesterday must use the SAME login set as current_floating
-    # (only logins with currently open positions). Using all equity_logins creates a
-    # mismatch: accounts that closed positions inflate the delta.
-    open_pnl_rows    = get_dealio_floating_pnl_for_logins(equity_logins)
-    current_floating = sum(float(r[1] or 0) for r in open_pnl_rows)
-    open_logins      = [int(r[0]) for r in open_pnl_rows]
 
     today_closed_pnl = sum(float(r[1] or 0) for r in get_dealio_closed_pnl_for_logins_date(equity_logins, str(d)))
 

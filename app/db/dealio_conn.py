@@ -428,6 +428,20 @@ def get_dealio_compbalance_for_logins(logins: list):
         conn.close()
 
 
+def get_dealio_compbalance_credit_for_logins(logins: list):
+    """Fetch (login, compbalance, compcredit) from dealio.users — live USD-converted balance + credit."""
+    conn = get_dealio_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT login, compbalance, compcredit FROM dealio.users WHERE login = ANY(%s)",
+                (logins,)
+            )
+            return cur.fetchall()
+    finally:
+        conn.close()
+
+
 def get_dealio_closed_pnl_for_logins_date(logins: list, date: str):
     """Fetch closed trade PnL from dealio.trades_mt4 for a specific close date."""
     conn = get_dealio_connection()
