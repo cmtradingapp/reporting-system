@@ -13,15 +13,16 @@ _TZ = ZoneInfo("Europe/Nicosia")
 
 router = APIRouter()
 
-_RECOVERY_CONFLICT = "conflict with recovery"
+_RETRYABLE_ERRORS = ("conflict with recovery", "ssl syscall error", "eof detected")
 
 def _with_retry(fn, *args, retries=3, delay=1.5):
-    """Retry fn on hot-standby replication conflict (dealio replica)."""
+    """Retry fn on transient dealio replica errors (replication conflict, SSL drop)."""
     for attempt in range(retries):
         try:
             return fn(*args)
         except Exception as e:
-            if attempt < retries - 1 and _RECOVERY_CONFLICT in str(e).lower():
+            msg = str(e).lower()
+            if attempt < retries - 1 and any(s in msg for s in _RETRYABLE_ERRORS):
                 time.sleep(delay)
                 continue
             raise
