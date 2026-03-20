@@ -53,6 +53,7 @@ def warm_cache():
             print(f"[warm_cache] live_eez: {e}")
 
 SYNC_INTERVAL_MINUTES          = int(os.getenv("SYNC_INTERVAL_MINUTES", "2"))
+TRANSACTIONS_SYNC_INTERVAL_MINUTES = int(os.getenv("TRANSACTIONS_SYNC_INTERVAL_MINUTES", "1"))
 ACCOUNTS_SYNC_HOURS            = int(os.getenv("ACCOUNTS_SYNC_HOURS", "6"))
 USERS_SYNC_HOURS               = int(os.getenv("USERS_SYNC_HOURS", "6"))
 TRANSACTIONS_SYNC_HOURS        = int(os.getenv("TRANSACTIONS_SYNC_HOURS", "6"))
@@ -96,7 +97,7 @@ async def lifespan(app: FastAPI):
     scheduler.add_job(
         run_transactions_etl,
         "interval",
-        minutes=SYNC_INTERVAL_MINUTES,
+        minutes=TRANSACTIONS_SYNC_INTERVAL_MINUTES,
         kwargs={"hours": TRANSACTIONS_SYNC_HOURS},
         id="transactions_sync",
         start_date=_base + timedelta(seconds=60),
