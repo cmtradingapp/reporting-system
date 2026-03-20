@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from app.auth.dependencies import get_current_user
 from app.db.postgres_conn import get_connection
-from app.db.dealio_conn import get_dealio_floating_pnl_for_logins
+from app.db.dealio_conn import get_dealio_floating_pnl_for_logins, get_dealio_equity_credit_for_logins
 from app import cache
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
@@ -29,7 +29,7 @@ async def live_equity_zeroed(request: Request, date: str = None):
             return JSONResponse(status_code=400, content={"detail": "Invalid date"})
 
     is_current_month = (d.year == today.year and d.month == today.month)
-    _ck = f"live_eez_v16:{d}"
+    _ck = f"live_eez_v17:{d}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -219,22 +219,48 @@ def _live_calc(d) -> dict:
                 WHERE confirmation_time::date = %(d)s
             """, {"d": str(d)})
             today_bonuses = float(cur.fetchone()[0] or 0)
+
+            # Alt calculation: logins with equity > 0 from trading_accounts
+            cur.execute("""
+                SELECT ta.login::bigint
+                FROM trading_accounts ta
+                JOIN accounts a ON a.accountid = ta.vtigeraccountid
+                WHERE ta.equity > 0
+                  AND (ta.deleted = 0 OR ta.deleted IS NULL)
+                  AND a.is_test_account = 0
+            """)
+            equity_logins = [int(r[0]) for r in cur.fetchall()]
+
+            cur.execute("""
+                SELECT login, SUM(net_amount)
+                FROM bonus_transactions
+                WHERE confirmation_time::date <= %(d)s
+                  AND login = ANY(%(logins)s)
+                GROUP BY login
+            """, {"d": str(d), "logins": equity_logins})
+            alt_bonus_map = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
     finally:
         conn.close()
 
-    open_pnl_map = {int(r[0]): float(r[1] or 0) for r in get_dealio_floating_pnl_for_logins(valid_logins)}
-
+    # Fixed formula: max(0, live_equity - GREATEST(0, cumulative_bonus))
+    # live_equity = compprevequity (balance + floating PnL) from dealio replica
+    # Matches historical formula exactly — avoids double-counting bonus baked into start_eez
     grand_total = 0.0
-    for login in valid_logins:
-        start  = start_eez_map.get(login, 0.0)
-        dep    = net_deposits_map.get(login, 0.0)
-        pnl    = open_pnl_map.get(login, 0.0)
-        bonus  = bonus_map.get(login, 0.0)
-        grand_total += max(0.0, start + dep + pnl - bonus)
+    for login, equity, credit in get_dealio_equity_credit_for_logins(valid_logins):
+        bonus = max(0.0, bonus_map.get(int(login), 0.0))
+        grand_total += max(0.0, float(equity or 0) - bonus)
+
+    # Alt: MAX(0, compprevequity - compcredit - cumulative_bonus) for equity>0 logins
+    alt_total = 0.0
+    if equity_logins:
+        for login, equity, credit in get_dealio_equity_credit_for_logins(equity_logins):
+            bonus = alt_bonus_map.get(int(login), 0.0)
+            alt_total += max(0.0, float(equity or 0) - float(credit or 0) - bonus)
 
     pnl_cash = round(grand_total - start_eez_total - net_deposits_today - today_bonuses)
     return {
         "total":               round(grand_total),
+        "total_alt":           round(alt_total),
         "start_equity_zeroed": round(start_eez_total),
         "net_deposits_today":  round(net_deposits_today),
         "pnl_cash":            pnl_cash,
