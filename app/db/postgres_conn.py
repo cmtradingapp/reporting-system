@@ -1947,7 +1947,7 @@ def truncate_dealio_trades_mt4():
 def fetch_dealio_trades_mt4_stats() -> dict:
     sql = """
         SELECT
-            COUNT(*)                  AS total_records,
+            (SELECT reltuples::bigint FROM pg_class WHERE relname = 'dealio_trades_mt4') AS total_records,
             MAX(synced_at)            AS last_synced_at,
             COUNT(DISTINCT login)     AS unique_logins,
             COALESCE(SUM(profit), 0)  AS total_profit,

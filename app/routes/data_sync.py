@@ -101,7 +101,7 @@ async def data_sync_page(request: Request):
         for future in futures:
             key = futures[future]
             try:
-                results[key] = future.result(timeout=20)
+                results[key] = future.result(timeout=60)
             except FutureTimeoutError:
                 logging.warning("data_sync job timed out: %s", key)
                 results[key] = [] if key.endswith("_log") else _err_stats()
