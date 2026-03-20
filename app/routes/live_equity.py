@@ -7,10 +7,24 @@ from app import cache
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 import traceback
+import time
 
 _TZ = ZoneInfo("Europe/Nicosia")
 
 router = APIRouter()
+
+_RECOVERY_CONFLICT = "conflict with recovery"
+
+def _with_retry(fn, *args, retries=3, delay=1.5):
+    """Retry fn on hot-standby replication conflict (dealio replica)."""
+    for attempt in range(retries):
+        try:
+            return fn(*args)
+        except Exception as e:
+            if attempt < retries - 1 and _RECOVERY_CONFLICT in str(e).lower():
+                time.sleep(delay)
+                continue
+            raise
 
 
 @router.get("/api/live-equity-zeroed")
@@ -36,9 +50,9 @@ async def live_equity_zeroed(request: Request, date: str = None):
 
     try:
         if is_current_month:
-            result = _live_calc(d)
+            result = _with_retry(_live_calc, d)
         else:
-            result = _historical_calc(d)
+            result = _with_retry(_historical_calc, d)
     except Exception as e:
         traceback.print_exc()
         return JSONResponse(status_code=500, content={"detail": str(e)})
