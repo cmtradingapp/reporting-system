@@ -451,18 +451,17 @@ def get_dealio_closed_pnl_for_logins_date(logins: list, date: str):
 
 
 def get_dealio_floating_pnl_for_logins(logins: list):
-    """Fetch floating PnL from dealio.trades_mt4 (open trades) for a specific list of logins."""
+    """Fetch floating PnL from dealio.positions (live open positions) for a specific list of logins."""
     conn = get_dealio_connection()
     try:
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT login,
-                       SUM(COALESCE(computed_commission, 0)
-                         + COALESCE(computed_profit, 0)
-                         + COALESCE(computed_swap, 0)) AS floatingpnl
-                FROM dealio.trades_mt4
+                       SUM(COALESCE(computedcommission, 0)
+                         + COALESCE(computedprofit, 0)
+                         + COALESCE(computedswap, 0)) AS floatingpnl
+                FROM dealio.positions
                 WHERE login = ANY(%s)
-                  AND close_time = '1970-01-01 00:00:00'
                   AND cmd < 2
                   AND symbol NOT IN %s
                 GROUP BY login
