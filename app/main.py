@@ -52,7 +52,7 @@ def warm_cache():
         except Exception as e:
             print(f"[warm_cache] live_eez: {e}")
 
-SYNC_INTERVAL_MINUTES          = int(os.getenv("SYNC_INTERVAL_MINUTES", "5"))
+SYNC_INTERVAL_MINUTES          = int(os.getenv("SYNC_INTERVAL_MINUTES", "2"))
 ACCOUNTS_SYNC_HOURS            = int(os.getenv("ACCOUNTS_SYNC_HOURS", "6"))
 USERS_SYNC_HOURS               = int(os.getenv("USERS_SYNC_HOURS", "6"))
 TRANSACTIONS_SYNC_HOURS        = int(os.getenv("TRANSACTIONS_SYNC_HOURS", "6"))
