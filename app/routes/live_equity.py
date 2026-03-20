@@ -220,24 +220,56 @@ def _live_calc(d) -> dict:
                 GROUP BY login
             """, {"d": str(d), "logins": equity_logins})
             bonus_map = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
+
+            # Daily start net equity: MAX(0, convertedbalance + convertedfloatingpnl)
+            # from dealio_daily_profits for yesterday, same equity_logins set
+            cur.execute("""
+                SELECT COALESCE(SUM(CASE
+                    WHEN COALESCE(d.convertedbalance,0) + COALESCE(d.convertedfloatingpnl,0) <= 0 THEN 0
+                    ELSE COALESCE(d.convertedbalance,0) + COALESCE(d.convertedfloatingpnl,0)
+                END), 0)
+                FROM (
+                    SELECT DISTINCT ON (login) login, convertedbalance, convertedfloatingpnl
+                    FROM dealio_daily_profits
+                    WHERE date::date = %(d)s::date - INTERVAL '1 day'
+                    ORDER BY login, date DESC
+                ) d
+                WHERE d.login = ANY(%(logins)s)
+            """, {"d": str(d), "logins": equity_logins})
+            start_net_equity = float(cur.fetchone()[0] or 0)
+
+            # Today's bonuses (for daily pnl cash)
+            cur.execute("""
+                SELECT COALESCE(SUM(net_amount), 0)
+                FROM bonus_transactions
+                WHERE confirmation_time::date = %(d)s
+            """, {"d": str(d)})
+            today_bonuses = float(cur.fetchone()[0] or 0)
     finally:
         conn.close()
 
-    # Fixed formula: MAX(0, compprevequity - compcredit - GREATEST(0, cumulative_bonus))
-    # Must use equity_logins (ta.equity > 0) — using all valid_logins includes dormant
-    # accounts with stale compprevequity values that inflate the total.
+    # EEZ: MAX(0, compprevequity - compcredit - GREATEST(0, cumulative_bonus))
+    # Daily end net equity: MAX(0, compprevequity - compcredit) — raw, no bonus deduction
+    # Both computed in one dealio pass for efficiency.
     grand_total = 0.0
+    daily_end_net_equity = 0.0
     if equity_logins:
         for login, equity, credit in get_dealio_equity_credit_for_logins(equity_logins):
-            bonus = max(0.0, bonus_map.get(int(login), 0.0))
-            grand_total += max(0.0, float(equity or 0) - float(credit or 0) - bonus)
+            net_eq = float(equity or 0) - float(credit or 0)
+            bonus  = max(0.0, bonus_map.get(int(login), 0.0))
+            grand_total          += max(0.0, net_eq - bonus)
+            daily_end_net_equity += max(0.0, net_eq)
 
-    pnl_cash = round(start_eez_total - grand_total - net_deposits_today)
+    pnl_cash       = round(start_eez_total - grand_total - net_deposits_today)
+    daily_pnl_cash = round(daily_end_net_equity - start_net_equity - net_deposits_today - today_bonuses)
     return {
-        "total":               round(grand_total),
-        "start_equity_zeroed": round(start_eez_total),
-        "net_deposits_today":  round(net_deposits_today),
-        "pnl_cash":            pnl_cash,
-        "is_live":             True,
-        "date":                str(d),
+        "total":                 round(grand_total),
+        "start_equity_zeroed":   round(start_eez_total),
+        "net_deposits_today":    round(net_deposits_today),
+        "pnl_cash":              pnl_cash,
+        "daily_pnl_cash":        daily_pnl_cash,
+        "daily_end_net_equity":  round(daily_end_net_equity),
+        "daily_start_net_equity": round(start_net_equity),
+        "is_live":               True,
+        "date":                  str(d),
     }
