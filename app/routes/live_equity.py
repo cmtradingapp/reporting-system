@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from app.auth.dependencies import get_current_user
 from app.db.postgres_conn import get_connection
-from app.db.dealio_conn import get_dealio_floating_pnl_for_logins, get_dealio_compbalance_credit_for_logins, get_dealio_closed_pnl_for_logins_date
+from app.db.dealio_conn import get_dealio_floating_pnl_for_logins, get_dealio_compbalance_for_logins, get_dealio_closed_pnl_for_logins_date
 from app import cache
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
@@ -44,7 +44,7 @@ async def live_equity_zeroed(request: Request, date: str = None):
             return JSONResponse(status_code=400, content={"detail": "Invalid date"})
 
     is_current_month = (d.year == today.year and d.month == today.month)
-    _ck = f"live_eez_v20:{d}"
+    _ck = f"live_eez_v21:{d}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -125,8 +125,10 @@ def _historical_calc(d) -> dict:
 
 
 def _live_calc(d) -> dict:
-    """Live EEZ (Method B): MAX(0, compbalance + live_floating - compcredit - cumulative_bonus).
-    compbalance is USD-converted and includes today's closed PnL (balance updates when trades close).
+    """Live EEZ: MAX(0, compbalance + live_floating - cumulative_bonus).
+    Matches snapshot formula: MAX(0, convertedbalance + convertedfloatingpnl - bonus).
+    compbalance = pure balance (no credit included) — no credit deduction needed.
+    compbalance includes today's closed PnL (balance updates when trades close).
     Only includes logins where ta.equity > 0 (avoids stale dealio values for dormant accounts).
     """
 
@@ -272,15 +274,15 @@ def _live_calc(d) -> dict:
     current_floating = sum(floating_map.values())
     open_logins      = list(floating_map.keys())
 
-    # EEZ (Method B): MAX(0, compbalance + live_floating - compcredit - bonus)
-    # compbalance includes today's closed PnL; live_floating covers open positions.
+    # EEZ: MAX(0, compbalance + live_floating - bonus)
+    # compbalance = pure balance (no credit) — matches snapshot formula exactly.
     # Daily end net equity: same without bonus deduction.
     grand_total = 0.0
     daily_end_net_equity = 0.0
     if equity_logins:
-        for login, balance, credit in get_dealio_compbalance_credit_for_logins(equity_logins):
+        for login, balance in get_dealio_compbalance_for_logins(equity_logins):
             flt    = floating_map.get(int(login), 0.0)
-            net_eq = float(balance or 0) + flt - float(credit or 0)
+            net_eq = float(balance or 0) + flt
             bonus  = max(0.0, bonus_map.get(int(login), 0.0))
             grand_total          += max(0.0, net_eq - bonus)
             daily_end_net_equity += max(0.0, net_eq)
