@@ -110,11 +110,9 @@ def _historical_calc(d) -> dict:
 
 
 def _live_calc(d) -> dict:
-    """Live EEZ per login: MAX(0, start_eez + net_deposits_today + open_pnl - cumulative_bonus).
-    start_eez = yesterday's EEZ from daily_equity_zeroed.
-    net_deposits_today = today's cash deposits/withdrawals from local transactions.
-    open_pnl = floating PnL from live dealio replica.
-    cumulative_bonus = total bonuses up to today from bonus_transactions.
+    """Live EEZ: MAX(0, compprevequity - compcredit - GREATEST(0, cumulative_bonus)).
+    Only includes logins where ta.equity > 0 (avoids stale dealio values for dormant accounts).
+    cumulative_bonus = SUM(net_amount) from bonus_transactions up to today.
     """
 
     conn = get_connection()
@@ -202,16 +200,6 @@ def _live_calc(d) -> dict:
             """, {"d": str(d)})
             net_deposits_today = float(cur.fetchone()[0] or 0)
 
-            # Cumulative bonus per login (up to today, same as snapshot formula)
-            cur.execute("""
-                SELECT login, SUM(net_amount)
-                FROM bonus_transactions
-                WHERE confirmation_time::date <= %(d)s
-                  AND login = ANY(%(logins)s)
-                GROUP BY login
-            """, {"d": str(d), "logins": valid_logins})
-            bonus_map = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
-
             # Today's new bonuses (for pnl_cash)
             cur.execute("""
                 SELECT COALESCE(SUM(net_amount), 0)
@@ -220,7 +208,7 @@ def _live_calc(d) -> dict:
             """, {"d": str(d)})
             today_bonuses = float(cur.fetchone()[0] or 0)
 
-            # Alt calculation: logins with equity > 0 from trading_accounts
+            # Logins with equity > 0 from live trading_accounts
             cur.execute("""
                 SELECT ta.login::bigint
                 FROM trading_accounts ta
@@ -231,6 +219,7 @@ def _live_calc(d) -> dict:
             """)
             equity_logins = [int(r[0]) for r in cur.fetchall()]
 
+            # Cumulative bonus per login up to today (for equity_logins only)
             cur.execute("""
                 SELECT login, SUM(net_amount)
                 FROM bonus_transactions
@@ -238,7 +227,7 @@ def _live_calc(d) -> dict:
                   AND login = ANY(%(logins)s)
                 GROUP BY login
             """, {"d": str(d), "logins": equity_logins})
-            alt_bonus_map = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
+            bonus_map = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
     finally:
         conn.close()
 
@@ -248,15 +237,12 @@ def _live_calc(d) -> dict:
     grand_total = 0.0
     if equity_logins:
         for login, equity, credit in get_dealio_equity_credit_for_logins(equity_logins):
-            bonus = max(0.0, alt_bonus_map.get(int(login), 0.0))
+            bonus = max(0.0, bonus_map.get(int(login), 0.0))
             grand_total += max(0.0, float(equity or 0) - float(credit or 0) - bonus)
-
-    alt_total = grand_total  # same formula, kept for backwards compat
 
     pnl_cash = round(grand_total - start_eez_total - net_deposits_today - today_bonuses)
     return {
         "total":               round(grand_total),
-        "total_alt":           round(alt_total),
         "start_equity_zeroed": round(start_eez_total),
         "net_deposits_today":  round(net_deposits_today),
         "pnl_cash":            pnl_cash,
