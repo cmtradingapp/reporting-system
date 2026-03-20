@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from app.auth.dependencies import get_current_user
 from app.db.postgres_conn import get_connection
-from app.db.dealio_conn import get_dealio_floating_pnl_for_logins, get_dealio_equity_credit_for_logins
+from app.db.dealio_conn import get_dealio_floating_pnl_for_logins, get_dealio_equity_credit_for_logins, get_dealio_closed_pnl_for_logins_date
 from app import cache
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
@@ -245,6 +245,19 @@ def _live_calc(d) -> dict:
                 WHERE confirmation_time::date = %(d)s
             """, {"d": str(d)})
             today_bonuses = float(cur.fetchone()[0] or 0)
+
+            # EOD floating PnL for yesterday (from local dealio_daily_profits)
+            cur.execute("""
+                SELECT COALESCE(SUM(COALESCE(d.convertedfloatingpnl, 0)), 0)
+                FROM (
+                    SELECT DISTINCT ON (login) login, convertedfloatingpnl
+                    FROM dealio_daily_profits
+                    WHERE date::date = %(d)s::date - INTERVAL '1 day'
+                    ORDER BY login, date DESC
+                ) d
+                WHERE d.login = ANY(%(logins)s)
+            """, {"d": str(d), "logins": equity_logins})
+            eod_floating_yesterday = float(cur.fetchone()[0] or 0)
     finally:
         conn.close()
 
@@ -260,16 +273,26 @@ def _live_calc(d) -> dict:
             grand_total          += max(0.0, net_eq - bonus)
             daily_end_net_equity += max(0.0, net_eq)
 
+    # Daily PnL: delta_floating + today_closed_pnl
+    current_floating = sum(float(r[1] or 0) for r in get_dealio_floating_pnl_for_logins(equity_logins))
+    today_closed_pnl = sum(float(r[1] or 0) for r in get_dealio_closed_pnl_for_logins_date(equity_logins, str(d)))
+    delta_floating   = current_floating - eod_floating_yesterday
+    daily_pnl        = round(delta_floating + today_closed_pnl)
+
     pnl_cash       = round(start_eez_total - grand_total - net_deposits_today)
     daily_pnl_cash = round(daily_end_net_equity - start_net_equity - net_deposits_today - today_bonuses)
     return {
-        "total":                 round(grand_total),
-        "start_equity_zeroed":   round(start_eez_total),
-        "net_deposits_today":    round(net_deposits_today),
-        "pnl_cash":              pnl_cash,
-        "daily_pnl_cash":        daily_pnl_cash,
-        "daily_end_net_equity":  round(daily_end_net_equity),
+        "total":                  round(grand_total),
+        "start_equity_zeroed":    round(start_eez_total),
+        "net_deposits_today":     round(net_deposits_today),
+        "pnl_cash":               pnl_cash,
+        "daily_pnl_cash":         daily_pnl_cash,
+        "daily_pnl":              daily_pnl,
+        "current_floating":       round(current_floating),
+        "eod_floating_yesterday": round(eod_floating_yesterday),
+        "today_closed_pnl":       round(today_closed_pnl),
+        "daily_end_net_equity":   round(daily_end_net_equity),
         "daily_start_net_equity": round(start_net_equity),
-        "is_live":               True,
-        "date":                  str(d),
+        "is_live":                True,
+        "date":                   str(d),
     }

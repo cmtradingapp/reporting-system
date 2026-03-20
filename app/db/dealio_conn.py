@@ -428,6 +428,28 @@ def get_dealio_compbalance_for_logins(logins: list):
         conn.close()
 
 
+def get_dealio_closed_pnl_for_logins_date(logins: list, date: str):
+    """Fetch closed trade PnL from dealio.trades_mt4 for a specific close date."""
+    conn = get_dealio_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT login,
+                       SUM(COALESCE(computed_commission, 0)
+                         + COALESCE(computed_profit, 0)
+                         + COALESCE(computed_swap, 0)) AS closed_pnl
+                FROM dealio.trades_mt4
+                WHERE login = ANY(%s)
+                  AND close_time::date = %s
+                  AND cmd < 2
+                  AND symbol NOT IN %s
+                GROUP BY login
+            """, (logins, date, _EXCLUDED_SYMBOLS_TUPLE))
+            return cur.fetchall()
+    finally:
+        conn.close()
+
+
 def get_dealio_floating_pnl_for_logins(logins: list):
     """Fetch floating PnL from dealio.trades_mt4 (open trades) for a specific list of logins."""
     conn = get_dealio_connection()
