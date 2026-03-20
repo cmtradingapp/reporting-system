@@ -1,9 +1,9 @@
 """
-EEZ Debug: Compare per-login snapshot vs live-formula reconstruction for 2026-03-19.
+EEZ Debug: Compare snapshot vs broken live vs FIXED live formula for 2026-03-19.
 
 Run on server:
-  cd /opt/reporting-system/reporting-system
-  PGPASSWORD=8PpVuUasBVR85T7WuAec python3 eez_debug_0319.py
+  docker cp /opt/reporting-system/reporting-system/eez_debug_0319.py reporting-system-app-1:/tmp/eez_debug_0319.py
+  docker exec reporting-system-app-1 python3 /tmp/eez_debug_0319.py
 """
 import psycopg2
 
@@ -18,33 +18,21 @@ conn = psycopg2.connect(
 
 with conn.cursor() as cur:
 
-    # ── 1. Snapshot values for 2026-03-19 ────────────────────────────────────
-    cur.execute("""
-        SELECT login, end_equity_zeroed
-        FROM daily_equity_zeroed
-        WHERE day = %s
-        ORDER BY login
-    """, (TARGET_DATE,))
+    # 1. Snapshot for 2026-03-19
+    cur.execute("SELECT login, end_equity_zeroed FROM daily_equity_zeroed WHERE day = %s", (TARGET_DATE,))
     snapshot = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
-    print(f"[1] Snapshot rows for {TARGET_DATE}: {len(snapshot)}")
 
-    # ── 2. Start EEZ per login (from 2026-03-18 snapshot) ────────────────────
-    cur.execute("""
-        SELECT login, end_equity_zeroed
-        FROM daily_equity_zeroed
-        WHERE day = %s
-        ORDER BY login
-    """, (PREV_DATE,))
+    # 2. Start EEZ (2026-03-18 snapshot)
+    cur.execute("SELECT login, end_equity_zeroed FROM daily_equity_zeroed WHERE day = %s", (PREV_DATE,))
     start_eez = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
-    print(f"[2] Start EEZ rows ({PREV_DATE}): {len(start_eez)}")
 
-    # ── 3. Net deposits per login on 2026-03-19 ───────────────────────────────
+    # 3. Net deposits on 2026-03-19 per login
     cur.execute("""
         SELECT ta.login::bigint,
                COALESCE(SUM(CASE
                    WHEN t.transactiontype IN ('Deposit','Withdrawal Cancelled') THEN  t.usdamount
                    WHEN t.transactiontype IN ('Withdrawal','Deposit Cancelled') THEN -t.usdamount
-               END), 0) AS net_dep
+               END), 0)
         FROM transactions t
         JOIN accounts a           ON a.accountid = t.vtigeraccountid
         JOIN trading_accounts ta  ON ta.vtigeraccountid = t.vtigeraccountid
@@ -62,133 +50,127 @@ with conn.cursor() as cur:
         GROUP BY ta.login::bigint
     """, (TARGET_DATE,))
     net_deposits = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
-    print(f"[3] Logins with net deposits on {TARGET_DATE}: {len(net_deposits)}")
 
-    # ── 4. Floating PnL per login from dealio_daily_profits for 2026-03-19 ───
-    #    (convertedbalance + convertedfloatingpnl = equity proxy for that date)
+    # 4. Balance + floating PnL from dealio_daily_profits for 2026-03-19
     cur.execute("""
-        SELECT DISTINCT ON (login)
-            login,
-            convertedbalance,
-            convertedfloatingpnl
+        SELECT DISTINCT ON (login) login, convertedbalance, convertedfloatingpnl
         FROM dealio_daily_profits
         WHERE date::date = %s
         ORDER BY login, date DESC
     """, (TARGET_DATE,))
     raw_equity = {}
     for r in cur.fetchall():
-        login = int(r[0])
-        bal   = float(r[1] or 0)
-        fpnl  = float(r[2] or 0)
-        raw_equity[login] = {"balance": bal, "fpnl": fpnl}
-    print(f"[4] dealio_daily_profits rows for {TARGET_DATE}: {len(raw_equity)}")
+        raw_equity[int(r[0])] = {"balance": float(r[1] or 0), "fpnl": float(r[2] or 0)}
 
-    # ── 5. Cumulative bonus per login up to 2026-03-19 ────────────────────────
+    # 5. Cumulative bonus up to 2026-03-19
     cur.execute("""
-        SELECT login, SUM(net_amount)
-        FROM bonus_transactions
-        WHERE confirmation_time::date <= %s
-        GROUP BY login
+        SELECT login, SUM(net_amount) FROM bonus_transactions
+        WHERE confirmation_time::date <= %s GROUP BY login
     """, (TARGET_DATE,))
-    bonus = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
-    print(f"[5] Logins with bonus up to {TARGET_DATE}: {len(bonus)}")
+    bonus_cum = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
 
-    # ── 6. Valid logins (non-test, non-deleted, has vtigeraccountid) ──────────
+    # 6. Today's new bonuses only (2026-03-19)
     cur.execute("""
-        SELECT ta.login::bigint
-        FROM trading_accounts ta
+        SELECT login, SUM(net_amount) FROM bonus_transactions
+        WHERE confirmation_time::date = %s GROUP BY login
+    """, (TARGET_DATE,))
+    bonus_today = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
+
+    # 7. Valid logins
+    cur.execute("""
+        SELECT ta.login::bigint FROM trading_accounts ta
         JOIN accounts a ON a.accountid = ta.vtigeraccountid
         WHERE (ta.deleted = 0 OR ta.deleted IS NULL)
-          AND a.is_test_account = 0
-          AND ta.vtigeraccountid IS NOT NULL
+          AND a.is_test_account = 0 AND ta.vtigeraccountid IS NOT NULL
     """)
     valid_logins = {int(r[0]) for r in cur.fetchall()}
-    print(f"[6] Valid logins: {len(valid_logins)}")
 
 conn.close()
 
-# ── Reconstruct live formula for each login ───────────────────────────────────
-# live  = max(0, start_eez + net_deposits + floating_pnl - cumulative_bonus)
-# Note: floating_pnl here = convertedfloatingpnl from dealio_daily_profits for that day
-#       (proxy — real live would be from dealio replica at time of calculation)
-
-all_logins = valid_logins & (set(snapshot.keys()) | set(start_eez.keys()) | set(raw_equity.keys()))
-
+# ── Per-login computation ─────────────────────────────────────────────────────
+THRESHOLD = 50.0
 rows = []
+
+all_logins = valid_logins & (set(snapshot) | set(start_eez) | set(raw_equity))
+
 for login in sorted(all_logins):
-    snap    = snapshot.get(login, None)   # what's stored
+    snap    = snapshot.get(login, 0.0)
     start   = start_eez.get(login, 0.0)
     dep     = net_deposits.get(login, 0.0)
-    eq_info = raw_equity.get(login)
-    fpnl    = eq_info["fpnl"]   if eq_info else 0.0
-    bal     = eq_info["balance"] if eq_info else 0.0
-    bon     = max(0.0, bonus.get(login, 0.0))   # clamp
+    eq      = raw_equity.get(login)
+    bal     = eq["balance"] if eq else 0.0
+    fpnl    = eq["fpnl"]    if eq else 0.0
     equity  = bal + fpnl
+    bon_cum = max(0.0, bonus_cum.get(login, 0.0))
+    bon_new = bonus_today.get(login, 0.0)   # today's bonuses only
 
-    # Live formula (same as _live_calc)
-    live_val = max(0.0, start + dep + fpnl - bon)
+    # ── BROKEN live formula (current code) ──────────────────────────────────
+    # Bug 1: uses total cumulative bonus (already baked into start_eez)
+    # Bug 2: uses total floating PnL instead of delta
+    broken_live = max(0.0, start + dep + fpnl - bon_cum)
 
-    # Historical formula (same as _historical_calc / snapshot formula)
+    # ── FIXED live formula ───────────────────────────────────────────────────
+    # Same shape as historical: use actual equity (balance+fpnl) - cumulative bonus
+    # (In production this will use live dealio equity instead of daily_profits)
     if equity <= 0:
-        hist_val = 0.0
+        fixed_live = 0.0
     else:
-        hist_val = max(0.0, equity - bon)
-
-    diff = live_val - (snap if snap is not None else 0.0)
+        fixed_live = max(0.0, equity - bon_cum)
 
     rows.append({
-        "login":    login,
-        "snapshot": snap,
-        "start_eez": start,
-        "net_dep":  dep,
-        "balance":  bal,
-        "fpnl":     fpnl,
-        "equity":   equity,
-        "bonus":    bon,
-        "live_val": round(live_val, 2),
-        "hist_val": round(hist_val, 2),
-        "diff_live_vs_snap": round(diff, 2),
+        "login":       login,
+        "snapshot":    snap,
+        "broken_live": round(broken_live, 2),
+        "fixed_live":  round(fixed_live, 2),
+        "diff_broken": round(broken_live - snap, 2),
+        "diff_fixed":  round(fixed_live  - snap, 2),
+        "start_eez":   start,
+        "net_dep":     dep,
+        "balance":     bal,
+        "fpnl":        fpnl,
+        "bon_cum":     bon_cum,
+        "bon_new":     bon_new,
     })
 
-# ── Print rows with meaningful differences ────────────────────────────────────
-THRESHOLD = 10.0  # only show logins where live vs snapshot differs by >$10
+# ── Print logins where fixed differs from snapshot by > threshold ─────────────
+print(f"\n{'='*150}")
+print(f"LOGIN COMPARISON: snapshot vs broken live vs FIXED live  ({TARGET_DATE})")
+print(f"Showing logins where |fixed - snapshot| > ${THRESHOLD}")
+print(f"{'='*150}")
+hdr = (f"{'LOGIN':>12}  {'SNAPSHOT':>12}  {'BROKEN_LIVE':>12}  {'FIXED_LIVE':>12}  "
+       f"{'DIFF_BRK':>10}  {'DIFF_FIX':>10}  {'START_EEZ':>12}  "
+       f"{'BALANCE':>12}  {'FPNL':>12}  {'BON_CUM':>10}  {'BON_NEW':>8}")
+print(hdr)
+print("-"*150)
 
-print(f"\n{'='*130}")
-print(f"Per-login comparison: live formula vs stored snapshot ({TARGET_DATE})")
-print(f"Only showing logins where |live - snapshot| > ${THRESHOLD}")
-print(f"{'='*130}")
-header = f"{'LOGIN':>12}  {'SNAPSHOT':>12}  {'LIVE_VAL':>12}  {'HIST_VAL':>12}  {'DIFF':>12}  {'START_EEZ':>12}  {'NET_DEP':>10}  {'BALANCE':>12}  {'FPNL':>12}  {'BONUS':>12}"
-print(header)
-print("-"*130)
-
-filtered = [r for r in rows if abs(r["diff_live_vs_snap"]) > THRESHOLD]
-filtered.sort(key=lambda x: abs(x["diff_live_vs_snap"]), reverse=True)
-
+filtered = [r for r in rows if abs(r["diff_fixed"]) > THRESHOLD]
+filtered.sort(key=lambda x: abs(x["diff_fixed"]), reverse=True)
 for r in filtered:
-    snap_str = f"{r['snapshot']:,.2f}" if r['snapshot'] is not None else "MISSING"
     print(
-        f"{r['login']:>12}  {snap_str:>12}  {r['live_val']:>12,.2f}  "
-        f"{r['hist_val']:>12,.2f}  {r['diff_live_vs_snap']:>12,.2f}  "
-        f"{r['start_eez']:>12,.2f}  {r['net_dep']:>10,.2f}  "
-        f"{r['balance']:>12,.2f}  {r['fpnl']:>12,.2f}  {r['bonus']:>12,.2f}"
+        f"{r['login']:>12}  {r['snapshot']:>12,.2f}  {r['broken_live']:>12,.2f}  "
+        f"{r['fixed_live']:>12,.2f}  {r['diff_broken']:>10,.2f}  {r['diff_fixed']:>10,.2f}  "
+        f"{r['start_eez']:>12,.2f}  {r['balance']:>12,.2f}  "
+        f"{r['fpnl']:>12,.2f}  {r['bon_cum']:>10,.2f}  {r['bon_new']:>8,.2f}"
     )
 
-print(f"\nTotal logins compared: {len(rows)}")
-print(f"Logins with |diff| > ${THRESHOLD}: {len(filtered)}")
+# ── Totals ────────────────────────────────────────────────────────────────────
+snap_total   = sum(r["snapshot"]    for r in rows)
+broken_total = sum(r["broken_live"] for r in rows)
+fixed_total  = sum(r["fixed_live"]  for r in rows)
 
-# Totals
-snap_total = sum(r["snapshot"] for r in rows if r["snapshot"] is not None)
-live_total = sum(r["live_val"] for r in rows)
-hist_total = sum(r["hist_val"] for r in rows)
-print(f"\nTOTALS:")
-print(f"  Stored snapshot total : ${snap_total:>15,.2f}")
-print(f"  Live formula total    : ${live_total:>15,.2f}")
-print(f"  Hist formula total    : ${hist_total:>15,.2f}")
-print(f"  Live - Snapshot diff  : ${live_total - snap_total:>15,.2f}")
-print(f"  Hist - Snapshot diff  : ${hist_total - snap_total:>15,.2f}")
+print(f"\n{'='*80}")
+print(f"TOTALS")
+print(f"{'='*80}")
+print(f"  Stored snapshot          : ${snap_total:>15,.2f}")
+print(f"  Broken live formula      : ${broken_total:>15,.2f}   diff: ${broken_total - snap_total:>12,.2f}")
+print(f"  FIXED live formula       : ${fixed_total:>15,.2f}   diff: ${fixed_total  - snap_total:>12,.2f}")
+print(f"\n  Total logins compared    : {len(rows)}")
+print(f"  Logins |fixed-snap| > $50: {len(filtered)}")
 
-# Also: logins in snapshot but NOT in valid_logins (orphaned)
-orphaned = set(snapshot.keys()) - valid_logins
-print(f"\nLogins in snapshot but NOT in valid_logins (orphaned/test/deleted): {len(orphaned)}")
-orphaned_sum = sum(snapshot[l] for l in orphaned)
-print(f"  Orphaned snapshot value: ${orphaned_sum:,.2f}")
+# ── Breakdown of remaining fixed vs snapshot gap ──────────────────────────────
+still_off = [(r["login"], r["diff_fixed"]) for r in rows if abs(r["diff_fixed"]) > THRESHOLD]
+if still_off:
+    over  = sum(d for _, d in still_off if d > 0)
+    under = sum(d for _, d in still_off if d < 0)
+    print(f"\n  Fixed over  snapshot (live > snap): ${over:>12,.2f}")
+    print(f"  Fixed under snapshot (live < snap): ${under:>12,.2f}")
