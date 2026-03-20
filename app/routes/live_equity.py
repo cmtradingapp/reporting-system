@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from app.auth.dependencies import get_current_user
 from app.db.postgres_conn import get_connection
-from app.db.dealio_conn import get_dealio_floating_pnl_for_logins, get_dealio_compbalance_for_logins, get_dealio_closed_pnl_for_logins_date
+from app.db.dealio_conn import get_dealio_connection, _EXCLUDED_SYMBOLS_TUPLE
 from app import cache
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
@@ -44,7 +44,7 @@ async def live_equity_zeroed(request: Request, date: str = None):
             return JSONResponse(status_code=400, content={"detail": "Invalid date"})
 
     is_current_month = (d.year == today.year and d.month == today.month)
-    _ck = f"live_eez_v21:{d}"
+    _ck = f"live_eez_v22:{d}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -266,11 +266,48 @@ def _live_calc(d) -> dict:
     finally:
         conn.close()
 
-    # Fetch floating first — needed for both Method B EEZ and daily_pnl calc.
-    # IMPORTANT: eod_floating_yesterday must use the SAME login set (open_logins only)
-    # to avoid mismatch when accounts close all positions.
-    floating_rows    = get_dealio_floating_pnl_for_logins(equity_logins)
-    floating_map     = {int(r[0]): float(r[1] or 0) for r in floating_rows}
+    # Single dealio connection for all live queries — reduces connection overhead.
+    floating_map     = {}
+    bal_map          = {}
+    today_closed_pnl = 0.0
+    if equity_logins:
+        dc = get_dealio_connection()
+        try:
+            with dc.cursor() as cur:
+                cur.execute("""
+                    SELECT login,
+                           SUM(COALESCE(computedcommission,0)
+                             + COALESCE(computedprofit,0)
+                             + COALESCE(computedswap,0))
+                    FROM dealio.positions
+                    WHERE login = ANY(%s) AND cmd < 2 AND symbol NOT IN %s
+                    GROUP BY login
+                """, (equity_logins, _EXCLUDED_SYMBOLS_TUPLE))
+                floating_map = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
+
+                cur.execute(
+                    "SELECT login, compbalance FROM dealio.users WHERE login = ANY(%s)",
+                    (equity_logins,)
+                )
+                bal_map = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
+
+                cur.execute("""
+                    SELECT login,
+                           SUM(COALESCE(computed_commission,0)
+                             + COALESCE(computed_profit,0)
+                             + COALESCE(computed_swap,0))
+                    FROM dealio.trades_mt4
+                    WHERE login = ANY(%s)
+                      AND close_time >= %s::date
+                      AND close_time <  %s::date + INTERVAL '1 day'
+                      AND cmd < 2
+                      AND symbol NOT IN %s
+                    GROUP BY login
+                """, (equity_logins, str(d), str(d), _EXCLUDED_SYMBOLS_TUPLE))
+                today_closed_pnl = sum(float(r[1] or 0) for r in cur.fetchall())
+        finally:
+            dc.close()
+
     current_floating = sum(floating_map.values())
     open_logins      = list(floating_map.keys())
 
@@ -279,15 +316,12 @@ def _live_calc(d) -> dict:
     # Daily end net equity: same without bonus deduction.
     grand_total = 0.0
     daily_end_net_equity = 0.0
-    if equity_logins:
-        for login, balance in get_dealio_compbalance_for_logins(equity_logins):
-            flt    = floating_map.get(int(login), 0.0)
-            net_eq = float(balance or 0) + flt
-            bonus  = max(0.0, bonus_map.get(int(login), 0.0))
-            grand_total          += max(0.0, net_eq - bonus)
-            daily_end_net_equity += max(0.0, net_eq)
-
-    today_closed_pnl = sum(float(r[1] or 0) for r in get_dealio_closed_pnl_for_logins_date(equity_logins, str(d)))
+    for login, balance in bal_map.items():
+        flt    = floating_map.get(login, 0.0)
+        net_eq = balance + flt
+        bonus  = max(0.0, bonus_map.get(login, 0.0))
+        grand_total          += max(0.0, net_eq - bonus)
+        daily_end_net_equity += max(0.0, net_eq)
 
     # Query eod_floating_yesterday only for currently-open logins
     eod_floating_yesterday = 0.0
