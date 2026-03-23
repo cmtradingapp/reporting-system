@@ -1,10 +1,10 @@
 import sys
 sys.path.insert(0, '/app')
 from app.etl.fetch_and_store import run_daily_equity_zeroed_snapshot
-from app.db.postgres_conn import _pg_conn
+from app.db.postgres_conn import get_connection
 
 # Delete the inflated rows (test accounts included) before re-running
-conn = _pg_conn()
+conn = get_connection()
 try:
     with conn.cursor() as cur:
         cur.execute("DELETE FROM daily_equity_zeroed WHERE day BETWEEN '2026-03-14' AND '2026-03-17'")
