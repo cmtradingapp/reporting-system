@@ -149,7 +149,7 @@ async def agent_bonuses_retention_api(request: Request, date_from: str, date_to:
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"bon_ret_v4:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"bon_ret_v5:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -161,6 +161,8 @@ async def agent_bonuses_retention_api(request: Request, date_from: str, date_to:
     except ValueError:
         return JSONResponse(status_code=400, content={"detail": "Invalid date format"})
 
+    # mv_daily_kpis replaces transactions NET subquery.
+    # mv_office_stats replaces dealio_trades_mt4 open-volume subquery.
     sql = """
         SELECT
             COALESCE(u.office_name, 'N/A')                   AS office_name,
@@ -168,7 +170,7 @@ async def agent_bonuses_retention_api(request: Request, date_from: str, date_to:
             COALESCE(u.agent_name, u.full_name, 'N/A')        AS agent_name,
             COALESCE(u.office, '')                             AS office,
             COALESCE(tgt.monthly_target_net, 0)::float        AS target_net,
-            COALESCE(net.net_usd, 0)::float                   AS net_usd,
+            COALESCE(mv.net_usd, 0)::float                    AS net_usd,
             COALESCE(vol.open_volume_usd, 0)::float           AS open_volume_usd
         FROM crm_users u
         LEFT JOIN (
@@ -178,28 +180,16 @@ async def agent_bonuses_retention_api(request: Request, date_from: str, date_to:
             GROUP BY agent_id
         ) tgt ON tgt.agent_id = u.id
         LEFT JOIN (
-            SELECT t.original_deposit_owner AS agent_id,
-                   SUM(CASE WHEN t.transactiontype IN ('Deposit','Withdrawal Cancelled') THEN t.usdamount
-                            WHEN t.transactiontype IN ('Withdrawal','Deposit Cancelled')  THEN -t.usdamount END) AS net_usd
-            FROM transactions t
-            JOIN accounts a ON a.accountid = t.vtigeraccountid
-            WHERE t.transactionapproval = 'Approved' AND (t.deleted = 0 OR t.deleted IS NULL)
-              AND t.transactiontype IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
-              AND t.confirmation_time >= %(date_from)s AND t.confirmation_time < %(date_to_excl)s
-              AND a.is_test_account = 0
-              AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
-            GROUP BY t.original_deposit_owner
-        ) net ON net.agent_id = u.id
+            SELECT k.agent_id, SUM(k.net_usd) AS net_usd
+            FROM mv_daily_kpis k
+            WHERE k.tx_date >= %(date_from)s AND k.tx_date < %(date_to_excl)s
+            GROUP BY k.agent_id
+        ) mv ON mv.agent_id = u.id
         LEFT JOIN (
-            SELECT a.assigned_to AS agent_id, SUM(d.notional_value)::float AS open_volume_usd
-            FROM dealio_trades_mt4 d
-            JOIN trading_accounts ta ON ta.login::bigint = d.login
-            JOIN accounts a ON a.accountid = ta.vtigeraccountid
-            WHERE d.open_time::date >= %(date_from)s AND d.open_time::date <= %(date_to)s
-              AND EXTRACT(YEAR FROM d.open_time) >= 2024
-              AND ta.vtigeraccountid IS NOT NULL
-              AND a.is_test_account = 0
-            GROUP BY a.assigned_to
+            SELECT agent_id, SUM(notional_usd)::float AS open_volume_usd
+            FROM mv_office_stats
+            WHERE open_date >= %(date_from)s AND open_date <= %(date_to)s
+            GROUP BY agent_id
         ) vol ON vol.agent_id = u.id
         WHERE u.department_ = 'Retention'
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
@@ -249,7 +239,6 @@ async def agent_bonuses_retention_api(request: Request, date_from: str, date_to:
             net_usd         = round(float(r[5]), 2)
             open_volume_usd = round(float(r[6]), 2)
 
-            # Target volume: full monthly value (same approach as target_net)
             target_vol = target_net * 1650
 
             group          = get_office_group(office)
@@ -304,28 +293,32 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"bon_sales_v3:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"bon_sales_v4:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
     try:
         dt_to             = datetime.strptime(date_to, "%Y-%m-%d").date()
         date_to_exclusive = (dt_to + timedelta(days=1)).strftime("%Y-%m-%d")
-        # validate date_from too
         datetime.strptime(date_from, "%Y-%m-%d")
     except ValueError:
         return JSONResponse(status_code=400, content={"detail": "Invalid date format"})
 
+    # mv_daily_kpis replaces the FTC transactions subquery.
+    # mv_bonuses replaces 3 ftd100_clients subqueries (ftd100_count,
+    #   total_sales_net, ftd_amount_bonus).
+    # ftc_net_usd still uses a live transactions query because its filter
+    #   (qual_date >= tx_date OR ftd=1) cannot be pre-aggregated cleanly.
     sql = """
         SELECT
             COALESCE(u.office_name, 'N/A')                       AS office_name,
             COALESCE(u.agent_name, u.full_name, 'N/A')            AS agent_name,
             COALESCE(tgt.target_ftc, 0)::int                      AS target_ftc,
             COALESCE(ftc.ftc_count, 0)::int                       AS ftc_count,
-            COALESCE(f100.ftd100_count, 0)::int                   AS ftd100_count,
+            COALESCE(bon.ftd100_count, 0)::int                    AS ftd100_count,
             COALESCE(ftc_net.net_usd, 0)::float                   AS ftc_net_usd,
-            COALESCE(sn.total_sales_net, 0)::float                AS total_sales_net,
-            COALESCE(fab.ftd_amount_bonus, 0)::float              AS ftd_amount_bonus_sql
+            COALESCE(bon.total_sales_net, 0)::float               AS total_sales_net,
+            COALESCE(bon.ftd_amount_bonus, 0)::float              AS ftd_amount_bonus_sql
         FROM crm_users u
         LEFT JOIN (
             SELECT agent_id::bigint, SUM(ftc)::int AS target_ftc
@@ -334,29 +327,24 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
             GROUP BY agent_id
         ) tgt ON tgt.agent_id = u.id
         LEFT JOIN (
-            SELECT t.original_deposit_owner AS agent_id,
-                   COUNT(DISTINCT t.vtigeraccountid)::int AS ftc_count
-            FROM transactions t
-            JOIN accounts a ON a.accountid = t.vtigeraccountid
-            WHERE t.transactionapproval = 'Approved'
-              AND (t.deleted = 0 OR t.deleted IS NULL)
-              AND t.transactiontype = 'Deposit'
-              AND t.ftd = 1
-              AND a.client_qualification_date IS NOT NULL
-              AND a.client_qualification_date >= %(date_from)s
-              AND a.client_qualification_date <  %(date_to_excl)s
-              AND a.is_test_account = 0
-            GROUP BY t.original_deposit_owner
+            -- FTC from mv_daily_kpis (qual_date axis)
+            SELECT k.agent_id, SUM(k.ftc_count)::int AS ftc_count
+            FROM mv_daily_kpis k
+            WHERE k.qual_date >= %(date_from)s AND k.qual_date < %(date_to_excl)s
+            GROUP BY k.agent_id
         ) ftc ON ftc.agent_id = u.id
         LEFT JOIN (
-            SELECT f.original_deposit_owner AS agent_id,
-                   COUNT(DISTINCT f.accountid)::int AS ftd100_count
-            FROM ftd100_clients f
-            WHERE f.ftd_100_date >= %(date_from)s
-              AND f.ftd_100_date <  %(date_to_excl)s
-            GROUP BY f.original_deposit_owner
-        ) f100 ON f100.agent_id = u.id
+            -- FTD100 count + net_until_qualification + FTD amount bonus from mv_bonuses
+            SELECT agent_id,
+                   SUM(ftd100_count)    AS ftd100_count,
+                   SUM(total_sales_net) AS total_sales_net,
+                   SUM(ftd_amount_bonus) AS ftd_amount_bonus
+            FROM mv_bonuses
+            WHERE ftd_100_date >= %(date_from)s AND ftd_100_date < %(date_to_excl)s
+            GROUP BY agent_id
+        ) bon ON bon.agent_id = u.id
         LEFT JOIN (
+            -- FTC net USD: live query — depends on (qual_date >= tx_date OR ftd=1)
             SELECT t.original_deposit_owner AS agent_id,
                    SUM(CASE WHEN t.transactiontype IN ('Deposit','Withdrawal Cancelled') THEN  t.usdamount
                             WHEN t.transactiontype IN ('Withdrawal','Deposit Cancelled')  THEN -t.usdamount END)::float AS net_usd
@@ -373,34 +361,13 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
               AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
             GROUP BY t.original_deposit_owner
         ) ftc_net ON ftc_net.agent_id = u.id
-        LEFT JOIN (
-            SELECT f.original_deposit_owner AS agent_id,
-                   SUM(f.net_until_qualification)::float AS total_sales_net
-            FROM ftd100_clients f
-            WHERE f.ftd_100_date >= %(date_from)s
-              AND f.ftd_100_date <  %(date_to_excl)s
-            GROUP BY f.original_deposit_owner
-        ) sn ON sn.agent_id = u.id
-        LEFT JOIN (
-            SELECT f.original_deposit_owner AS agent_id,
-                   SUM(CASE
-                       WHEN f.ftd_100_amount < 500  THEN 0
-                       WHEN f.ftd_100_amount < 1000 THEN 10
-                       WHEN f.ftd_100_amount < 5000 THEN 20
-                       ELSE 50
-                   END)::float AS ftd_amount_bonus
-            FROM ftd100_clients f
-            WHERE f.ftd_100_date >= %(date_from)s
-              AND f.ftd_100_date <  %(date_to_excl)s
-            GROUP BY f.original_deposit_owner
-        ) fab ON fab.agent_id = u.id
         WHERE u.department_ = 'Sales'
           AND u.team = 'Conversion'
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'
           {role_filter}
-        ORDER BY u.office_name NULLS LAST, COALESCE(f100.ftd100_count, 0) DESC, u.agent_name
+        ORDER BY u.office_name NULLS LAST, COALESCE(bon.ftd100_count, 0) DESC, u.agent_name
     """
 
     conn = get_connection()
@@ -424,7 +391,6 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
 
             target_pct = ftc_count / target_ftc if target_ftc > 0 else None
 
-            # Global rule: all bonuses = 0 if FTD100 < 50% of target FTC
             qualify = target_ftc > 0 and ftd100_count >= 0.50 * target_ftc
 
             multiplier         = get_sales_multiplier(ftd100_count)

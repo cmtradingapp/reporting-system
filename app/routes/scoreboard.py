@@ -72,7 +72,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"perf_v10:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"perf_v11:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -83,33 +83,36 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
     except ValueError:
         return JSONResponse(status_code=400, content={"detail": "Invalid date format"})
 
+    # ── Main sales table: Sales/Conversion agents ─────────────────────────────
+    # mv_daily_kpis replaces 3 separate transactions subqueries (FTC, NET, FTD).
+    # A single OR-filtered scan of mv_daily_kpis handles both the tx_date axis
+    # (NET, FTD) and the qual_date axis (FTC) in one pass.
     sql = """
         SELECT
             COALESCE(u.office_name, 'N/A')              AS office_name,
             COALESCE(u.agent_name, u.full_name, 'N/A')  AS agent_name,
             COALESCE(u.department_, '')                  AS department_,
-            COALESCE(ftc.cnt, 0)                         AS ftc,
+            COALESCE(mv.ftc, 0)::int                     AS ftc,
             COALESCE(tgt.target_ftc, 0)                  AS target_ftc,
             COALESCE(f100.ftd100_cnt, 0)                 AS ftd100,
-            COALESCE(net.net_usd, 0)::float              AS net_deposits,
-            COALESCE(ftd_cnt.cnt, 0)                     AS ftd_count
+            COALESCE(mv.net_usd, 0)::float               AS net_deposits,
+            COALESCE(mv.ftd_count, 0)::int               AS ftd_count
         FROM crm_users u
         LEFT JOIN (
+            -- Combined FTC + NET + FTD from mv_daily_kpis in a single scan
             SELECT
-                t.original_deposit_owner          AS agent_id,
-                COUNT(DISTINCT t.vtigeraccountid) AS cnt
-            FROM transactions t
-            JOIN accounts a ON a.accountid = t.vtigeraccountid
-            WHERE t.transactionapproval = 'Approved'
-              AND (t.deleted = 0 OR t.deleted IS NULL)
-              AND t.transactiontype = 'Deposit'
-              AND t.ftd = 1
-              AND a.client_qualification_date IS NOT NULL
-              AND a.client_qualification_date >= %(date_from)s
-              AND a.client_qualification_date <  %(date_to_excl)s
-              AND a.is_test_account = 0
-            GROUP BY t.original_deposit_owner
-        ) ftc ON ftc.agent_id = u.id
+                k.agent_id,
+                SUM(CASE WHEN k.qual_date >= %(date_from)s AND k.qual_date < %(date_to_excl)s
+                         THEN k.ftc_count ELSE 0 END)::int  AS ftc,
+                SUM(CASE WHEN k.tx_date  >= %(date_from)s AND k.tx_date  < %(date_to_excl)s
+                         THEN k.net_usd  ELSE 0 END)        AS net_usd,
+                SUM(CASE WHEN k.tx_date  >= %(date_from)s AND k.tx_date  < %(date_to_excl)s
+                         THEN k.ftd_count ELSE 0 END)::int  AS ftd_count
+            FROM mv_daily_kpis k
+            WHERE (k.qual_date >= %(date_from)s AND k.qual_date < %(date_to_excl)s)
+               OR (k.tx_date   >= %(date_from)s AND k.tx_date   < %(date_to_excl)s)
+            GROUP BY k.agent_id
+        ) mv ON mv.agent_id = u.id
         LEFT JOIN (
             SELECT agent_id::bigint, SUM(ftc)::int AS target_ftc
             FROM targets
@@ -118,60 +121,25 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
             GROUP BY agent_id
         ) tgt ON tgt.agent_id = u.id
         LEFT JOIN (
-            SELECT
-                f.original_deposit_owner          AS agent_id,
-                COUNT(DISTINCT f.accountid)       AS ftd100_cnt
+            SELECT f.original_deposit_owner AS agent_id,
+                   COUNT(DISTINCT f.accountid) AS ftd100_cnt
             FROM ftd100_clients f
             WHERE f.ftd_100_date >= %(date_from)s
               AND f.ftd_100_date <  %(date_to_excl)s
             GROUP BY f.original_deposit_owner
         ) f100 ON f100.agent_id = u.id
-        LEFT JOIN (
-            SELECT
-                t.original_deposit_owner                         AS agent_id,
-                SUM(CASE
-                    WHEN t.transactiontype IN ('Deposit', 'Withdrawal Cancelled') THEN  t.usdamount
-                    WHEN t.transactiontype IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
-                END)                                             AS net_usd
-            FROM transactions t
-            JOIN accounts a ON a.accountid = t.vtigeraccountid
-            WHERE t.transactionapproval = 'Approved'
-              AND (t.deleted = 0 OR t.deleted IS NULL)
-              AND t.transactiontype IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
-              AND t.confirmation_time >= %(date_from)s
-              AND t.confirmation_time <  %(date_to_excl)s
-              AND a.is_test_account = 0
-              AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
-            GROUP BY t.original_deposit_owner
-        ) net ON net.agent_id = u.id
-        LEFT JOIN (
-            SELECT
-                t.original_deposit_owner          AS agent_id,
-                COUNT(t.mttransactionsid)         AS cnt
-            FROM transactions t
-            JOIN accounts a ON a.accountid = t.vtigeraccountid
-            WHERE t.transactionapproval = 'Approved'
-              AND (t.deleted = 0 OR t.deleted IS NULL)
-              AND t.transactiontype = 'Deposit'
-              AND t.ftd = 1
-              AND t.confirmation_time >= %(date_from)s
-              AND t.confirmation_time <  %(date_to_excl)s
-              AND a.is_test_account = 0
-            GROUP BY t.original_deposit_owner
-        ) ftd_cnt ON ftd_cnt.agent_id = u.id
         WHERE u.department_ = 'Sales'
           AND u.team = 'Conversion'
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'
           {role_filter}
-        ORDER BY u.office_name NULLS LAST, COALESCE(ftc.cnt, 0) DESC, u.agent_name
+        ORDER BY u.office_name NULLS LAST, COALESCE(mv.ftc, 0) DESC, u.agent_name
     """
 
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            # Fetch public holidays (graceful fallback if table missing)
             try:
                 cur.execute("SELECT holiday_date FROM public_holidays")
                 holidays = {row[0] for row in cur.fetchall()}
@@ -184,61 +152,32 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
             cur.execute(final_sql, final_params)
             rows = cur.fetchall()
 
-            # Grand FTC — all departments/teams
+            # Grand FTC — company-wide, qual_date axis
             cur.execute("""
-                SELECT COUNT(DISTINCT t.vtigeraccountid)
-                FROM transactions t
-                JOIN accounts a ON a.accountid = t.vtigeraccountid
-                WHERE t.transactionapproval = 'Approved'
-                  AND (t.deleted = 0 OR t.deleted IS NULL)
-                  AND t.transactiontype = 'Deposit'
-                  AND t.ftd = 1
-                  AND a.client_qualification_date IS NOT NULL
-                  AND a.client_qualification_date >= %(date_from)s
-                  AND a.client_qualification_date <  %(date_to_excl)s
-                  AND a.is_test_account = 0
+                SELECT COALESCE(SUM(ftc_count), 0)
+                FROM mv_daily_kpis
+                WHERE qual_date >= %(date_from)s AND qual_date < %(date_to_excl)s
             """, {"date_from": date_from, "date_to_excl": date_to_exclusive})
             grand_ftc = int(cur.fetchone()[0] or 0)
 
-            # Grand NET $ — all departments, year > 2024, no blank accountid, no test agents
+            # Grand NET — company-wide, tx_date axis (from mv_run_rate 'all')
             cur.execute("""
-                SELECT COALESCE(SUM(CASE
-                    WHEN t.transactiontype IN ('Deposit', 'Withdrawal Cancelled') THEN  t.usdamount
-                    WHEN t.transactiontype IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
-                END), 0)
-                FROM transactions t
-                JOIN crm_users u ON u.id = t.original_deposit_owner
-                JOIN accounts a ON a.accountid = t.vtigeraccountid
-                WHERE t.transactionapproval = 'Approved'
-                  AND (t.deleted = 0 OR t.deleted IS NULL)
-                  AND t.transactiontype IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
-                  AND t.confirmation_time >= %(date_from)s
-                  AND t.confirmation_time <  %(date_to_excl)s
-                  AND EXTRACT(YEAR FROM t.confirmation_time) >= 2024
-                  AND t.vtigeraccountid IS NOT NULL
-                  AND a.is_test_account = 0
-                  AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
-                  AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
+                SELECT COALESCE(SUM(net_usd), 0)
+                FROM mv_run_rate
+                WHERE dept_group = 'all'
+                  AND tx_date >= %(date_from)s AND tx_date < %(date_to_excl)s
             """, {"date_from": date_from, "date_to_excl": date_to_exclusive})
             grand_net = float(cur.fetchone()[0] or 0)
 
-            # Open Volume — join via trading_accounts.login, filter year > 2024, no blank accountid, no test agents
+            # Open Volume — from mv_office_stats (test-filter already baked in)
             cur.execute("""
-                SELECT COALESCE(SUM(d.notional_value), 0)
-                FROM dealio_trades_mt4 d
-                JOIN trading_accounts ta ON ta.login::bigint = d.login
-                JOIN accounts a          ON a.accountid = ta.vtigeraccountid
-                LEFT JOIN crm_users u    ON u.id = a.assigned_to
-                WHERE d.open_time::date >= %(date_from)s
-                  AND d.open_time::date <= %(date_to)s
-                  AND EXTRACT(YEAR FROM d.open_time) >= 2024
-                  AND ta.vtigeraccountid IS NOT NULL
-                  AND a.is_test_account = 0
-                  AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
+                SELECT COALESCE(SUM(notional_usd), 0)
+                FROM mv_office_stats
+                WHERE open_date >= %(date_from)s AND open_date <= %(date_to)s
             """, {"date_from": date_from, "date_to": date_to})
             open_volume = float(cur.fetchone()[0] or 0)
 
-            # End Equity Zeroed — latest available date per login in the selected month/year
+            # End Equity Zeroed — live (real-time snapshot, not suitable for MV)
             cur.execute("""
                 WITH latest_equity AS (
                     SELECT DISTINCT ON (login)
@@ -263,7 +202,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
                             0
                         )
                     END
-                ), 0) AS end_equity_zeroed
+                ), 0)
                 FROM latest_equity d
                 JOIN trading_accounts ta  ON ta.login::bigint = d.login
                 JOIN accounts a           ON a.accountid = ta.vtigeraccountid
@@ -274,67 +213,35 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
             """, {"date_to": date_to})
             end_equity_zeroed = float(cur.fetchone()[0] or 0)
 
-            # Daily net — company-wide for date_to (same scope as grand_net, matches NET $ card)
+            # Daily NET — from mv_run_rate 'all', single day
             cur.execute("""
-                SELECT COALESCE(SUM(CASE
-                    WHEN t.transactiontype IN ('Deposit', 'Withdrawal Cancelled') THEN  t.usdamount
-                    WHEN t.transactiontype IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
-                END), 0)
-                FROM transactions t
-                JOIN crm_users u ON u.id = t.original_deposit_owner
-                JOIN accounts a ON a.accountid = t.vtigeraccountid
-                WHERE t.transactionapproval = 'Approved'
-                  AND (t.deleted = 0 OR t.deleted IS NULL)
-                  AND t.transactiontype IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
-                  AND t.confirmation_time::date = %(date_to)s
-                  AND EXTRACT(YEAR FROM t.confirmation_time) >= 2024
-                  AND t.vtigeraccountid IS NOT NULL
-                  AND a.is_test_account = 0
-                  AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
-                  AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
+                SELECT COALESCE(SUM(net_usd), 0)
+                FROM mv_run_rate
+                WHERE dept_group = 'all' AND tx_date = %(date_to)s
             """, {"date_to": date_to})
             daily_net = float(cur.fetchone()[0] or 0)
 
-            # Grand FTD — company-wide count for the full date range (matches daily_ftd scope)
+            # Grand FTD — company-wide, tx_date axis
             cur.execute("""
-                SELECT COUNT(t.mttransactionsid)
-                FROM transactions t
-                JOIN accounts a ON a.accountid = t.vtigeraccountid
-                WHERE t.transactionapproval = 'Approved'
-                  AND (t.deleted = 0 OR t.deleted IS NULL)
-                  AND t.transactiontype = 'Deposit'
-                  AND t.ftd = 1
-                  AND t.confirmation_time >= %(date_from)s
-                  AND t.confirmation_time <  %(date_to_excl)s
-                  AND a.is_test_account = 0
+                SELECT COALESCE(SUM(ftd_count), 0)
+                FROM mv_daily_kpis
+                WHERE tx_date >= %(date_from)s AND tx_date < %(date_to_excl)s
             """, {"date_from": date_from, "date_to_excl": date_to_exclusive})
             grand_ftd = int(cur.fetchone()[0] or 0)
 
-            # Daily FTD — count for date_to
+            # Daily FTD — single day
             cur.execute("""
-                SELECT COUNT(t.mttransactionsid)
-                FROM transactions t
-                JOIN accounts a ON a.accountid = t.vtigeraccountid
-                WHERE t.transactionapproval = 'Approved'
-                  AND (t.deleted = 0 OR t.deleted IS NULL)
-                  AND t.transactiontype = 'Deposit'
-                  AND t.ftd = 1
-                  AND t.confirmation_time::date = %(date_to)s
-                  AND a.is_test_account = 0
+                SELECT COALESCE(SUM(ftd_count), 0)
+                FROM mv_daily_kpis
+                WHERE tx_date = %(date_to)s
             """, {"date_to": date_to})
             daily_ftd = int(cur.fetchone()[0] or 0)
 
-            # Daily FTC — unique clients qualified on date_to
+            # Daily FTC — qual_date = date_to
             cur.execute("""
-                SELECT COUNT(DISTINCT t.vtigeraccountid)
-                FROM transactions t
-                JOIN accounts a ON a.accountid = t.vtigeraccountid
-                WHERE t.transactionapproval = 'Approved'
-                  AND (t.deleted = 0 OR t.deleted IS NULL)
-                  AND t.transactiontype = 'Deposit'
-                  AND t.ftd = 1
-                  AND a.client_qualification_date::date = %(date_to)s
-                  AND a.is_test_account = 0
+                SELECT COALESCE(SUM(ftc_count), 0)
+                FROM mv_daily_kpis
+                WHERE qual_date = %(date_to)s
             """, {"date_to": date_to})
             daily_ftc = int(cur.fetchone()[0] or 0)
 
@@ -402,7 +309,7 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"perf_ret_v4:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"perf_ret_v5:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -414,14 +321,16 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
     except ValueError:
         return JSONResponse(status_code=400, content={"detail": "Invalid date format"})
 
+    # ── Retention table: mv_daily_kpis replaces 2 transaction subqueries (NET,
+    #    DEPOSIT).  Open volume comes from mv_office_stats.
     sql = """
         SELECT
             COALESCE(u.office_name, 'N/A')                   AS office_name,
             COALESCE(u.department, 'N/A')                     AS dept_name,
             COALESCE(u.agent_name, u.full_name, 'N/A')        AS agent_name,
             COALESCE(tgt.monthly_target_net, 0)::float        AS target_net,
-            COALESCE(net.net_usd, 0)::float                   AS net_usd,
-            COALESCE(dep.deposit_usd, 0)::float               AS deposit_usd,
+            COALESCE(mv.net_usd, 0)::float                    AS net_usd,
+            COALESCE(mv.deposit_usd, 0)::float                AS deposit_usd,
             COALESCE(vol.open_volume_usd, 0)::float           AS open_volume_usd
         FROM crm_users u
         LEFT JOIN (
@@ -431,38 +340,19 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
             GROUP BY agent_id
         ) tgt ON tgt.agent_id = u.id
         LEFT JOIN (
-            SELECT t.original_deposit_owner AS agent_id,
-                   SUM(CASE WHEN t.transactiontype IN ('Deposit','Withdrawal Cancelled') THEN t.usdamount
-                            WHEN t.transactiontype IN ('Withdrawal','Deposit Cancelled')  THEN -t.usdamount END) AS net_usd
-            FROM transactions t
-            JOIN accounts a ON a.accountid = t.vtigeraccountid
-            WHERE t.transactionapproval = 'Approved' AND (t.deleted = 0 OR t.deleted IS NULL)
-              AND t.transactiontype IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
-              AND t.confirmation_time >= %(date_from)s AND t.confirmation_time < %(date_to_excl)s
-              AND a.is_test_account = 0
-              AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
-            GROUP BY t.original_deposit_owner
-        ) net ON net.agent_id = u.id
+            -- NET + DEPOSIT in one mv_daily_kpis scan
+            SELECT k.agent_id,
+                   SUM(k.net_usd)     AS net_usd,
+                   SUM(k.deposit_usd) AS deposit_usd
+            FROM mv_daily_kpis k
+            WHERE k.tx_date >= %(date_from)s AND k.tx_date < %(date_to_excl)s
+            GROUP BY k.agent_id
+        ) mv ON mv.agent_id = u.id
         LEFT JOIN (
-            SELECT t.original_deposit_owner AS agent_id, SUM(t.usdamount)::float AS deposit_usd
-            FROM transactions t JOIN accounts a ON a.accountid = t.vtigeraccountid
-            WHERE t.transactionapproval = 'Approved' AND (t.deleted = 0 OR t.deleted IS NULL)
-              AND t.transactiontype IN ('Deposit','Withdrawal Cancelled')
-              AND t.confirmation_time >= %(date_from)s AND t.confirmation_time < %(date_to_excl)s
-              AND a.is_test_account = 0
-              AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
-            GROUP BY t.original_deposit_owner
-        ) dep ON dep.agent_id = u.id
-        LEFT JOIN (
-            SELECT a.assigned_to AS agent_id, SUM(d.notional_value)::float AS open_volume_usd
-            FROM dealio_trades_mt4 d
-            JOIN trading_accounts ta ON ta.login::bigint = d.login
-            JOIN accounts a ON a.accountid = ta.vtigeraccountid
-            WHERE d.open_time::date >= %(date_from)s AND d.open_time::date <= %(date_to)s
-              AND EXTRACT(YEAR FROM d.open_time) >= 2024
-              AND ta.vtigeraccountid IS NOT NULL
-              AND a.is_test_account = 0
-            GROUP BY a.assigned_to
+            SELECT agent_id, SUM(notional_usd)::float AS open_volume_usd
+            FROM mv_office_stats
+            WHERE open_date >= %(date_from)s AND open_date <= %(date_to)s
+            GROUP BY agent_id
         ) vol ON vol.agent_id = u.id
         WHERE u.department_ = 'Retention'
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
@@ -496,29 +386,11 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
             cur.execute(final_sql, final_params)
             rows = cur.fetchall()
 
-            # Daily net retention — date_to only (same logic as dashboard Q3)
+            # Daily net retention — from mv_run_rate 'retention', single day
             cur.execute("""
-                SELECT COALESCE(SUM(CASE
-                    WHEN t.transactiontype IN ('Deposit', 'Withdrawal Cancelled') THEN  t.usdamount
-                    WHEN t.transactiontype IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
-                END), 0)
-                FROM transactions t
-                JOIN accounts a ON a.accountid = t.vtigeraccountid
-                JOIN crm_users u ON u.id = t.original_deposit_owner
-                WHERE t.transactionapproval = 'Approved'
-                  AND (t.deleted = 0 OR t.deleted IS NULL)
-                  AND t.transactiontype IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
-                  AND t.confirmation_time::date = %(date_to)s
-                  AND a.is_test_account = 0
-                  AND u.department_ = 'Retention'
-                  AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
-                  AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
-                  AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'
-                  AND TRIM(COALESCE(u.department, '')) NOT ILIKE '%%Retention%%'
-                  AND TRIM(COALESCE(u.department, '')) NOT ILIKE '%%Conversion%%'
-                  AND TRIM(COALESCE(u.department, '')) NOT ILIKE '%%Support%%'
-                  AND TRIM(COALESCE(u.department, '')) NOT ILIKE '%%General%%'
-                  AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
+                SELECT COALESCE(SUM(net_usd), 0)
+                FROM mv_run_rate
+                WHERE dept_group = 'retention' AND tx_date = %(date_to)s
             """, {"date_to": date_to})
             daily_net_retention = float(cur.fetchone()[0] or 0)
 

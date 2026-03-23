@@ -2079,3 +2079,223 @@ def fetch_dealio_daily_profits_stats() -> dict:
             }
     finally:
         conn.close()
+
+
+# =============================================================================
+# Materialized view helpers
+# =============================================================================
+
+_MV_SETUP_SQL = [
+    # ── mv_daily_kpis ────────────────────────────────────────────────────────
+    """
+    CREATE MATERIALIZED VIEW IF NOT EXISTS mv_daily_kpis AS
+    SELECT
+        t.original_deposit_owner                                             AS agent_id,
+        t.confirmation_time::date                                            AS tx_date,
+        a.client_qualification_date::date                                    AS qual_date,
+        COALESCE(SUM(CASE
+            WHEN t.transactiontype IN ('Deposit', 'Withdrawal Cancelled')  THEN  t.usdamount
+            WHEN t.transactiontype IN ('Withdrawal', 'Deposit Cancelled')  THEN -t.usdamount
+        END), 0)                                                             AS net_usd,
+        COALESCE(SUM(CASE
+            WHEN t.transactiontype IN ('Deposit', 'Withdrawal Cancelled')  THEN t.usdamount
+            ELSE 0
+        END), 0)                                                             AS deposit_usd,
+        COALESCE(SUM(CASE
+            WHEN t.transactiontype IN ('Withdrawal', 'Deposit Cancelled')  THEN t.usdamount
+            ELSE 0
+        END), 0)                                                             AS withdrawal_usd,
+        SUM(CASE WHEN t.transactiontype = 'Deposit' AND t.ftd = 1 THEN 1 ELSE 0 END)::int AS ftd_count,
+        COUNT(DISTINCT CASE WHEN t.transactiontype = 'Deposit' AND t.ftd = 1
+                            THEN t.vtigeraccountid END)::int                 AS ftc_count
+    FROM transactions t
+    JOIN accounts  a ON a.accountid = t.vtigeraccountid
+    JOIN crm_users u ON u.id        = t.original_deposit_owner
+    WHERE t.transactionapproval = 'Approved'
+      AND (t.deleted = 0 OR t.deleted IS NULL)
+      AND t.transactiontype IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
+      AND t.vtigeraccountid IS NOT NULL
+      AND a.is_test_account = 0
+      AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%'
+      AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%bonus%'
+    GROUP BY t.original_deposit_owner, t.confirmation_time::date, a.client_qualification_date::date
+    """,
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_daily_kpis_u    ON mv_daily_kpis (agent_id, tx_date, COALESCE(qual_date, '1900-01-01'::date))",
+    "CREATE INDEX IF NOT EXISTS idx_mv_daily_kpis_tx_date     ON mv_daily_kpis (tx_date)",
+    "CREATE INDEX IF NOT EXISTS idx_mv_daily_kpis_qual_date   ON mv_daily_kpis (qual_date) WHERE qual_date IS NOT NULL",
+    "CREATE INDEX IF NOT EXISTS idx_mv_daily_kpis_agent       ON mv_daily_kpis (agent_id)",
+
+    # ── mv_office_stats ──────────────────────────────────────────────────────
+    """
+    CREATE MATERIALIZED VIEW IF NOT EXISTS mv_office_stats AS
+    SELECT
+        a.assigned_to                                                        AS agent_id,
+        ta.vtigeraccountid                                                   AS accountid,
+        d.open_time::date                                                    AS open_date,
+        SUM(d.notional_value)                                                AS notional_usd,
+        MAX(CASE WHEN d.notional_value > 0 THEN 1 ELSE 0 END)::smallint     AS has_positive_notional
+    FROM dealio_trades_mt4 d
+    JOIN trading_accounts ta ON ta.login::bigint = d.login
+    JOIN accounts         a  ON a.accountid      = ta.vtigeraccountid
+    LEFT JOIN crm_users   u  ON u.id             = a.assigned_to
+    WHERE ta.vtigeraccountid IS NOT NULL
+      AND a.is_test_account = 0
+      AND d.open_time::date >= '2024-01-01'
+      AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%'
+    GROUP BY a.assigned_to, ta.vtigeraccountid, d.open_time::date
+    """,
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_office_stats_u         ON mv_office_stats (COALESCE(agent_id, -1), accountid, open_date)",
+    "CREATE INDEX IF NOT EXISTS idx_mv_office_stats_open_date        ON mv_office_stats (open_date)",
+    "CREATE INDEX IF NOT EXISTS idx_mv_office_stats_agent            ON mv_office_stats (agent_id)",
+
+    # ── mv_bonuses ───────────────────────────────────────────────────────────
+    """
+    CREATE MATERIALIZED VIEW IF NOT EXISTS mv_bonuses AS
+    SELECT
+        f.original_deposit_owner                AS agent_id,
+        f.ftd_100_date,
+        COUNT(DISTINCT f.accountid)::int        AS ftd100_count,
+        COALESCE(SUM(f.net_until_qualification), 0) AS total_sales_net,
+        COALESCE(SUM(CASE
+            WHEN f.ftd_100_amount < 500   THEN 0
+            WHEN f.ftd_100_amount < 1000  THEN 10
+            WHEN f.ftd_100_amount < 5000  THEN 20
+            ELSE 50
+        END), 0)::float                         AS ftd_amount_bonus
+    FROM ftd100_clients f
+    WHERE f.original_deposit_owner IS NOT NULL
+    GROUP BY f.original_deposit_owner, f.ftd_100_date
+    """,
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_bonuses_u    ON mv_bonuses (agent_id, ftd_100_date)",
+    "CREATE INDEX IF NOT EXISTS idx_mv_bonuses_date        ON mv_bonuses (ftd_100_date)",
+    "CREATE INDEX IF NOT EXISTS idx_mv_bonuses_agent       ON mv_bonuses (agent_id)",
+
+    # ── mv_run_rate  (depends on mv_daily_kpis — must come last) ─────────────
+    """
+    CREATE MATERIALIZED VIEW IF NOT EXISTS mv_run_rate AS
+    WITH tagged AS (
+        SELECT k.agent_id, k.tx_date, k.qual_date,
+               k.net_usd, k.deposit_usd, k.ftd_count, k.ftc_count,
+               CASE
+                   WHEN u.department_ = 'Sales'
+                    AND u.team = 'Conversion'
+                    AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%'
+                    AND TRIM(COALESCE(u.full_name, ''))               NOT ILIKE 'test%'
+                   THEN 'sales'
+                   WHEN u.department_ = 'Retention'
+                    AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%'
+                    AND TRIM(COALESCE(u.full_name, ''))               NOT ILIKE 'test%'
+                    AND TRIM(COALESCE(u.department, ''))              NOT ILIKE '%Retention%'
+                    AND TRIM(COALESCE(u.department, ''))              NOT ILIKE '%Conversion%'
+                    AND TRIM(COALESCE(u.department, ''))              NOT ILIKE '%Support%'
+                    AND TRIM(COALESCE(u.department, ''))              NOT ILIKE '%General%'
+                   THEN 'retention'
+                   ELSE 'other'
+               END AS dept_group
+        FROM mv_daily_kpis k
+        JOIN crm_users u ON u.id = k.agent_id
+    )
+    SELECT dept_group, tx_date, qual_date,
+           SUM(net_usd) AS net_usd, SUM(deposit_usd) AS deposit_usd,
+           SUM(ftd_count) AS ftd_count, SUM(ftc_count) AS ftc_count
+    FROM tagged GROUP BY dept_group, tx_date, qual_date
+    UNION ALL
+    SELECT 'all', tx_date, qual_date,
+           SUM(net_usd), SUM(deposit_usd), SUM(ftd_count), SUM(ftc_count)
+    FROM mv_daily_kpis GROUP BY tx_date, qual_date
+    """,
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_run_rate_u      ON mv_run_rate (dept_group, tx_date, COALESCE(qual_date, '1900-01-01'::date))",
+    "CREATE INDEX IF NOT EXISTS idx_mv_run_rate_dept          ON mv_run_rate (dept_group)",
+    "CREATE INDEX IF NOT EXISTS idx_mv_run_rate_tx_date       ON mv_run_rate (tx_date)",
+    "CREATE INDEX IF NOT EXISTS idx_mv_run_rate_qual          ON mv_run_rate (qual_date) WHERE qual_date IS NOT NULL",
+]
+
+
+def ensure_materialized_views() -> None:
+    """Create all 4 materialized views and their indexes if they don't exist.
+    Called once at application startup (lifespan).
+    """
+    conn = get_connection()
+    try:
+        for sql in _MV_SETUP_SQL:
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(sql)
+                conn.commit()
+            except Exception as e:
+                conn.rollback()
+                print(f"[ensure_materialized_views] skipped: {e}")
+    finally:
+        conn.close()
+
+
+_MV_ORDER = [
+    "mv_daily_kpis",    # base — must be first
+    "mv_office_stats",  # independent
+    "mv_bonuses",       # independent
+    "mv_run_rate",      # depends on mv_daily_kpis — must be last
+]
+
+# Module-level status dict updated by refresh_materialized_views()
+_mv_refresh_status: dict = {mv: {"last_refresh": None, "last_error": None} for mv in _MV_ORDER}
+
+
+def refresh_materialized_views() -> None:
+    """Refresh all 4 MVs concurrently (non-blocking reads during refresh).
+    Order matters: mv_daily_kpis must complete before mv_run_rate.
+    Called by APScheduler every 2 minutes.
+    """
+    from datetime import datetime, timezone
+    for mv in _MV_ORDER:
+        conn = get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(f"REFRESH MATERIALIZED VIEW CONCURRENTLY {mv}")
+            conn.commit()
+            _mv_refresh_status[mv]["last_refresh"] = datetime.now(timezone.utc).isoformat()
+            _mv_refresh_status[mv]["last_error"]   = None
+        except Exception as e:
+            _mv_refresh_status[mv]["last_error"] = str(e)
+            print(f"[refresh_materialized_views] {mv}: {e}")
+        finally:
+            conn.close()
+
+
+def get_mv_status() -> list:
+    """Return status of each MV: last refresh time, error, and estimated row count."""
+    from datetime import datetime, timezone
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT relname, reltuples::bigint
+                FROM pg_class
+                WHERE relname = ANY(%s) AND relkind = 'm'
+            """, ([mv for mv in _MV_ORDER],))
+            row_counts = {row[0]: int(row[1]) for row in cur.fetchall()}
+    except Exception:
+        row_counts = {}
+    finally:
+        conn.close()
+
+    now = datetime.now(timezone.utc)
+    result = []
+    for mv in _MV_ORDER:
+        status = _mv_refresh_status[mv]
+        last_refresh = status["last_refresh"]
+        age_seconds = None
+        if last_refresh:
+            try:
+                ts = datetime.fromisoformat(last_refresh)
+                age_seconds = int((now - ts).total_seconds())
+            except Exception:
+                pass
+        result.append({
+            "name":         mv,
+            "last_refresh": last_refresh,
+            "age_seconds":  age_seconds,
+            "rows":         row_counts.get(mv),
+            "last_error":   status["last_error"],
+            "healthy":      status["last_error"] is None and age_seconds is not None and age_seconds < 300,
+        })
+    return result

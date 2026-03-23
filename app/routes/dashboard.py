@@ -47,8 +47,8 @@ def _dashboard_calc(today: date_type) -> dict:
     tomorrow = today + timedelta(days=1)
 
     month_start_str = month_start.strftime("%Y-%m-%d")
-    today_str = today.strftime("%Y-%m-%d")
-    tomorrow_str = tomorrow.strftime("%Y-%m-%d")
+    today_str       = today.strftime("%Y-%m-%d")
+    tomorrow_str    = tomorrow.strftime("%Y-%m-%d")
 
     conn = get_connection()
     try:
@@ -61,196 +61,108 @@ def _dashboard_calc(today: date_type) -> dict:
                 conn.rollback()
                 holidays = set()
 
-            wd_total = count_working_days(month_start, month_end, holidays)
+            wd_total  = count_working_days(month_start, month_end, holidays)
             wd_passed = count_working_days(month_start, today, holidays)
-            wd_left = wd_total - wd_passed
-            safe_wdp = wd_passed if wd_passed > 0 else 1
+            wd_left   = wd_total - wd_passed
+            safe_wdp  = wd_passed if wd_passed > 0 else 1
 
-            # Get last_mtd date (for display on PnL cards)
+            # Get last_mtd date (for PnL cards)
             cur.execute("""
                 SELECT MAX(date)::date
                 FROM dealio_daily_profits
                 WHERE EXTRACT(YEAR  FROM date) = EXTRACT(YEAR  FROM CURRENT_DATE)
                   AND EXTRACT(MONTH FROM date) = EXTRACT(MONTH FROM CURRENT_DATE)
             """)
-            last_mtd_date = cur.fetchone()[0] or (today - timedelta(days=1))
+            last_mtd_date      = cur.fetchone()[0] or (today - timedelta(days=1))
             last_mtd_str       = last_mtd_date.strftime("%Y-%m-%d")
             last_mtd_plus1_str = (last_mtd_date + timedelta(days=1)).strftime("%Y-%m-%d")
 
-            # Q1 — Net Deposits (grand overall)
+            p = {"month_start": month_start_str, "today": today_str, "tomorrow": tomorrow_str}
+
+            # Q1 — Net Deposits grand total  (mv_run_rate 'all')
             cur.execute("""
                 SELECT
-                  COALESCE(SUM(CASE
-                    WHEN t.transactiontype IN ('Deposit', 'Withdrawal Cancelled') THEN  t.usdamount
-                    WHEN t.transactiontype IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
-                  END) FILTER (WHERE t.confirmation_time::date = CURRENT_DATE), 0) AS daily,
-                  COALESCE(SUM(CASE
-                    WHEN t.transactiontype IN ('Deposit', 'Withdrawal Cancelled') THEN  t.usdamount
-                    WHEN t.transactiontype IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
-                  END), 0) AS monthly
-                FROM transactions t
-                JOIN crm_users u ON u.id = t.original_deposit_owner
-                JOIN accounts a ON a.accountid = t.vtigeraccountid
-                WHERE t.transactionapproval = 'Approved'
-                  AND (t.deleted = 0 OR t.deleted IS NULL)
-                  AND t.transactiontype IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
-                  AND t.confirmation_time >= %(month_start)s
-                  AND t.confirmation_time <  %(tomorrow)s
-                  AND EXTRACT(YEAR FROM t.confirmation_time) >= 2024
-                  AND t.vtigeraccountid IS NOT NULL
-                  AND a.is_test_account = 0
-                  AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
-                  AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
-            """, {"month_start": month_start_str, "tomorrow": tomorrow_str})
+                    COALESCE(SUM(net_usd) FILTER (WHERE tx_date = %(today)s::date), 0) AS daily,
+                    COALESCE(SUM(net_usd), 0)                                           AS monthly
+                FROM mv_run_rate
+                WHERE dept_group = 'all'
+                  AND tx_date >= %(month_start)s AND tx_date <= %(today)s
+            """, p)
             row = cur.fetchone()
-            nd_daily = float(row[0] or 0)
-            nd_monthly = float(row[1] or 0)
+            nd_daily, nd_monthly = float(row[0] or 0), float(row[1] or 0)
 
-            # Q2 — Net Deposits – Sales
+            # Q2 — Net Deposits – Sales  (mv_run_rate 'sales')
             cur.execute("""
                 SELECT
-                  COALESCE(SUM(CASE
-                    WHEN t.transactiontype IN ('Deposit', 'Withdrawal Cancelled') THEN  t.usdamount
-                    WHEN t.transactiontype IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
-                  END) FILTER (WHERE t.confirmation_time::date = CURRENT_DATE), 0) AS daily,
-                  COALESCE(SUM(CASE
-                    WHEN t.transactiontype IN ('Deposit', 'Withdrawal Cancelled') THEN  t.usdamount
-                    WHEN t.transactiontype IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
-                  END), 0) AS monthly
-                FROM transactions t
-                JOIN crm_users u ON u.id = t.original_deposit_owner
-                JOIN accounts a ON a.accountid = t.vtigeraccountid
-                WHERE t.transactionapproval = 'Approved'
-                  AND (t.deleted = 0 OR t.deleted IS NULL)
-                  AND t.transactiontype IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
-                  AND t.confirmation_time >= %(month_start)s
-                  AND t.confirmation_time <  %(tomorrow)s
-                  AND EXTRACT(YEAR FROM t.confirmation_time) >= 2024
-                  AND t.vtigeraccountid IS NOT NULL
-                  AND a.is_test_account = 0
-                  AND u.department_ = 'Sales'
-                  AND u.team = 'Conversion'
-                  AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
-                  AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
-                  AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'
-                  AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
-            """, {"month_start": month_start_str, "tomorrow": tomorrow_str})
+                    COALESCE(SUM(net_usd) FILTER (WHERE tx_date = %(today)s::date), 0) AS daily,
+                    COALESCE(SUM(net_usd), 0)                                           AS monthly
+                FROM mv_run_rate
+                WHERE dept_group = 'sales'
+                  AND tx_date >= %(month_start)s AND tx_date <= %(today)s
+            """, p)
             row = cur.fetchone()
-            nd_sales_daily = float(row[0] or 0)
-            nd_sales_monthly = float(row[1] or 0)
+            nd_sales_daily, nd_sales_monthly = float(row[0] or 0), float(row[1] or 0)
 
-            # Q3 — Net Deposits – Retention
+            # Q3 — Net Deposits – Retention  (mv_run_rate 'retention')
             cur.execute("""
                 SELECT
-                  COALESCE(SUM(CASE
-                    WHEN t.transactiontype IN ('Deposit', 'Withdrawal Cancelled') THEN  t.usdamount
-                    WHEN t.transactiontype IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
-                  END) FILTER (WHERE t.confirmation_time::date = CURRENT_DATE), 0) AS daily,
-                  COALESCE(SUM(CASE
-                    WHEN t.transactiontype IN ('Deposit', 'Withdrawal Cancelled') THEN  t.usdamount
-                    WHEN t.transactiontype IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
-                  END), 0) AS monthly
-                FROM transactions t
-                JOIN accounts a ON a.accountid = t.vtigeraccountid
-                JOIN crm_users u ON u.id = t.original_deposit_owner
-                WHERE t.transactionapproval = 'Approved'
-                  AND (t.deleted = 0 OR t.deleted IS NULL)
-                  AND t.transactiontype IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
-                  AND t.confirmation_time >= %(month_start)s
-                  AND t.confirmation_time <  %(tomorrow)s
-                  AND a.is_test_account = 0
-                  AND u.department_ = 'Retention'
-                  AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
-                  AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
-                  AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'
-                  AND TRIM(COALESCE(u.department, '')) NOT ILIKE '%%Retention%%'
-                  AND TRIM(COALESCE(u.department, '')) NOT ILIKE '%%Conversion%%'
-                  AND TRIM(COALESCE(u.department, '')) NOT ILIKE '%%Support%%'
-                  AND TRIM(COALESCE(u.department, '')) NOT ILIKE '%%General%%'
-                  AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
-            """, {"month_start": month_start_str, "tomorrow": tomorrow_str})
+                    COALESCE(SUM(net_usd) FILTER (WHERE tx_date = %(today)s::date), 0) AS daily,
+                    COALESCE(SUM(net_usd), 0)                                           AS monthly
+                FROM mv_run_rate
+                WHERE dept_group = 'retention'
+                  AND tx_date >= %(month_start)s AND tx_date <= %(today)s
+            """, p)
             row = cur.fetchone()
-            nd_ret_daily = float(row[0] or 0)
-            nd_ret_monthly = float(row[1] or 0)
+            nd_ret_daily, nd_ret_monthly = float(row[0] or 0), float(row[1] or 0)
 
-            # Q4 — FTD #
+            # Q4 — FTD count  (mv_run_rate 'all', tx_date axis)
             cur.execute("""
                 SELECT
-                  COUNT(t.mttransactionsid) FILTER (WHERE t.confirmation_time::date = CURRENT_DATE) AS daily,
-                  COUNT(t.mttransactionsid) AS monthly
-                FROM transactions t
-                JOIN accounts a ON a.accountid = t.vtigeraccountid
-                WHERE t.transactionapproval = 'Approved'
-                  AND (t.deleted = 0 OR t.deleted IS NULL)
-                  AND t.transactiontype = 'Deposit'
-                  AND t.ftd = 1
-                  AND t.confirmation_time >= %(month_start)s
-                  AND t.confirmation_time <  %(tomorrow)s
-                  AND a.is_test_account = 0
-            """, {"month_start": month_start_str, "tomorrow": tomorrow_str})
+                    COALESCE(SUM(ftd_count) FILTER (WHERE tx_date = %(today)s::date), 0) AS daily,
+                    COALESCE(SUM(ftd_count), 0)                                           AS monthly
+                FROM mv_run_rate
+                WHERE dept_group = 'all'
+                  AND tx_date >= %(month_start)s AND tx_date <= %(today)s
+            """, p)
             row = cur.fetchone()
-            ftd_daily = int(row[0] or 0)
-            ftd_monthly = int(row[1] or 0)
+            ftd_daily, ftd_monthly = int(row[0] or 0), int(row[1] or 0)
 
-            # Q5 — FTC #
+            # Q5 — FTC count  (mv_run_rate 'all', qual_date axis)
             cur.execute("""
                 SELECT
-                  COUNT(DISTINCT t.vtigeraccountid) FILTER (WHERE a.client_qualification_date::date = CURRENT_DATE) AS daily,
-                  COUNT(DISTINCT t.vtigeraccountid) AS monthly
-                FROM transactions t
-                JOIN accounts a ON a.accountid = t.vtigeraccountid
-                WHERE t.transactionapproval = 'Approved'
-                  AND (t.deleted = 0 OR t.deleted IS NULL)
-                  AND t.transactiontype = 'Deposit'
-                  AND t.ftd = 1
-                  AND a.client_qualification_date >= %(month_start)s
-                  AND a.client_qualification_date <  %(tomorrow)s
-                  AND a.is_test_account = 0
-            """, {"month_start": month_start_str, "tomorrow": tomorrow_str})
+                    COALESCE(SUM(ftc_count) FILTER (WHERE qual_date = %(today)s::date), 0) AS daily,
+                    COALESCE(SUM(ftc_count), 0)                                             AS monthly
+                FROM mv_run_rate
+                WHERE dept_group = 'all'
+                  AND qual_date >= %(month_start)s AND qual_date <= %(today)s
+            """, p)
             row = cur.fetchone()
-            ftc_daily = int(row[0] or 0)
-            ftc_monthly = int(row[1] or 0)
+            ftc_daily, ftc_monthly = int(row[0] or 0), int(row[1] or 0)
 
-            # Q6 — # Traders
+            # Q6 — Traders  (mv_office_stats — COUNT DISTINCT accountid)
             cur.execute("""
                 SELECT
-                  COUNT(DISTINCT ta.vtigeraccountid) FILTER (WHERE d.open_time::date = CURRENT_DATE) AS daily,
-                  COUNT(DISTINCT ta.vtigeraccountid) AS monthly
-                FROM dealio_trades_mt4 d
-                JOIN trading_accounts ta ON ta.login::bigint = d.login::bigint
-                JOIN accounts a ON a.accountid = ta.vtigeraccountid
-                WHERE d.notional_value > 0
-                  AND ta.vtigeraccountid IS NOT NULL
-                  AND ta.vtigeraccountid::text != ''
-                  AND d.open_time::date >= %(month_start)s
-                  AND d.open_time::date <= %(today)s
-                  AND a.is_test_account = 0
-            """, {"month_start": month_start_str, "today": today_str})
+                    COUNT(DISTINCT accountid) FILTER (WHERE open_date = %(today)s::date) AS daily,
+                    COUNT(DISTINCT accountid)                                             AS monthly
+                FROM mv_office_stats
+                WHERE open_date >= %(month_start)s AND open_date <= %(today)s
+                  AND has_positive_notional = 1
+            """, p)
             row = cur.fetchone()
-            traders_daily = int(row[0] or 0)
-            traders_monthly = int(row[1] or 0)
+            traders_daily, traders_monthly = int(row[0] or 0), int(row[1] or 0)
 
-            # Q7 — Open Volume
+            # Q7 — Open Volume  (mv_office_stats — SUM notional_usd)
             cur.execute("""
                 SELECT
-                  COALESCE(SUM(d.notional_value) FILTER (WHERE d.open_time::date = CURRENT_DATE), 0) AS daily,
-                  COALESCE(SUM(d.notional_value), 0) AS monthly
-                FROM dealio_trades_mt4 d
-                JOIN trading_accounts ta ON ta.login::bigint = d.login
-                JOIN accounts a ON a.accountid = ta.vtigeraccountid
-                LEFT JOIN crm_users u ON u.id = a.assigned_to
-                WHERE d.open_time::date >= %(month_start)s
-                  AND d.open_time::date <= %(today)s
-                  AND EXTRACT(YEAR FROM d.open_time) >= 2024
-                  AND ta.vtigeraccountid IS NOT NULL
-                  AND a.is_test_account = 0
-                  AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
-            """, {"month_start": month_start_str, "today": today_str})
+                    COALESCE(SUM(notional_usd) FILTER (WHERE open_date = %(today)s::date), 0) AS daily,
+                    COALESCE(SUM(notional_usd), 0)                                             AS monthly
+                FROM mv_office_stats
+                WHERE open_date >= %(month_start)s AND open_date <= %(today)s
+            """, p)
             row = cur.fetchone()
-            ov_daily = float(row[0] or 0)
-            ov_monthly = float(row[1] or 0)
+            ov_daily, ov_monthly = float(row[0] or 0), float(row[1] or 0)
 
-            # Q8 — End Equity Zeroed (snapshot)
+            # Q8 — End Equity Zeroed  (live — real-time snapshot, not in MV)
             cur.execute("""
                 WITH latest_equity AS (
                     SELECT DISTINCT ON (login)
@@ -275,7 +187,7 @@ def _dashboard_calc(today: date_type) -> dict:
                             0
                         )
                     END
-                ), 0) AS end_equity_zeroed
+                ), 0)
                 FROM latest_equity d
                 JOIN trading_accounts ta  ON ta.login::bigint = d.login
                 JOIN accounts a           ON a.accountid = ta.vtigeraccountid
@@ -286,7 +198,7 @@ def _dashboard_calc(today: date_type) -> dict:
             """)
             end_equity_zeroed = float(cur.fetchone()[0] or 0)
 
-            # Q9 — ABS Exposure (snapshot)
+            # Q9 — ABS Exposure  (live snapshot of open positions)
             cur.execute("""
                 SELECT COALESCE(
                   CASE WHEN ABS(SUM(CASE WHEN cmd=0 THEN notional_value ELSE -notional_value END)) < 1
@@ -302,7 +214,7 @@ def _dashboard_calc(today: date_type) -> dict:
             """)
             abs_exposure = float(cur.fetchone()[0] or 0)
 
-            # Q10 — Daily PnL
+            # Q10 — Daily PnL  (live from dealio_daily_profits)
             cur.execute("""
                 SELECT COALESCE(SUM(
                     COALESCE(convertedclosedpnl, 0) + COALESCE(converteddeltafloatingpnl, 0)
@@ -372,7 +284,7 @@ async def dashboard_api(request: Request):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
     today = datetime.now(_TZ).date()
-    _ck = f"dashboard_v6:{today.isoformat()}"
+    _ck = f"dashboard_v7:{today.isoformat()}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)

@@ -1733,8 +1733,12 @@
   }
   updateSyncBar();
   setInterval(function() {
-    if (document.visibilityState === 'visible') { updateSyncBar(); }
-  }, 120000);
+    if (document.visibilityState !== 'visible') return;
+    const today = new Date().toISOString().split('T')[0];
+    const dt = document.getElementById('date-to').value;
+    updateSyncBar();
+    if (dt === today) loadAllData();
+  }, 60000);
 </script>
 
 <script src="https://instant.page/5.2.0/instantpage.min.js" type="module"></script>

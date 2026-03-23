@@ -450,8 +450,12 @@
   }
   updateSyncBar();
   setInterval(function() {
-    if (document.visibilityState === 'visible') { updateSyncBar(); }
-  }, 120000);
+    if (document.visibilityState !== 'visible') return;
+    const today = new Date().toISOString().split('T')[0];
+    const endDate = document.getElementById('endDate').value;
+    updateSyncBar();
+    if (endDate === today) loadData();
+  }, 60000);
 </script>
 <script src="https://instant.page/5.2.0/instantpage.min.js" type="module"></script>
 </body>

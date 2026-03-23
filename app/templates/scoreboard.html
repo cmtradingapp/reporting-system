@@ -1891,17 +1891,15 @@
     } catch(e) {}
   }
   updateSyncBar();
-  // Auto-refresh every 2 minutes when page is visible
-  setInterval(function() {
-    if (document.visibilityState === 'visible') { updateSyncBar(); }
-  }, 120000);
-
-  // Auto-refresh live equity every 2 minutes
+  // Auto-refresh every 60 s when page is visible
   setInterval(function() {
     if (document.visibilityState !== 'visible') return;
+    const today = new Date().toISOString().split('T')[0];
     const dt = document.getElementById('date-to').value;
+    updateSyncBar();
     loadLiveEquity(dt);
-  }, 120000);
+    if (dt === today) loadAll();
+  }, 60000);
 </script>
 
 <script src="https://instant.page/5.2.0/instantpage.min.js" type="module"></script>

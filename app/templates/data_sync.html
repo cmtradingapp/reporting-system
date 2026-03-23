@@ -123,6 +123,17 @@
   </div>
   <div id="sync-bar" style="font-size:0.73rem;color:#8b949e;margin-bottom:14px;"><i class="bi bi-arrow-repeat me-1"></i>Last sync: <span id="sync-bar-val">—</span></div>
 
+  <!-- ── Materialized View Status ───────────────────────────────────── -->
+  <div class="card p-4 mb-5" id="mv-status-card">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+      <div class="section-title mb-0">Materialized View Status</div>
+      <span style="font-size:0.72rem;color:#8b949e;" id="mv-last-checked">checking…</span>
+    </div>
+    <div id="mv-status-body">
+      <div class="text-center py-3 text-muted small">Loading…</div>
+    </div>
+  </div>
+
   <!-- Table Sections -->
   {% for t in tables %}
   <div id="section-{{ t.key }}" class="table-section">
@@ -303,6 +314,67 @@
       document.getElementById('spinner').classList.remove('active');
     }
   }
+
+  // ── Materialized View Status ───────────────────────────────────────
+  function fmtAge(secs) {
+    if (secs === null || secs === undefined) return '—';
+    if (secs < 60)  return secs + 's ago';
+    if (secs < 3600) return Math.floor(secs / 60) + ' min ago';
+    return Math.floor(secs / 3600) + 'h ago';
+  }
+  function fmtRows(n) {
+    if (n === null || n === undefined) return '—';
+    return Number(n).toLocaleString('en-US');
+  }
+  async function loadMvStatus() {
+    try {
+      const res  = await fetch('/api/mv-status');
+      if (!res.ok) return;
+      const mvs  = await res.json();
+      const rows = mvs.map(mv => {
+        const dot   = mv.healthy
+          ? '<span class="status-dot dot-green me-2"></span>'
+          : '<span class="status-dot dot-red me-2"></span>';
+        const errHtml = mv.last_error
+          ? `<div style="font-size:0.72rem;color:#f85149;margin-top:3px;word-break:break-word;">${mv.last_error}</div>`
+          : '';
+        return `<tr>
+          <td style="white-space:nowrap;">${dot}<code style="color:#c9d1d9;font-size:0.82rem;">${mv.name}</code></td>
+          <td style="font-size:0.82rem;">${fmtAge(mv.age_seconds)}${errHtml}</td>
+          <td style="font-size:0.82rem;text-align:right;">${fmtRows(mv.rows)}</td>
+          <td style="font-size:0.72rem;">
+            ${mv.healthy
+              ? '<span style="color:#3fb950;">OK</span>'
+              : (mv.last_error
+                  ? '<span style="color:#f85149;">Error</span>'
+                  : '<span style="color:#e3b341;">Stale</span>')}
+          </td>
+        </tr>`;
+      }).join('');
+      document.getElementById('mv-status-body').innerHTML = `
+        <div class="table-responsive">
+          <table class="table table-sm mb-0">
+            <thead>
+              <tr>
+                <th>View</th>
+                <th>Last Refresh</th>
+                <th style="text-align:right;">Rows (est.)</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>`;
+      document.getElementById('mv-last-checked').textContent = 'checked ' + new Date().toLocaleTimeString();
+    } catch(e) {
+      document.getElementById('mv-status-body').innerHTML =
+        `<div class="text-danger small">Failed to load MV status: ${e.message}</div>`;
+    }
+  }
+  loadMvStatus();
+  setInterval(function() {
+    if (document.visibilityState === 'visible') loadMvStatus();
+  }, 60000);
 
   // Mobile sidebar toggle
   (function(){

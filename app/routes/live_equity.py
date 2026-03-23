@@ -44,7 +44,7 @@ async def live_equity_zeroed(request: Request, date: str = None):
             return JSONResponse(status_code=400, content={"detail": "Invalid date"})
 
     is_current_month = (d.year == today.year and d.month == today.month)
-    _ck = f"live_eez_v22:{d}"
+    _ck = f"live_eez_v23:{d}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -177,50 +177,11 @@ def _live_calc(d) -> dict:
             """, {"d": str(d)})
             start_eez_total = float(cur.fetchone()[0] or 0)
 
-            # Net deposits per login (today, excl. bonuses via comment filter)
+            # Net deposits today — read from MV (pre-filtered, indexed on tx_date)
             cur.execute("""
-                SELECT ta.login::bigint,
-                       COALESCE(SUM(CASE
-                           WHEN t.transactiontype IN ('Deposit', 'Withdrawal Cancelled') THEN  t.usdamount
-                           WHEN t.transactiontype IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
-                       END), 0)
-                FROM transactions t
-                JOIN crm_users u ON u.id = t.original_deposit_owner
-                JOIN accounts a  ON a.accountid = t.vtigeraccountid
-                JOIN trading_accounts ta ON ta.vtigeraccountid = t.vtigeraccountid
-                WHERE t.transactionapproval = 'Approved'
-                  AND (t.deleted = 0 OR t.deleted IS NULL)
-                  AND t.transactiontype IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
-                  AND t.confirmation_time::date = %(d)s::date
-                  AND EXTRACT(YEAR FROM t.confirmation_time) >= 2024
-                  AND t.vtigeraccountid IS NOT NULL
-                  AND a.is_test_account = 0
-                  AND (ta.deleted = 0 OR ta.deleted IS NULL)
-                  AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
-                  AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
-                  AND ta.login::bigint = ANY(%(logins)s)
-                GROUP BY ta.login::bigint
-            """, {"d": str(d), "logins": valid_logins})
-            net_deposits_map = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
-
-            # Aggregate net deposits (for display)
-            cur.execute("""
-                SELECT COALESCE(SUM(CASE
-                    WHEN t.transactiontype IN ('Deposit', 'Withdrawal Cancelled') THEN  t.usdamount
-                    WHEN t.transactiontype IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
-                END), 0)
-                FROM transactions t
-                JOIN crm_users u ON u.id = t.original_deposit_owner
-                JOIN accounts a  ON a.accountid = t.vtigeraccountid
-                WHERE t.transactionapproval = 'Approved'
-                  AND (t.deleted = 0 OR t.deleted IS NULL)
-                  AND t.transactiontype IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
-                  AND t.confirmation_time::date = %(d)s::date
-                  AND EXTRACT(YEAR FROM t.confirmation_time) >= 2024
-                  AND t.vtigeraccountid IS NOT NULL
-                  AND a.is_test_account = 0
-                  AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
-                  AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
+                SELECT COALESCE(SUM(net_usd), 0)
+                FROM mv_daily_kpis
+                WHERE tx_date = %(d)s::date
             """, {"d": str(d)})
             net_deposits_today = float(cur.fetchone()[0] or 0)
 
