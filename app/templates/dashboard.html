@@ -16,28 +16,17 @@
     .sidebar-link:hover { background-color: #21262d; color: #e0e0e0; }
     .sidebar-link.active { color: #3fb950; border-left-color: #3fb950; background-color: rgba(63,185,80,0.08); }
     .main-content { margin-left: 220px; flex: 1; min-width: 0; }
-    .card { background-color: #161b22; border: 1px solid #30363d; border-radius: 12px; }
 
     /* KPI cards */
-    .kpi-card { background-color: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 10px 14px; height: 100%; display: flex; flex-direction: column; justify-content: center; }
+    .kpi-card { background-color: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 10px 14px; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
     .kpi-value { font-size: 1.3rem; font-weight: 700; line-height: 1.2; }
     .kpi-label { font-size: 0.68rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.8px; margin-top: 3px; }
 
-    /* Section title */
-    .dash-group-title { font-size: 1rem; font-weight: 600; color: #c9d1d9; border-left: 3px solid #238636; padding-left: 10px; }
-
-    .text-daily    { color: #388bfd; }
-    .text-monthly  { color: #3fb950; }
-    .text-rr       { color: #d29922; }
-    .text-pos      { color: #3fb950; }
-    .text-neg      { color: #f85149; }
-
-    /* Run-rate full-width bar on mobile */
-    @media (max-width: 575px) {
-      .rr-card { flex-direction: row !important; justify-content: space-between; align-items: center; padding: 10px 16px !important; }
-      .rr-card .kpi-value { font-size: 1.15rem; }
-      .rr-card .kpi-label { margin-top: 0 !important; }
-    }
+    .text-daily   { color: #388bfd; }
+    .text-monthly { color: #3fb950; }
+    .text-rr      { color: #d29922; }
+    .text-pos     { color: #3fb950; }
+    .text-neg     { color: #f85149; }
 
     /* Spinner */
     #loading { display: none; text-align: center; padding: 60px; color: #8b949e; }
@@ -60,10 +49,8 @@
       .mob-topbar { display:flex; align-items:center; justify-content:center; position:fixed; top:0; left:0; right:0; height:48px; background:#161b22; border-bottom:1px solid #30363d; z-index:150; }
       .mob-topbar-title { font-size:0.92rem; font-weight:700; color:#e0e0e0; padding:0 44px; }
       .main-content { margin-left: 0 !important; padding-top: 48px; }
-      .dash-group-title { display: none; }
-      .dash-group { margin-bottom: 0.75rem !important; }
       .kpi-card { padding: 8px 10px; }
-      .kpi-value { font-size: 1.1rem; }
+      .kpi-value { font-size: 1.05rem; }
     }
     @media (min-width: 768px) and (max-width: 1024px) {
       body { display:block; }
@@ -109,12 +96,11 @@
 <div class="main-content">
 <div class="container-fluid px-4 py-4">
 
-  <!-- Header (desktop) -->
+  <!-- Header -->
   <div class="mb-1 d-none d-md-flex align-items-center gap-3">
     <h4 class="fw-bold text-white mb-0">Dashboard</h4>
     <span style="font-size:0.73rem;color:#8b949e;white-space:nowrap;"><span id="wd-total">—</span> work days &middot; <span id="wd-left">—</span> left</span>
   </div>
-  <!-- Sync bar -->
   <div style="font-size:0.73rem;color:#8b949e;margin-bottom:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
     <span><i class="bi bi-arrow-repeat me-1"></i>Last sync: <span id="sync-bar-val">—</span></span>
     <span class="d-md-none" style="white-space:nowrap;"><span id="wd-total-mob">—</span> work days &middot; <span id="wd-left-mob">—</span> left</span>
@@ -126,127 +112,129 @@
   <div id="loading"><div class="spinner-border text-secondary" role="status"></div><div class="mt-2 small">Loading…</div></div>
   <div id="error-msg" class="alert alert-danger small"></div>
 
-  <!-- Cards container -->
+  <!-- Cards — same order as scoreboard mobile view -->
   <div id="cards-container" style="display:none;">
+    <div class="row g-2">
 
-    <!-- FTD / FTC -->
-    <div class="dash-group mb-4">
-      <div class="dash-group-title mb-3">FTD / FTC</div>
-      <div class="row g-2">
-        <div class="col-6 col-sm-4">
-          <div class="kpi-card text-center">
-            <div style="display:flex;justify-content:center;align-items:center;gap:14px;">
-              <div>
-                <div class="kpi-value text-daily" id="ftd-daily">—</div>
-                <div class="kpi-label">Daily FTD</div>
-              </div>
-              <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
-              <div>
-                <div class="kpi-value text-daily" id="ftc-daily">—</div>
-                <div class="kpi-label">Daily FTC</div>
-              </div>
+      <!-- Daily FTD / Daily FTC -->
+      <div class="col-6 col-md-2">
+        <div class="kpi-card">
+          <div style="display:flex;justify-content:center;align-items:center;gap:12px;">
+            <div>
+              <div class="kpi-value text-daily" id="ftd-daily">—</div>
+              <div class="kpi-label">Daily FTD</div>
             </div>
-          </div>
-        </div>
-        <div class="col-6 col-sm-4">
-          <div class="kpi-card text-center">
-            <div style="display:flex;justify-content:center;align-items:center;gap:14px;">
-              <div>
-                <div class="kpi-value text-monthly" id="ftd-monthly">—</div>
-                <div class="kpi-label">FTD</div>
-              </div>
-              <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
-              <div>
-                <div class="kpi-value text-monthly" id="ftc-monthly">—</div>
-                <div class="kpi-label">FTC</div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="col-12 col-sm-4">
-          <div class="kpi-card text-center">
-            <div style="display:flex;justify-content:center;align-items:center;gap:14px;">
-              <div>
-                <div class="kpi-value text-rr" id="ftd-rr">—</div>
-                <div class="kpi-label">FTD RR</div>
-              </div>
-              <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
-              <div>
-                <div class="kpi-value text-rr" id="ftc-rr">—</div>
-                <div class="kpi-label">FTC RR</div>
-              </div>
+            <div style="color:#484f58;font-size:1.4rem;line-height:1;">/</div>
+            <div>
+              <div class="kpi-value text-daily" id="ftc-daily">—</div>
+              <div class="kpi-label">Daily FTC</div>
             </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- Net Deposits -->
-    <div class="dash-group mb-4">
-      <div class="dash-group-title mb-3">Net Deposits</div>
-      <div class="row g-2">
-        <div class="col-6 col-sm-4">
-          <div class="kpi-card text-center">
-            <div style="display:flex;justify-content:center;align-items:center;gap:14px;">
-              <div>
-                <div class="kpi-value text-daily" id="nd-sales-daily">—</div>
-                <div class="kpi-label">Daily Net</div>
-              </div>
-              <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
-              <div>
-                <div class="kpi-value text-daily" id="nd-ret-daily">—</div>
-                <div class="kpi-label">Daily Ret Net</div>
-              </div>
+      <!-- Daily Net / Daily Ret Net -->
+      <div class="col-6 col-md-2">
+        <div class="kpi-card">
+          <div style="display:flex;justify-content:center;align-items:center;gap:12px;">
+            <div>
+              <div class="kpi-value text-monthly" id="nd-sales-daily">—</div>
+              <div class="kpi-label">Daily Net</div>
+            </div>
+            <div style="color:#484f58;font-size:1.4rem;line-height:1;">/</div>
+            <div>
+              <div class="kpi-value text-daily" id="nd-ret-daily">—</div>
+              <div class="kpi-label">Daily Ret Net</div>
             </div>
           </div>
         </div>
-        <div class="col-6 col-sm-4">
-          <div class="kpi-card text-center">
-            <div class="kpi-value text-monthly" id="nd-monthly">—</div>
-            <div class="kpi-label">NET $</div>
-          </div>
-        </div>
-        <div class="col-12 col-sm-4">
-          <div class="kpi-card rr-card text-center">
-            <div class="kpi-value text-rr" id="nd-rr">—</div>
-            <div class="kpi-label">NET RR</div>
+      </div>
+
+      <!-- FTD / FTC (MTD) -->
+      <div class="col-6 col-md-2">
+        <div class="kpi-card">
+          <div style="display:flex;justify-content:center;align-items:center;gap:12px;">
+            <div>
+              <div class="kpi-value text-daily" id="ftd-monthly">—</div>
+              <div class="kpi-label">FTD</div>
+            </div>
+            <div style="color:#484f58;font-size:1.4rem;line-height:1;">/</div>
+            <div>
+              <div class="kpi-value text-daily" id="ftc-monthly">—</div>
+              <div class="kpi-label">FTC</div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- Volume & Snapshots -->
-    <div class="dash-group mb-4">
-      <div class="dash-group-title mb-3">Volume &amp; Snapshots</div>
-      <div class="row g-2">
-        <div class="col-6">
-          <div class="kpi-card text-center">
-            <div class="kpi-value" style="color:#c9d1d9;" id="ov-monthly">—</div>
-            <div class="kpi-label">Open Volume</div>
-          </div>
+      <!-- NET $ -->
+      <div class="col-6 col-md-2">
+        <div class="kpi-card">
+          <div class="kpi-value text-monthly" id="nd-monthly">—</div>
+          <div class="kpi-label">NET $</div>
         </div>
-        <div class="col-6">
-          <div class="kpi-card text-center">
-            <div class="kpi-value text-rr" id="ov-rr">—</div>
-            <div class="kpi-label">Open Volume RR</div>
-          </div>
-        </div>
-        <div class="col-6">
-          <div class="kpi-card text-center">
-            <span id="dash-live-eez-badge" style="background:#1a4731;color:#3fb950;border:1px solid #238636;border-radius:4px;padding:1px 6px;font-size:0.6rem;letter-spacing:0.04em;">LIVE</span>
-            <div class="kpi-value mt-1" style="color:#58a6ff;" id="dash-live-eez-val">—</div>
-            <div class="kpi-label">Live End EEZ<span id="dash-live-eez-updated" style="display:block;font-size:0.55rem;color:#484f58;font-weight:400;text-transform:none;letter-spacing:0;margin-top:1px;"></span></div>
-          </div>
-        </div>
-        <div class="col-6">
-          <div class="kpi-card text-center">
-            <div class="kpi-value" id="pnl-daily">—</div>
-            <div class="kpi-label">Daily PnL Cash<span id="pnl-date" style="display:block;font-size:0.55rem;color:#484f58;font-weight:400;text-transform:none;letter-spacing:0;margin-top:1px;"></span></div>
+      </div>
+
+      <!-- FTD RR / FTC RR -->
+      <div class="col-6 col-md-2">
+        <div class="kpi-card">
+          <div style="display:flex;justify-content:center;align-items:center;gap:12px;">
+            <div>
+              <div class="kpi-value text-rr" id="ftd-rr">—</div>
+              <div class="kpi-label">FTD RR</div>
+            </div>
+            <div style="color:#484f58;font-size:1.4rem;line-height:1;">/</div>
+            <div>
+              <div class="kpi-value text-rr" id="ftc-rr">—</div>
+              <div class="kpi-label">FTC RR</div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
 
+      <!-- NET RR -->
+      <div class="col-6 col-md-2">
+        <div class="kpi-card">
+          <div class="kpi-value text-rr" id="nd-rr">—</div>
+          <div class="kpi-label">NET RR</div>
+        </div>
+      </div>
+
+      <!-- Open Volume -->
+      <div class="col-6 col-md-2">
+        <div class="kpi-card">
+          <div class="kpi-value" style="color:#c9d1d9;" id="ov-monthly">—</div>
+          <div class="kpi-label">Open Volume</div>
+        </div>
+      </div>
+
+      <!-- Open Volume RR -->
+      <div class="col-6 col-md-2">
+        <div class="kpi-card">
+          <div class="kpi-value text-rr" id="ov-rr">—</div>
+          <div class="kpi-label">Open Volume RR</div>
+        </div>
+      </div>
+
+      <!-- Live End EEZ -->
+      <div class="col-6 col-md-2">
+        <div class="kpi-card">
+          <div class="kpi-value" style="color:#58a6ff;" id="dash-live-eez-val">—</div>
+          <div class="kpi-label">
+            <span id="dash-live-eez-badge" style="display:none;background:#1a4731;color:#3fb950;border:1px solid #238636;border-radius:4px;padding:1px 5px;font-size:0.55rem;letter-spacing:0.04em;margin-right:3px;vertical-align:middle;">LIVE</span>Live End EEZ<span id="dash-live-eez-updated" style="display:block;font-size:0.55rem;color:#484f58;font-weight:400;text-transform:none;letter-spacing:0;margin-top:1px;"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Daily PnL Cash -->
+      <div class="col-6 col-md-2">
+        <div class="kpi-card">
+          <div class="kpi-value" id="pnl-daily">—</div>
+          <div class="kpi-label">Daily PnL Cash<span id="pnl-date" style="display:block;font-size:0.55rem;color:#484f58;font-weight:400;text-transform:none;letter-spacing:0;margin-top:1px;"></span></div>
+        </div>
+      </div>
+
+    </div>
   </div><!-- /cards-container -->
 </div>
 </div>
@@ -257,7 +245,7 @@
     const neg = v < 0;
     const abs = Math.abs(v);
     const s = '$' + abs.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0});
-    return neg ? '‑' + s : s;
+    return neg ? '-$' + abs.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0}) : s;
   }
   function fmtNum(v) {
     if (v === null || v === undefined) return '—';
@@ -339,7 +327,7 @@
       const abs = Math.abs(data.total);
       el.textContent = (neg ? '-$' : '$') + abs.toLocaleString('en-US');
       if (data.is_live) {
-        badge.style.display = '';
+        badge.style.display = 'inline';
         upd.textContent = 'as of ' + new Date().toLocaleTimeString();
       } else {
         badge.style.display = 'none';
