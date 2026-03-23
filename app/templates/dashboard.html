@@ -18,20 +18,14 @@
     .main-content { margin-left: 220px; flex: 1; min-width: 0; }
     .card { background-color: #161b22; border: 1px solid #30363d; border-radius: 12px; }
 
-    /* KPI cards */
-    .kpi-card { background-color: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 14px 16px; height: 100%; }
+    /* KPI cards — matches scoreboard style */
+    .kpi-card { background-color: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 10px 14px; height: 100%; display: flex; flex-direction: column; justify-content: center; }
     .kpi-value { font-size: 1.3rem; font-weight: 700; line-height: 1.2; }
     .kpi-label { font-size: 0.68rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.8px; margin-top: 3px; }
 
     /* Dashboard group title */
-    .dash-group-title { font-size: 0.75rem; font-weight: 700; color: #8b949e; text-transform: uppercase; letter-spacing: 1px; border-left: 3px solid #30363d; padding-left: 8px; }
+    .dash-group-title { font-size: 1rem; font-weight: 600; color: #c9d1d9; border-left: 3px solid #238636; padding-left: 10px; }
 
-    /* Variant badges */
-    .variant-badge { display: inline-block; font-size: 0.65rem; font-weight: 700; padding: 2px 8px; border-radius: 10px; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
-    .daily-badge   { background: rgba(56,139,253,0.12);  color: #388bfd; border: 1px solid rgba(56,139,253,0.3); }
-    .monthly-badge { background: rgba(63,185,80,0.12);   color: #3fb950; border: 1px solid rgba(63,185,80,0.3); }
-    .rr-badge      { background: rgba(210,153,34,0.12);  color: #d29922; border: 1px solid rgba(210,153,34,0.3); }
-    .snapshot-badge{ background: rgba(163,113,247,0.12); color: #a371f7; border: 1px solid rgba(163,113,247,0.3); }
     .text-daily    { color: #388bfd; }
     .text-monthly  { color: #3fb950; }
     .text-rr       { color: #d29922; }
@@ -147,27 +141,24 @@
 
     <!-- Net Deposits -->
     <div class="dash-group mb-4">
-      <div class="dash-group-title mb-2">Net Deposits</div>
-      <div class="row g-3">
+      <div class="dash-group-title mb-3">Net Deposits</div>
+      <div class="row g-2">
         <div class="col-4">
           <div class="kpi-card text-center">
-            <div><span class="variant-badge daily-badge">Daily</span></div>
             <div class="kpi-value text-daily" id="nd-daily">—</div>
-            <div class="kpi-label">Net Deposits</div>
+            <div class="kpi-label">Daily Net</div>
           </div>
         </div>
         <div class="col-4">
           <div class="kpi-card text-center">
-            <div><span class="variant-badge monthly-badge">Monthly</span></div>
             <div class="kpi-value text-monthly" id="nd-monthly">—</div>
-            <div class="kpi-label">Net Deposits</div>
+            <div class="kpi-label">MTD Net</div>
           </div>
         </div>
         <div class="col-4">
           <div class="kpi-card text-center">
-            <div><span class="variant-badge rr-badge">Run Rate</span></div>
             <div class="kpi-value text-rr" id="nd-rr">—</div>
-            <div class="kpi-label">Net Deposits</div>
+            <div class="kpi-label">Net Run Rate</div>
           </div>
         </div>
       </div>
@@ -175,27 +166,24 @@
 
     <!-- Net Deposits – Sales -->
     <div class="dash-group mb-4">
-      <div class="dash-group-title mb-2">Net Deposits – Sales</div>
-      <div class="row g-3">
+      <div class="dash-group-title mb-3">Net Deposits – Sales</div>
+      <div class="row g-2">
         <div class="col-4">
           <div class="kpi-card text-center">
-            <div><span class="variant-badge daily-badge">Daily</span></div>
             <div class="kpi-value text-daily" id="nds-daily">—</div>
-            <div class="kpi-label">Net Deposits Sales</div>
+            <div class="kpi-label">Daily Sales</div>
           </div>
         </div>
         <div class="col-4">
           <div class="kpi-card text-center">
-            <div><span class="variant-badge monthly-badge">Monthly</span></div>
             <div class="kpi-value text-monthly" id="nds-monthly">—</div>
-            <div class="kpi-label">Net Deposits Sales</div>
+            <div class="kpi-label">MTD Sales</div>
           </div>
         </div>
         <div class="col-4">
           <div class="kpi-card text-center">
-            <div><span class="variant-badge rr-badge">Run Rate</span></div>
             <div class="kpi-value text-rr" id="nds-rr">—</div>
-            <div class="kpi-label">Net Deposits Sales</div>
+            <div class="kpi-label">Sales Run Rate</div>
           </div>
         </div>
       </div>
@@ -203,139 +191,128 @@
 
     <!-- Net Deposits – Retention -->
     <div class="dash-group mb-4">
-      <div class="dash-group-title mb-2">Net Deposits – Retention</div>
-      <div class="row g-3">
+      <div class="dash-group-title mb-3">Net Deposits – Retention</div>
+      <div class="row g-2">
         <div class="col-4">
           <div class="kpi-card text-center">
-            <div><span class="variant-badge daily-badge">Daily</span></div>
             <div class="kpi-value text-daily" id="ndr-daily">—</div>
-            <div class="kpi-label">Net Deposits Retention</div>
+            <div class="kpi-label">Daily Ret.</div>
           </div>
         </div>
         <div class="col-4">
           <div class="kpi-card text-center">
-            <div><span class="variant-badge monthly-badge">Monthly</span></div>
             <div class="kpi-value text-monthly" id="ndr-monthly">—</div>
-            <div class="kpi-label">Net Deposits Retention</div>
+            <div class="kpi-label">MTD Ret.</div>
           </div>
         </div>
         <div class="col-4">
           <div class="kpi-card text-center">
-            <div><span class="variant-badge rr-badge">Run Rate</span></div>
             <div class="kpi-value text-rr" id="ndr-rr">—</div>
-            <div class="kpi-label">Net Deposits Retention</div>
+            <div class="kpi-label">Ret. Run Rate</div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- FTD -->
+    <!-- FTD / FTC -->
     <div class="dash-group mb-4">
-      <div class="dash-group-title mb-2">FTD #</div>
-      <div class="row g-3">
+      <div class="dash-group-title mb-3">FTD / FTC</div>
+      <div class="row g-2">
         <div class="col-4">
           <div class="kpi-card text-center">
-            <div><span class="variant-badge daily-badge">Daily</span></div>
-            <div class="kpi-value text-daily" id="ftd-daily">—</div>
-            <div class="kpi-label">FTD</div>
+            <div style="display:flex;justify-content:center;align-items:center;gap:10px;">
+              <div>
+                <div class="kpi-value text-daily" id="ftd-daily">—</div>
+                <div class="kpi-label">Daily FTD</div>
+              </div>
+              <div style="color:#484f58;font-size:1.4rem;line-height:1;">/</div>
+              <div>
+                <div class="kpi-value text-daily" id="ftc-daily">—</div>
+                <div class="kpi-label">Daily FTC</div>
+              </div>
+            </div>
           </div>
         </div>
         <div class="col-4">
           <div class="kpi-card text-center">
-            <div><span class="variant-badge monthly-badge">Monthly</span></div>
-            <div class="kpi-value text-monthly" id="ftd-monthly">—</div>
-            <div class="kpi-label">FTD</div>
+            <div style="display:flex;justify-content:center;align-items:center;gap:10px;">
+              <div>
+                <div class="kpi-value text-monthly" id="ftd-monthly">—</div>
+                <div class="kpi-label">MTD FTD</div>
+              </div>
+              <div style="color:#484f58;font-size:1.4rem;line-height:1;">/</div>
+              <div>
+                <div class="kpi-value text-monthly" id="ftc-monthly">—</div>
+                <div class="kpi-label">MTD FTC</div>
+              </div>
+            </div>
           </div>
         </div>
         <div class="col-4">
           <div class="kpi-card text-center">
-            <div><span class="variant-badge rr-badge">Run Rate</span></div>
-            <div class="kpi-value text-rr" id="ftd-rr">—</div>
-            <div class="kpi-label">FTD</div>
+            <div style="display:flex;justify-content:center;align-items:center;gap:10px;">
+              <div>
+                <div class="kpi-value text-rr" id="ftd-rr">—</div>
+                <div class="kpi-label">FTD RR</div>
+              </div>
+              <div style="color:#484f58;font-size:1.4rem;line-height:1;">/</div>
+              <div>
+                <div class="kpi-value text-rr" id="ftc-rr">—</div>
+                <div class="kpi-label">FTC RR</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- FTC -->
+    <!-- Traders / Open Volume -->
     <div class="dash-group mb-4">
-      <div class="dash-group-title mb-2">FTC #</div>
-      <div class="row g-3">
+      <div class="dash-group-title mb-3">Traders / Open Volume</div>
+      <div class="row g-2">
         <div class="col-4">
           <div class="kpi-card text-center">
-            <div><span class="variant-badge daily-badge">Daily</span></div>
-            <div class="kpi-value text-daily" id="ftc-daily">—</div>
-            <div class="kpi-label">FTC</div>
+            <div style="display:flex;justify-content:center;align-items:center;gap:10px;">
+              <div>
+                <div class="kpi-value text-daily" id="traders-daily">—</div>
+                <div class="kpi-label">Daily Traders</div>
+              </div>
+              <div style="color:#484f58;font-size:1.4rem;line-height:1;">/</div>
+              <div>
+                <div class="kpi-value text-daily" id="ov-daily">—</div>
+                <div class="kpi-label">Daily Vol</div>
+              </div>
+            </div>
           </div>
         </div>
         <div class="col-4">
           <div class="kpi-card text-center">
-            <div><span class="variant-badge monthly-badge">Monthly</span></div>
-            <div class="kpi-value text-monthly" id="ftc-monthly">—</div>
-            <div class="kpi-label">FTC</div>
+            <div style="display:flex;justify-content:center;align-items:center;gap:10px;">
+              <div>
+                <div class="kpi-value text-monthly" id="traders-monthly">—</div>
+                <div class="kpi-label">MTD Traders</div>
+              </div>
+              <div style="color:#484f58;font-size:1.4rem;line-height:1;">/</div>
+              <div>
+                <div class="kpi-value text-monthly" id="ov-monthly">—</div>
+                <div class="kpi-label">MTD Vol</div>
+              </div>
+            </div>
           </div>
         </div>
         <div class="col-4">
           <div class="kpi-card text-center">
-            <div><span class="variant-badge rr-badge">Run Rate</span></div>
-            <div class="kpi-value text-rr" id="ftc-rr">—</div>
-            <div class="kpi-label">FTC</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Traders -->
-    <div class="dash-group mb-4">
-      <div class="dash-group-title mb-2"># Traders</div>
-      <div class="row g-3">
-        <div class="col-4">
-          <div class="kpi-card text-center">
-            <div><span class="variant-badge daily-badge">Daily</span></div>
-            <div class="kpi-value text-daily" id="traders-daily">—</div>
-            <div class="kpi-label">Traders</div>
-          </div>
-        </div>
-        <div class="col-4">
-          <div class="kpi-card text-center">
-            <div><span class="variant-badge monthly-badge">Monthly</span></div>
-            <div class="kpi-value text-monthly" id="traders-monthly">—</div>
-            <div class="kpi-label">Traders</div>
-          </div>
-        </div>
-        <div class="col-4">
-          <div class="kpi-card text-center">
-            <div><span class="variant-badge rr-badge">Run Rate</span></div>
-            <div class="kpi-value text-rr" id="traders-rr">—</div>
-            <div class="kpi-label">Traders</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Open Volume -->
-    <div class="dash-group mb-4">
-      <div class="dash-group-title mb-2">Open Volume</div>
-      <div class="row g-3">
-        <div class="col-4">
-          <div class="kpi-card text-center">
-            <div><span class="variant-badge daily-badge">Daily</span></div>
-            <div class="kpi-value text-daily" id="ov-daily">—</div>
-            <div class="kpi-label">Open Volume</div>
-          </div>
-        </div>
-        <div class="col-4">
-          <div class="kpi-card text-center">
-            <div><span class="variant-badge monthly-badge">Monthly</span></div>
-            <div class="kpi-value text-monthly" id="ov-monthly">—</div>
-            <div class="kpi-label">Open Volume</div>
-          </div>
-        </div>
-        <div class="col-4">
-          <div class="kpi-card text-center">
-            <div><span class="variant-badge rr-badge">Run Rate</span></div>
-            <div class="kpi-value text-rr" id="ov-rr">—</div>
-            <div class="kpi-label">Open Volume</div>
+            <div style="display:flex;justify-content:center;align-items:center;gap:10px;">
+              <div>
+                <div class="kpi-value text-rr" id="traders-rr">—</div>
+                <div class="kpi-label">Traders RR</div>
+              </div>
+              <div style="color:#484f58;font-size:1.4rem;line-height:1;">/</div>
+              <div>
+                <div class="kpi-value text-rr" id="ov-rr">—</div>
+                <div class="kpi-label">Vol RR</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -343,21 +320,18 @@
 
     <!-- Snapshots -->
     <div class="dash-group mb-4">
-      <div class="dash-group-title mb-2">Snapshots</div>
-      <div class="row g-3">
+      <div class="dash-group-title mb-3">Snapshots</div>
+      <div class="row g-2">
         <div class="col-6">
           <div class="kpi-card text-center">
-            <div><span class="variant-badge snapshot-badge">Snapshot</span></div>
             <div class="kpi-value text-snapshot" id="abs-val">—</div>
             <div class="kpi-label">ABS Exposure</div>
           </div>
         </div>
         <div class="col-6">
           <div class="kpi-card text-center">
-            <div>
-              <span id="dash-live-eez-badge" style="background:#1a4731;color:#3fb950;border:1px solid #238636;border-radius:4px;padding:1px 6px;font-size:0.6rem;letter-spacing:0.04em;">LIVE</span>
-            </div>
-            <div class="kpi-value" style="color:#58a6ff;" id="dash-live-eez-val">—</div>
+            <span id="dash-live-eez-badge" style="background:#1a4731;color:#3fb950;border:1px solid #238636;border-radius:4px;padding:1px 6px;font-size:0.6rem;letter-spacing:0.04em;">LIVE</span>
+            <div class="kpi-value mt-1" style="color:#58a6ff;" id="dash-live-eez-val">—</div>
             <div class="kpi-label">Live End Equity Zeroed</div>
             <div style="font-size:0.6rem;color:#484f58;margin-top:2px;" id="dash-live-eez-updated"></div>
           </div>
