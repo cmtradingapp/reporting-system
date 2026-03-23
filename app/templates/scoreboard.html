@@ -232,16 +232,18 @@
       .kpi-value { font-size:1.1rem; }
       .kpi-split { flex-wrap:nowrap !important; gap:6px !important; }
       .kpi-split .kpi-value { font-size:0.88rem; }
-      #kpi-daily-ftd { order:1; }
-      #kpi-ftd-ftc   { order:2; }
-      #kpi-daily-net { order:3; }
-      #kpi-ftd-rr    { order:4; }
-      #kpi-net       { order:5; }
-      #kpi-net-rr    { order:6; }
-      #kpi-vol       { order:7; }
-      #kpi-vol-rr    { order:8; }
-      #kpi-live-equity { order:10; }
-      #kpi-live-equity-alt { order:11; }
+      #kpi-daily-ftd      { order:1; }
+      #kpi-daily-net      { order:2; }
+      #kpi-ftd-ftc        { order:3; }
+      #kpi-net            { order:4; }
+      #kpi-ftd-rr         { order:5; }
+      #kpi-net-rr         { order:6; }
+      #kpi-vol            { order:7; }
+      #kpi-vol-rr         { order:8; }
+      #kpi-start-equity   { order:9; }
+      #kpi-live-equity    { order:10; }
+      #kpi-daily-pnl-cash { order:11; }
+      #kpi-daily-pnl      { order:12; }
       .date-input { width:120px; }
       .cnt-badge { display:none; }
       #row-count, #ret-row-count { display:none; }
@@ -475,7 +477,6 @@
       </div>
     </div>
     {% if current_user.role == 'admin' %}
-    <div class="w-100 d-md-none"></div>
     <div class="col-6 col-md-2" id="kpi-start-equity">
       <div class="kpi-card text-center">
         <div class="kpi-value" style="color:#8b949e;" id="stat-start-equity-zeroed">—</div>
