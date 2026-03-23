@@ -1,9 +1,29 @@
 import sys
 sys.path.insert(0, '/app')
+import psycopg2
 from app.db.dealio_conn import get_dealio_connection
 from app.db.postgres_conn import get_connection
+from app.config import (
+    DEALIO_PG_HOST, DEALIO_PG_PORT, DEALIO_PG_USER,
+    DEALIO_PG_PASSWORD, DEALIO_PG_DB,
+    DEALIO_PG_SSLCERT, DEALIO_PG_SSLKEY, DEALIO_PG_SSLROOTCERT,
+)
 from datetime import date, timedelta
 from collections import defaultdict
+
+def get_dealio_long_conn():
+    """Dealio connection with extended timeout + TCP keepalives for long queries."""
+    return psycopg2.connect(
+        host=DEALIO_PG_HOST, port=DEALIO_PG_PORT,
+        user=DEALIO_PG_USER, password=DEALIO_PG_PASSWORD,
+        dbname=DEALIO_PG_DB,
+        connect_timeout=30,
+        options="-c statement_timeout=600000",  # 10 minutes
+        sslmode="require",
+        sslcert=DEALIO_PG_SSLCERT, sslkey=DEALIO_PG_SSLKEY, sslrootcert=DEALIO_PG_SSLROOTCERT,
+        client_encoding="utf8",
+        keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=5,
+    )
 
 DEALIO = {
     '2026-03-23': -155844.47,
@@ -91,6 +111,8 @@ try:
     # Step 4: Cumulative credit per login per day from Dealio source cmd=7
     # No login filter here — filter in Python to avoid passing 365K logins over SSL
     valid_logins_set = set(valid_logins)
+    dealio_conn.close()
+    dealio_conn = get_dealio_long_conn()
     with dealio_conn.cursor() as cur:
         cur.execute("""
             SELECT login,
