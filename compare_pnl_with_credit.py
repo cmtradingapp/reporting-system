@@ -89,6 +89,8 @@ try:
         dep_rows = {str(r[0]): float(r[1]) for r in cur.fetchall()}
 
     # Step 4: Cumulative credit per login per day from Dealio source cmd=7
+    # No login filter here — filter in Python to avoid passing 365K logins over SSL
+    valid_logins_set = set(valid_logins)
     with dealio_conn.cursor() as cur:
         cur.execute("""
             SELECT login,
@@ -97,11 +99,10 @@ try:
             FROM dealio.trades_mt4
             WHERE cmd = 7
               AND close_time < '2026-03-24'
-              AND login = ANY(%s)
             GROUP BY login, close_time::date
             ORDER BY login, day
-        """, (valid_logins,))
-        credit_rows = cur.fetchall()
+        """)
+        credit_rows = [(r[0], r[1], r[2]) for r in cur.fetchall() if int(r[0]) in valid_logins_set]
         print(f"Credit (cmd=7) rows fetched: {len(credit_rows)}")
 
 finally:
