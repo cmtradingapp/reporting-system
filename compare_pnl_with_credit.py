@@ -1,29 +1,7 @@
 import sys
 sys.path.insert(0, '/app')
-import psycopg2
-from app.db.dealio_conn import get_dealio_connection
 from app.db.postgres_conn import get_connection
-from app.config import (
-    DEALIO_PG_HOST, DEALIO_PG_PORT, DEALIO_PG_USER,
-    DEALIO_PG_PASSWORD, DEALIO_PG_DB,
-    DEALIO_PG_SSLCERT, DEALIO_PG_SSLKEY, DEALIO_PG_SSLROOTCERT,
-)
 from datetime import date, timedelta
-from collections import defaultdict
-
-def get_dealio_long_conn():
-    """Dealio connection with extended timeout + TCP keepalives for long queries."""
-    return psycopg2.connect(
-        host=DEALIO_PG_HOST, port=DEALIO_PG_PORT,
-        user=DEALIO_PG_USER, password=DEALIO_PG_PASSWORD,
-        dbname=DEALIO_PG_DB,
-        connect_timeout=30,
-        options="-c statement_timeout=600000",  # 10 minutes
-        sslmode="require",
-        sslcert=DEALIO_PG_SSLCERT, sslkey=DEALIO_PG_SSLKEY, sslrootcert=DEALIO_PG_SSLROOTCERT,
-        client_encoding="utf8",
-        keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=5,
-    )
 
 DEALIO = {
     '2026-03-23': -155844.47,
@@ -51,12 +29,11 @@ DEALIO = {
     '2026-03-01': -10417.25,
 }
 
-pg_conn = get_connection()
-dealio_conn = get_dealio_connection()
-
+conn = get_connection()
 try:
-    with pg_conn.cursor() as cur:
-        # Step 1: Get valid (non-test) logins
+    with conn.cursor() as cur:
+
+        # Valid (non-test) logins — same filter as live formula
         cur.execute("""
             SELECT ta.login::bigint
             FROM trading_accounts ta
@@ -68,40 +45,23 @@ try:
         valid_logins = [r[0] for r in cur.fetchall()]
         print(f"Valid logins: {len(valid_logins)}")
 
-        valid_logins_set = set(valid_logins)
-
-        # Step 2a: Floating PnL — filtered to valid CRM logins
+        # Our formula: MAX(0, convertedbalance + convertedfloatingpnl) per login per day
+        # Matches start_net_equity / daily_end_net_equity logic in live_equity.py
         cur.execute("""
             SELECT DISTINCT ON (date::date, login)
                 date::date AS day,
                 login,
-                convertedfloatingpnl
+                COALESCE(convertedbalance, 0) + COALESCE(convertedfloatingpnl, 0) AS net_equity
             FROM dealio_daily_profits
             WHERE date >= '2026-02-28' AND date < '2026-03-24'
               AND login = ANY(%s)
             ORDER BY date::date, login, date DESC
         """, (valid_logins,))
-        floating = {}
+        equity = {}
         for r in cur.fetchall():
-            floating[(int(r[1]), str(r[0]))] = float(r[2]) if r[2] else 0.0
+            equity[(int(r[1]), str(r[0]))] = float(r[2]) if r[2] else 0.0
 
-        # Step 2b: Floating PnL — ALL logins (no filter)
-        cur.execute("""
-            SELECT DISTINCT ON (date::date, login)
-                date::date AS day,
-                login,
-                convertedfloatingpnl
-            FROM dealio_daily_profits
-            WHERE date >= '2026-02-28' AND date < '2026-03-24'
-            ORDER BY date::date, login, date DESC
-        """)
-        floating_all = {}
-        for r in cur.fetchall():
-            floating_all[(int(r[1]), str(r[0]))] = float(r[2]) if r[2] else 0.0
-        print(f"Filtered logins in floating: {len(set(k[0] for k in floating))}")
-        print(f"All logins in floating:      {len(set(k[0] for k in floating_all))}")
-
-        # Step 3: Net deposits per day
+        # Net deposits — same filter as live formula
         cur.execute("""
             SELECT t.confirmation_time::date AS day,
                    SUM(CASE
@@ -126,48 +86,47 @@ try:
         """)
         dep_rows = {str(r[0]): float(r[1]) for r in cur.fetchall()}
 
+        # Bonuses per day — same as live formula
+        cur.execute("""
+            SELECT confirmation_time::date AS day, COALESCE(SUM(net_amount), 0) AS bonuses
+            FROM bonus_transactions
+            WHERE confirmation_time >= '2026-03-01'
+              AND confirmation_time <  '2026-03-24'
+            GROUP BY confirmation_time::date
+            ORDER BY day
+        """)
+        bonus_rows = {str(r[0]): float(r[1]) for r in cur.fetchall()}
+
 finally:
-    pg_conn.close()
-    dealio_conn.close()
+    conn.close()
 
-# Login sets
-all_logins     = set(k[0] for k in floating.keys())
-all_logins_all = set(k[0] for k in floating_all.keys())
-
+all_logins = set(k[0] for k in equity.keys())
 dates = sorted(DEALIO.keys())
 
 def fmt(v): return f"${v:,.2f}" if v is not None else "N/A"
 
-print(f"\n{'Date':<12} {'Dealio Ref':>14} {'CEO filtered':>14} {'CEO all logins':>16} {'Diff filtered':>14} {'Diff all':>12}")
-print("-" * 90)
+print(f"\n{'Date':<12} {'Dealio Ref':>14} {'Our Formula':>14} {'Diff':>12}")
+print("-" * 56)
 
-dealio_total  = 0.0
-ceo_total     = 0.0
-ceo_all_total = 0.0
+dealio_total = 0.0
+ours_total   = 0.0
 
 for d in dates:
     dealio_v = DEALIO[d]
     prev     = str(date.fromisoformat(d) - timedelta(days=1))
     net_dep  = dep_rows.get(d, 0.0)
+    bonuses  = bonus_rows.get(d, 0.0)
 
-    # CEO filtered (CRM non-test accounts only)
-    end_f   = sum(max(0.0, floating.get((l, d),    0.0)) for l in all_logins if (l, d)    in floating)
-    start_f = sum(max(0.0, floating.get((l, prev), 0.0)) for l in all_logins if (l, prev) in floating)
-    ceo = round(end_f - start_f - net_dep, 2) if (end_f or start_f) else None
+    end_eq   = sum(max(0.0, equity.get((l, d),    0.0)) for l in all_logins if (l, d)    in equity)
+    start_eq = sum(max(0.0, equity.get((l, prev), 0.0)) for l in all_logins if (l, prev) in equity)
+    ours = round(end_eq - start_eq - net_dep - bonuses, 2) if (end_eq or start_eq) else None
 
-    # CEO all logins (no filter)
-    end_a   = sum(max(0.0, floating_all.get((l, d),    0.0)) for l in all_logins_all if (l, d)    in floating_all)
-    start_a = sum(max(0.0, floating_all.get((l, prev), 0.0)) for l in all_logins_all if (l, prev) in floating_all)
-    ceo_all = round(end_a - start_a - net_dep, 2) if (end_a or start_a) else None
+    diff = round(ours - dealio_v, 2) if ours is not None else None
 
-    diff_ceo     = round(ceo     - dealio_v, 2) if ceo     is not None else None
-    diff_ceo_all = round(ceo_all - dealio_v, 2) if ceo_all is not None else None
-
-    if ceo     is not None: ceo_total     += ceo
-    if ceo_all is not None: ceo_all_total += ceo_all
+    if ours is not None: ours_total   += ours
     dealio_total += dealio_v
 
-    print(f"{d:<12} {fmt(dealio_v):>14} {fmt(ceo):>14} {fmt(ceo_all):>16} {fmt(diff_ceo):>14} {fmt(diff_ceo_all):>12}")
+    print(f"{d:<12} {fmt(dealio_v):>14} {fmt(ours):>14} {fmt(diff):>12}")
 
-print("-" * 90)
-print(f"{'TOTAL':<12} {fmt(dealio_total):>14} {fmt(ceo_total):>14} {fmt(ceo_all_total):>16} {fmt(ceo_total-dealio_total):>14} {fmt(ceo_all_total-dealio_total):>12}")
+print("-" * 56)
+print(f"{'TOTAL':<12} {fmt(dealio_total):>14} {fmt(ours_total):>14} {fmt(ours_total-dealio_total):>12}")
