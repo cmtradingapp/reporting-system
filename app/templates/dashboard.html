@@ -18,18 +18,19 @@
     .main-content { margin-left: 220px; flex: 1; min-width: 0; }
     .card { background-color: #161b22; border: 1px solid #30363d; border-radius: 12px; }
 
-    /* KPI cards — matches scoreboard style */
+    /* KPI cards */
     .kpi-card { background-color: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 10px 14px; height: 100%; display: flex; flex-direction: column; justify-content: center; }
     .kpi-value { font-size: 1.3rem; font-weight: 700; line-height: 1.2; }
     .kpi-label { font-size: 0.68rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.8px; margin-top: 3px; }
 
-    /* Dashboard group title */
+    /* Section title */
     .dash-group-title { font-size: 1rem; font-weight: 600; color: #c9d1d9; border-left: 3px solid #238636; padding-left: 10px; }
 
     .text-daily    { color: #388bfd; }
     .text-monthly  { color: #3fb950; }
     .text-rr       { color: #d29922; }
-    .text-snapshot { color: #a371f7; }
+    .text-pos      { color: #3fb950; }
+    .text-neg      { color: #f85149; }
 
     /* Run-rate full-width bar on mobile */
     @media (max-width: 575px) {
@@ -72,7 +73,6 @@
       .mob-topbar { display:flex; align-items:center; justify-content:center; position:fixed; top:0; left:0; right:0; height:48px; background:#161b22; border-bottom:1px solid #30363d; z-index:150; }
       .mob-topbar-title { font-size:0.95rem; font-weight:700; color:#e0e0e0; padding:0 44px; }
       .main-content { margin-left:0 !important; padding-top:48px; }
-      .table-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
     }
   </style>
 </head>
@@ -114,7 +114,7 @@
     <h4 class="fw-bold text-white mb-0">Dashboard</h4>
     <span style="font-size:0.73rem;color:#8b949e;white-space:nowrap;"><span id="wd-total">—</span> work days &middot; <span id="wd-left">—</span> left</span>
   </div>
-  <!-- Sync bar (both) — working days shown on mobile here -->
+  <!-- Sync bar -->
   <div style="font-size:0.73rem;color:#8b949e;margin-bottom:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
     <span><i class="bi bi-arrow-repeat me-1"></i>Last sync: <span id="sync-bar-val">—</span></span>
     <span class="d-md-none" style="white-space:nowrap;"><span id="wd-total-mob">—</span> work days &middot; <span id="wd-left-mob">—</span> left</span>
@@ -129,7 +129,7 @@
   <!-- Cards container -->
   <div id="cards-container" style="display:none;">
 
-    <!-- FTD / FTC — paired, at top, scoreboard style -->
+    <!-- FTD / FTC -->
     <div class="dash-group mb-4">
       <div class="dash-group-title mb-3">FTD / FTC</div>
       <div class="row g-2">
@@ -153,12 +153,12 @@
             <div style="display:flex;justify-content:center;align-items:center;gap:14px;">
               <div>
                 <div class="kpi-value text-monthly" id="ftd-monthly">—</div>
-                <div class="kpi-label">MTD FTD</div>
+                <div class="kpi-label">FTD</div>
               </div>
               <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
               <div>
                 <div class="kpi-value text-monthly" id="ftc-monthly">—</div>
-                <div class="kpi-label">MTD FTC</div>
+                <div class="kpi-label">FTC</div>
               </div>
             </div>
           </div>
@@ -187,141 +187,61 @@
       <div class="row g-2">
         <div class="col-6 col-sm-4">
           <div class="kpi-card text-center">
-            <div class="kpi-value text-daily" id="nd-daily">—</div>
-            <div class="kpi-label">Daily Net</div>
+            <div style="display:flex;justify-content:center;align-items:center;gap:14px;">
+              <div>
+                <div class="kpi-value text-daily" id="nd-sales-daily">—</div>
+                <div class="kpi-label">Daily Net</div>
+              </div>
+              <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
+              <div>
+                <div class="kpi-value text-daily" id="nd-ret-daily">—</div>
+                <div class="kpi-label">Daily Ret Net</div>
+              </div>
+            </div>
           </div>
         </div>
         <div class="col-6 col-sm-4">
           <div class="kpi-card text-center">
             <div class="kpi-value text-monthly" id="nd-monthly">—</div>
-            <div class="kpi-label">MTD Net</div>
+            <div class="kpi-label">NET $</div>
           </div>
         </div>
         <div class="col-12 col-sm-4">
           <div class="kpi-card rr-card text-center">
             <div class="kpi-value text-rr" id="nd-rr">—</div>
-            <div class="kpi-label">Net Run Rate</div>
+            <div class="kpi-label">NET RR</div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Net Deposits – Sales -->
+    <!-- Volume & Snapshots -->
     <div class="dash-group mb-4">
-      <div class="dash-group-title mb-3">Net Deposits – Sales</div>
-      <div class="row g-2">
-        <div class="col-6 col-sm-4">
-          <div class="kpi-card text-center">
-            <div class="kpi-value text-daily" id="nds-daily">—</div>
-            <div class="kpi-label">Daily Sales</div>
-          </div>
-        </div>
-        <div class="col-6 col-sm-4">
-          <div class="kpi-card text-center">
-            <div class="kpi-value text-monthly" id="nds-monthly">—</div>
-            <div class="kpi-label">MTD Sales</div>
-          </div>
-        </div>
-        <div class="col-12 col-sm-4">
-          <div class="kpi-card rr-card text-center">
-            <div class="kpi-value text-rr" id="nds-rr">—</div>
-            <div class="kpi-label">Sales Run Rate</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Net Deposits – Retention -->
-    <div class="dash-group mb-4">
-      <div class="dash-group-title mb-3">Net Deposits – Retention</div>
-      <div class="row g-2">
-        <div class="col-6 col-sm-4">
-          <div class="kpi-card text-center">
-            <div class="kpi-value text-daily" id="ndr-daily">—</div>
-            <div class="kpi-label">Daily Ret.</div>
-          </div>
-        </div>
-        <div class="col-6 col-sm-4">
-          <div class="kpi-card text-center">
-            <div class="kpi-value text-monthly" id="ndr-monthly">—</div>
-            <div class="kpi-label">MTD Ret.</div>
-          </div>
-        </div>
-        <div class="col-12 col-sm-4">
-          <div class="kpi-card rr-card text-center">
-            <div class="kpi-value text-rr" id="ndr-rr">—</div>
-            <div class="kpi-label">Ret. Run Rate</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- # Traders -->
-    <div class="dash-group mb-4">
-      <div class="dash-group-title mb-3"># Traders</div>
-      <div class="row g-2">
-        <div class="col-6 col-sm-4">
-          <div class="kpi-card text-center">
-            <div class="kpi-value text-daily" id="traders-daily">—</div>
-            <div class="kpi-label">Daily Traders</div>
-          </div>
-        </div>
-        <div class="col-6 col-sm-4">
-          <div class="kpi-card text-center">
-            <div class="kpi-value text-monthly" id="traders-monthly">—</div>
-            <div class="kpi-label">MTD Traders</div>
-          </div>
-        </div>
-        <div class="col-12 col-sm-4">
-          <div class="kpi-card rr-card text-center">
-            <div class="kpi-value text-rr" id="traders-rr">—</div>
-            <div class="kpi-label">Traders Run Rate</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Open Volume -->
-    <div class="dash-group mb-4">
-      <div class="dash-group-title mb-3">Open Volume</div>
-      <div class="row g-2">
-        <div class="col-6 col-sm-4">
-          <div class="kpi-card text-center">
-            <div class="kpi-value text-daily" id="ov-daily">—</div>
-            <div class="kpi-label">Daily Vol</div>
-          </div>
-        </div>
-        <div class="col-6 col-sm-4">
-          <div class="kpi-card text-center">
-            <div class="kpi-value text-monthly" id="ov-monthly">—</div>
-            <div class="kpi-label">MTD Vol</div>
-          </div>
-        </div>
-        <div class="col-12 col-sm-4">
-          <div class="kpi-card rr-card text-center">
-            <div class="kpi-value text-rr" id="ov-rr">—</div>
-            <div class="kpi-label">Vol Run Rate</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Snapshots -->
-    <div class="dash-group mb-4">
-      <div class="dash-group-title mb-3">Snapshots</div>
+      <div class="dash-group-title mb-3">Volume &amp; Snapshots</div>
       <div class="row g-2">
         <div class="col-6">
           <div class="kpi-card text-center">
-            <div class="kpi-value text-snapshot" id="abs-val">—</div>
-            <div class="kpi-label">ABS Exposure</div>
+            <div class="kpi-value" style="color:#c9d1d9;" id="ov-monthly">—</div>
+            <div class="kpi-label">Open Volume</div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div class="kpi-card text-center">
+            <div class="kpi-value text-rr" id="ov-rr">—</div>
+            <div class="kpi-label">Open Volume RR</div>
           </div>
         </div>
         <div class="col-6">
           <div class="kpi-card text-center">
             <span id="dash-live-eez-badge" style="background:#1a4731;color:#3fb950;border:1px solid #238636;border-radius:4px;padding:1px 6px;font-size:0.6rem;letter-spacing:0.04em;">LIVE</span>
             <div class="kpi-value mt-1" style="color:#58a6ff;" id="dash-live-eez-val">—</div>
-            <div class="kpi-label">Live End Equity Zeroed</div>
-            <div style="font-size:0.6rem;color:#484f58;margin-top:2px;" id="dash-live-eez-updated"></div>
+            <div class="kpi-label">Live End EEZ<span id="dash-live-eez-updated" style="display:block;font-size:0.55rem;color:#484f58;font-weight:400;text-transform:none;letter-spacing:0;margin-top:1px;"></span></div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div class="kpi-card text-center">
+            <div class="kpi-value" id="pnl-daily">—</div>
+            <div class="kpi-label">Daily PnL Cash<span id="pnl-date" style="display:block;font-size:0.55rem;color:#484f58;font-weight:400;text-transform:none;letter-spacing:0;margin-top:1px;"></span></div>
           </div>
         </div>
       </div>
@@ -343,6 +263,12 @@
     if (v === null || v === undefined) return '—';
     return v.toLocaleString('en-US');
   }
+  function setPnL(elId, v) {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    el.textContent = fmtMoney(v);
+    el.className = 'kpi-value ' + (v > 0 ? 'text-pos' : v < 0 ? 'text-neg' : '');
+  }
 
   async function fetchData() {
     const loading = document.getElementById('loading');
@@ -356,58 +282,38 @@
     try {
       const res  = await fetch('/api/dashboard');
       const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Server error');
 
-      if (!res.ok) {
-        throw new Error(data.detail || 'Server error');
-      }
-
-      // Working days (desktop + mobile)
+      // Working days
       document.getElementById('wd-total').textContent     = fmtNum(data.working_days);
       document.getElementById('wd-left').textContent      = fmtNum(data.working_days_left);
       document.getElementById('wd-total-mob').textContent = fmtNum(data.working_days);
       document.getElementById('wd-left-mob').textContent  = fmtNum(data.working_days_left);
 
-      // Net Deposits
-      document.getElementById('nd-daily').textContent   = fmtMoney(data.net_deposits.daily);
-      document.getElementById('nd-monthly').textContent = fmtMoney(data.net_deposits.monthly);
-      document.getElementById('nd-rr').textContent      = fmtMoney(data.net_deposits.rr);
-
-      // Net Deposits Sales
-      document.getElementById('nds-daily').textContent   = fmtMoney(data.net_deposits_sales.daily);
-      document.getElementById('nds-monthly').textContent = fmtMoney(data.net_deposits_sales.monthly);
-      document.getElementById('nds-rr').textContent      = fmtMoney(data.net_deposits_sales.rr);
-
-      // Net Deposits Retention
-      document.getElementById('ndr-daily').textContent   = fmtMoney(data.net_deposits_retention.daily);
-      document.getElementById('ndr-monthly').textContent = fmtMoney(data.net_deposits_retention.monthly);
-      document.getElementById('ndr-rr').textContent      = fmtMoney(data.net_deposits_retention.rr);
-
-      // FTD
+      // FTD / FTC
       document.getElementById('ftd-daily').textContent   = fmtNum(data.ftd.daily);
-      document.getElementById('ftd-monthly').textContent = fmtNum(data.ftd.monthly);
-      document.getElementById('ftd-rr').textContent      = fmtNum(data.ftd.rr);
-
-      // FTC
       document.getElementById('ftc-daily').textContent   = fmtNum(data.ftc.daily);
+      document.getElementById('ftd-monthly').textContent = fmtNum(data.ftd.monthly);
       document.getElementById('ftc-monthly').textContent = fmtNum(data.ftc.monthly);
+      document.getElementById('ftd-rr').textContent      = fmtNum(data.ftd.rr);
       document.getElementById('ftc-rr').textContent      = fmtNum(data.ftc.rr);
 
-      // Traders
-      document.getElementById('traders-daily').textContent   = fmtNum(data.traders.daily);
-      document.getElementById('traders-monthly').textContent = fmtNum(data.traders.monthly);
-      document.getElementById('traders-rr').textContent      = fmtNum(data.traders.rr);
+      // Net Deposits
+      document.getElementById('nd-sales-daily').textContent = fmtMoney(data.net_deposits_sales.daily);
+      document.getElementById('nd-ret-daily').textContent   = fmtMoney(data.net_deposits_retention.daily);
+      document.getElementById('nd-monthly').textContent     = fmtMoney(data.net_deposits.monthly);
+      document.getElementById('nd-rr').textContent          = fmtMoney(data.net_deposits.rr);
 
       // Open Volume
-      document.getElementById('ov-daily').textContent   = fmtMoney(data.open_volume.daily);
       document.getElementById('ov-monthly').textContent = fmtMoney(data.open_volume.monthly);
       document.getElementById('ov-rr').textContent      = fmtMoney(data.open_volume.rr);
 
-      // Snapshots
-      document.getElementById('abs-val').textContent = fmtMoney(data.abs_exposure);
+      // Daily PnL Cash
+      setPnL('pnl-daily', data.pnl_cash.daily);
+      const pnlDateEl = document.getElementById('pnl-date');
+      if (pnlDateEl && data.pnl_cash.pnl_date) pnlDateEl.textContent = data.pnl_cash.pnl_date;
 
-      // Timestamp
       document.getElementById('last-updated').textContent = new Date().toLocaleTimeString();
-
       loading.style.display = 'none';
       cards.style.display   = 'block';
     } catch (err) {
@@ -452,7 +358,6 @@
   toggle.addEventListener('click',  () => { sidebar.classList.toggle('open'); overlay.classList.toggle('show'); });
   overlay.addEventListener('click', () => { sidebar.classList.remove('open'); overlay.classList.remove('show'); });
 
-  // ── Last sync bar ──────────────────────────────────────────────────────
   function fmtRelTime(iso) {
     if (!iso) return '—';
     const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
