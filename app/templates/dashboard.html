@@ -31,9 +31,12 @@
     .text-rr       { color: #d29922; }
     .text-snapshot { color: #a371f7; }
 
-    /* Working days bar */
-    .wd-bar { background-color: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 10px 16px; font-size: 0.82rem; color: #8b949e; }
-    .wd-bar span { color: #c9d1d9; font-weight: 600; }
+    /* Run-rate full-width bar on mobile */
+    @media (max-width: 575px) {
+      .rr-card { flex-direction: row !important; justify-content: space-between; align-items: center; padding: 10px 16px !important; }
+      .rr-card .kpi-value { font-size: 1.15rem; }
+      .rr-card .kpi-label { margin-top: 0 !important; }
+    }
 
     /* Spinner */
     #loading { display: none; text-align: center; padding: 60px; color: #8b949e; }
@@ -56,7 +59,6 @@
       .mob-topbar { display:flex; align-items:center; justify-content:center; position:fixed; top:0; left:0; right:0; height:48px; background:#161b22; border-bottom:1px solid #30363d; z-index:150; }
       .mob-topbar-title { font-size:0.92rem; font-weight:700; color:#e0e0e0; padding:0 44px; }
       .main-content { margin-left: 0 !important; padding-top: 48px; }
-      h4.fw-bold { display:none; }
       .dash-group-title { display: none; }
       .dash-group { margin-bottom: 0.75rem !important; }
       .kpi-card { padding: 8px 10px; }
@@ -107,22 +109,17 @@
 <div class="main-content">
 <div class="container-fluid px-4 py-4">
 
-  <!-- Header -->
-  <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
-    <div>
-      <h4 class="fw-bold text-white mb-0">Dashboard</h4>
-      <p class="text-muted small mb-0">Refreshed: <span id="last-updated">—</span></p>
-      <p class="mb-0" style="font-size:0.73rem;color:#8b949e;"><i class="bi bi-arrow-repeat me-1"></i>Last sync: <span id="sync-bar-val">—</span></p>
-    </div>
-    <button class="btn-refresh" id="btn-refresh">&#8635; Refresh</button>
+  <!-- Header (desktop) -->
+  <div class="mb-1 d-none d-md-flex align-items-center gap-3">
+    <h4 class="fw-bold text-white mb-0">Dashboard</h4>
+    <span style="font-size:0.73rem;color:#8b949e;white-space:nowrap;"><span id="wd-total">—</span> work days &middot; <span id="wd-left">—</span> left</span>
   </div>
-
-  <!-- Working Days bar -->
-  <div class="wd-bar mb-4" id="wd-bar" style="display:none;">
-    Working Days: <span id="wd-total">—</span> &nbsp;|&nbsp;
-    Passed: <span id="wd-passed">—</span> &nbsp;|&nbsp;
-    Left: <span id="wd-left">—</span>
-    <span class="ms-3 text-muted" id="wd-date-range"></span>
+  <!-- Sync bar (both) — working days shown on mobile here -->
+  <div style="font-size:0.73rem;color:#8b949e;margin-bottom:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <span><i class="bi bi-arrow-repeat me-1"></i>Last sync: <span id="sync-bar-val">—</span></span>
+    <span class="d-md-none" style="white-space:nowrap;"><span id="wd-total-mob">—</span> work days &middot; <span id="wd-left-mob">—</span> left</span>
+    <span class="ms-auto d-none d-md-inline">Updated: <span id="last-updated">—</span></span>
+    <button class="btn-refresh" id="btn-refresh">&#8635; Refresh</button>
   </div>
 
   <!-- Loading / Error -->
@@ -131,6 +128,58 @@
 
   <!-- Cards container -->
   <div id="cards-container" style="display:none;">
+
+    <!-- FTD / FTC — paired, at top, scoreboard style -->
+    <div class="dash-group mb-4">
+      <div class="dash-group-title mb-3">FTD / FTC</div>
+      <div class="row g-2">
+        <div class="col-6 col-sm-4">
+          <div class="kpi-card text-center">
+            <div style="display:flex;justify-content:center;align-items:center;gap:14px;">
+              <div>
+                <div class="kpi-value text-daily" id="ftd-daily">—</div>
+                <div class="kpi-label">Daily FTD</div>
+              </div>
+              <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
+              <div>
+                <div class="kpi-value text-daily" id="ftc-daily">—</div>
+                <div class="kpi-label">Daily FTC</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-sm-4">
+          <div class="kpi-card text-center">
+            <div style="display:flex;justify-content:center;align-items:center;gap:14px;">
+              <div>
+                <div class="kpi-value text-monthly" id="ftd-monthly">—</div>
+                <div class="kpi-label">MTD FTD</div>
+              </div>
+              <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
+              <div>
+                <div class="kpi-value text-monthly" id="ftc-monthly">—</div>
+                <div class="kpi-label">MTD FTC</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-12 col-sm-4">
+          <div class="kpi-card text-center">
+            <div style="display:flex;justify-content:center;align-items:center;gap:14px;">
+              <div>
+                <div class="kpi-value text-rr" id="ftd-rr">—</div>
+                <div class="kpi-label">FTD RR</div>
+              </div>
+              <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
+              <div>
+                <div class="kpi-value text-rr" id="ftc-rr">—</div>
+                <div class="kpi-label">FTC RR</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- Net Deposits -->
     <div class="dash-group mb-4">
@@ -148,8 +197,8 @@
             <div class="kpi-label">MTD Net</div>
           </div>
         </div>
-        <div class="col-6 col-sm-4">
-          <div class="kpi-card text-center">
+        <div class="col-12 col-sm-4">
+          <div class="kpi-card rr-card text-center">
             <div class="kpi-value text-rr" id="nd-rr">—</div>
             <div class="kpi-label">Net Run Rate</div>
           </div>
@@ -173,8 +222,8 @@
             <div class="kpi-label">MTD Sales</div>
           </div>
         </div>
-        <div class="col-6 col-sm-4">
-          <div class="kpi-card text-center">
+        <div class="col-12 col-sm-4">
+          <div class="kpi-card rr-card text-center">
             <div class="kpi-value text-rr" id="nds-rr">—</div>
             <div class="kpi-label">Sales Run Rate</div>
           </div>
@@ -198,8 +247,8 @@
             <div class="kpi-label">MTD Ret.</div>
           </div>
         </div>
-        <div class="col-6 col-sm-4">
-          <div class="kpi-card text-center">
+        <div class="col-12 col-sm-4">
+          <div class="kpi-card rr-card text-center">
             <div class="kpi-value text-rr" id="ndr-rr">—</div>
             <div class="kpi-label">Ret. Run Rate</div>
           </div>
@@ -207,57 +256,7 @@
       </div>
     </div>
 
-    <!-- FTD -->
-    <div class="dash-group mb-4">
-      <div class="dash-group-title mb-3">FTD #</div>
-      <div class="row g-2">
-        <div class="col-6 col-sm-4">
-          <div class="kpi-card text-center">
-            <div class="kpi-value text-daily" id="ftd-daily">—</div>
-            <div class="kpi-label">Daily FTD</div>
-          </div>
-        </div>
-        <div class="col-6 col-sm-4">
-          <div class="kpi-card text-center">
-            <div class="kpi-value text-monthly" id="ftd-monthly">—</div>
-            <div class="kpi-label">MTD FTD</div>
-          </div>
-        </div>
-        <div class="col-6 col-sm-4">
-          <div class="kpi-card text-center">
-            <div class="kpi-value text-rr" id="ftd-rr">—</div>
-            <div class="kpi-label">FTD Run Rate</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- FTC -->
-    <div class="dash-group mb-4">
-      <div class="dash-group-title mb-3">FTC #</div>
-      <div class="row g-2">
-        <div class="col-6 col-sm-4">
-          <div class="kpi-card text-center">
-            <div class="kpi-value text-daily" id="ftc-daily">—</div>
-            <div class="kpi-label">Daily FTC</div>
-          </div>
-        </div>
-        <div class="col-6 col-sm-4">
-          <div class="kpi-card text-center">
-            <div class="kpi-value text-monthly" id="ftc-monthly">—</div>
-            <div class="kpi-label">MTD FTC</div>
-          </div>
-        </div>
-        <div class="col-6 col-sm-4">
-          <div class="kpi-card text-center">
-            <div class="kpi-value text-rr" id="ftc-rr">—</div>
-            <div class="kpi-label">FTC Run Rate</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Traders -->
+    <!-- # Traders -->
     <div class="dash-group mb-4">
       <div class="dash-group-title mb-3"># Traders</div>
       <div class="row g-2">
@@ -273,8 +272,8 @@
             <div class="kpi-label">MTD Traders</div>
           </div>
         </div>
-        <div class="col-6 col-sm-4">
-          <div class="kpi-card text-center">
+        <div class="col-12 col-sm-4">
+          <div class="kpi-card rr-card text-center">
             <div class="kpi-value text-rr" id="traders-rr">—</div>
             <div class="kpi-label">Traders Run Rate</div>
           </div>
@@ -298,8 +297,8 @@
             <div class="kpi-label">MTD Vol</div>
           </div>
         </div>
-        <div class="col-6 col-sm-4">
-          <div class="kpi-card text-center">
+        <div class="col-12 col-sm-4">
+          <div class="kpi-card rr-card text-center">
             <div class="kpi-value text-rr" id="ov-rr">—</div>
             <div class="kpi-label">Vol Run Rate</div>
           </div>
@@ -349,12 +348,10 @@
     const loading = document.getElementById('loading');
     const errMsg  = document.getElementById('error-msg');
     const cards   = document.getElementById('cards-container');
-    const wdBar   = document.getElementById('wd-bar');
 
     loading.style.display = 'block';
     errMsg.style.display  = 'none';
     cards.style.display   = 'none';
-    wdBar.style.display   = 'none';
 
     try {
       const res  = await fetch('/api/dashboard');
@@ -364,11 +361,11 @@
         throw new Error(data.detail || 'Server error');
       }
 
-      // Working days bar
-      document.getElementById('wd-total').textContent  = fmtNum(data.working_days);
-      document.getElementById('wd-passed').textContent = fmtNum(data.working_days_passed);
-      document.getElementById('wd-left').textContent   = fmtNum(data.working_days_left);
-      document.getElementById('wd-date-range').textContent = data.month_start + ' → ' + data.date;
+      // Working days (desktop + mobile)
+      document.getElementById('wd-total').textContent     = fmtNum(data.working_days);
+      document.getElementById('wd-left').textContent      = fmtNum(data.working_days_left);
+      document.getElementById('wd-total-mob').textContent = fmtNum(data.working_days);
+      document.getElementById('wd-left-mob').textContent  = fmtNum(data.working_days_left);
 
       // Net Deposits
       document.getElementById('nd-daily').textContent   = fmtMoney(data.net_deposits.daily);
@@ -413,7 +410,6 @@
 
       loading.style.display = 'none';
       cards.style.display   = 'block';
-      wdBar.style.display   = 'block';
     } catch (err) {
       loading.style.display = 'none';
       errMsg.style.display  = 'block';
