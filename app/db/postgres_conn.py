@@ -2241,20 +2241,27 @@ _mv_refresh_status: dict = {mv: {"last_refresh": None, "last_error": None} for m
 
 
 def refresh_materialized_views() -> None:
-    """Refresh all 4 MVs concurrently (non-blocking reads during refresh).
-    Order matters: mv_daily_kpis must complete before mv_run_rate.
+    """Refresh all 4 MVs. Tries CONCURRENTLY first (non-blocking); falls back to
+    plain refresh if no unique index exists. Order matters: mv_daily_kpis before mv_run_rate.
     Called by APScheduler every 2 minutes.
     """
     from datetime import datetime, timezone
     for mv in _MV_ORDER:
         conn = get_connection()
         try:
-            with conn.cursor() as cur:
-                cur.execute(f"REFRESH MATERIALIZED VIEW CONCURRENTLY {mv}")
-            conn.commit()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(f"REFRESH MATERIALIZED VIEW CONCURRENTLY {mv}")
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                with conn.cursor() as cur:
+                    cur.execute(f"REFRESH MATERIALIZED VIEW {mv}")
+                conn.commit()
             _mv_refresh_status[mv]["last_refresh"] = datetime.now(timezone.utc).isoformat()
             _mv_refresh_status[mv]["last_error"]   = None
         except Exception as e:
+            conn.rollback()
             _mv_refresh_status[mv]["last_error"] = str(e)
             print(f"[refresh_materialized_views] {mv}: {e}")
         finally:

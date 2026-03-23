@@ -38,7 +38,7 @@ def warm_cache():
     """Refresh cache for dashboard and live EEZ every minute so users always get fresh numbers."""
     today = datetime.now(_TZ).date()
 
-    _ck = f"dashboard_v7:{today.isoformat()}"
+    _ck = f"dashboard_v8:{today.isoformat()}"
     try:
         cache.set(_ck, _dashboard_calc(today))
     except Exception as e:

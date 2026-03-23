@@ -139,19 +139,7 @@ def _dashboard_calc(today: date_type) -> dict:
             row = cur.fetchone()
             ftc_daily, ftc_monthly = int(row[0] or 0), int(row[1] or 0)
 
-            # Q6 — Traders  (mv_office_stats — COUNT DISTINCT accountid)
-            cur.execute("""
-                SELECT
-                    COUNT(DISTINCT accountid) FILTER (WHERE open_date = %(today)s::date) AS daily,
-                    COUNT(DISTINCT accountid)                                             AS monthly
-                FROM mv_office_stats
-                WHERE open_date >= %(month_start)s AND open_date <= %(today)s
-                  AND has_positive_notional = 1
-            """, p)
-            row = cur.fetchone()
-            traders_daily, traders_monthly = int(row[0] or 0), int(row[1] or 0)
-
-            # Q7 — Open Volume  (mv_office_stats — SUM notional_usd)
+            # Q6 — Open Volume  (mv_office_stats — SUM notional_usd)
             cur.execute("""
                 SELECT
                     COALESCE(SUM(notional_usd) FILTER (WHERE open_date = %(today)s::date), 0) AS daily,
@@ -162,59 +150,7 @@ def _dashboard_calc(today: date_type) -> dict:
             row = cur.fetchone()
             ov_daily, ov_monthly = float(row[0] or 0), float(row[1] or 0)
 
-            # Q8 — End Equity Zeroed  (live — real-time snapshot, not in MV)
-            cur.execute("""
-                WITH latest_equity AS (
-                    SELECT DISTINCT ON (login)
-                        login, convertedbalance, convertedfloatingpnl
-                    FROM dealio_daily_profits
-                    WHERE date >= date_trunc('month', CURRENT_DATE)
-                      AND date <  date_trunc('month', CURRENT_DATE) + INTERVAL '1 month'
-                    ORDER BY login, date DESC
-                ),
-                old_bonus_balance AS (
-                    SELECT login, SUM(net_amount) AS old_bonus_balance
-                    FROM bonus_transactions
-                    WHERE confirmation_time < CURRENT_DATE + INTERVAL '1 day'
-                    GROUP BY login
-                )
-                SELECT COALESCE(SUM(
-                    CASE
-                        WHEN COALESCE(d.convertedbalance, 0) + COALESCE(d.convertedfloatingpnl, 0) <= 0 THEN 0
-                        ELSE GREATEST(
-                            COALESCE(d.convertedbalance, 0) + COALESCE(d.convertedfloatingpnl, 0)
-                                - COALESCE(ob.old_bonus_balance, 0),
-                            0
-                        )
-                    END
-                ), 0)
-                FROM latest_equity d
-                JOIN trading_accounts ta  ON ta.login::bigint = d.login
-                JOIN accounts a           ON a.accountid = ta.vtigeraccountid
-                JOIN crm_users u          ON u.id = a.assigned_to
-                LEFT JOIN old_bonus_balance ob ON ob.login::bigint = d.login
-                WHERE a.is_test_account = 0
-                  AND (ta.deleted = 0 OR ta.deleted IS NULL)
-            """)
-            end_equity_zeroed = float(cur.fetchone()[0] or 0)
-
-            # Q9 — ABS Exposure  (live snapshot of open positions)
-            cur.execute("""
-                SELECT COALESCE(
-                  CASE WHEN ABS(SUM(CASE WHEN cmd=0 THEN notional_value ELSE -notional_value END)) < 1
-                       THEN 0
-                       ELSE ABS(SUM(CASE WHEN cmd=0 THEN notional_value ELSE -notional_value END))
-                  END, 0)
-                FROM dealio_trades_mt4 d
-                JOIN trading_accounts ta ON ta.login::bigint = d.login
-                JOIN accounts a ON a.accountid = ta.vtigeraccountid
-                WHERE CAST(d.close_time AS DATE) = '1970-01-01'
-                  AND d.symbol NOT IN ('ZeroingZAR','ZeroingUSD','ZeroingNGN','ZeroingKES','ZeroingJPY','ZeroingGBP','ZeroingEUR')
-                  AND a.is_test_account = 0
-            """)
-            abs_exposure = float(cur.fetchone()[0] or 0)
-
-            # Q10 — Daily PnL  (live from dealio_daily_profits)
+            # Q7 — Daily PnL  (live from dealio_daily_profits)
             cur.execute("""
                 SELECT COALESCE(SUM(
                     COALESCE(convertedclosedpnl, 0) + COALESCE(converteddeltafloatingpnl, 0)
@@ -227,24 +163,6 @@ def _dashboard_calc(today: date_type) -> dict:
                   AND a.is_test_account = 0
             """, {"last_mtd": last_mtd_str})
             pnl_daily = round(float(cur.fetchone()[0] or 0), 2)
-
-        # Monthly PnL
-        try:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT COALESCE(SUM(
-                        COALESCE(convertedclosedpnl, 0) + COALESCE(converteddeltafloatingpnl, 0)
-                    ), 0)
-                    FROM dealio_daily_profits d
-                    JOIN trading_accounts ta ON ta.login::bigint = d.login
-                    JOIN accounts a ON a.accountid = ta.vtigeraccountid
-                    WHERE d.date >= %(month_start)s::date
-                      AND d.date <  %(tomorrow)s::date
-                      AND a.is_test_account = 0
-                """, {"month_start": month_start_str, "tomorrow": tomorrow_str})
-                pnl_monthly = round(float(cur.fetchone()[0] or 0), 2)
-        except Exception:
-            pnl_monthly = None
 
         def rr_money(val):
             return round(val / safe_wdp * wd_total, 2)
@@ -261,15 +179,11 @@ def _dashboard_calc(today: date_type) -> dict:
             "net_deposits":           {"daily": round(nd_daily, 2),       "monthly": round(nd_monthly, 2),       "rr": rr_money(nd_monthly)},
             "net_deposits_sales":     {"daily": round(nd_sales_daily, 2), "monthly": round(nd_sales_monthly, 2), "rr": rr_money(nd_sales_monthly)},
             "net_deposits_retention": {"daily": round(nd_ret_daily, 2),   "monthly": round(nd_ret_monthly, 2),   "rr": rr_money(nd_ret_monthly)},
-            "ftd":     {"daily": ftd_daily,     "monthly": ftd_monthly,     "rr": rr_int(ftd_monthly)},
-            "ftc":     {"daily": ftc_daily,     "monthly": ftc_monthly,     "rr": rr_int(ftc_monthly)},
-            "traders": {"daily": traders_daily, "monthly": traders_monthly, "rr": rr_int(traders_monthly)},
+            "ftd":         {"daily": ftd_daily,  "monthly": ftd_monthly,  "rr": rr_int(ftd_monthly)},
+            "ftc":         {"daily": ftc_daily,  "monthly": ftc_monthly,  "rr": rr_int(ftc_monthly)},
             "open_volume": {"daily": round(ov_daily, 2), "monthly": round(ov_monthly, 2), "rr": rr_money(ov_monthly)},
-            "end_equity_zeroed": round(end_equity_zeroed, 2),
-            "abs_exposure":      round(abs_exposure, 2),
             "pnl_cash": {
                 "daily":    pnl_daily,
-                "monthly":  pnl_monthly,
                 "pnl_date": last_mtd_str,
             },
         }
@@ -284,7 +198,7 @@ async def dashboard_api(request: Request):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
     today = datetime.now(_TZ).date()
-    _ck = f"dashboard_v7:{today.isoformat()}"
+    _ck = f"dashboard_v8:{today.isoformat()}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
