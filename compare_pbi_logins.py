@@ -21,7 +21,8 @@ try:
         cur.execute("""
             SELECT
                 COALESCE(ta.serverid::text, 'NO_TA') as serverid,
-                COALESCE(ta.broker, 'NO_TA') as broker,
+                COALESCE(ta.platform, 'NO_TA') as platform,
+                COALESCE(ta.trade_group, '?') as trade_group,
                 COALESCE(ta.currency, '?') as currency,
                 COUNT(DISTINCT d.login) as logins,
                 ROUND(SUM(GREATEST(0, d.convertedbalance + d.convertedfloatingpnl))::numeric, 2) as raw_eez,
@@ -31,25 +32,25 @@ try:
                 AND (ta.deleted = 0 OR ta.deleted IS NULL)
             LEFT JOIN daily_equity_zeroed ez ON ez.login = d.login AND ez.day = %s
             WHERE d.date::date = %s AND d.login = ANY(%s)
-            GROUP BY ta.serverid, ta.broker, ta.currency
+            GROUP BY ta.serverid, ta.platform, ta.trade_group, ta.currency
             ORDER BY logins DESC
         """, (SNAPSHOT_DATE, SNAPSHOT_DATE, in_ours_not_pbi))
         rows = cur.fetchall()
-        print(f"{'serverid':<12} {'broker':<20} {'currency':<10} {'logins':>8} {'raw_eez':>14} {'snapshot_eez':>14}")
-        print("-" * 80)
+        print(f"{'serverid':<12} {'platform':<12} {'trade_group':<25} {'currency':<10} {'logins':>8} {'raw_eez':>14} {'snapshot_eez':>14}")
+        print("-" * 95)
         for r in rows:
-            print(f"{str(r[0]):<12} {str(r[1]):<20} {str(r[2]):<10} {r[3]:>8} {str(r[4]):>14} {str(r[5]):>14}")
+            print(f"{str(r[0]):<12} {str(r[1]):<12} {str(r[2]):<25} {str(r[3]):<10} {r[4]:>8} {str(r[5]):>14} {str(r[6]):>14}")
 
         print(f"\n=== ACCOUNTS IN PBI BUT NOT OUR SNAPSHOT ({len(in_pbi_not_ours)}) ===")
         cur.execute("""
             SELECT
                 COALESCE(ta.serverid::text, 'NO_TA') as serverid,
-                COALESCE(ta.broker, 'NO_TA') as broker,
+                COALESCE(ta.platform, 'NO_TA') as platform,
                 COUNT(DISTINCT ta.login) as logins_in_ta
             FROM trading_accounts ta
             WHERE ta.login::bigint = ANY(%s)
               AND (ta.deleted = 0 OR ta.deleted IS NULL)
-            GROUP BY ta.serverid, ta.broker
+            GROUP BY ta.serverid, ta.platform
             ORDER BY logins_in_ta DESC
         """, (in_pbi_not_ours,))
         rows = cur.fetchall()
