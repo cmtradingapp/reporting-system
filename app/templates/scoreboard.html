@@ -487,6 +487,13 @@
       </div>
     </div>
 
+    <div class="col-6 col-md-2" id="kpi-daily-pnl-cash">
+      <div class="kpi-card text-center">
+        <div class="kpi-value" id="stat-daily-pnl-cash">—</div>
+        <div class="kpi-label">Daily PnL Cash</div>
+      </div>
+    </div>
+
     <div class="col-6 col-md-2" id="kpi-daily-pnl">
       <div class="kpi-card text-center">
         <div class="kpi-value" id="stat-daily-pnl">—</div>
@@ -767,6 +774,19 @@
           if (startDt) startDt.textContent = 'prev day end';
         } else {
           startEl.textContent = '—';
+        }
+      }
+
+      const dailyPnlEl = document.getElementById('stat-daily-pnl-cash');
+      if (dailyPnlEl) {
+        if (data.daily_pnl_cash != null) {
+          const dNeg = data.daily_pnl_cash < 0;
+          const dAbs = Math.abs(data.daily_pnl_cash);
+          dailyPnlEl.textContent = (dNeg ? '-$' : '$') + dAbs.toLocaleString('en-US');
+          dailyPnlEl.style.color = dNeg ? '#f85149' : '#3fb950';
+        } else {
+          dailyPnlEl.textContent = '—';
+          dailyPnlEl.style.color = '#8b949e';
         }
       }
 
