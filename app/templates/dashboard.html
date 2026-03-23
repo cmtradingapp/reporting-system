@@ -332,29 +332,6 @@
       </div>
     </div>
 
-    <!-- PnL Cash -->
-    <div class="dash-group mb-4">
-      <div class="dash-group-title mb-2">PnL Cash</div>
-      <div class="row g-3">
-        <div class="col-12 col-sm-6">
-          <div class="kpi-card text-center">
-            <div><span class="variant-badge daily-badge">Daily</span></div>
-            <div class="kpi-value" id="pnl-daily">—</div>
-            <div class="kpi-label">PnL Cash</div>
-            <div style="font-size:0.65rem;color:#484f58;margin-top:3px;" id="pnl-date-label">—</div>
-          </div>
-        </div>
-        <div class="col-12 col-sm-6">
-          <div class="kpi-card text-center">
-            <div><span class="variant-badge monthly-badge">Monthly</span></div>
-            <div class="kpi-value" id="pnl-monthly">—</div>
-            <div class="kpi-label">PnL Cash</div>
-            <div style="font-size:0.65rem;color:#484f58;margin-top:3px;" id="pnl-month-label">—</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <!-- Snapshots -->
     <div class="dash-group mb-4">
       <div class="dash-group-title mb-2">Snapshots</div>
@@ -455,18 +432,6 @@
       document.getElementById('ov-daily').textContent   = fmtMoney(data.open_volume.daily);
       document.getElementById('ov-monthly').textContent = fmtMoney(data.open_volume.monthly);
       document.getElementById('ov-rr').textContent      = fmtMoney(data.open_volume.rr);
-
-      // PnL Cash
-      const pnlColor = v => v >= 0 ? '#3fb950' : '#f85149';
-      const pnlD = document.getElementById('pnl-daily');
-      const pnlM = document.getElementById('pnl-monthly');
-      pnlD.textContent = fmtMoney(data.pnl_cash.daily);
-      pnlD.style.color = pnlColor(data.pnl_cash.daily);
-      pnlM.textContent = fmtMoney(data.pnl_cash.monthly);
-      pnlM.style.color = pnlColor(data.pnl_cash.monthly);
-      const pnlDate = data.pnl_cash.pnl_date;
-      document.getElementById('pnl-date-label').textContent = 'As of ' + pnlDate;
-      document.getElementById('pnl-month-label').textContent = data.month_start + ' → ' + pnlDate;
 
       // Snapshots
       document.getElementById('abs-val').textContent = fmtMoney(data.abs_exposure);
