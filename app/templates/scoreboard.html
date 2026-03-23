@@ -474,6 +474,8 @@
         <div class="kpi-label">Open Volume RR</div>
       </div>
     </div>
+    {% if current_user.role == 'admin' %}
+    <div class="w-100 d-md-none"></div>
     <div class="col-6 col-md-2" id="kpi-start-equity">
       <div class="kpi-card text-center">
         <div class="kpi-value" style="color:#8b949e;" id="stat-start-equity-zeroed">—</div>
@@ -486,20 +488,19 @@
         <div class="kpi-label"><span id="live-eez-badge" style="display:none;background:#1a4731;color:#3fb950;border:1px solid #238636;border-radius:4px;padding:1px 5px;font-size:0.55rem;letter-spacing:0.04em;margin-right:3px;vertical-align:middle;">LIVE</span>Live End EEZ<span id="live-eez-updated" style="display:block;font-size:0.55rem;color:#484f58;font-weight:400;text-transform:none;letter-spacing:0;margin-top:1px;"></span></div>
       </div>
     </div>
-
     <div class="col-6 col-md-2" id="kpi-daily-pnl-cash">
       <div class="kpi-card text-center">
         <div class="kpi-value" id="stat-daily-pnl-cash">—</div>
         <div class="kpi-label">Daily PnL Cash</div>
       </div>
     </div>
-
     <div class="col-6 col-md-2" id="kpi-daily-pnl">
       <div class="kpi-card text-center">
         <div class="kpi-value" id="stat-daily-pnl">—</div>
         <div class="kpi-label">Daily PnL<span id="daily-pnl-breakdown" style="display:block;font-size:0.55rem;color:#484f58;font-weight:400;text-transform:none;letter-spacing:0;margin-top:1px;"></span></div>
       </div>
     </div>
+    {% endif %}
   </div>
 
   {% if show_sales %}
