@@ -57,17 +57,10 @@
       .mob-topbar-title { font-size:0.92rem; font-weight:700; color:#e0e0e0; padding:0 44px; }
       .main-content { margin-left: 0 !important; padding-top: 48px; }
       h4.fw-bold { display:none; }
-      /* Hide section titles — cards identify themselves via Daily/Monthly/RR badge */
       .dash-group-title { display: none; }
-      /* Tighten group spacing */
-      .dash-group { margin-bottom: 0.6rem !important; }
-      /* Reduce Bootstrap gutter so 3 cols fit on narrow screens */
-      .dash-group .row { --bs-gutter-x: 0.4rem; --bs-gutter-y: 0.4rem; }
-      /* Compact card to fit 3 across */
-      .kpi-card { padding: 6px 3px; text-align: center; }
-      .kpi-value { font-size: 0.75rem; line-height: 1.2; }
-      .kpi-label { font-size: 0.52rem; letter-spacing: 0.3px; margin-top: 1px; }
-      .variant-badge { font-size: 0.5rem; padding: 1px 4px; margin-bottom: 2px; letter-spacing: 0.3px; }
+      .dash-group { margin-bottom: 0.75rem !important; }
+      .kpi-card { padding: 8px 10px; }
+      .kpi-value { font-size: 1.1rem; }
     }
     @media (min-width: 768px) and (max-width: 1024px) {
       body { display:block; }
@@ -143,19 +136,19 @@
     <div class="dash-group mb-4">
       <div class="dash-group-title mb-3">Net Deposits</div>
       <div class="row g-2">
-        <div class="col-4">
+        <div class="col-6 col-sm-4">
           <div class="kpi-card text-center">
             <div class="kpi-value text-daily" id="nd-daily">—</div>
             <div class="kpi-label">Daily Net</div>
           </div>
         </div>
-        <div class="col-4">
+        <div class="col-6 col-sm-4">
           <div class="kpi-card text-center">
             <div class="kpi-value text-monthly" id="nd-monthly">—</div>
             <div class="kpi-label">MTD Net</div>
           </div>
         </div>
-        <div class="col-4">
+        <div class="col-6 col-sm-4">
           <div class="kpi-card text-center">
             <div class="kpi-value text-rr" id="nd-rr">—</div>
             <div class="kpi-label">Net Run Rate</div>
@@ -168,19 +161,19 @@
     <div class="dash-group mb-4">
       <div class="dash-group-title mb-3">Net Deposits – Sales</div>
       <div class="row g-2">
-        <div class="col-4">
+        <div class="col-6 col-sm-4">
           <div class="kpi-card text-center">
             <div class="kpi-value text-daily" id="nds-daily">—</div>
             <div class="kpi-label">Daily Sales</div>
           </div>
         </div>
-        <div class="col-4">
+        <div class="col-6 col-sm-4">
           <div class="kpi-card text-center">
             <div class="kpi-value text-monthly" id="nds-monthly">—</div>
             <div class="kpi-label">MTD Sales</div>
           </div>
         </div>
-        <div class="col-4">
+        <div class="col-6 col-sm-4">
           <div class="kpi-card text-center">
             <div class="kpi-value text-rr" id="nds-rr">—</div>
             <div class="kpi-label">Sales Run Rate</div>
@@ -193,19 +186,19 @@
     <div class="dash-group mb-4">
       <div class="dash-group-title mb-3">Net Deposits – Retention</div>
       <div class="row g-2">
-        <div class="col-4">
+        <div class="col-6 col-sm-4">
           <div class="kpi-card text-center">
             <div class="kpi-value text-daily" id="ndr-daily">—</div>
             <div class="kpi-label">Daily Ret.</div>
           </div>
         </div>
-        <div class="col-4">
+        <div class="col-6 col-sm-4">
           <div class="kpi-card text-center">
             <div class="kpi-value text-monthly" id="ndr-monthly">—</div>
             <div class="kpi-label">MTD Ret.</div>
           </div>
         </div>
-        <div class="col-4">
+        <div class="col-6 col-sm-4">
           <div class="kpi-card text-center">
             <div class="kpi-value text-rr" id="ndr-rr">—</div>
             <div class="kpi-label">Ret. Run Rate</div>
@@ -214,105 +207,101 @@
       </div>
     </div>
 
-    <!-- FTD / FTC -->
+    <!-- FTD -->
     <div class="dash-group mb-4">
-      <div class="dash-group-title mb-3">FTD / FTC</div>
+      <div class="dash-group-title mb-3">FTD #</div>
       <div class="row g-2">
-        <div class="col-4">
+        <div class="col-6 col-sm-4">
           <div class="kpi-card text-center">
-            <div style="display:flex;justify-content:center;align-items:center;gap:10px;">
-              <div>
-                <div class="kpi-value text-daily" id="ftd-daily">—</div>
-                <div class="kpi-label">Daily FTD</div>
-              </div>
-              <div style="color:#484f58;font-size:1.4rem;line-height:1;">/</div>
-              <div>
-                <div class="kpi-value text-daily" id="ftc-daily">—</div>
-                <div class="kpi-label">Daily FTC</div>
-              </div>
-            </div>
+            <div class="kpi-value text-daily" id="ftd-daily">—</div>
+            <div class="kpi-label">Daily FTD</div>
           </div>
         </div>
-        <div class="col-4">
+        <div class="col-6 col-sm-4">
           <div class="kpi-card text-center">
-            <div style="display:flex;justify-content:center;align-items:center;gap:10px;">
-              <div>
-                <div class="kpi-value text-monthly" id="ftd-monthly">—</div>
-                <div class="kpi-label">MTD FTD</div>
-              </div>
-              <div style="color:#484f58;font-size:1.4rem;line-height:1;">/</div>
-              <div>
-                <div class="kpi-value text-monthly" id="ftc-monthly">—</div>
-                <div class="kpi-label">MTD FTC</div>
-              </div>
-            </div>
+            <div class="kpi-value text-monthly" id="ftd-monthly">—</div>
+            <div class="kpi-label">MTD FTD</div>
           </div>
         </div>
-        <div class="col-4">
+        <div class="col-6 col-sm-4">
           <div class="kpi-card text-center">
-            <div style="display:flex;justify-content:center;align-items:center;gap:10px;">
-              <div>
-                <div class="kpi-value text-rr" id="ftd-rr">—</div>
-                <div class="kpi-label">FTD RR</div>
-              </div>
-              <div style="color:#484f58;font-size:1.4rem;line-height:1;">/</div>
-              <div>
-                <div class="kpi-value text-rr" id="ftc-rr">—</div>
-                <div class="kpi-label">FTC RR</div>
-              </div>
-            </div>
+            <div class="kpi-value text-rr" id="ftd-rr">—</div>
+            <div class="kpi-label">FTD Run Rate</div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Traders / Open Volume -->
+    <!-- FTC -->
     <div class="dash-group mb-4">
-      <div class="dash-group-title mb-3">Traders / Open Volume</div>
+      <div class="dash-group-title mb-3">FTC #</div>
       <div class="row g-2">
-        <div class="col-4">
+        <div class="col-6 col-sm-4">
           <div class="kpi-card text-center">
-            <div style="display:flex;justify-content:center;align-items:center;gap:10px;">
-              <div>
-                <div class="kpi-value text-daily" id="traders-daily">—</div>
-                <div class="kpi-label">Daily Traders</div>
-              </div>
-              <div style="color:#484f58;font-size:1.4rem;line-height:1;">/</div>
-              <div>
-                <div class="kpi-value text-daily" id="ov-daily">—</div>
-                <div class="kpi-label">Daily Vol</div>
-              </div>
-            </div>
+            <div class="kpi-value text-daily" id="ftc-daily">—</div>
+            <div class="kpi-label">Daily FTC</div>
           </div>
         </div>
-        <div class="col-4">
+        <div class="col-6 col-sm-4">
           <div class="kpi-card text-center">
-            <div style="display:flex;justify-content:center;align-items:center;gap:10px;">
-              <div>
-                <div class="kpi-value text-monthly" id="traders-monthly">—</div>
-                <div class="kpi-label">MTD Traders</div>
-              </div>
-              <div style="color:#484f58;font-size:1.4rem;line-height:1;">/</div>
-              <div>
-                <div class="kpi-value text-monthly" id="ov-monthly">—</div>
-                <div class="kpi-label">MTD Vol</div>
-              </div>
-            </div>
+            <div class="kpi-value text-monthly" id="ftc-monthly">—</div>
+            <div class="kpi-label">MTD FTC</div>
           </div>
         </div>
-        <div class="col-4">
+        <div class="col-6 col-sm-4">
           <div class="kpi-card text-center">
-            <div style="display:flex;justify-content:center;align-items:center;gap:10px;">
-              <div>
-                <div class="kpi-value text-rr" id="traders-rr">—</div>
-                <div class="kpi-label">Traders RR</div>
-              </div>
-              <div style="color:#484f58;font-size:1.4rem;line-height:1;">/</div>
-              <div>
-                <div class="kpi-value text-rr" id="ov-rr">—</div>
-                <div class="kpi-label">Vol RR</div>
-              </div>
-            </div>
+            <div class="kpi-value text-rr" id="ftc-rr">—</div>
+            <div class="kpi-label">FTC Run Rate</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Traders -->
+    <div class="dash-group mb-4">
+      <div class="dash-group-title mb-3"># Traders</div>
+      <div class="row g-2">
+        <div class="col-6 col-sm-4">
+          <div class="kpi-card text-center">
+            <div class="kpi-value text-daily" id="traders-daily">—</div>
+            <div class="kpi-label">Daily Traders</div>
+          </div>
+        </div>
+        <div class="col-6 col-sm-4">
+          <div class="kpi-card text-center">
+            <div class="kpi-value text-monthly" id="traders-monthly">—</div>
+            <div class="kpi-label">MTD Traders</div>
+          </div>
+        </div>
+        <div class="col-6 col-sm-4">
+          <div class="kpi-card text-center">
+            <div class="kpi-value text-rr" id="traders-rr">—</div>
+            <div class="kpi-label">Traders Run Rate</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Open Volume -->
+    <div class="dash-group mb-4">
+      <div class="dash-group-title mb-3">Open Volume</div>
+      <div class="row g-2">
+        <div class="col-6 col-sm-4">
+          <div class="kpi-card text-center">
+            <div class="kpi-value text-daily" id="ov-daily">—</div>
+            <div class="kpi-label">Daily Vol</div>
+          </div>
+        </div>
+        <div class="col-6 col-sm-4">
+          <div class="kpi-card text-center">
+            <div class="kpi-value text-monthly" id="ov-monthly">—</div>
+            <div class="kpi-label">MTD Vol</div>
+          </div>
+        </div>
+        <div class="col-6 col-sm-4">
+          <div class="kpi-card text-center">
+            <div class="kpi-value text-rr" id="ov-rr">—</div>
+            <div class="kpi-label">Vol Run Rate</div>
           </div>
         </div>
       </div>
