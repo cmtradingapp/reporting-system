@@ -216,6 +216,14 @@
         </div>
       </div>
 
+      <!-- Start EEZ -->
+      <div class="col-6 col-md-2">
+        <div class="kpi-card">
+          <div class="kpi-value" style="color:#58a6ff;" id="dash-start-eez-val">—</div>
+          <div class="kpi-label">Start EEZ<span id="dash-start-eez-date" style="display:block;font-size:0.55rem;color:#484f58;font-weight:400;text-transform:none;letter-spacing:0;margin-top:1px;">prev day end</span></div>
+        </div>
+      </div>
+
       <!-- Live End EEZ -->
       <div class="col-6 col-md-2">
         <div class="kpi-card">
@@ -230,7 +238,7 @@
       <div class="col-6 col-md-2">
         <div class="kpi-card">
           <div class="kpi-value" id="pnl-daily">—</div>
-          <div class="kpi-label">Daily PnL Cash<span id="pnl-date" style="display:block;font-size:0.55rem;color:#484f58;font-weight:400;text-transform:none;letter-spacing:0;margin-top:1px;"></span></div>
+          <div class="kpi-label">Daily PnL Cash</div>
         </div>
       </div>
 
@@ -296,11 +304,6 @@
       document.getElementById('ov-monthly').textContent = fmtMoney(data.open_volume.monthly);
       document.getElementById('ov-rr').textContent      = fmtMoney(data.open_volume.rr);
 
-      // Daily PnL Cash
-      setPnL('pnl-daily', data.pnl_cash.daily);
-      const pnlDateEl = document.getElementById('pnl-date');
-      if (pnlDateEl && data.pnl_cash.pnl_date) pnlDateEl.textContent = data.pnl_cash.pnl_date;
-
       document.getElementById('last-updated').textContent = new Date().toLocaleTimeString();
       loading.style.display = 'none';
       cards.style.display   = 'block';
@@ -333,6 +336,33 @@
         badge.style.display = 'none';
         upd.textContent = '';
       }
+
+      // Start EEZ
+      const startEl = document.getElementById('dash-start-eez-val');
+      if (startEl) {
+        if (data.start_equity_zeroed != null) {
+          const sNeg = data.start_equity_zeroed < 0;
+          const sAbs = Math.abs(data.start_equity_zeroed);
+          startEl.textContent = (sNeg ? '-$' : '$') + sAbs.toLocaleString('en-US');
+        } else {
+          startEl.textContent = '—';
+        }
+      }
+
+      // Daily PnL Cash — matches performance report formula
+      const pnlEl = document.getElementById('pnl-daily');
+      if (pnlEl) {
+        if (data.daily_pnl_cash != null) {
+          const dNeg = data.daily_pnl_cash < 0;
+          const dAbs = Math.abs(data.daily_pnl_cash);
+          pnlEl.textContent = (dNeg ? '-$' : '$') + dAbs.toLocaleString('en-US');
+          pnlEl.className = 'kpi-value ' + (data.daily_pnl_cash > 0 ? 'text-pos' : data.daily_pnl_cash < 0 ? 'text-neg' : '');
+        } else {
+          pnlEl.textContent = '—';
+          pnlEl.className = 'kpi-value';
+        }
+      }
+
     } catch(e) {
       console.error('loadLiveEquity error:', e);
       if (el) el.textContent = 'Err: ' + e.message;
