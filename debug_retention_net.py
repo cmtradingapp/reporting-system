@@ -71,65 +71,80 @@ with conn.cursor() as cur:
 conn.close()
 
 # ── SOURCE 2: Dealio replica — dealio.trades_mt4 cmd=6 ───────────────────────
-dc = get_dealio_connection()
-with dc.cursor() as cur:
+# Chunk logins to avoid SSL timeout on large arrays
+CHUNK = 5000
+_ADJ = ('Cashback','CFDRollover','CommEUR','CommUSD','CorrectiEUR','CorrectiGBP',
+        'CorrectiJPY','Correction','CredExp','CredExpEUR','CredExpGBP','CredExpJPY',
+        'Dividend','DividendEUR','DividendGBP','DividendJPY','Dormant','EarnedCr',
+        'EarnedCrEUR','FEE','INACT-FEE','Inactivity','Rollover','SPREAD',
+        'ZeroingEUR','ZeroingGBP','ZeroingJPY','ZeroingKES','ZeroingNGN',
+        'ZeroingUSD','ZeroingZAR')
 
-    cur.execute("""
-        SELECT
-            COALESCE(SUM(COALESCE(computed_profit, profit, 0)), 0),
-            COUNT(*)
-        FROM dealio.trades_mt4
-        WHERE cmd = 6
-          AND login = ANY(%s)
-          AND close_time::date >= %s
-          AND close_time::date <= %s
-    """, (retention_logins, DATE_FROM, DATE_TO))
-    row = cur.fetchone()
-    mt4_net, mt4_count = float(row[0] or 0), int(row[1] or 0)
+mt4_net       = 0.0;  mt4_count      = 0
+mt4_cash_net  = 0.0;  mt4_cash_count = 0
+symbol_totals = {}
 
-    # Cash only (exclude adjustment symbols)
-    cur.execute("""
-        SELECT
-            COALESCE(SUM(COALESCE(computed_profit, profit, 0)), 0),
-            COUNT(*)
-        FROM dealio.trades_mt4
-        WHERE cmd = 6
-          AND login = ANY(%s)
-          AND close_time::date >= %s
-          AND close_time::date <= %s
-          AND (symbol IS NULL OR symbol = ''
-               OR symbol NOT IN (
-                   'Cashback','CFDRollover','CommEUR','CommUSD','CorrectiEUR','CorrectiGBP',
-                   'CorrectiJPY','Correction','CredExp','CredExpEUR','CredExpGBP','CredExpJPY',
-                   'Dividend','DividendEUR','DividendGBP','DividendJPY','Dormant','EarnedCr',
-                   'EarnedCrEUR','FEE','INACT-FEE','Inactivity','Rollover','SPREAD',
-                   'ZeroingEUR','ZeroingGBP','ZeroingJPY','ZeroingKES','ZeroingNGN',
-                   'ZeroingUSD','ZeroingZAR'
-               ))
-    """, (retention_logins, DATE_FROM, DATE_TO))
-    row = cur.fetchone()
-    mt4_cash_net, mt4_cash_count = float(row[0] or 0), int(row[1] or 0)
+chunks = [retention_logins[i:i+CHUNK] for i in range(0, len(retention_logins), CHUNK)]
+print(f"Querying Dealio replica in {len(chunks)} chunks...")
 
-    # Symbol breakdown
-    print()
-    print("cmd=6 breakdown by symbol (retention logins, March 2026):")
-    cur.execute("""
-        SELECT COALESCE(symbol, '(no symbol)') AS sym,
-               COUNT(*) AS cnt,
-               COALESCE(SUM(COALESCE(computed_profit, profit)), 0) AS total
-        FROM dealio.trades_mt4
-        WHERE cmd = 6
-          AND login = ANY(%s)
-          AND close_time::date >= %s
-          AND close_time::date <= %s
-        GROUP BY symbol
-        ORDER BY ABS(SUM(COALESCE(computed_profit, profit))) DESC
-        LIMIT 20
-    """, (retention_logins, DATE_FROM, DATE_TO))
-    for r in cur.fetchall():
-        print(f"  {str(r[0]):<25} {r[1]:>6,} ops   {float(r[2]):>12,.0f}")
+for i, chunk in enumerate(chunks, 1):
+    dc = get_dealio_connection()
+    try:
+        with dc.cursor() as cur:
+            cur.execute("""
+                SELECT
+                    COALESCE(SUM(COALESCE(computed_profit, profit, 0)), 0),
+                    COUNT(*)
+                FROM dealio.trades_mt4
+                WHERE cmd = 6
+                  AND login = ANY(%s)
+                  AND close_time::date >= %s
+                  AND close_time::date <= %s
+            """, (chunk, DATE_FROM, DATE_TO))
+            row = cur.fetchone()
+            mt4_net   += float(row[0] or 0)
+            mt4_count += int(row[1] or 0)
 
-dc.close()
+            cur.execute("""
+                SELECT
+                    COALESCE(SUM(COALESCE(computed_profit, profit, 0)), 0),
+                    COUNT(*)
+                FROM dealio.trades_mt4
+                WHERE cmd = 6
+                  AND login = ANY(%s)
+                  AND close_time::date >= %s
+                  AND close_time::date <= %s
+                  AND (symbol IS NULL OR symbol = ''
+                       OR symbol NOT IN %s)
+            """, (chunk, DATE_FROM, DATE_TO, _ADJ))
+            row = cur.fetchone()
+            mt4_cash_net   += float(row[0] or 0)
+            mt4_cash_count += int(row[1] or 0)
+
+            cur.execute("""
+                SELECT COALESCE(symbol, '') AS sym,
+                       COUNT(*) AS cnt,
+                       COALESCE(SUM(COALESCE(computed_profit, profit)), 0) AS total
+                FROM dealio.trades_mt4
+                WHERE cmd = 6
+                  AND login = ANY(%s)
+                  AND close_time::date >= %s
+                  AND close_time::date <= %s
+                GROUP BY symbol
+            """, (chunk, DATE_FROM, DATE_TO))
+            for r in cur.fetchall():
+                sym = str(r[0]) or '(no symbol)'
+                symbol_totals[sym] = symbol_totals.get(sym, (0, 0.0))
+                symbol_totals[sym] = (symbol_totals[sym][0] + int(r[1]),
+                                      symbol_totals[sym][1] + float(r[2]))
+    finally:
+        dc.close()
+    print(f"  chunk {i}/{len(chunks)} done")
+
+print()
+print("cmd=6 breakdown by symbol (retention logins, March 2026):")
+for sym, (cnt, total) in sorted(symbol_totals.items(), key=lambda x: -abs(x[1][1]))[:20]:
+    print(f"  {sym:<25} {cnt:>6,} ops   {total:>12,.0f}")
 
 print()
 print("=" * 60)
