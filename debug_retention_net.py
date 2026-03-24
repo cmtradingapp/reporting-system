@@ -76,7 +76,7 @@ with dc.cursor() as cur:
 
     cur.execute("""
         SELECT
-            COALESCE(SUM(COALESCE(computed_profit, 0)), 0),
+            COALESCE(SUM(COALESCE(computed_profit, profit, 0)), 0),
             COUNT(*)
         FROM dealio.trades_mt4
         WHERE cmd = 6
@@ -90,7 +90,7 @@ with dc.cursor() as cur:
     # Cash only (exclude adjustment symbols)
     cur.execute("""
         SELECT
-            COALESCE(SUM(COALESCE(computed_profit, 0)), 0),
+            COALESCE(SUM(COALESCE(computed_profit, profit, 0)), 0),
             COUNT(*)
         FROM dealio.trades_mt4
         WHERE cmd = 6
@@ -116,14 +116,14 @@ with dc.cursor() as cur:
     cur.execute("""
         SELECT COALESCE(symbol, '(no symbol)') AS sym,
                COUNT(*) AS cnt,
-               COALESCE(SUM(computed_profit), 0) AS total
+               COALESCE(SUM(COALESCE(computed_profit, profit)), 0) AS total
         FROM dealio.trades_mt4
         WHERE cmd = 6
           AND login = ANY(%s)
           AND close_time::date >= %s
           AND close_time::date <= %s
         GROUP BY symbol
-        ORDER BY ABS(SUM(computed_profit)) DESC
+        ORDER BY ABS(SUM(COALESCE(computed_profit, profit))) DESC
         LIMIT 20
     """, (retention_logins, DATE_FROM, DATE_TO))
     for r in cur.fetchall():
