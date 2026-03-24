@@ -47,7 +47,7 @@ with conn.cursor() as cur:
           AND t.transactiontype IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
           AND t.vtigeraccountid IS NOT NULL
           AND a.is_test_account = 0
-          AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%bonus%'
+          AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
           AND t.original_deposit_owner = ANY(%s)
           AND t.confirmation_time::date >= %s
           AND t.confirmation_time::date <= %s
