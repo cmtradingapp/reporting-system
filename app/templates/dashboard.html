@@ -242,6 +242,14 @@
         </div>
       </div>
 
+      <!-- Daily PnL -->
+      <div class="col-6 col-md-2">
+        <div class="kpi-card">
+          <div class="kpi-value" id="pnl-daily-live">—</div>
+          <div class="kpi-label">Daily PnL</div>
+        </div>
+      </div>
+
     </div>
   </div><!-- /cards-container -->
 </div>
@@ -360,6 +368,20 @@
         } else {
           pnlEl.textContent = '—';
           pnlEl.className = 'kpi-value';
+        }
+      }
+
+      // Daily PnL (live: delta_floating + today_closed_pnl)
+      const pnlLiveEl = document.getElementById('pnl-daily-live');
+      if (pnlLiveEl) {
+        if (data.daily_pnl != null) {
+          const dNeg = data.daily_pnl < 0;
+          const dAbs = Math.abs(data.daily_pnl);
+          pnlLiveEl.textContent = (dNeg ? '-$' : '$') + dAbs.toLocaleString('en-US');
+          pnlLiveEl.className = 'kpi-value ' + (data.daily_pnl > 0 ? 'text-pos' : data.daily_pnl < 0 ? 'text-neg' : '');
+        } else {
+          pnlLiveEl.textContent = '—';
+          pnlLiveEl.className = 'kpi-value';
         }
       }
 
