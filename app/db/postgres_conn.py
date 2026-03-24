@@ -2222,6 +2222,7 @@ _MV_SETUP_SQL = [
                            AND birth_date IS NOT NULL)                              AS new_live_month
     FROM accounts
     WHERE is_test_account = 0
+      AND (is_demo = 0 OR is_demo IS NULL)
       AND createdtime IS NOT NULL
     """,
     "CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_account_stats_u ON mv_account_stats (id)",
