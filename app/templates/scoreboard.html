@@ -469,12 +469,14 @@
         <div class="kpi-label">Open Volume</div>
       </div>
     </div>
+    {% if current_user.role != 'admin' %}
     <div class="col-6 col-md-2" id="kpi-vol-rr">
       <div class="kpi-card text-center">
         <div class="kpi-value" style="color:#d29922;" id="stat-open-volume-rr">—</div>
         <div class="kpi-label">Open Volume RR</div>
       </div>
     </div>
+    {% endif %}
     {% if current_user.role == 'admin' %}
     <div class="col-6 col-md-2" id="kpi-start-equity">
       <div class="kpi-card text-center">
