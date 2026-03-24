@@ -165,3 +165,57 @@ print("Gap vs Dealio (-$15,810):")
 for name, gap in gaps.items():
     marker = "  <-- BEST" if name == best else ""
     print(f"  {name:<30} ${gap:>8,.0f}{marker}")
+
+# ── E) Read today's daily_profits directly from Dealio replica ────────────
+# Uses the same pre-computed columns Dealio's UI reads:
+#   convertedclosedpnl + converteddeltafloatingpnl - convertednetdeposit
+# Tested with two filters:
+#   E1 = all logins (no test filter) — matches Dealio's unfiltered total
+#   E2 = our equity_logins only
+print()
+print("─" * 60)
+print("E) Read dealio.daily_profits LIVE from Dealio replica (today)")
+print("─" * 60)
+dc2 = get_dealio_connection()
+with dc2.cursor() as cur:
+    # E1: all logins (no filter) — should match Dealio export exactly
+    cur.execute("""
+        SELECT COALESCE(SUM(
+            COALESCE(d.convertedclosedpnl, 0)
+            + COALESCE(d.converteddeltafloatingpnl, 0)
+            - COALESCE(d.convertednetdeposit, 0)
+        ), 0)
+        FROM (
+            SELECT DISTINCT ON (login)
+                login, convertedclosedpnl, converteddeltafloatingpnl, convertednetdeposit
+            FROM dealio.daily_profits
+            WHERE date::date = %s
+            ORDER BY login, date DESC
+        ) d
+    """, (today,))
+    e1 = float(cur.fetchone()[0])
+
+    # E2: filtered by our equity_logins (non-test accounts)
+    cur.execute("""
+        SELECT COALESCE(SUM(
+            COALESCE(d.convertedclosedpnl, 0)
+            + COALESCE(d.converteddeltafloatingpnl, 0)
+            - COALESCE(d.convertednetdeposit, 0)
+        ), 0)
+        FROM (
+            SELECT DISTINCT ON (login)
+                login, convertedclosedpnl, converteddeltafloatingpnl, convertednetdeposit
+            FROM dealio.daily_profits
+            WHERE date::date = %s
+            ORDER BY login, date DESC
+        ) d
+        WHERE d.login = ANY(%s)
+    """, (today, equity_logins))
+    e2 = float(cur.fetchone()[0])
+dc2.close()
+
+print(f"  E1 (ALL logins, no filter):      ${e1:>12,.0f}")
+print(f"  E2 (equity_logins filter):        ${e2:>12,.0f}")
+print()
+print("  NOTE: E1 should match Dealio's download if run at same time.")
+print(f"  Dealio at 11:15 CY was:          ${-15810:>12,}")
