@@ -305,7 +305,7 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
         return JSONResponse(status_code=400, content={"detail": "Invalid date format"})
 
     # mv_daily_kpis replaces the FTC transactions subquery.
-    # mv_bonuses replaces 3 ftd100_clients subqueries (ftd100_count,
+    # mv_sales_bonuses replaces 3 ftd100_clients subqueries (ftd100_count,
     #   total_sales_net, ftd_amount_bonus).
     # ftc_net_usd still uses a live transactions query because its filter
     #   (qual_date >= tx_date OR ftd=1) cannot be pre-aggregated cleanly.
@@ -334,12 +334,12 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
             GROUP BY k.agent_id
         ) ftc ON ftc.agent_id = u.id
         LEFT JOIN (
-            -- FTD100 count + net_until_qualification + FTD amount bonus from mv_bonuses
+            -- FTD100 count + net_until_qualification + FTD amount bonus from mv_sales_bonuses
             SELECT agent_id,
                    SUM(ftd100_count)    AS ftd100_count,
                    SUM(total_sales_net) AS total_sales_net,
                    SUM(ftd_amount_bonus) AS ftd_amount_bonus
-            FROM mv_bonuses
+            FROM mv_sales_bonuses
             WHERE ftd_100_date >= %(date_from)s AND ftd_100_date < %(date_to_excl)s
             GROUP BY agent_id
         ) bon ON bon.agent_id = u.id

@@ -14,7 +14,7 @@
 -- DROP ORDER: run_rate depends on daily_kpis — drop it first
 -- =============================================================================
 DROP MATERIALIZED VIEW IF EXISTS mv_run_rate      CASCADE;
-DROP MATERIALIZED VIEW IF EXISTS mv_bonuses       CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS mv_sales_bonuses       CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS mv_volume_stats  CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS mv_daily_kpis    CASCADE;
 
@@ -134,7 +134,7 @@ CREATE INDEX idx_mv_volume_stats_account   ON mv_volume_stats (accountid);
 
 
 -- =============================================================================
--- 3.  mv_bonuses
+-- 3.  mv_sales_bonuses
 -- =============================================================================
 -- Grain   : (agent_id, ftd_100_date)
 -- Source  : ftd100_clients
@@ -145,7 +145,7 @@ CREATE INDEX idx_mv_volume_stats_account   ON mv_volume_stats (accountid);
 --   < $500  → $0   |  $500–$999  → $10
 --   $1000–$4999 → $20  |  >= $5000 → $50
 -- =============================================================================
-CREATE MATERIALIZED VIEW mv_bonuses AS
+CREATE MATERIALIZED VIEW mv_sales_bonuses AS
 SELECT
     f.original_deposit_owner                                             AS agent_id,
     f.ftd_100_date,
@@ -163,9 +163,9 @@ GROUP BY
     f.original_deposit_owner,
     f.ftd_100_date;
 
-CREATE UNIQUE INDEX idx_mv_bonuses_u      ON mv_bonuses (agent_id, ftd_100_date);
-CREATE INDEX idx_mv_bonuses_date          ON mv_bonuses (ftd_100_date);
-CREATE INDEX idx_mv_bonuses_agent         ON mv_bonuses (agent_id);
+CREATE UNIQUE INDEX idx_mv_sales_bon_u      ON mv_sales_bonuses (agent_id, ftd_100_date);
+CREATE INDEX idx_mv_sales_bon_date          ON mv_sales_bonuses (ftd_100_date);
+CREATE INDEX idx_mv_sales_bon_agent         ON mv_sales_bonuses (agent_id);
 
 
 -- =============================================================================
@@ -261,7 +261,7 @@ CREATE INDEX idx_mv_run_rate_qual     ON mv_run_rate (qual_date) WHERE qual_date
 --     $$
 --         REFRESH MATERIALIZED VIEW CONCURRENTLY mv_daily_kpis;
 --         REFRESH MATERIALIZED VIEW CONCURRENTLY mv_volume_stats;
---         REFRESH MATERIALIZED VIEW CONCURRENTLY mv_bonuses;
+--         REFRESH MATERIALIZED VIEW CONCURRENTLY mv_sales_bonuses;
 --         REFRESH MATERIALIZED VIEW CONCURRENTLY mv_run_rate;
 --     $$
 -- );

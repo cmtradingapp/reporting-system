@@ -2148,9 +2148,9 @@ _MV_SETUP_SQL = [
     "CREATE INDEX IF NOT EXISTS idx_mv_volume_stats_open_date        ON mv_volume_stats (open_date)",
     "CREATE INDEX IF NOT EXISTS idx_mv_volume_stats_agent            ON mv_volume_stats (agent_id)",
 
-    # ── mv_bonuses ───────────────────────────────────────────────────────────
+    # ── mv_sales_bonuses ───────────────────────────────────────────────────────────
     """
-    CREATE MATERIALIZED VIEW IF NOT EXISTS mv_bonuses AS
+    CREATE MATERIALIZED VIEW IF NOT EXISTS mv_sales_bonuses AS
     SELECT
         f.original_deposit_owner                AS agent_id,
         f.ftd_100_date,
@@ -2166,9 +2166,9 @@ _MV_SETUP_SQL = [
     WHERE f.original_deposit_owner IS NOT NULL
     GROUP BY f.original_deposit_owner, f.ftd_100_date
     """,
-    "CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_bonuses_u    ON mv_bonuses (agent_id, ftd_100_date)",
-    "CREATE INDEX IF NOT EXISTS idx_mv_bonuses_date        ON mv_bonuses (ftd_100_date)",
-    "CREATE INDEX IF NOT EXISTS idx_mv_bonuses_agent       ON mv_bonuses (agent_id)",
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_sales_bon_u    ON mv_sales_bonuses (agent_id, ftd_100_date)",
+    "CREATE INDEX IF NOT EXISTS idx_mv_sales_bon_date        ON mv_sales_bonuses (ftd_100_date)",
+    "CREATE INDEX IF NOT EXISTS idx_mv_sales_bon_agent       ON mv_sales_bonuses (agent_id)",
 
     # ── mv_run_rate  (depends on mv_daily_kpis — must come last) ─────────────
     """
@@ -2232,7 +2232,7 @@ def ensure_materialized_views() -> None:
 _MV_ORDER = [
     "mv_daily_kpis",    # base — must be first
     "mv_volume_stats",  # independent
-    "mv_bonuses",       # independent
+    "mv_sales_bonuses",       # independent
     "mv_run_rate",      # depends on mv_daily_kpis — must be last
 ]
 
