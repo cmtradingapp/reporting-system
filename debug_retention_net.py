@@ -1,16 +1,15 @@
 """
 debug_retention_net.py
 
-Compares retention net deposits for March 2026:
-  1. Our system   — transactions table (CRM, approved) filtered to retention agents
-  2. Dealio MT4   — dealio.trades_mt4 cmd=6 (replica) filtered to retention account logins
+Day-by-day comparison of retention net deposits for March 2026:
+  1. CRM  — transactions table (approved, no bonus) filtered to retention agents
+  2. DDP  — dealio_daily_profits (local, fully synced) filtered to retention account logins
 
 Run:
     docker exec reporting-system-app-1 python debug_retention_net.py
 """
 
 from app.db.postgres_conn import get_connection
-from app.db.dealio_conn import get_dealio_connection
 
 DATE_FROM = '2026-03-01'
 DATE_TO   = '2026-03-31'
@@ -18,7 +17,7 @@ DATE_TO   = '2026-03-31'
 conn = get_connection()
 with conn.cursor() as cur:
 
-    # ── Retention agent IDs (same filter as scoreboard retention table) ───────
+    # ── Retention agent IDs ───────────────────────────────────────────────────
     cur.execute("""
         SELECT id FROM crm_users
         WHERE department_ = 'Retention'
@@ -31,30 +30,7 @@ with conn.cursor() as cur:
           AND TRIM(COALESCE(department, ''))            NOT ILIKE '%General%'
     """)
     retention_agent_ids = [r[0] for r in cur.fetchall()]
-    print(f"Retention agents: {len(retention_agent_ids)}")
-
-    # ── SOURCE 1: Our transactions table (CRM) ────────────────────────────────
-    cur.execute("""
-        SELECT
-            COALESCE(SUM(CASE
-                WHEN t.transactiontype IN ('Deposit', 'Withdrawal Cancelled')  THEN  t.usdamount
-                WHEN t.transactiontype IN ('Withdrawal', 'Deposit Cancelled')  THEN -t.usdamount
-            END), 0) AS net_usd,
-            COUNT(*) AS tx_count
-        FROM transactions t
-        JOIN accounts a ON a.accountid = t.vtigeraccountid
-        WHERE t.transactionapproval = 'Approved'
-          AND (t.deleted = 0 OR t.deleted IS NULL)
-          AND t.transactiontype IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
-          AND t.vtigeraccountid IS NOT NULL
-          AND a.is_test_account = 0
-          AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
-          AND t.original_deposit_owner = ANY(%s)
-          AND t.confirmation_time::date >= %s
-          AND t.confirmation_time::date <= %s
-    """, (retention_agent_ids, DATE_FROM, DATE_TO))
-    row = cur.fetchone()
-    crm_net, crm_count = float(row[0] or 0), int(row[1] or 0)
+    print(f"Retention agents: {len(retention_agent_ids):,}")
 
     # ── Retention account logins ──────────────────────────────────────────────
     cur.execute("""
@@ -66,102 +42,66 @@ with conn.cursor() as cur:
           AND (ta.deleted = 0 OR ta.deleted IS NULL)
     """, (retention_agent_ids,))
     retention_logins = [r[0] for r in cur.fetchall()]
-    print(f"Retention account logins: {len(retention_logins):,}")
+    print(f"Retention logins: {len(retention_logins):,}")
+
+    # ── CRM per day ───────────────────────────────────────────────────────────
+    cur.execute("""
+        SELECT
+            t.confirmation_time::date AS day,
+            COALESCE(SUM(CASE
+                WHEN t.transactiontype IN ('Deposit', 'Withdrawal Cancelled')  THEN  t.usdamount
+                WHEN t.transactiontype IN ('Withdrawal', 'Deposit Cancelled')  THEN -t.usdamount
+            END), 0) AS net_usd,
+            COUNT(*) AS cnt
+        FROM transactions t
+        JOIN accounts a ON a.accountid = t.vtigeraccountid
+        WHERE t.transactionapproval = 'Approved'
+          AND (t.deleted = 0 OR t.deleted IS NULL)
+          AND t.transactiontype IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
+          AND t.vtigeraccountid IS NOT NULL
+          AND a.is_test_account = 0
+          AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
+          AND t.original_deposit_owner = ANY(%s)
+          AND t.confirmation_time::date >= %s
+          AND t.confirmation_time::date <= %s
+        GROUP BY t.confirmation_time::date
+        ORDER BY day
+    """, (retention_agent_ids, DATE_FROM, DATE_TO))
+    crm_by_day = {str(r[0]): (float(r[1]), int(r[2])) for r in cur.fetchall()}
+
+    # ── Dealio daily profits per day (local copy) ─────────────────────────────
+    cur.execute("""
+        SELECT
+            date::date AS day,
+            COALESCE(SUM(convertednetdeposit), 0) AS net_usd,
+            COUNT(*) AS cnt
+        FROM dealio_daily_profits
+        WHERE login = ANY(%s)
+          AND date::date >= %s
+          AND date::date <= %s
+        GROUP BY date::date
+        ORDER BY day
+    """, (retention_logins, DATE_FROM, DATE_TO))
+    ddp_by_day = {str(r[0]): (float(r[1]), int(r[2])) for r in cur.fetchall()}
 
 conn.close()
 
-# ── SOURCE 2: Dealio replica — dealio.trades_mt4 cmd=6 ───────────────────────
-# Chunk logins to avoid SSL timeout on large arrays
-CHUNK = 5000
-_ADJ = ('Cashback','CFDRollover','CommEUR','CommUSD','CorrectiEUR','CorrectiGBP',
-        'CorrectiJPY','Correction','CredExp','CredExpEUR','CredExpGBP','CredExpJPY',
-        'Dividend','DividendEUR','DividendGBP','DividendJPY','Dormant','EarnedCr',
-        'EarnedCrEUR','FEE','INACT-FEE','Inactivity','Rollover','SPREAD',
-        'ZeroingEUR','ZeroingGBP','ZeroingJPY','ZeroingKES','ZeroingNGN',
-        'ZeroingUSD','ZeroingZAR')
-
-mt4_net          = 0.0;  mt4_count         = 0
-mt4_nobonus_net  = 0.0;  mt4_nobonus_count = 0
-symbol_totals    = {}
-comment_totals   = {}
-
-chunks = [retention_logins[i:i+CHUNK] for i in range(0, len(retention_logins), CHUNK)]
-print(f"Querying Dealio replica in {len(chunks)} chunks...")
-
-for i, chunk in enumerate(chunks, 1):
-    dc = get_dealio_connection()
-    try:
-        with dc.cursor() as cur:
-            # All cmd=6
-            cur.execute("""
-                SELECT
-                    COALESCE(SUM(COALESCE(computed_profit, profit, 0)), 0),
-                    COUNT(*)
-                FROM dealio.trades_mt4
-                WHERE cmd = 6
-                  AND login = ANY(%s)
-                  AND close_time::date >= %s
-                  AND close_time::date <= %s
-            """, (chunk, DATE_FROM, DATE_TO))
-            row = cur.fetchone()
-            mt4_net   += float(row[0] or 0)
-            mt4_count += int(row[1] or 0)
-
-            # cmd=6 excluding bonus comments
-            cur.execute("""
-                SELECT
-                    COALESCE(SUM(COALESCE(computed_profit, profit, 0)), 0),
-                    COUNT(*)
-                FROM dealio.trades_mt4
-                WHERE cmd = 6
-                  AND login = ANY(%s)
-                  AND close_time::date >= %s
-                  AND close_time::date <= %s
-                  AND LOWER(COALESCE(comment, '')) NOT LIKE '%%bonus%%'
-            """, (chunk, DATE_FROM, DATE_TO))
-            row = cur.fetchone()
-            mt4_nobonus_net   += float(row[0] or 0)
-            mt4_nobonus_count += int(row[1] or 0)
-
-            # Comment breakdown (top contributors)
-            cur.execute("""
-                SELECT COALESCE(comment, '(no comment)') AS cmt,
-                       COUNT(*) AS cnt,
-                       COALESCE(SUM(COALESCE(computed_profit, profit)), 0) AS total
-                FROM dealio.trades_mt4
-                WHERE cmd = 6
-                  AND login = ANY(%s)
-                  AND close_time::date >= %s
-                  AND close_time::date <= %s
-                GROUP BY comment
-            """, (chunk, DATE_FROM, DATE_TO))
-            for r in cur.fetchall():
-                cmt = str(r[0]) or '(no comment)'
-                comment_totals[cmt] = comment_totals.get(cmt, (0, 0.0))
-                comment_totals[cmt] = (comment_totals[cmt][0] + int(r[1]),
-                                       comment_totals[cmt][1] + float(r[2]))
-    finally:
-        dc.close()
-    print(f"  chunk {i}/{len(chunks)} done")
+# ── Day-by-day comparison ─────────────────────────────────────────────────────
+all_days = sorted(set(list(crm_by_day.keys()) + list(ddp_by_day.keys())))
 
 print()
-print("cmd=6 breakdown by comment (top 20, retention logins, March 2026):")
-for cmt, (cnt, total) in sorted(comment_totals.items(), key=lambda x: -abs(x[1][1]))[:20]:
-    print(f"  {cmt[:35]:<35} {cnt:>6,} ops   {total:>12,.0f}")
+print(f"{'Date':<12} {'CRM':>12} {'DDP':>12} {'Diff':>12}  {'CRM txs':>8}  {'DDP rows':>8}")
+print("-" * 72)
 
-print()
-print("=" * 60)
-print(f"Date range:              {DATE_FROM} – {DATE_TO}")
-print(f"Retention agents:        {len(retention_agent_ids):,}")
-print(f"Retention logins:        {len(retention_logins):,}")
-print()
-print(f"CRM transactions:        ${crm_net:>12,.0f}  ({crm_count:,} txs)")
-print(f"MT4 cmd=6 all:           ${mt4_net:>12,.0f}  ({mt4_count:,} ops)")
-print(f"MT4 cmd=6 no bonus:      ${mt4_nobonus_net:>12,.0f}  ({mt4_nobonus_count:,} ops)")
-print()
-print(f"Dealio known:            ${3_055_666:>12,}")
-print(f"Our scoreboard:          ${3_145_294:>12,}")
-print()
-print(f"MT4 all      vs Dealio:  {mt4_net        - 3_055_666:>+12,.0f}")
-print(f"MT4 no bonus vs Dealio:  {mt4_nobonus_net - 3_055_666:>+12,.0f}")
-print(f"CRM          vs Dealio:  {crm_net         - 3_055_666:>+12,.0f}")
+crm_total = ddp_total = 0.0
+for d in all_days:
+    crm_net, crm_cnt = crm_by_day.get(d, (0.0, 0))
+    ddp_net, ddp_cnt = ddp_by_day.get(d, (0.0, 0))
+    diff = crm_net - ddp_net
+    crm_total += crm_net
+    ddp_total += ddp_net
+    flag = "  <<<" if abs(diff) > 5000 else ""
+    print(f"{d:<12} {crm_net:>12,.0f} {ddp_net:>12,.0f} {diff:>+12,.0f}  {crm_cnt:>8,}  {ddp_cnt:>8,}{flag}")
+
+print("-" * 72)
+print(f"{'TOTAL':<12} {crm_total:>12,.0f} {ddp_total:>12,.0f} {crm_total-ddp_total:>+12,.0f}")
