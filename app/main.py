@@ -52,6 +52,7 @@ def warm_cache():
 
 SYNC_INTERVAL_MINUTES          = int(os.getenv("SYNC_INTERVAL_MINUTES", "2"))
 TRANSACTIONS_SYNC_INTERVAL_MINUTES = int(os.getenv("TRANSACTIONS_SYNC_INTERVAL_MINUTES", "1"))
+MV_REFRESH_INTERVAL_MINUTES    = int(os.getenv("MV_REFRESH_INTERVAL_MINUTES", "1"))
 ACCOUNTS_SYNC_HOURS            = int(os.getenv("ACCOUNTS_SYNC_HOURS", "6"))
 USERS_SYNC_HOURS               = int(os.getenv("USERS_SYNC_HOURS", "6"))
 TRANSACTIONS_SYNC_HOURS        = int(os.getenv("TRANSACTIONS_SYNC_HOURS", "6"))
@@ -190,7 +191,7 @@ async def lifespan(app: FastAPI):
     scheduler.add_job(
         refresh_materialized_views,
         "interval",
-        minutes=SYNC_INTERVAL_MINUTES,
+        minutes=MV_REFRESH_INTERVAL_MINUTES,
         id="mv_refresh",
         start_date=_base + timedelta(seconds=90),
         replace_existing=True,
