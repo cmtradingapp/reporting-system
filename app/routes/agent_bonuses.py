@@ -162,7 +162,7 @@ async def agent_bonuses_retention_api(request: Request, date_from: str, date_to:
         return JSONResponse(status_code=400, content={"detail": "Invalid date format"})
 
     # mv_daily_kpis replaces transactions NET subquery.
-    # mv_office_stats replaces dealio_trades_mt4 open-volume subquery.
+    # mv_volume_stats replaces dealio_trades_mt4 open-volume subquery.
     sql = """
         SELECT
             COALESCE(u.office_name, 'N/A')                   AS office_name,
@@ -187,7 +187,7 @@ async def agent_bonuses_retention_api(request: Request, date_from: str, date_to:
         ) mv ON mv.agent_id = u.id
         LEFT JOIN (
             SELECT agent_id, SUM(notional_usd)::float AS open_volume_usd
-            FROM mv_office_stats
+            FROM mv_volume_stats
             WHERE open_date >= %(date_from)s AND open_date <= %(date_to)s
             GROUP BY agent_id
         ) vol ON vol.agent_id = u.id

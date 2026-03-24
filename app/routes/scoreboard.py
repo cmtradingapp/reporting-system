@@ -169,10 +169,10 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
             """, {"date_from": date_from, "date_to_excl": date_to_exclusive})
             grand_net = float(cur.fetchone()[0] or 0)
 
-            # Open Volume — from mv_office_stats (test-filter already baked in)
+            # Open Volume — from mv_volume_stats (test-filter already baked in)
             cur.execute("""
                 SELECT COALESCE(SUM(notional_usd), 0)
-                FROM mv_office_stats
+                FROM mv_volume_stats
                 WHERE open_date >= %(date_from)s AND open_date <= %(date_to)s
             """, {"date_from": date_from, "date_to": date_to})
             open_volume = float(cur.fetchone()[0] or 0)
@@ -322,7 +322,7 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
         return JSONResponse(status_code=400, content={"detail": "Invalid date format"})
 
     # ── Retention table: mv_daily_kpis replaces 2 transaction subqueries (NET,
-    #    DEPOSIT).  Open volume comes from mv_office_stats.
+    #    DEPOSIT).  Open volume comes from mv_volume_stats.
     sql = """
         SELECT
             COALESCE(u.office_name, 'N/A')                   AS office_name,
@@ -350,7 +350,7 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
         ) mv ON mv.agent_id = u.id
         LEFT JOIN (
             SELECT agent_id, SUM(notional_usd)::float AS open_volume_usd
-            FROM mv_office_stats
+            FROM mv_volume_stats
             WHERE open_date >= %(date_from)s AND open_date <= %(date_to)s
             GROUP BY agent_id
         ) vol ON vol.agent_id = u.id

@@ -2125,9 +2125,9 @@ _MV_SETUP_SQL = [
     "CREATE INDEX IF NOT EXISTS idx_mv_daily_kpis_qual_date   ON mv_daily_kpis (qual_date) WHERE qual_date IS NOT NULL",
     "CREATE INDEX IF NOT EXISTS idx_mv_daily_kpis_agent       ON mv_daily_kpis (agent_id)",
 
-    # ── mv_office_stats ──────────────────────────────────────────────────────
+    # ── mv_volume_stats ──────────────────────────────────────────────────────
     """
-    CREATE MATERIALIZED VIEW IF NOT EXISTS mv_office_stats AS
+    CREATE MATERIALIZED VIEW IF NOT EXISTS mv_volume_stats AS
     SELECT
         a.assigned_to                                                        AS agent_id,
         ta.vtigeraccountid                                                   AS accountid,
@@ -2144,9 +2144,9 @@ _MV_SETUP_SQL = [
       AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%'
     GROUP BY a.assigned_to, ta.vtigeraccountid, d.open_time::date
     """,
-    "CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_office_stats_u         ON mv_office_stats (COALESCE(agent_id, -1), accountid, open_date)",
-    "CREATE INDEX IF NOT EXISTS idx_mv_office_stats_open_date        ON mv_office_stats (open_date)",
-    "CREATE INDEX IF NOT EXISTS idx_mv_office_stats_agent            ON mv_office_stats (agent_id)",
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_volume_stats_u         ON mv_volume_stats (COALESCE(agent_id, -1), accountid, open_date)",
+    "CREATE INDEX IF NOT EXISTS idx_mv_volume_stats_open_date        ON mv_volume_stats (open_date)",
+    "CREATE INDEX IF NOT EXISTS idx_mv_volume_stats_agent            ON mv_volume_stats (agent_id)",
 
     # ── mv_bonuses ───────────────────────────────────────────────────────────
     """
@@ -2231,7 +2231,7 @@ def ensure_materialized_views() -> None:
 
 _MV_ORDER = [
     "mv_daily_kpis",    # base — must be first
-    "mv_office_stats",  # independent
+    "mv_volume_stats",  # independent
     "mv_bonuses",       # independent
     "mv_run_rate",      # depends on mv_daily_kpis — must be last
 ]

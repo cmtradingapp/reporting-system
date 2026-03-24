@@ -139,12 +139,12 @@ def _dashboard_calc(today: date_type) -> dict:
             row = cur.fetchone()
             ftc_daily, ftc_monthly = int(row[0] or 0), int(row[1] or 0)
 
-            # Q6 — Open Volume  (mv_office_stats — SUM notional_usd)
+            # Q6 — Open Volume  (mv_volume_stats — SUM notional_usd)
             cur.execute("""
                 SELECT
                     COALESCE(SUM(notional_usd) FILTER (WHERE open_date = %(today)s::date), 0) AS daily,
                     COALESCE(SUM(notional_usd), 0)                                             AS monthly
-                FROM mv_office_stats
+                FROM mv_volume_stats
                 WHERE open_date >= %(month_start)s AND open_date <= %(today)s
             """, p)
             row = cur.fetchone()
