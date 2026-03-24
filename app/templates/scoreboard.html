@@ -495,6 +495,36 @@
       </div>
     </div>
     {% endif %}
+    <div class="col-6 col-md-2" id="kpi-new-leads">
+      <div class="kpi-card text-center">
+        <div class="kpi-split" style="display:flex;justify-content:center;align-items:center;gap:10px;">
+          <div>
+            <div class="kpi-value" style="color:#a371f7;" id="stat-leads-today">—</div>
+            <div class="kpi-label">Leads Today</div>
+          </div>
+          <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
+          <div>
+            <div class="kpi-value" style="color:#a371f7;" id="stat-leads-month">—</div>
+            <div class="kpi-label">Leads MTD</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-2" id="kpi-new-live">
+      <div class="kpi-card text-center">
+        <div class="kpi-split" style="display:flex;justify-content:center;align-items:center;gap:10px;">
+          <div>
+            <div class="kpi-value" style="color:#f78166;" id="stat-live-today">—</div>
+            <div class="kpi-label">Live Acc Today</div>
+          </div>
+          <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
+          <div>
+            <div class="kpi-value" style="color:#f78166;" id="stat-live-month">—</div>
+            <div class="kpi-label">Live Acc MTD</div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   {% if show_sales %}
@@ -874,6 +904,15 @@
     if (dailyFtcEl) dailyFtcEl.textContent = (data.daily_ftc ?? 0).toLocaleString();
     const dailyNetEl = document.getElementById('stat-daily-net');
     if (dailyNetEl) dailyNetEl.textContent = netFmt(data.daily_net ?? 0);
+    // New Leads + Live Accounts
+    if (data.new_leads) {
+      const el = document.getElementById('stat-leads-today'); if (el) el.textContent = (data.new_leads.daily ?? 0).toLocaleString();
+      const el2 = document.getElementById('stat-leads-month'); if (el2) el2.textContent = (data.new_leads.monthly ?? 0).toLocaleString();
+    }
+    if (data.new_live) {
+      const el = document.getElementById('stat-live-today'); if (el) el.textContent = (data.new_live.daily ?? 0).toLocaleString();
+      const el2 = document.getElementById('stat-live-month'); if (el2) el2.textContent = (data.new_live.monthly ?? 0).toLocaleString();
+    }
   }
 
   function renderTable() {

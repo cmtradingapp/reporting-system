@@ -164,6 +164,20 @@ def _dashboard_calc(today: date_type) -> dict:
             """, {"last_mtd": last_mtd_str})
             pnl_daily = round(float(cur.fetchone()[0] or 0), 2)
 
+            # Q8 — New Leads + Live Accounts (from mv_account_stats)
+            cur.execute("""
+                SELECT new_leads_today, new_leads_month, new_live_today, new_live_month
+                FROM mv_account_stats
+                LIMIT 1
+            """)
+            row = cur.fetchone()
+            if row:
+                new_leads_today, new_leads_month, new_live_today, new_live_month = (
+                    int(row[0] or 0), int(row[1] or 0), int(row[2] or 0), int(row[3] or 0)
+                )
+            else:
+                new_leads_today = new_leads_month = new_live_today = new_live_month = 0
+
         def rr_money(val):
             return round(val / safe_wdp * wd_total, 2)
 
@@ -186,6 +200,8 @@ def _dashboard_calc(today: date_type) -> dict:
                 "daily":    pnl_daily,
                 "pnl_date": last_mtd_str,
             },
+            "new_leads": {"daily": new_leads_today, "monthly": new_leads_month},
+            "new_live":  {"daily": new_live_today,  "monthly": new_live_month},
         }
     finally:
         conn.close()
@@ -198,7 +214,7 @@ async def dashboard_api(request: Request):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
     today = datetime.now(_TZ).date()
-    _ck = f"dashboard_v8:{today.isoformat()}"
+    _ck = f"dashboard_v9:{today.isoformat()}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)

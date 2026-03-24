@@ -2208,6 +2208,23 @@ _MV_SETUP_SQL = [
     "CREATE INDEX IF NOT EXISTS idx_mv_run_rate_dept          ON mv_run_rate (dept_group)",
     "CREATE INDEX IF NOT EXISTS idx_mv_run_rate_tx_date       ON mv_run_rate (tx_date)",
     "CREATE INDEX IF NOT EXISTS idx_mv_run_rate_qual          ON mv_run_rate (qual_date) WHERE qual_date IS NOT NULL",
+
+    # ── mv_account_stats  (new leads + live accounts — today and MTD) ─────────
+    """
+    CREATE MATERIALIZED VIEW IF NOT EXISTS mv_account_stats AS
+    SELECT
+        1                                                                           AS id,
+        COUNT(*) FILTER (WHERE createdtime::date = CURRENT_DATE)                    AS new_leads_today,
+        COUNT(*) FILTER (WHERE createdtime >= date_trunc('month', CURRENT_DATE))    AS new_leads_month,
+        COUNT(*) FILTER (WHERE createdtime::date = CURRENT_DATE
+                           AND birth_date IS NOT NULL)                              AS new_live_today,
+        COUNT(*) FILTER (WHERE createdtime >= date_trunc('month', CURRENT_DATE)
+                           AND birth_date IS NOT NULL)                              AS new_live_month
+    FROM accounts
+    WHERE is_test_account = 0
+      AND createdtime IS NOT NULL
+    """,
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_account_stats_u ON mv_account_stats (id)",
 ]
 
 
@@ -2230,10 +2247,11 @@ def ensure_materialized_views() -> None:
 
 
 _MV_ORDER = [
-    "mv_daily_kpis",    # base — must be first
-    "mv_volume_stats",  # independent
-    "mv_sales_bonuses",       # independent
-    "mv_run_rate",      # depends on mv_daily_kpis — must be last
+    "mv_daily_kpis",      # base — must be first
+    "mv_volume_stats",    # independent
+    "mv_sales_bonuses",   # independent
+    "mv_run_rate",        # depends on mv_daily_kpis — must be last
+    "mv_account_stats",   # independent — new leads + live accounts
 ]
 
 # Module-level status dict updated by refresh_materialized_views()

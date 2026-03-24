@@ -72,7 +72,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"perf_v11:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"perf_v12:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -245,6 +245,20 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
             """, {"date_to": date_to})
             daily_ftc = int(cur.fetchone()[0] or 0)
 
+            # New Leads + Live Accounts (mv_account_stats — always today/MTD)
+            cur.execute("""
+                SELECT new_leads_today, new_leads_month, new_live_today, new_live_month
+                FROM mv_account_stats
+                LIMIT 1
+            """)
+            row = cur.fetchone()
+            if row:
+                new_leads_today, new_leads_month, new_live_today, new_live_month = (
+                    int(row[0] or 0), int(row[1] or 0), int(row[2] or 0), int(row[3] or 0)
+                )
+            else:
+                new_leads_today = new_leads_month = new_live_today = new_live_month = 0
+
         today = datetime.now(_TZ).date()
         month_end           = last_day_of_month(dt_from)
         working_days        = count_working_days(dt_from, month_end, holidays)
@@ -289,6 +303,8 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
             "daily_net":            round(daily_net, 2),
             "daily_ftd":            daily_ftd,
             "daily_ftc":            daily_ftc,
+            "new_leads":            {"daily": new_leads_today, "monthly": new_leads_month},
+            "new_live":             {"daily": new_live_today,  "monthly": new_live_month},
             "working_days":         working_days,
             "working_days_passed":  working_days_passed,
             "working_days_left":    working_days_left,
