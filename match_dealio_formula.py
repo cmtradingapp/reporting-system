@@ -90,38 +90,63 @@ with dc.cursor() as cur:
         print(f"  {r[0]}: {r[1]:,} rows")
     print()
 
-    # For each date, compute all formula variations
-    header = f"{'Date':<12} {'Dealio':>10} {'F1':>10} {'F2':>10} {'F3':>10} {'F4':>10} {'F5':>10}"
+    # For each date, compute formula variations with and without login filter
+    header = f"{'Date':<12} {'Dealio':>10} {'F1 filtered':>12} {'F6 all logins':>14} {'gap F1':>10} {'gap F6':>10}"
     print(header)
     print("─" * len(header))
 
     for d in sorted(KNOWN.keys(), reverse=True):
         d_prev = d - timedelta(days=1)
 
-        # EOD values for date d (from dealio.daily_profits)
+        # F1: our equity_logins filter
         cur.execute("""
             SELECT
-                COALESCE(SUM(CASE WHEN cb+cf > 0 THEN cb+cf ELSE 0 END), 0) AS eod_equity_clipped,
-                COALESCE(SUM(COALESCE(convertedequity,0)), 0)                AS eod_conv_equity,
-                COALESCE(SUM(COALESCE(convertednetdeposit,0)), 0)            AS net_dep
+                COALESCE(SUM(CASE WHEN cb+cf > 0 THEN cb+cf ELSE 0 END), 0),
+                COALESCE(SUM(COALESCE(convertednetdeposit,0)), 0)
             FROM (
                 SELECT DISTINCT ON (login)
-                    COALESCE(convertedbalance,     0)  AS cb,
-                    COALESCE(convertedfloatingpnl, 0)  AS cf,
-                    convertedequity,
+                    COALESCE(convertedbalance,     0) AS cb,
+                    COALESCE(convertedfloatingpnl, 0) AS cf,
                     convertednetdeposit
                 FROM dealio.daily_profits
-                WHERE date::date = %s
-                  AND login = ANY(%s)
+                WHERE date::date = %s AND login = ANY(%s)
                 ORDER BY login, date DESC
             ) x
         """, (str(d), equity_logins))
         row = cur.fetchone()
-        eod_clipped   = float(row[0])
-        eod_conv_eq   = float(row[1])
-        net_dep       = float(row[2])
+        eod_f = float(row[0]); net_dep_f = float(row[1])
 
-        # SOD option A: yesterday's convertedbalance + convertedfloatingpnl (our current)
+        cur.execute("""
+            SELECT COALESCE(SUM(CASE WHEN cb+cf > 0 THEN cb+cf ELSE 0 END), 0)
+            FROM (
+                SELECT DISTINCT ON (login)
+                    COALESCE(convertedbalance,     0) AS cb,
+                    COALESCE(convertedfloatingpnl, 0) AS cf
+                FROM dealio.daily_profits
+                WHERE date::date = %s AND login = ANY(%s)
+                ORDER BY login, date DESC
+            ) x
+        """, (str(d_prev), equity_logins))
+        sod_f = float(cur.fetchone()[0])
+
+        # F6: ALL logins in dealio.daily_profits (no filter)
+        cur.execute("""
+            SELECT
+                COALESCE(SUM(CASE WHEN cb+cf > 0 THEN cb+cf ELSE 0 END), 0),
+                COALESCE(SUM(COALESCE(convertednetdeposit,0)), 0)
+            FROM (
+                SELECT DISTINCT ON (login)
+                    COALESCE(convertedbalance,     0) AS cb,
+                    COALESCE(convertedfloatingpnl, 0) AS cf,
+                    convertednetdeposit
+                FROM dealio.daily_profits
+                WHERE date::date = %s
+                ORDER BY login, date DESC
+            ) x
+        """, (str(d),))
+        row = cur.fetchone()
+        eod_a = float(row[0]); net_dep_a = float(row[1])
+
         cur.execute("""
             SELECT COALESCE(SUM(CASE WHEN cb+cf > 0 THEN cb+cf ELSE 0 END), 0)
             FROM (
@@ -130,45 +155,19 @@ with dc.cursor() as cur:
                     COALESCE(convertedfloatingpnl, 0) AS cf
                 FROM dealio.daily_profits
                 WHERE date::date = %s
-                  AND login = ANY(%s)
                 ORDER BY login, date DESC
             ) x
-        """, (str(d_prev), equity_logins))
-        sod_yesterday = float(cur.fetchone()[0])
+        """, (str(d_prev),))
+        sod_a = float(cur.fetchone()[0])
 
-        # SOD option B: equityprevday from today's records
-        cur.execute("""
-            SELECT COALESCE(SUM(COALESCE(equityprevday,0)), 0),
-                   COALESCE(SUM(CASE WHEN equityprevday > 0 THEN equityprevday ELSE 0 END), 0)
-            FROM (
-                SELECT DISTINCT ON (login)
-                    equityprevday
-                FROM dealio.daily_profits
-                WHERE date::date = %s
-                  AND login = ANY(%s)
-                ORDER BY login, date DESC
-            ) x
-        """, (str(d), equity_logins))
-        row = cur.fetchone()
-        sod_epd_raw     = float(row[0])
-        sod_epd_clipped = float(row[1])
-
-        bonus = bonus_by_date.get(d, 0.0)
-
-        f1 = round(eod_clipped - sod_yesterday   - net_dep)           # our current
-        f2 = round(eod_clipped - sod_epd_clipped - net_dep)           # equityprevday clipped
-        f3 = round(eod_clipped - sod_yesterday   - net_dep - bonus)   # our current + bonus
-        f4 = round(eod_clipped - sod_epd_raw     - net_dep)           # equityprevday unclipped
-        f5 = round(eod_conv_eq - sod_epd_raw     - net_dep)           # convertedequity vs epd
-
+        f1 = round(eod_f - sod_f - net_dep_f)
+        f6 = round(eod_a - sod_a - net_dep_a)
         known = KNOWN[d]
-        print(f"{str(d):<12} {known:>10,} {f1:>10,} {f2:>10,} {f3:>10,} {f4:>10,} {f5:>10,}")
+
+        print(f"{str(d):<12} {known:>10,} {f1:>12,} {f6:>14,} {known-f1:>+10,} {known-f6:>+10,}")
 
     print()
-    print("F1 = MAX(0,cb+cf) EOD  - MAX(0,cb+cf) SOD yesterday  - net_dep          [current]")
-    print("F2 = MAX(0,cb+cf) EOD  - MAX(0,equityprevday)         - net_dep")
-    print("F3 = F1 - bonuses")
-    print("F4 = MAX(0,cb+cf) EOD  - equityprevday (no clip)      - net_dep")
-    print("F5 = convertedequity   - equityprevday (no clip)      - net_dep")
+    print("F1 = MAX(0,cb+cf) EOD - MAX(0,cb+cf) SOD - net_dep  [equity_logins only]")
+    print("F6 = MAX(0,cb+cf) EOD - MAX(0,cb+cf) SOD - net_dep  [ALL logins in daily_profits]")
 
 dc.close()
