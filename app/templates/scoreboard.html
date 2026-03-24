@@ -1394,6 +1394,14 @@
         const _nf = v => (v < 0 ? '-$' : '$') + Math.round(Math.abs(v)).toLocaleString();
         retDailyEl.textContent = _nf(data.daily_net_retention ?? 0);
       }
+      // For retention-only users (SHOW_SALES=false), populate global KPI cards here
+      if (!SHOW_SALES) {
+        updateStats(data);
+        const wdEl = document.getElementById('stat-wd'); if (wdEl) wdEl.textContent = wd;
+        const wdLEl = document.getElementById('stat-wd-left'); if (wdLEl) wdLEl.textContent = wd_left;
+        const wdMEl = document.getElementById('stat-wd-mob'); if (wdMEl) wdMEl.textContent = wd;
+        const wdLMEl = document.getElementById('stat-wd-left-mob'); if (wdLMEl) wdLMEl.textContent = wd_left;
+      }
     } catch(e) {
       document.getElementById('ret-error-msg').textContent = 'Error: ' + e.message;
       document.getElementById('ret-error-msg').style.display = 'block';

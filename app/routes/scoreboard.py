@@ -325,7 +325,7 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"perf_ret_v5:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"perf_ret_v6:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -410,6 +410,73 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
             """, {"date_to": date_to})
             daily_net_retention = float(cur.fetchone()[0] or 0)
 
+            # Global KPI stats (same as /api/performance — needed for retention-only users)
+            cur.execute("""
+                SELECT COALESCE(SUM(ftc_count), 0)
+                FROM mv_daily_kpis
+                WHERE qual_date >= %(date_from)s AND qual_date < %(date_to_excl)s
+            """, {"date_from": date_from, "date_to_excl": date_to_exclusive})
+            grand_ftc = int(cur.fetchone()[0] or 0)
+
+            cur.execute("""
+                SELECT COALESCE(SUM(net_usd), 0)
+                FROM mv_run_rate
+                WHERE dept_group = 'all'
+                  AND tx_date >= %(date_from)s AND tx_date < %(date_to_excl)s
+            """, {"date_from": date_from, "date_to_excl": date_to_exclusive})
+            grand_net = float(cur.fetchone()[0] or 0)
+
+            cur.execute("""
+                SELECT COALESCE(SUM(notional_usd), 0)
+                FROM mv_volume_stats
+                WHERE open_date >= %(date_from)s AND open_date <= %(date_to)s
+            """, {"date_from": date_from, "date_to": date_to})
+            open_volume = float(cur.fetchone()[0] or 0)
+
+            cur.execute("""
+                SELECT COALESCE(SUM(ftd_count), 0)
+                FROM mv_daily_kpis
+                WHERE tx_date >= %(date_from)s AND tx_date < %(date_to_excl)s
+            """, {"date_from": date_from, "date_to_excl": date_to_exclusive})
+            grand_ftd = int(cur.fetchone()[0] or 0)
+
+            cur.execute("""
+                SELECT COALESCE(SUM(ftd_count), 0)
+                FROM mv_daily_kpis WHERE tx_date = %(date_to)s
+            """, {"date_to": date_to})
+            daily_ftd = int(cur.fetchone()[0] or 0)
+
+            cur.execute("""
+                SELECT COALESCE(SUM(ftc_count), 0)
+                FROM mv_daily_kpis WHERE qual_date = %(date_to)s
+            """, {"date_to": date_to})
+            daily_ftc = int(cur.fetchone()[0] or 0)
+
+            cur.execute("""
+                SELECT COALESCE(SUM(net_usd), 0)
+                FROM mv_run_rate WHERE dept_group = 'all' AND tx_date = %(date_to)s
+            """, {"date_to": date_to})
+            daily_net = float(cur.fetchone()[0] or 0)
+
+            # New Leads + Live Accounts
+            cur.execute("""
+                SELECT new_leads_today, new_leads_month, new_live_today, new_live_month
+                FROM mv_account_stats LIMIT 1
+            """)
+            row = cur.fetchone()
+            if row:
+                new_leads_today, new_leads_month, new_live_today, new_live_month = (
+                    int(row[0] or 0), int(row[1] or 0), int(row[2] or 0), int(row[3] or 0)
+                )
+            else:
+                new_leads_today = new_leads_month = new_live_today = new_live_month = 0
+
+            safe_wdp     = working_days_passed if working_days_passed > 0 else 1
+            grand_ftc_rr = round(grand_ftc  / safe_wdp * working_days)
+            grand_ftd_rr = round(grand_ftd  / safe_wdp * working_days)
+            grand_net_rr = round(grand_net  / safe_wdp * working_days, 2)
+            open_volume_rr = round(open_volume / safe_wdp * working_days) if open_volume > 0 else round(open_volume)
+
         today               = datetime.now(_TZ).date()
         month_end           = last_day_of_month(dt_from)
         working_days        = count_working_days(dt_from, month_end, holidays)
@@ -434,6 +501,20 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
             "working_days":            working_days,
             "working_days_passed":     working_days_passed,
             "working_days_left":       working_days_left,
+            # Global KPI stats (for retention-only users who don't call /api/performance)
+            "grand_ftc":               grand_ftc,
+            "grand_ftc_rr":            grand_ftc_rr,
+            "grand_ftd":               grand_ftd,
+            "grand_ftd_rr":            grand_ftd_rr,
+            "grand_net":               round(grand_net, 2),
+            "grand_net_rr":            grand_net_rr,
+            "open_volume":             round(open_volume, 2),
+            "open_volume_rr":          open_volume_rr,
+            "daily_ftd":               daily_ftd,
+            "daily_ftc":               daily_ftc,
+            "daily_net":               round(daily_net, 2),
+            "new_leads":               {"daily": new_leads_today, "monthly": new_leads_month},
+            "new_live":                {"daily": new_live_today,  "monthly": new_live_month},
         }
         cache.set(_ck, _result)
         return JSONResponse(content=_result)
