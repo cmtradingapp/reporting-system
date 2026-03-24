@@ -495,6 +495,7 @@
       </div>
     </div>
     {% endif %}
+    {% if current_user.role == 'admin' %}
     <div class="col-6 col-md-2" id="kpi-new-leads">
       <div class="kpi-card text-center">
         <div class="kpi-split" style="display:flex;justify-content:center;align-items:center;gap:10px;">
@@ -525,6 +526,7 @@
         </div>
       </div>
     </div>
+    {% endif %}
   </div>
 
   {% if show_sales %}
