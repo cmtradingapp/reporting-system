@@ -471,17 +471,17 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
             else:
                 new_leads_today = new_leads_month = new_live_today = new_live_month = 0
 
-            safe_wdp     = working_days_passed if working_days_passed > 0 else 1
-            grand_ftc_rr = round(grand_ftc  / safe_wdp * working_days)
-            grand_ftd_rr = round(grand_ftd  / safe_wdp * working_days)
-            grand_net_rr = round(grand_net  / safe_wdp * working_days, 2)
-            open_volume_rr = round(open_volume / safe_wdp * working_days) if open_volume > 0 else round(open_volume)
-
         today               = datetime.now(_TZ).date()
         month_end           = last_day_of_month(dt_from)
         working_days        = count_working_days(dt_from, month_end, holidays)
         working_days_passed = count_working_days(dt_from, min(dt_to, today), holidays)
         working_days_left   = working_days - working_days_passed
+
+        safe_wdp       = working_days_passed if working_days_passed > 0 else 1
+        grand_ftc_rr   = round(grand_ftc   / safe_wdp * working_days)
+        grand_ftd_rr   = round(grand_ftd   / safe_wdp * working_days)
+        grand_net_rr   = round(grand_net   / safe_wdp * working_days, 2)
+        open_volume_rr = round(open_volume / safe_wdp * working_days) if open_volume > 0 else round(open_volume)
 
         data = [
             {
