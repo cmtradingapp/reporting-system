@@ -3,13 +3,14 @@ debug_retention_net.py
 
 Compares retention net deposits for March 2026:
   1. Our system   — transactions table (CRM, approved) filtered to retention agents
-  2. Dealio MT4   — dealio_trades_mt4 cmd=6 filtered to logins of retention accounts
+  2. Dealio MT4   — dealio.trades_mt4 cmd=6 (replica) filtered to retention account logins
 
 Run:
     docker exec reporting-system-app-1 python debug_retention_net.py
 """
 
 from app.db.postgres_conn import get_connection
+from app.db.dealio_conn import get_dealio_connection
 
 DATE_FROM = '2026-03-01'
 DATE_TO   = '2026-03-31'
@@ -55,8 +56,7 @@ with conn.cursor() as cur:
     row = cur.fetchone()
     crm_net, crm_count = float(row[0] or 0), int(row[1] or 0)
 
-    # ── SOURCE 2: dealio_trades_mt4 cmd=6 for retention account logins ────────
-    # Get logins belonging to retention-assigned accounts
+    # ── Retention account logins ──────────────────────────────────────────────
     cur.execute("""
         SELECT DISTINCT ta.login::bigint
         FROM trading_accounts ta
@@ -68,11 +68,17 @@ with conn.cursor() as cur:
     retention_logins = [r[0] for r in cur.fetchall()]
     print(f"Retention account logins: {len(retention_logins):,}")
 
+conn.close()
+
+# ── SOURCE 2: Dealio replica — dealio.trades_mt4 cmd=6 ───────────────────────
+dc = get_dealio_connection()
+with dc.cursor() as cur:
+
     cur.execute("""
         SELECT
-            COALESCE(SUM(COALESCE(computed_profit, 0)), 0) AS net_usd,
-            COUNT(*) AS tx_count
-        FROM dealio_trades_mt4
+            COALESCE(SUM(COALESCE(computed_profit, 0)), 0),
+            COUNT(*)
+        FROM dealio.trades_mt4
         WHERE cmd = 6
           AND login = ANY(%s)
           AND close_time::date >= %s
@@ -81,12 +87,12 @@ with conn.cursor() as cur:
     row = cur.fetchone()
     mt4_net, mt4_count = float(row[0] or 0), int(row[1] or 0)
 
-    # ── SOURCE 2b: cmd=6 excluding adjustment symbols ─────────────────────────
+    # Cash only (exclude adjustment symbols)
     cur.execute("""
         SELECT
-            COALESCE(SUM(COALESCE(computed_profit, 0)), 0) AS net_usd,
-            COUNT(*) AS tx_count
-        FROM dealio_trades_mt4
+            COALESCE(SUM(COALESCE(computed_profit, 0)), 0),
+            COUNT(*)
+        FROM dealio.trades_mt4
         WHERE cmd = 6
           AND login = ANY(%s)
           AND close_time::date >= %s
@@ -104,14 +110,14 @@ with conn.cursor() as cur:
     row = cur.fetchone()
     mt4_cash_net, mt4_cash_count = float(row[0] or 0), int(row[1] or 0)
 
-    # ── Breakdown of cmd=6 by symbol ─────────────────────────────────────────
+    # Symbol breakdown
     print()
     print("cmd=6 breakdown by symbol (retention logins, March 2026):")
     cur.execute("""
         SELECT COALESCE(symbol, '(no symbol)') AS sym,
                COUNT(*) AS cnt,
                COALESCE(SUM(computed_profit), 0) AS total
-        FROM dealio_trades_mt4
+        FROM dealio.trades_mt4
         WHERE cmd = 6
           AND login = ANY(%s)
           AND close_time::date >= %s
@@ -121,9 +127,9 @@ with conn.cursor() as cur:
         LIMIT 20
     """, (retention_logins, DATE_FROM, DATE_TO))
     for r in cur.fetchall():
-        print(f"  {r[0]:<25} {r[1]:>6,} ops   {float(r[2]):>12,.0f}")
+        print(f"  {str(r[0]):<25} {r[1]:>6,} ops   {float(r[2]):>12,.0f}")
 
-conn.close()
+dc.close()
 
 print()
 print("=" * 60)
@@ -138,6 +144,6 @@ print()
 print(f"Dealio known:            ${3_055_666:>12,}")
 print(f"Our scoreboard:          ${3_145_294:>12,}")
 print()
-print(f"MT4 all   vs Dealio:     {mt4_net - 3_055_666:>+12,.0f}")
+print(f"MT4 all   vs Dealio:     {mt4_net   - 3_055_666:>+12,.0f}")
 print(f"MT4 cash  vs Dealio:     {mt4_cash_net - 3_055_666:>+12,.0f}")
-print(f"CRM       vs Dealio:     {crm_net - 3_055_666:>+12,.0f}")
+print(f"CRM       vs Dealio:     {crm_net   - 3_055_666:>+12,.0f}")
