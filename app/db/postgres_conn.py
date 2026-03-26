@@ -2247,6 +2247,8 @@ _MV_SETUP_SQL = [
         f.original_deposit_owner                AS agent_id,
         f.ftd_100_date,
         COUNT(DISTINCT f.accountid)::int        AS ftd100_count,
+        COUNT(DISTINCT CASE WHEN f.ftd_100_amount >= 240 THEN f.accountid END)::int AS ftd100_full_count,
+        COUNT(DISTINCT CASE WHEN f.ftd_100_amount <  240 THEN f.accountid END)::int AS ftd100_half_count,
         COALESCE(SUM(f.net_until_qualification), 0) AS total_sales_net,
         COALESCE(SUM(CASE
             WHEN f.ftd_100_amount < 500   THEN 0

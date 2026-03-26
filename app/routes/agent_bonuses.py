@@ -293,7 +293,7 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"bon_sales_v4:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"bon_sales_v5:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -316,6 +316,8 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
             COALESCE(tgt.target_ftc, 0)::int                      AS target_ftc,
             COALESCE(ftc.ftc_count, 0)::int                       AS ftc_count,
             COALESCE(bon.ftd100_count, 0)::int                    AS ftd100_count,
+            COALESCE(bon.ftd100_full_count, 0)::int               AS ftd100_full_count,
+            COALESCE(bon.ftd100_half_count, 0)::int               AS ftd100_half_count,
             COALESCE(ftc_net.net_usd, 0)::float                   AS ftc_net_usd,
             COALESCE(bon.total_sales_net, 0)::float               AS total_sales_net,
             COALESCE(bon.ftd_amount_bonus, 0)::float              AS ftd_amount_bonus_sql
@@ -336,9 +338,11 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
         LEFT JOIN (
             -- FTD100 count + net_until_qualification + FTD amount bonus from mv_sales_bonuses
             SELECT agent_id,
-                   SUM(ftd100_count)    AS ftd100_count,
-                   SUM(total_sales_net) AS total_sales_net,
-                   SUM(ftd_amount_bonus) AS ftd_amount_bonus
+                   SUM(ftd100_count)       AS ftd100_count,
+                   SUM(ftd100_full_count)  AS ftd100_full_count,
+                   SUM(ftd100_half_count)  AS ftd100_half_count,
+                   SUM(total_sales_net)    AS total_sales_net,
+                   SUM(ftd_amount_bonus)   AS ftd_amount_bonus
             FROM mv_sales_bonuses
             WHERE ftd_100_date >= %(date_from)s AND ftd_100_date < %(date_to_excl)s
             GROUP BY agent_id
@@ -385,16 +389,18 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
             target_ftc           = int(r[2])
             ftc_count            = int(r[3])
             ftd100_count         = int(r[4])
-            ftc_net_usd          = round(float(r[5]), 2)
-            total_sales_net      = round(float(r[6]), 2)
-            ftd_amount_bonus_raw = round(float(r[7]), 2)
+            ftd100_full_count    = int(r[5])
+            ftd100_half_count    = int(r[6])
+            ftc_net_usd          = round(float(r[7]), 2)
+            total_sales_net      = round(float(r[8]), 2)
+            ftd_amount_bonus_raw = round(float(r[9]), 2)
 
             target_pct = ftc_count / target_ftc if target_ftc > 0 else None
 
             qualify = target_ftc > 0 and ftd100_count >= 0.50 * target_ftc
 
             multiplier         = get_sales_multiplier(ftd100_count)
-            basic_bonus        = ftd100_count * multiplier if qualify else 0
+            basic_bonus        = (ftd100_full_count * multiplier + ftd100_half_count * multiplier / 2) if qualify else 0
             sales_target_bonus = get_sales_target_bonus(ftd100_count, target_ftc) if qualify else 0
             ftd_amount_bonus   = ftd_amount_bonus_raw if qualify else 0
             total_sales_bonus  = basic_bonus + sales_target_bonus + ftd_amount_bonus
