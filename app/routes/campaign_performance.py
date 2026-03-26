@@ -199,7 +199,7 @@ async def campaign_performance_table_api(
             ]
             acct_sql = (
                 f"SELECT {', '.join(acct_sel)}"
-                " FROM accounts a LEFT JOIN campaigns c ON a.campaign = c.crmid"
+                " FROM accounts a LEFT JOIN campaigns c ON SPLIT_PART(a.campaign, '.', 1) = c.crmid"
                 " WHERE a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)"
             )
             if acct_grp:
@@ -226,7 +226,7 @@ async def campaign_performance_table_api(
                 f"SELECT {', '.join(txn_sel)}"
                 " FROM transactions t"
                 " JOIN accounts a ON a.accountid = t.vtigeraccountid"
-                " LEFT JOIN campaigns c ON a.campaign = c.crmid"
+                " LEFT JOIN campaigns c ON SPLIT_PART(a.campaign, '.', 1) = c.crmid"
                 " JOIN crm_users u ON u.id = t.original_deposit_owner"
                 " WHERE t.transactionapproval = 'Approved'"
                 "   AND (t.deleted = 0 OR t.deleted IS NULL)"
