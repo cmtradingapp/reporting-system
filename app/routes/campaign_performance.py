@@ -24,7 +24,7 @@ VALID_GROUPS = {
     "office_name":          "COALESCE(cu.office_name, '(Unassigned)')",
     "agent_name":           "COALESCE(cu.agent_name, '(Unassigned)')",
     "country":              "COALESCE(a.country_iso, '(Unassigned)')",
-    "client_classification": "COALESCE(cc.classification_value::text, a.sales_client_potential, '(Unassigned)')",
+    "client_classification": "CASE WHEN a.sales_client_potential ~ '^[0-9]+(\\.[0-9]+)?$' AND a.sales_client_potential::numeric BETWEEN 1 AND 10 THEN a.sales_client_potential::numeric::int::text ELSE '(Unassigned)' END",
 }
 GROUP_LABELS = {
     "marketing_group":      "Marketing Group",
@@ -308,7 +308,7 @@ def _build_filter_clauses(
         clauses.append("AND a.original_affiliate = %(f_affiliate)s")
         params["f_affiliate"] = f_affiliate
 
-    _cv = "COALESCE(cc.classification_value, CASE WHEN a.sales_client_potential ~ '^[0-9]+$' THEN a.sales_client_potential::int END)"
+    _cv = "CASE WHEN a.sales_client_potential ~ '^[0-9]+(\\.[0-9]+)?$' THEN a.sales_client_potential::numeric::int END"
     needs_cc_join = False
     if f_classification:
         needs_cc_join = True
@@ -349,7 +349,7 @@ def _camp_table_calc(
 
     # Determine which extra JOINs are needed
     groups_needing_cu = {"office_name", "agent_name"}
-    groups_needing_cc = {"client_classification"}
+    groups_needing_cc = set()
     needs_cu_join = group1 in groups_needing_cu or group2 in groups_needing_cu
     needs_cc_join_for_group = group1 in groups_needing_cc or group2 in groups_needing_cc
 
