@@ -99,6 +99,13 @@ def ensure_table():
         ALTER TABLE accounts ALTER COLUMN gender            TYPE VARCHAR(100);
         ALTER TABLE accounts ALTER COLUMN customer_language TYPE VARCHAR(100);
         ALTER TABLE accounts ALTER COLUMN country_iso       TYPE VARCHAR(100);
+        ALTER TABLE accounts ADD COLUMN IF NOT EXISTS classification_int SMALLINT
+            GENERATED ALWAYS AS (
+                CASE WHEN sales_client_potential ~ '^[0-9]+(\.[0-9]+)?$'
+                     THEN sales_client_potential::numeric::int
+                     ELSE NULL END
+            ) STORED;
+        CREATE INDEX IF NOT EXISTS idx_accounts_classification_int ON accounts (classification_int);
 
         CREATE TABLE IF NOT EXISTS sync_log (
             id            SERIAL PRIMARY KEY,

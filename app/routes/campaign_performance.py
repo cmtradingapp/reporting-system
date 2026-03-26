@@ -24,7 +24,7 @@ VALID_GROUPS = {
     "office_name":          "COALESCE(cu.office_name, '(Unassigned)')",
     "agent_name":           "COALESCE(cu.agent_name, '(Unassigned)')",
     "country":              "COALESCE(a.country_iso, '(Unassigned)')",
-    "client_classification": "CASE WHEN a.sales_client_potential ~ '^[0-9]+(\\.[0-9]+)?$' AND a.sales_client_potential::numeric BETWEEN 1 AND 10 THEN a.sales_client_potential::numeric::int::text ELSE '(Unassigned)' END",
+    "client_classification": "COALESCE(a.classification_int::text, '(Unassigned)')",
 }
 GROUP_LABELS = {
     "marketing_group":      "Marketing Group",
@@ -169,57 +169,133 @@ async def campaign_filter_options(request: Request):
 
 # ── KPI cards ─────────────────────────────────────────────────────────────────
 
-def _camp_kpi_calc(date_from: str, date_to: str) -> dict:
+def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None) -> dict:
     dt_to = datetime.strptime(date_to, "%Y-%m-%d").date()
     date_to_exclusive = (dt_to + timedelta(days=1)).strftime("%Y-%m-%d")
+
+    if f_classification == "High Quality":
+        class_where = "AND a.classification_int BETWEEN 6 AND 10"
+    elif f_classification == "Low Quality":
+        class_where = "AND a.classification_int BETWEEN 1 AND 5"
+    elif f_classification == "No segmentation":
+        class_where = "AND (a.classification_int IS NULL OR a.classification_int NOT BETWEEN 1 AND 10)"
+    else:
+        class_where = ""
 
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute("""
-                SELECT new_leads_today, new_leads_month, new_live_today, new_live_month
-                FROM mv_account_stats LIMIT 1
-            """)
-            row = cur.fetchone()
-            if row:
+            if not class_where:
+                cur.execute("""
+                    SELECT new_leads_today, new_leads_month, new_live_today, new_live_month
+                    FROM mv_account_stats LIMIT 1
+                """)
+                row = cur.fetchone()
+                if row:
+                    leads_today, leads_mtd, live_today, live_mtd = (
+                        int(row[0] or 0), int(row[1] or 0), int(row[2] or 0), int(row[3] or 0)
+                    )
+                else:
+                    leads_today = leads_mtd = live_today = live_mtd = 0
+            else:
+                cur.execute(f"""
+                    SELECT
+                        COUNT(*) FILTER (WHERE a.createdtime::date = %(date_to)s)                                   AS leads_today,
+                        COUNT(*) FILTER (WHERE a.createdtime::date >= %(date_from)s
+                                           AND a.createdtime::date < %(date_to_excl)s)                             AS leads_mtd,
+                        COUNT(*) FILTER (WHERE a.birth_date IS NOT NULL
+                                           AND a.createdtime::date = %(date_to)s)                                  AS live_today,
+                        COUNT(*) FILTER (WHERE a.birth_date IS NOT NULL
+                                           AND a.createdtime::date >= %(date_from)s
+                                           AND a.createdtime::date < %(date_to_excl)s)                             AS live_mtd
+                    FROM accounts a
+                    WHERE a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)
+                    {class_where}
+                """, {"date_from": date_from, "date_to_excl": date_to_exclusive, "date_to": date_to})
+                row = cur.fetchone()
                 leads_today, leads_mtd, live_today, live_mtd = (
                     int(row[0] or 0), int(row[1] or 0), int(row[2] or 0), int(row[3] or 0)
-                )
+                ) if row else (0, 0, 0, 0)
+
+            if not class_where:
+                cur.execute("""
+                    SELECT
+                        COALESCE(SUM(deposit_usd),    0)                                                AS deposits,
+                        COALESCE(SUM(withdrawal_usd), 0)                                                AS withdrawals,
+                        COALESCE(SUM(net_usd),        0)                                                AS net_deposits,
+                        COALESCE(SUM(ftd_count),      0)                                                AS ftd_mtd,
+                        COALESCE(SUM(CASE WHEN tx_date = %(date_to)s THEN ftd_count ELSE 0 END), 0)     AS ftd_daily
+                    FROM mv_daily_kpis
+                    WHERE tx_date >= %(date_from)s AND tx_date < %(date_to_excl)s
+                """, {"date_from": date_from, "date_to_excl": date_to_exclusive, "date_to": date_to})
+                row = cur.fetchone()
+                if row:
+                    deposits_total    = float(row[0] or 0)
+                    withdrawals_total = float(row[1] or 0)
+                    net_total         = float(row[2] or 0)
+                    ftd_mtd           = int(row[3] or 0)
+                    ftd_daily         = int(row[4] or 0)
+                else:
+                    deposits_total = withdrawals_total = net_total = ftd_mtd = ftd_daily = 0
+
+                cur.execute("""
+                    SELECT
+                        COALESCE(SUM(ftc_count), 0)                                                     AS ftc_mtd,
+                        COALESCE(SUM(CASE WHEN qual_date = %(date_to)s THEN ftc_count ELSE 0 END), 0)   AS ftc_daily
+                    FROM mv_daily_kpis
+                    WHERE qual_date >= %(date_from)s AND qual_date < %(date_to_excl)s
+                """, {"date_from": date_from, "date_to_excl": date_to_exclusive, "date_to": date_to})
+                row = cur.fetchone()
+                ftc_mtd   = int(row[0] or 0) if row else 0
+                ftc_daily = int(row[1] or 0) if row else 0
             else:
-                leads_today = leads_mtd = live_today = live_mtd = 0
+                cur.execute(f"""
+                    SELECT
+                        COALESCE(SUM(CASE WHEN t.transactiontype IN ('Deposit','Withdrawal Cancelled') THEN t.usdamount ELSE 0 END), 0)  AS deposits,
+                        COALESCE(SUM(CASE WHEN t.transactiontype IN ('Withdrawal','Deposit Cancelled') THEN t.usdamount ELSE 0 END), 0)  AS withdrawals,
+                        COALESCE(SUM(CASE WHEN t.ftd = 1 AND t.transactiontype = 'Deposit' THEN 1 ELSE 0 END), 0)                        AS ftd_mtd,
+                        COALESCE(SUM(CASE WHEN t.ftd = 1 AND t.transactiontype = 'Deposit'
+                                          AND t.confirmation_time::date = %(date_to)s THEN 1 ELSE 0 END), 0)                             AS ftd_daily
+                    FROM transactions t
+                    JOIN accounts a ON a.accountid = t.vtigeraccountid
+                    JOIN crm_users u ON u.id = t.original_deposit_owner
+                    WHERE t.transactionapproval = 'Approved'
+                      AND (t.deleted = 0 OR t.deleted IS NULL)
+                      AND t.transactiontype IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
+                      AND t.vtigeraccountid IS NOT NULL
+                      AND a.is_test_account = 0
+                      AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
+                      AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
+                      AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
+                      AND t.confirmation_time::date >= %(date_from)s
+                      AND t.confirmation_time::date <  %(date_to_excl)s
+                    {class_where}
+                """, {"date_from": date_from, "date_to_excl": date_to_exclusive, "date_to": date_to})
+                row = cur.fetchone()
+                if row:
+                    deposits_total    = float(row[0] or 0)
+                    withdrawals_total = float(row[1] or 0)
+                    net_total         = deposits_total - withdrawals_total
+                    ftd_mtd           = int(row[2] or 0)
+                    ftd_daily         = int(row[3] or 0)
+                else:
+                    deposits_total = withdrawals_total = net_total = ftd_mtd = ftd_daily = 0
 
-            cur.execute("""
-                SELECT
-                    COALESCE(SUM(deposit_usd),    0)                                                AS deposits,
-                    COALESCE(SUM(withdrawal_usd), 0)                                                AS withdrawals,
-                    COALESCE(SUM(net_usd),        0)                                                AS net_deposits,
-                    COALESCE(SUM(ftd_count),      0)                                                AS ftd_mtd,
-                    COALESCE(SUM(CASE WHEN tx_date = %(date_to)s THEN ftd_count ELSE 0 END), 0)     AS ftd_daily
-                FROM mv_daily_kpis
-                WHERE tx_date >= %(date_from)s AND tx_date < %(date_to_excl)s
-            """, {"date_from": date_from, "date_to_excl": date_to_exclusive, "date_to": date_to})
-            row = cur.fetchone()
-            if row:
-                deposits_total    = float(row[0] or 0)
-                withdrawals_total = float(row[1] or 0)
-                net_total         = float(row[2] or 0)
-                ftd_mtd           = int(row[3] or 0)
-                ftd_daily         = int(row[4] or 0)
-            else:
-                deposits_total = withdrawals_total = net_total = ftd_mtd = ftd_daily = 0
+                cur.execute(f"""
+                    SELECT
+                        COUNT(*) FILTER (WHERE a.client_qualification_date::date >= %(date_from)s
+                                           AND a.client_qualification_date::date < %(date_to_excl)s)   AS ftc_mtd,
+                        COUNT(*) FILTER (WHERE a.client_qualification_date::date = %(date_to)s)        AS ftc_daily
+                    FROM accounts a
+                    WHERE a.client_qualification_date IS NOT NULL
+                      AND a.is_test_account = 0
+                    {class_where}
+                """, {"date_from": date_from, "date_to_excl": date_to_exclusive, "date_to": date_to})
+                row = cur.fetchone()
+                ftc_mtd   = int(row[0] or 0) if row else 0
+                ftc_daily = int(row[1] or 0) if row else 0
 
-            cur.execute("""
-                SELECT
-                    COALESCE(SUM(ftc_count), 0)                                                     AS ftc_mtd,
-                    COALESCE(SUM(CASE WHEN qual_date = %(date_to)s THEN ftc_count ELSE 0 END), 0)   AS ftc_daily
-                FROM mv_daily_kpis
-                WHERE qual_date >= %(date_from)s AND qual_date < %(date_to_excl)s
-            """, {"date_from": date_from, "date_to_excl": date_to_exclusive, "date_to": date_to})
-            row = cur.fetchone()
-            ftc_mtd   = int(row[0] or 0) if row else 0
-            ftc_daily = int(row[1] or 0) if row else 0
-
-            cur.execute("""
+            cur.execute(f"""
                 SELECT COUNT(DISTINCT t.vtigeraccountid)
                 FROM transactions t
                 JOIN accounts a  ON a.accountid = t.vtigeraccountid
@@ -235,6 +311,7 @@ def _camp_kpi_calc(date_from: str, date_to: str) -> dict:
                   AND t.confirmation_time::date >= %(date_from)s
                   AND t.confirmation_time::date <  %(date_to_excl)s
                   AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
+                {class_where}
             """, {"date_from": date_from, "date_to_excl": date_to_exclusive})
             row = cur.fetchone()
             traders_count = int(row[0] or 0) if row else 0
@@ -256,12 +333,12 @@ def _camp_kpi_calc(date_from: str, date_to: str) -> dict:
 
 
 @router.get("/api/campaign-performance")
-async def campaign_performance_api(request: Request, date_from: str, date_to: str):
+async def campaign_performance_api(request: Request, date_from: str, date_to: str, f_classification: str = None):
     user = await get_current_user(request)
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
-    _ck = f"camp_perf_v1:{date_from}:{date_to}"
+    _ck = f"camp_perf_v1:{date_from}:{date_to}:{f_classification}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -272,7 +349,7 @@ async def campaign_performance_api(request: Request, date_from: str, date_to: st
         return JSONResponse(status_code=400, content={"detail": "Invalid date format"})
 
     try:
-        _result = _camp_kpi_calc(date_from, date_to)
+        _result = _camp_kpi_calc(date_from, date_to, f_classification)
         cache.set(_ck, _result)
         return JSONResponse(content=_result)
     except Exception as e:
@@ -308,16 +385,14 @@ def _build_filter_clauses(
         clauses.append("AND a.original_affiliate = %(f_affiliate)s")
         params["f_affiliate"] = f_affiliate
 
-    _cv = "CASE WHEN a.sales_client_potential ~ '^[0-9]+(\\.[0-9]+)?$' THEN a.sales_client_potential::numeric::int END"
     needs_cc_join = False
     if f_classification:
-        needs_cc_join = True
         if f_classification == "High Quality":
-            clauses.append(f"AND {_cv} BETWEEN 6 AND 10")
+            clauses.append("AND a.classification_int BETWEEN 6 AND 10")
         elif f_classification == "Low Quality":
-            clauses.append(f"AND {_cv} BETWEEN 1 AND 5")
+            clauses.append("AND a.classification_int BETWEEN 1 AND 5")
         else:  # No segmentation
-            clauses.append(f"AND ({_cv} IS NULL OR {_cv} NOT BETWEEN 1 AND 10)")
+            clauses.append("AND (a.classification_int IS NULL OR a.classification_int NOT BETWEEN 1 AND 10)")
 
     if ftc_groups_list:
         ftc_conds = [FTC_GROUP_RANGES[g] for g in ftc_groups_list if g in FTC_GROUP_RANGES]

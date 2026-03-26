@@ -56,7 +56,7 @@ def warm_cache():
     month_start = today.replace(day=1).isoformat()
     today_iso   = today.isoformat()
 
-    _ck = f"camp_perf_v1:{month_start}:{today_iso}"
+    _ck = f"camp_perf_v1:{month_start}:{today_iso}:None"
     try:
         cache.set(_ck, _camp_kpi_calc(month_start, today_iso))
     except Exception as e:

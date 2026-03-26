@@ -550,7 +550,9 @@
     }
 
     try {
-      const res = await fetch(`/api/campaign-performance?date_from=${df}&date_to=${dt}`);
+      const fClass = (document.getElementById('f-classification')?.value || '');
+      const kpiUrl = `/api/campaign-performance?date_from=${df}&date_to=${dt}` + (fClass ? `&f_classification=${encodeURIComponent(fClass)}` : '');
+      const res = await fetch(kpiUrl);
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Server error');
       updateStats(data);
@@ -1080,7 +1082,7 @@
   // Init all 6 dropdowns (empty options until API returns)
   ['f-mkt-group','f-campaign-name','f-legacy-id','f-channel','f-sub-channel','f-affiliate'].forEach(id => _sddInit(id, []));
 
-  document.getElementById('f-classification')?.addEventListener('change', () => loadTable());
+  document.getElementById('f-classification')?.addEventListener('change', () => { loadData(); loadTable(); });
   document.querySelectorAll('.ftc-cb').forEach(cb => cb.addEventListener('change', () => loadTable()));
 
   function toggleAllFtc(state) {
