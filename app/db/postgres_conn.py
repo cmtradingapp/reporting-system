@@ -1755,6 +1755,7 @@ def ensure_client_classification_table():
             classification_category VARCHAR(20) NOT NULL,
             synced_at               TIMESTAMP DEFAULT NOW()
         );
+        ALTER TABLE client_classification ADD COLUMN IF NOT EXISTS classification_value SMALLINT;
     """
     conn = get_connection()
     try:
@@ -1777,22 +1778,31 @@ def upsert_client_classification(df: pd.DataFrame):
             pass
         return 'No segmentation'
 
+    def _raw_value(val):
+        try:
+            return int(val)
+        except (TypeError, ValueError):
+            return None
+
     rows = []
     for _, row in df.iterrows():
         accountid = _clean(row.get('accountid'))
         if accountid is None:
             continue
-        category = _category(row.get('client_classification'))
-        rows.append((int(accountid), category))
+        raw_val = row.get('client_classification')
+        category = _category(raw_val)
+        numeric_val = _raw_value(raw_val)
+        rows.append((int(accountid), category, numeric_val))
 
     if not rows:
         return
 
     sql = """
-        INSERT INTO client_classification (accountid, classification_category, synced_at)
+        INSERT INTO client_classification (accountid, classification_category, classification_value, synced_at)
         VALUES %s
         ON CONFLICT (accountid) DO UPDATE SET
             classification_category = EXCLUDED.classification_category,
+            classification_value    = EXCLUDED.classification_value,
             synced_at               = NOW()
     """
     conn = get_connection()

@@ -87,11 +87,11 @@ async def ftc_date_api(
         team_clause = "AND u.department = %(team)s"
         params["team"] = team
     if classification == "Low Quality":
-        classification_clause = "AND cc.classification_category = 'Low Quality'"
+        classification_clause = "AND cc.classification_value BETWEEN 1 AND 5"
     elif classification == "High Quality":
-        classification_clause = "AND cc.classification_category = 'High Quality'"
+        classification_clause = "AND cc.classification_value BETWEEN 6 AND 10"
     elif classification == "No segmentation":
-        classification_clause = "AND (cc.classification_category = 'No segmentation' OR cc.accountid IS NULL)"
+        classification_clause = "AND (cc.accountid IS NULL OR cc.classification_value IS NULL OR cc.classification_value NOT BETWEEN 1 AND 10)"
 
     sql = """
         WITH ftc_groups AS (
@@ -101,7 +101,7 @@ async def ftc_date_api(
                 (%(end_date)s::date - a.client_qualification_date::date) AS days_diff
             FROM accounts a
             LEFT JOIN crm_users u ON u.id = a.assigned_to
-            LEFT JOIN client_classification cc ON cc.accountid = a.accountid
+            LEFT JOIN client_classification cc ON cc.accountid = a.accountid::BIGINT
             WHERE a.client_qualification_date IS NOT NULL
               AND a.client_qualification_date::date >= '2024-01-01'
               AND a.client_qualification_date::date <= %(end_date)s::date

@@ -75,6 +75,14 @@
     #filter-toggle:hover { background: rgba(255,255,255,0.03); }
     #filter-body { border-top: 1px solid #30363d; padding: 12px 16px 14px; }
 
+    /* Searchable filter inputs */
+    .filter-text { background-color: #21262d; border: 1px solid #30363d; color: #e0e0e0; border-radius: 6px; padding: 5px 10px; font-size: 0.82rem; width: 155px; }
+    .filter-text:focus { outline: none; border-color: #238636; box-shadow: 0 0 0 2px rgba(35,134,54,0.2); }
+    .filter-text::placeholder { color: #484f58; }
+    .group-cb-wrap { color: #8b949e; font-size: 0.78rem; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+    .group-cb-wrap input[type=checkbox] { accent-color: #238636; cursor: pointer; width: 13px; height: 13px; }
+    .filter-row-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.8px; color: #8b949e; margin-bottom: 4px; display: block; }
+
     /* Mobile Responsive */
     .sidebar-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:99; }
     .sidebar-overlay.show { display:block; }
@@ -203,24 +211,44 @@
         <span style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.8px;color:#8b949e;">View By</span>
         <select id="sel-group1" class="group-select">
           <option value="none">— None —</option>
-          <option value="marketing_group">Marketing Group</option>
-          <option value="campaign_name">Campaign Name</option>
-          <option value="campaign_legacy_id">Campaign Legacy ID</option>
-          <option value="campaign_channel">Campaign Channel</option>
-          <option value="campaign_sub_channel">Campaign Sub-channel</option>
-          <option value="original_affiliate">Original Affiliate</option>
+          <optgroup label="Campaign">
+            <option value="marketing_group">Marketing Group</option>
+            <option value="campaign_name">Campaign Name</option>
+            <option value="campaign_legacy_id">Campaign Legacy ID</option>
+            <option value="campaign_channel">Campaign Channel</option>
+            <option value="campaign_sub_channel">Campaign Sub-channel</option>
+            <option value="original_affiliate">Original Affiliate</option>
+          </optgroup>
+          <optgroup label="Agent">
+            <option value="office_name">Office</option>
+            <option value="agent_name">Agent</option>
+          </optgroup>
+          <optgroup label="Account">
+            <option value="country">Country</option>
+            <option value="client_classification">Classification</option>
+          </optgroup>
         </select>
       </div>
       <div style="display:flex;flex-direction:column;gap:4px;">
         <span style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.8px;color:#8b949e;">Sub-group</span>
         <select id="sel-group2" class="group-select">
           <option value="none">— None —</option>
-          <option value="marketing_group">Marketing Group</option>
-          <option value="campaign_name">Campaign Name</option>
-          <option value="campaign_legacy_id">Campaign Legacy ID</option>
-          <option value="campaign_channel">Campaign Channel</option>
-          <option value="campaign_sub_channel">Campaign Sub-channel</option>
-          <option value="original_affiliate">Original Affiliate</option>
+          <optgroup label="Campaign">
+            <option value="marketing_group">Marketing Group</option>
+            <option value="campaign_name">Campaign Name</option>
+            <option value="campaign_legacy_id">Campaign Legacy ID</option>
+            <option value="campaign_channel">Campaign Channel</option>
+            <option value="campaign_sub_channel">Campaign Sub-channel</option>
+            <option value="original_affiliate">Original Affiliate</option>
+          </optgroup>
+          <optgroup label="Agent">
+            <option value="office_name">Office</option>
+            <option value="agent_name">Agent</option>
+          </optgroup>
+          <optgroup label="Account">
+            <option value="country">Country</option>
+            <option value="client_classification">Classification</option>
+          </optgroup>
         </select>
       </div>
       <div class="filter-sep" style="height:42px;"></div>
@@ -233,6 +261,64 @@
           <option value="day">Day</option>
         </select>
       </div>
+    </div>
+
+    <!-- Row 4: Campaign Filters -->
+    <div class="d-flex flex-wrap align-items-end gap-3" style="margin-top:10px;padding-top:10px;border-top:1px solid #21262d;">
+      <div style="display:flex;flex-direction:column;">
+        <span class="filter-row-label">Marketing Group</span>
+        <input class="filter-text" id="f-mkt-group" list="dl-mkt-group" placeholder="All" autocomplete="off" />
+        <datalist id="dl-mkt-group"></datalist>
+      </div>
+      <div style="display:flex;flex-direction:column;">
+        <span class="filter-row-label">Campaign Name</span>
+        <input class="filter-text" id="f-campaign-name" list="dl-campaign-name" placeholder="All" autocomplete="off" />
+        <datalist id="dl-campaign-name"></datalist>
+      </div>
+      <div style="display:flex;flex-direction:column;">
+        <span class="filter-row-label">Campaign Legacy ID</span>
+        <input class="filter-text" id="f-legacy-id" list="dl-legacy-id" placeholder="All" autocomplete="off" />
+        <datalist id="dl-legacy-id"></datalist>
+      </div>
+      <div style="display:flex;flex-direction:column;">
+        <span class="filter-row-label">Campaign Channel</span>
+        <input class="filter-text" id="f-channel" list="dl-channel" placeholder="All" autocomplete="off" />
+        <datalist id="dl-channel"></datalist>
+      </div>
+      <div style="display:flex;flex-direction:column;">
+        <span class="filter-row-label">Campaign Sub-channel</span>
+        <input class="filter-text" id="f-sub-channel" list="dl-sub-channel" placeholder="All" autocomplete="off" />
+        <datalist id="dl-sub-channel"></datalist>
+      </div>
+      <div style="display:flex;flex-direction:column;">
+        <span class="filter-row-label">Original Affiliate</span>
+        <input class="filter-text" id="f-affiliate" list="dl-affiliate" placeholder="All" autocomplete="off" />
+        <datalist id="dl-affiliate"></datalist>
+      </div>
+      <div class="filter-sep" style="height:42px;"></div>
+      <div style="display:flex;flex-direction:column;">
+        <span class="filter-row-label">Classification</span>
+        <select id="f-classification" class="group-select">
+          <option value="">All</option>
+          <option value="High Quality">High Quality</option>
+          <option value="Low Quality">Low Quality</option>
+          <option value="No segmentation">No segmentation</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Row 5: FTC Groups -->
+    <div class="d-flex flex-wrap align-items-center gap-3" style="margin-top:10px;">
+      <span style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.8px;color:#8b949e;white-space:nowrap;">FTC Groups</span>
+      <label class="group-cb-wrap"><input type="checkbox" class="ftc-cb" value="0 - 7 days" checked> 0–7</label>
+      <label class="group-cb-wrap"><input type="checkbox" class="ftc-cb" value="8 - 14 days" checked> 8–14</label>
+      <label class="group-cb-wrap"><input type="checkbox" class="ftc-cb" value="15 - 30 days" checked> 15–30</label>
+      <label class="group-cb-wrap"><input type="checkbox" class="ftc-cb" value="31 - 60 days" checked> 31–60</label>
+      <label class="group-cb-wrap"><input type="checkbox" class="ftc-cb" value="61 - 90 days" checked> 61–90</label>
+      <label class="group-cb-wrap"><input type="checkbox" class="ftc-cb" value="91 - 120 days" checked> 91–120</label>
+      <label class="group-cb-wrap"><input type="checkbox" class="ftc-cb" value="120+ days" checked> 120+</label>
+      <button onclick="toggleAllFtc(true)" class="quick-btn" style="padding:3px 8px;font-size:0.72rem;">All</button>
+      <button onclick="toggleAllFtc(false)" class="quick-btn" style="padding:3px 8px;font-size:0.72rem;">None</button>
     </div>
 
     </div><!-- /filter-body -->
@@ -509,6 +595,30 @@
   }
 
   // ── Table API fetch ──────────────────────────────────────────────────────
+  function _getFilterParams() {
+    const fMktGroup    = (document.getElementById('f-mkt-group')?.value    || '').trim();
+    const fLegacyId    = (document.getElementById('f-legacy-id')?.value    || '').trim();
+    const fCampaignName= (document.getElementById('f-campaign-name')?.value|| '').trim();
+    const fChannel     = (document.getElementById('f-channel')?.value      || '').trim();
+    const fSubChannel  = (document.getElementById('f-sub-channel')?.value  || '').trim();
+    const fAffiliate   = (document.getElementById('f-affiliate')?.value    || '').trim();
+    const fClass       = (document.getElementById('f-classification')?.value || '');
+    const allCbs       = document.querySelectorAll('.ftc-cb');
+    const checkedCbs   = Array.from(allCbs).filter(cb => cb.checked).map(cb => cb.value);
+    const ftcGroups    = (checkedCbs.length > 0 && checkedCbs.length < allCbs.length)
+                         ? checkedCbs.join(',') : null;
+    let extra = '';
+    if (fMktGroup)     extra += `&f_mkt_group=${encodeURIComponent(fMktGroup)}`;
+    if (fLegacyId)     extra += `&f_legacy_id=${encodeURIComponent(fLegacyId)}`;
+    if (fCampaignName) extra += `&f_campaign_name=${encodeURIComponent(fCampaignName)}`;
+    if (fChannel)      extra += `&f_channel=${encodeURIComponent(fChannel)}`;
+    if (fSubChannel)   extra += `&f_sub_channel=${encodeURIComponent(fSubChannel)}`;
+    if (fAffiliate)    extra += `&f_affiliate=${encodeURIComponent(fAffiliate)}`;
+    if (fClass)        extra += `&f_classification=${encodeURIComponent(fClass)}`;
+    if (ftcGroups)     extra += `&ftc_groups=${encodeURIComponent(ftcGroups)}`;
+    return extra;
+  }
+
   async function loadTable(silent = false) {
     const df  = document.getElementById('date-from').value;
     const dt  = document.getElementById('date-to').value;
@@ -547,7 +657,7 @@
     }
 
     try {
-      const res = await fetch(`/api/campaign-performance/table?date_from=${df}&date_to=${dt}&group1=${g1}&group2=${g2}&period=${per}`);
+      const res = await fetch(`/api/campaign-performance/table?date_from=${df}&date_to=${dt}&group1=${g1}&group2=${g2}&period=${per}${_getFilterParams()}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Server error');
       tblData = data;
@@ -868,6 +978,44 @@
   document.getElementById('sel-group1').addEventListener('change', () => loadTable());
   document.getElementById('sel-group2').addEventListener('change', () => loadTable());
   document.getElementById('sel-period').addEventListener('change', () => loadTable());
+
+  // Campaign filter inputs + classification → reload table
+  ['f-mkt-group','f-legacy-id','f-campaign-name','f-channel','f-sub-channel','f-affiliate'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      // Reload only when user finishes typing (blur or Enter) or clears the field
+      el.addEventListener('change', () => loadTable());
+      el.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); loadTable(); } });
+    }
+  });
+  document.getElementById('f-classification')?.addEventListener('change', () => loadTable());
+  document.querySelectorAll('.ftc-cb').forEach(cb => cb.addEventListener('change', () => loadTable()));
+
+  function toggleAllFtc(state) {
+    document.querySelectorAll('.ftc-cb').forEach(cb => { cb.checked = state; });
+    loadTable();
+  }
+
+  // ── Load filter options (populate datalists) ─────────────────────────────
+  async function loadFilterOptions() {
+    try {
+      const res = await fetch('/api/campaign-performance/filter-options');
+      if (!res.ok) return;
+      const d = await res.json();
+      const fill = (dlId, items) => {
+        const dl = document.getElementById(dlId);
+        if (!dl) return;
+        dl.innerHTML = items.map(v => `<option value="${v.replace(/"/g,'&quot;')}"></option>`).join('');
+      };
+      fill('dl-mkt-group',      d.marketing_groups    || []);
+      fill('dl-campaign-name',  d.campaign_names      || []);
+      fill('dl-legacy-id',      d.campaign_legacy_ids || []);
+      fill('dl-channel',        d.campaign_channels   || []);
+      fill('dl-sub-channel',    d.campaign_sub_channels || []);
+      fill('dl-affiliate',      d.original_affiliates || []);
+    } catch(e) {}
+  }
+  loadFilterOptions();
 
   // ── Init ─────────────────────────────────────────────────────────────────
   document.getElementById('date-from').value = firstOfMonth(state.year, state.month);

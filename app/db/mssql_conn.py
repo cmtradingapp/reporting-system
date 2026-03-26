@@ -196,6 +196,19 @@ def get_client_classification() -> pd.DataFrame:
         conn.close()
 
 
+def get_country_map() -> dict:
+    """Returns dict of iso2code (uppercase) → country name from report.countries."""
+    conn = _get_mssql_connection()
+    try:
+        query = "SELECT iso2code, name FROM report.countries WHERE iso2code IS NOT NULL AND iso2code <> ''"
+        df = pd.read_sql(query, conn)
+        return {str(r.iso2code).strip().upper(): str(r.name).strip() for _, r in df.iterrows()}
+    except Exception:
+        return {}
+    finally:
+        conn.close()
+
+
 def get_dealio_mt4trades_full():
     """
     Generator using keyset pagination on ticket (clustered PK).

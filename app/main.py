@@ -62,7 +62,7 @@ def warm_cache():
     except Exception as e:
         print(f"[warm_cache] camp_perf: {e}")
 
-    _ck = f"camp_tbl_v2:{month_start}:{today_iso}:none:none:none"
+    _ck = f"camp_tbl_v3:{month_start}:{today_iso}:none:none:none:None:None:None:None:None:None:None:None"
     try:
         cache.set(_ck, _camp_table_calc(month_start, today_iso))
     except Exception as e:
