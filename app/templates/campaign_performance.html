@@ -194,35 +194,41 @@
     </div>
 
     <!-- Row 3: Grouping -->
-    <div class="d-flex flex-wrap align-items-center gap-2">
-      <span class="text-muted small">Group By</span>
-      <select id="sel-group1" class="group-select">
-        <option value="none">— None —</option>
-        <option value="marketing_group">Marketing Group</option>
-        <option value="campaign_name">Campaign Name</option>
-        <option value="campaign_legacy_id">Campaign Legacy ID</option>
-        <option value="campaign_channel">Campaign Channel</option>
-        <option value="campaign_sub_channel">Campaign Sub-channel</option>
-        <option value="original_affiliate">Original Affiliate</option>
-      </select>
-      <span class="text-muted small ms-2">Then By</span>
-      <select id="sel-group2" class="group-select">
-        <option value="none">— None —</option>
-        <option value="marketing_group">Marketing Group</option>
-        <option value="campaign_name">Campaign Name</option>
-        <option value="campaign_legacy_id">Campaign Legacy ID</option>
-        <option value="campaign_channel">Campaign Channel</option>
-        <option value="campaign_sub_channel">Campaign Sub-channel</option>
-        <option value="original_affiliate">Original Affiliate</option>
-      </select>
-      <div class="filter-sep"></div>
-      <span class="text-muted small ms-2">Period</span>
-      <select id="sel-period" class="group-select">
-        <option value="none">— None —</option>
-        <option value="year">Year</option>
-        <option value="month">Month</option>
-        <option value="day">Day</option>
-      </select>
+    <div class="d-flex flex-wrap align-items-end gap-3">
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <span style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.8px;color:#8b949e;">View By</span>
+        <select id="sel-group1" class="group-select">
+          <option value="none">— None —</option>
+          <option value="marketing_group">Marketing Group</option>
+          <option value="campaign_name">Campaign Name</option>
+          <option value="campaign_legacy_id">Campaign Legacy ID</option>
+          <option value="campaign_channel">Campaign Channel</option>
+          <option value="campaign_sub_channel">Campaign Sub-channel</option>
+          <option value="original_affiliate">Original Affiliate</option>
+        </select>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <span style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.8px;color:#8b949e;">Sub-group</span>
+        <select id="sel-group2" class="group-select">
+          <option value="none">— None —</option>
+          <option value="marketing_group">Marketing Group</option>
+          <option value="campaign_name">Campaign Name</option>
+          <option value="campaign_legacy_id">Campaign Legacy ID</option>
+          <option value="campaign_channel">Campaign Channel</option>
+          <option value="campaign_sub_channel">Campaign Sub-channel</option>
+          <option value="original_affiliate">Original Affiliate</option>
+        </select>
+      </div>
+      <div class="filter-sep" style="height:42px;"></div>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <span style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.8px;color:#8b949e;">Time Frame</span>
+        <select id="sel-period" class="group-select">
+          <option value="none">— None —</option>
+          <option value="year">Year</option>
+          <option value="month">Month</option>
+          <option value="day">Day</option>
+        </select>
+      </div>
     </div>
 
     </div><!-- /filter-body -->
