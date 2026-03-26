@@ -1756,6 +1756,13 @@ def ensure_client_classification_table():
             synced_at               TIMESTAMP DEFAULT NOW()
         );
         ALTER TABLE client_classification ADD COLUMN IF NOT EXISTS classification_value SMALLINT;
+        UPDATE client_classification
+        SET classification_value = CASE
+            WHEN classification_category = 'High Quality' THEN 8
+            WHEN classification_category = 'Low Quality'  THEN 3
+            ELSE 0
+        END
+        WHERE classification_value IS NULL;
     """
     conn = get_connection()
     try:
