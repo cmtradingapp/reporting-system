@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Campaign Performance</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet"/>
+  <style>
+    body { background-color: #0f1117; color: #e0e0e0; font-family: 'Segoe UI', sans-serif; display: flex; min-height: 100vh; }
+    .sidebar { width: 220px; min-height: 100vh; background-color: #161b22; border-right: 1px solid #30363d; display: flex; flex-direction: column; position: fixed; top: 0; left: 0; bottom: 0; z-index: 100; }
+    .sidebar-brand { padding: 20px 20px 16px; border-bottom: 1px solid #30363d; font-weight: 700; font-size: 1rem; color: #e0e0e0; }
+    .sidebar-nav { padding: 12px 0; flex: 1; }
+    .sidebar-link { display: flex; align-items: center; gap: 10px; padding: 10px 20px; color: #8b949e; text-decoration: none; font-size: 0.9rem; transition: background 0.15s, color 0.15s; border-left: 3px solid transparent; }
+    .sidebar-link:hover { background-color: #21262d; color: #e0e0e0; }
+    .sidebar-link.active { color: #3fb950; border-left-color: #3fb950; background-color: rgba(63,185,80,0.08); }
+    .main-content { margin-left: 220px; flex: 1; min-width: 0; }
+    .card { background-color: #161b22; border: 1px solid #30363d; border-radius: 12px; }
+
+    /* Period buttons */
+    .period-btn { background-color: #21262d; border: 1px solid #30363d; color: #8b949e; font-size: 0.82rem; padding: 5px 12px; border-radius: 6px; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+    .period-btn:hover { background-color: #2d333a; color: #c9d1d9; border-color: #484f58; }
+    .period-btn.active { background-color: rgba(35,134,54,0.25); border-color: #238636; color: #3fb950; font-weight: 600; }
+
+    /* Date inputs */
+    .date-input { background-color: #21262d; border: 1px solid #30363d; color: #e0e0e0; border-radius: 6px; padding: 5px 10px; font-size: 0.82rem; width: 140px; }
+    .date-input:focus { outline: none; border-color: #238636; box-shadow: 0 0 0 2px rgba(35,134,54,0.2); }
+    .date-input::-webkit-calendar-picker-indicator { filter: invert(0.7); cursor: pointer; }
+
+    /* Quick buttons */
+    .quick-btn { background-color: #21262d; border: 1px solid #30363d; color: #8b949e; font-size: 0.78rem; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-weight: 600; letter-spacing: 0.5px; transition: all 0.15s; }
+    .quick-btn:hover { background-color: #2d333a; color: #c9d1d9; border-color: #484f58; }
+    .quick-btn.active-quick { background: linear-gradient(135deg,#1a4731,#238636); color: #3fb950; border-color: #238636; }
+
+    /* Custom searchable select */
+    .cs-wrap { position: relative; display: inline-block; }
+    .cs-trigger { background-color: #21262d; border: 1px solid #30363d; color: #e0e0e0; border-radius: 6px; padding: 4px 24px 4px 10px; font-size: 0.82rem; min-width: 130px; cursor: pointer; user-select: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23484f58'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-sizing: border-box; }
+    .cs-trigger:hover { border-color: #484f58; }
+    .cs-dropdown { display: none; position: absolute; top: calc(100% + 3px); left: 0; z-index: 1000; background: #21262d; border: 1px solid #30363d; border-radius: 6px; min-width: 170px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+    .cs-dropdown.open { display: block; }
+    .cs-search { width: 100%; box-sizing: border-box; padding: 6px 8px; font-size: 0.8rem; background: #161b22; border: none; border-bottom: 1px solid #30363d; color: #e0e0e0; outline: none; border-radius: 6px 6px 0 0; }
+    .cs-search::placeholder { color: #484f58; }
+    .cs-optlist { max-height: 200px; overflow-y: auto; }
+    .cs-option { padding: 6px 10px; font-size: 0.82rem; color: #c9d1d9; cursor: pointer; }
+    .cs-option:hover { background: #30363d; }
+    .cs-option.selected { color: #388bfd; }
+
+    /* Filter separator */
+    .filter-sep { width: 1px; height: 28px; background-color: #30363d; margin: 0 6px; }
+
+    /* KPI cards */
+    .kpi-card { background-color: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 10px 14px; height: 100%; display: flex; flex-direction: column; justify-content: center; }
+    .kpi-value { font-size: 1.3rem; font-weight: 700; line-height: 1.2; }
+    .kpi-split .kpi-value { font-size: 1rem; }
+    .kpi-label { font-size: 0.68rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.8px; margin-top: 3px; }
+
+    /* Spinner */
+    #loading { display: none; text-align: center; padding: 60px; color: #8b949e; }
+    #error-msg { display: none; }
+
+    /* Section title */
+    .section-title { font-size: 1rem; font-weight: 600; color: #c9d1d9; border-left: 3px solid #238636; padding-left: 10px; }
+
+    /* Sidebar user block */
+    .sidebar-user { padding: 14px 20px; border-top: 1px solid #30363d; }
+    .sidebar-nav { overflow-y: auto; }
+
+    /* Filter bar collapsible */
+    #filter-toggle { cursor: pointer; padding: 10px 16px; user-select: none; border-radius: 12px; }
+    #filter-toggle:hover { background: rgba(255,255,255,0.03); }
+    #filter-body { border-top: 1px solid #30363d; padding: 12px 16px 14px; }
+
+    /* Mobile Responsive */
+    .sidebar-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:99; }
+    .sidebar-overlay.show { display:block; }
+    .sidebar-toggle { display:none; position:fixed; top:8px; left:10px; z-index:300; background:transparent; border:none; color:#e0e0e0; border-radius:8px; padding:7px 10px; cursor:pointer; font-size:1.2rem; line-height:1; }
+    .mob-topbar { display:none; }
+    @media (max-width: 767px) {
+      body { display:block; }
+      .sidebar-toggle { display:block; }
+      .sidebar { transform:translateX(-240px); transition:transform 0.25s ease; }
+      .sidebar.open { transform:translateX(0); box-shadow:4px 0 20px rgba(0,0,0,0.6); }
+      .mob-topbar { display:flex; align-items:center; justify-content:center; position:fixed; top:0; left:0; right:0; height:48px; background:#161b22; border-bottom:1px solid #30363d; z-index:150; }
+      .mob-topbar-title { font-size:0.92rem; font-weight:700; color:#e0e0e0; padding:0 44px; }
+      .main-content { margin-left:0 !important; padding-top:48px; }
+      .date-input { width:120px; }
+      h4.fw-bold { display:none; }
+    }
+    @media (min-width: 768px) and (max-width: 1366px) {
+      body { display:block; }
+      .sidebar-toggle { display:block; }
+      .sidebar { transform:translateX(-240px); transition:transform 0.25s ease; }
+      .sidebar.open { transform:translateX(0); box-shadow:4px 0 20px rgba(0,0,0,0.6); }
+      .mob-topbar { display:flex; align-items:center; justify-content:center; position:fixed; top:0; left:0; right:0; height:48px; background:#161b22; border-bottom:1px solid #30363d; z-index:150; }
+      .mob-topbar-title { font-size:0.95rem; font-weight:700; color:#e0e0e0; padding:0 44px; }
+      .main-content { margin-left:0 !important; padding-top:48px; }
+      .col-md-3 { width:50% !important; flex:0 0 50% !important; max-width:50% !important; }
+      .kpi-card { padding:8px 6px; }
+      .kpi-value { font-size:0.95rem; }
+      .kpi-split { gap:3px !important; }
+      .kpi-split .kpi-value { font-size:0.72rem; }
+      .kpi-label { font-size:0.6rem; letter-spacing:0.4px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="mob-topbar"><span class="mob-topbar-title">Campaign Performance</span></div>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+<button class="sidebar-toggle" id="sidebar-toggle"><i class="bi bi-list"></i></button>
+<div class="sidebar">
+  <div class="sidebar-brand">
+    <i class="bi bi-bar-chart-fill text-success me-2"></i>Reporting System
+  </div>
+  <nav class="sidebar-nav">
+    <a href="/performance" class="sidebar-link"><i class="bi bi-trophy"></i>Performance Report</a>
+    <a href="/campaign-performance" class="sidebar-link active"><i class="bi bi-graph-up-arrow"></i>Campaign Performance</a>
+    <a href="/agent-bonuses" class="sidebar-link"><i class="bi bi-cash-stack"></i>Agent Bonuses</a>
+    {% if current_user.role == 'admin' %}
+    <a href="/dashboard" class="sidebar-link"><i class="bi bi-speedometer2"></i>Dashboard</a>
+    <a href="/ftc-date" class="sidebar-link"><i class="bi bi-calendar2-check"></i>FTC Date</a>
+    <a href="/data-sync" class="sidebar-link"><i class="bi bi-database"></i>Data Sync</a>
+    <a href="/holidays" class="sidebar-link"><i class="bi bi-calendar-x"></i>Holidays</a>
+    {% endif %}
+  </nav>
+  <div class="sidebar-user">
+    <div style="font-size:0.68rem;color:#8b949e;margin-bottom:2px;">Signed in as</div>
+    <div style="font-weight:600;font-size:0.82rem;color:#e0e0e0;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ current_user.full_name }}</div>
+    <div style="font-size:0.7rem;color:#3fb950;margin-bottom:8px;">{{ current_user.role | replace('_', ' ') | title }}</div>
+    <div style="display:flex;gap:12px;align-items:center;">
+      {% if current_user.role == 'admin' %}<a href="/admin/users" style="color:#8b949e;text-decoration:none;font-size:1.05rem;" title="Admin Users"><i class="bi bi-people-fill"></i></a>{% endif %}
+      <a href="/logout" style="color:#f85149;text-decoration:none;font-size:1.05rem;" title="Logout"><i class="bi bi-box-arrow-right"></i></a>
+    </div>
+  </div>
+</div>
+
+<div class="main-content">
+<div class="container-fluid px-4 py-4">
+
+  <!-- Header -->
+  <div class="mb-1 d-none d-md-flex align-items-baseline gap-3">
+    <h4 class="fw-bold text-white mb-0">Campaign Performance</h4>
+  </div>
+  <div id="sync-bar" style="font-size:0.73rem;color:#8b949e;margin-bottom:14px;display:flex;align-items:center;gap:12px;">
+    <i class="bi bi-arrow-repeat me-1"></i>Last sync: <span id="sync-bar-val">—</span>
+  </div>
+
+  <!-- Filter Bar -->
+  <div class="card mb-4">
+    <div class="d-flex align-items-center justify-content-between" id="filter-toggle">
+      <span style="font-size:0.8rem;color:#8b949e;font-weight:600;"><i class="bi bi-sliders me-2" style="color:#388bfd;"></i>Filters</span>
+      <i class="bi bi-chevron-up" id="filter-chevron" style="color:#8b949e;font-size:0.8rem;transition:transform 0.2s;"></i>
+    </div>
+    <div id="filter-body">
+
+    <!-- Row 1: Year + Month + Office -->
+    <div class="d-flex flex-wrap align-items-center gap-1 mb-3">
+      <button class="period-btn year-btn" data-year="2024">2024</button>
+      <button class="period-btn year-btn" data-year="2025">2025</button>
+      <button class="period-btn year-btn" data-year="2026">2026</button>
+      <div class="filter-sep"></div>
+      <button class="period-btn month-btn" data-month="1">Jan</button>
+      <button class="period-btn month-btn" data-month="2">Feb</button>
+      <button class="period-btn month-btn" data-month="3">Mar</button>
+      <button class="period-btn month-btn" data-month="4">Apr</button>
+      <button class="period-btn month-btn" data-month="5">May</button>
+      <button class="period-btn month-btn" data-month="6">Jun</button>
+      <button class="period-btn month-btn" data-month="7">Jul</button>
+      <button class="period-btn month-btn" data-month="8">Aug</button>
+      <button class="period-btn month-btn" data-month="9">Sep</button>
+      <button class="period-btn month-btn" data-month="10">Oct</button>
+      <button class="period-btn month-btn" data-month="11">Nov</button>
+      <button class="period-btn month-btn" data-month="12">Dec</button>
+    </div>
+
+    <!-- Row 2: Date range -->
+    <div class="d-flex flex-wrap align-items-center gap-2">
+      <span class="text-muted small">From</span>
+      <input type="date" id="date-from" class="date-input" />
+      <span class="text-muted small">To</span>
+      <input type="date" id="date-to" class="date-input" />
+      <div class="filter-sep"></div>
+      <button class="quick-btn" id="btn-today">TODAY</button>
+      <button class="quick-btn" id="btn-ystrd">YSTRD</button>
+      <div class="filter-sep"></div>
+      <button class="btn btn-sm text-white px-3" style="background:linear-gradient(135deg,#238636,#2ea043);border:none;border-radius:6px;" id="btn-apply">
+        <i class="bi bi-arrow-clockwise me-1"></i>Apply
+      </button>
+    </div>
+
+    </div><!-- /filter-body -->
+  </div>
+
+  <!-- KPI Cards — Row 1 -->
+  <div class="row g-2 mb-2">
+    <div class="col-6 col-md-3" id="kpi-leads">
+      <div class="kpi-card text-center">
+        <div class="kpi-split" style="display:flex;justify-content:center;align-items:center;gap:10px;">
+          <div>
+            <div class="kpi-value" style="color:#a371f7;" id="stat-leads-daily">—</div>
+            <div class="kpi-label">Leads Today</div>
+          </div>
+          <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
+          <div>
+            <div class="kpi-value" style="color:#a371f7;" id="stat-leads-mtd">—</div>
+            <div class="kpi-label">Leads MTD</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3" id="kpi-live">
+      <div class="kpi-card text-center">
+        <div class="kpi-split" style="display:flex;justify-content:center;align-items:center;gap:10px;">
+          <div>
+            <div class="kpi-value" style="color:#f78166;" id="stat-live-daily">—</div>
+            <div class="kpi-label">Live Acc Today</div>
+          </div>
+          <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
+          <div>
+            <div class="kpi-value" style="color:#f78166;" id="stat-live-mtd">—</div>
+            <div class="kpi-label">Live Acc MTD</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3" id="kpi-ftd">
+      <div class="kpi-card text-center">
+        <div class="kpi-split" style="display:flex;justify-content:center;align-items:center;gap:10px;">
+          <div>
+            <div class="kpi-value" style="color:#388bfd;" id="stat-ftd-daily">—</div>
+            <div class="kpi-label">FTD Today</div>
+          </div>
+          <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
+          <div>
+            <div class="kpi-value" style="color:#388bfd;" id="stat-ftd-mtd">—</div>
+            <div class="kpi-label">FTD MTD</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3" id="kpi-ftc">
+      <div class="kpi-card text-center">
+        <div class="kpi-split" style="display:flex;justify-content:center;align-items:center;gap:10px;">
+          <div>
+            <div class="kpi-value" style="color:#388bfd;" id="stat-ftc-daily">—</div>
+            <div class="kpi-label">FTC Today</div>
+          </div>
+          <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
+          <div>
+            <div class="kpi-value" style="color:#388bfd;" id="stat-ftc-mtd">—</div>
+            <div class="kpi-label">FTC MTD</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPI Cards — Row 2 -->
+  <div class="row g-2 mb-4">
+    <div class="col-6 col-md-3" id="kpi-deposits">
+      <div class="kpi-card text-center">
+        <div class="kpi-value" style="color:#3fb950;" id="stat-deposits">—</div>
+        <div class="kpi-label">Deposits $</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3" id="kpi-withdrawals">
+      <div class="kpi-card text-center">
+        <div class="kpi-value" style="color:#f85149;" id="stat-withdrawals">—</div>
+        <div class="kpi-label">Withdrawals $</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3" id="kpi-net">
+      <div class="kpi-card text-center">
+        <div class="kpi-value" style="color:#3fb950;" id="stat-net-deposits">—</div>
+        <div class="kpi-label">Net Deposits $</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3" id="kpi-traders">
+      <div class="kpi-card text-center">
+        <div class="kpi-value" style="color:#d29922;" id="stat-traders">—</div>
+        <div class="kpi-label">No. of Traders</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading / Error -->
+  <div id="loading" style="text-align:center;padding:40px;color:#8b949e;">
+    <div class="spinner-border text-success mb-3" style="width:2rem;height:2rem;"></div>
+    <div class="small">Loading...</div>
+  </div>
+  <div id="error-msg" class="text-danger text-center p-4 small"></div>
+
+</div>
+</div>
+
+<script>
+  const now = new Date();
+  let state = {
+    year:  now.getFullYear(),
+    month: now.getMonth() + 1,
+  };
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function todayStr() { return `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`; }
+  function yesterdayStr() {
+    const d = new Date(now); d.setDate(d.getDate() - 1);
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  }
+  function firstOfMonth(year, month) { return `${year}-${pad(month)}-01`; }
+  function lastOfMonth(year, month) {
+    const d = new Date(year, month, 0);
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  }
+  function dateToForMonth(year, month) {
+    const isCurrentMonth = year === now.getFullYear() && month === now.getMonth() + 1;
+    return isCurrentMonth ? todayStr() : lastOfMonth(year, month);
+  }
+  function fmtMoney(v) {
+    if (v === null || v === undefined) return '—';
+    return (v < 0 ? '-$' : '$') + Math.round(Math.abs(v)).toLocaleString('en-US');
+  }
+
+  // ── Button highlight helpers ─────────────────────────────────────────────
+  function activateYear(year) {
+    document.querySelectorAll('.year-btn').forEach(b => b.classList.toggle('active', parseInt(b.dataset.year) === year));
+  }
+  function activateMonth(month) {
+    document.querySelectorAll('.month-btn').forEach(b => b.classList.toggle('active', parseInt(b.dataset.month) === month));
+  }
+  function setQuickActive(id) {
+    ['btn-today','btn-ystrd'].forEach(i => document.getElementById(i).classList.toggle('active-quick', i === id));
+  }
+
+  // ── API fetch + KPI update ───────────────────────────────────────────────
+  async function loadData() {
+    const df = document.getElementById('date-from').value;
+    const dt = document.getElementById('date-to').value;
+    if (!df || !dt) return;
+
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('error-msg').style.display = 'none';
+
+    try {
+      const res = await fetch(`/api/campaign-performance?date_from=${df}&date_to=${dt}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Server error');
+      updateStats(data);
+    } catch(e) {
+      document.getElementById('error-msg').textContent = 'Error: ' + e.message;
+      document.getElementById('error-msg').style.display = 'block';
+    } finally {
+      document.getElementById('loading').style.display = 'none';
+    }
+  }
+
+  function updateStats(data) {
+    // Leads
+    const leadsD = document.getElementById('stat-leads-daily');
+    const leadsMtd = document.getElementById('stat-leads-mtd');
+    if (leadsD) leadsD.textContent = (data.leads?.daily ?? 0).toLocaleString();
+    if (leadsMtd) leadsMtd.textContent = (data.leads?.mtd ?? 0).toLocaleString();
+
+    // Live Accounts
+    const liveD = document.getElementById('stat-live-daily');
+    const liveMtd = document.getElementById('stat-live-mtd');
+    if (liveD) liveD.textContent = (data.live_accounts?.daily ?? 0).toLocaleString();
+    if (liveMtd) liveMtd.textContent = (data.live_accounts?.mtd ?? 0).toLocaleString();
+
+    // FTD
+    const ftdD = document.getElementById('stat-ftd-daily');
+    const ftdMtd = document.getElementById('stat-ftd-mtd');
+    if (ftdD) ftdD.textContent = (data.ftd?.daily ?? 0).toLocaleString();
+    if (ftdMtd) ftdMtd.textContent = (data.ftd?.mtd ?? 0).toLocaleString();
+
+    // FTC
+    const ftcD = document.getElementById('stat-ftc-daily');
+    const ftcMtd = document.getElementById('stat-ftc-mtd');
+    if (ftcD) ftcD.textContent = (data.ftc?.daily ?? 0).toLocaleString();
+    if (ftcMtd) ftcMtd.textContent = (data.ftc?.mtd ?? 0).toLocaleString();
+
+    // Deposits
+    const depEl = document.getElementById('stat-deposits');
+    if (depEl) depEl.textContent = fmtMoney(data.deposits ?? 0);
+
+    // Withdrawals
+    const wdEl = document.getElementById('stat-withdrawals');
+    if (wdEl) wdEl.textContent = fmtMoney(data.withdrawals ?? 0);
+
+    // Net Deposits
+    const netEl = document.getElementById('stat-net-deposits');
+    if (netEl) {
+      const v = data.net_deposits ?? 0;
+      netEl.textContent = fmtMoney(v);
+      netEl.style.color = v >= 0 ? '#3fb950' : '#f85149';
+    }
+
+    // Traders
+    const tradersEl = document.getElementById('stat-traders');
+    if (tradersEl) tradersEl.textContent = (data.traders_count ?? 0).toLocaleString();
+  }
+
+  // ── Year/Month/Quick buttons ─────────────────────────────────────────────
+  document.querySelectorAll('.year-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.year = parseInt(btn.dataset.year);
+      activateYear(state.year);
+      setQuickActive(null);
+      document.getElementById('date-from').value = firstOfMonth(state.year, state.month);
+      document.getElementById('date-to').value   = dateToForMonth(state.year, state.month);
+      loadData();
+    });
+  });
+
+  document.querySelectorAll('.month-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.month = parseInt(btn.dataset.month);
+      activateMonth(state.month);
+      setQuickActive(null);
+      document.getElementById('date-from').value = firstOfMonth(state.year, state.month);
+      document.getElementById('date-to').value   = dateToForMonth(state.year, state.month);
+      loadData();
+    });
+  });
+
+  document.getElementById('btn-today').addEventListener('click', () => {
+    const t = todayStr();
+    document.getElementById('date-from').value = t;
+    document.getElementById('date-to').value   = t;
+    setQuickActive('btn-today');
+    loadData();
+  });
+
+  document.getElementById('btn-ystrd').addEventListener('click', () => {
+    const y = yesterdayStr();
+    document.getElementById('date-from').value = y;
+    document.getElementById('date-to').value   = y;
+    setQuickActive('btn-ystrd');
+    loadData();
+  });
+
+  document.getElementById('btn-apply').addEventListener('click', () => {
+    setQuickActive(null);
+    loadData();
+  });
+
+  // ── Init ─────────────────────────────────────────────────────────────────
+  document.getElementById('date-from').value = firstOfMonth(state.year, state.month);
+  document.getElementById('date-to').value   = todayStr();
+  activateYear(state.year);
+  activateMonth(state.month);
+  loadData();
+
+  // ── Filter bar toggle ────────────────────────────────────────────────────
+  (function(){
+    const FKEY = 'cp_filter_open';
+    const fbody = document.getElementById('filter-body');
+    const fchev = document.getElementById('filter-chevron');
+    const isTablet = window.innerWidth >= 768 && window.innerWidth <= 1024;
+    if (isTablet || localStorage.getItem(FKEY) !== '1') {
+      fbody.style.display = 'none';
+      fchev.style.transform = 'rotate(180deg)';
+    }
+    document.getElementById('filter-toggle').addEventListener('click', function() {
+      const open = fbody.style.display !== 'none';
+      fbody.style.display = open ? 'none' : '';
+      fchev.style.transform = open ? 'rotate(180deg)' : '';
+      localStorage.setItem(FKEY, open ? '0' : '1');
+    });
+  })();
+
+  // ── Mobile sidebar toggle ────────────────────────────────────────────────
+  (function(){
+    var toggle = document.getElementById('sidebar-toggle');
+    var sb = document.querySelector('.sidebar');
+    var overlay = document.getElementById('sidebar-overlay');
+    if (!toggle) return;
+    toggle.addEventListener('click', function(){ sb.classList.toggle('open'); overlay.classList.toggle('show'); });
+    overlay.addEventListener('click', function(){ sb.classList.remove('open'); overlay.classList.remove('show'); });
+  })();
+
+  // ── Last sync bar ────────────────────────────────────────────────────────
+  function fmtRelTime(iso) {
+    if (!iso) return '—';
+    const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+    if (diff < 1) return 'just now';
+    if (diff < 60) return diff + ' min ago';
+    const h = Math.floor(diff / 60), m = diff % 60;
+    return h + 'h ' + (m > 0 ? m + 'm ' : '') + 'ago';
+  }
+  async function updateSyncBar() {
+    try {
+      const res = await fetch('/api/last-sync');
+      if (!res.ok) return;
+      const d = await res.json();
+      const tables = ['transactions', 'campaigns'];
+      let latest = null;
+      tables.forEach(t => { if (d[t]) { const ts = new Date(d[t]); if (!latest || ts > latest) latest = ts; } });
+      const el = document.getElementById('sync-bar-val');
+      if (el) el.textContent = latest ? fmtRelTime(latest.toISOString()) : '—';
+    } catch(e) {}
+  }
+  updateSyncBar();
+
+  // ── Auto-refresh every 60s when visible ──────────────────────────────────
+  setInterval(function() {
+    if (document.visibilityState !== 'visible') return;
+    updateSyncBar();
+    const today = new Date().toISOString().split('T')[0];
+    const dt = document.getElementById('date-to').value;
+    if (dt === today) loadData();
+  }, 60000);
+</script>
+
+<script src="https://instant.page/5.2.0/instantpage.min.js" type="module"></script>
+</body>
+</html>
