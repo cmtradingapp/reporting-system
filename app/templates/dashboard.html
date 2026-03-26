@@ -309,14 +309,16 @@
     el.className = 'kpi-value ' + (v > 0 ? 'text-pos' : v < 0 ? 'text-neg' : '');
   }
 
-  async function fetchData() {
+  async function fetchData(silent = false) {
     const loading = document.getElementById('loading');
     const errMsg  = document.getElementById('error-msg');
     const cards   = document.getElementById('cards-container');
 
-    loading.style.display = 'block';
-    errMsg.style.display  = 'none';
-    cards.style.display   = 'none';
+    if (!silent) {
+      loading.style.display = 'block';
+      errMsg.style.display  = 'none';
+      cards.style.display   = 'none';
+    }
 
     try {
       const res  = await fetch('/api/dashboard');
@@ -358,12 +360,16 @@
       }
 
       document.getElementById('last-updated').textContent = new Date().toLocaleTimeString();
-      loading.style.display = 'none';
-      cards.style.display   = 'block';
+      if (!silent) {
+        loading.style.display = 'none';
+        cards.style.display   = 'block';
+      }
     } catch (err) {
-      loading.style.display = 'none';
-      errMsg.style.display  = 'block';
-      errMsg.textContent    = 'Error loading dashboard: ' + err.message;
+      if (!silent) {
+        loading.style.display = 'none';
+        errMsg.style.display  = 'block';
+        errMsg.textContent    = 'Error loading dashboard: ' + err.message;
+      }
     }
   }
 
@@ -471,7 +477,7 @@
     if (document.visibilityState !== 'visible') return;
     updateSyncBar();
     loadLiveEquity();
-    fetchData();
+    fetchData(true);
   }, 60000);
 </script>
 </body>

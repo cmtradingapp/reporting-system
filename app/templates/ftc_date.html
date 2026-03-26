@@ -327,7 +327,7 @@
     document.getElementById('ftcBody').innerHTML = html;
   }
 
-  function loadData() {
+  function loadData(silent = false) {
     const endDate = document.getElementById('endDate').value;
     if (!endDate) return;
 
@@ -342,27 +342,29 @@
     if (team)           url += `&team=${encodeURIComponent(team)}`;
     if (classification) url += `&classification=${encodeURIComponent(classification)}`;
 
-    document.getElementById('spinner').classList.add('active');
-    document.getElementById('appliedDate').textContent = '';
+    if (!silent) {
+      document.getElementById('spinner').classList.add('active');
+      document.getElementById('appliedDate').textContent = '';
+    }
 
     fetch(url)
       .then(r => r.json())
       .then(data => {
         if (data.detail) {
-          document.getElementById('ftcBody').innerHTML =
+          if (!silent) document.getElementById('ftcBody').innerHTML =
             `<tr><td colspan="12" class="text-center text-danger py-3">${data.detail}</td></tr>`;
           return;
         }
         lastData = data;
         renderWithFilters();
-        document.getElementById('appliedDate').textContent = `End date: ${data.end_date}`;
+        if (!silent) document.getElementById('appliedDate').textContent = `End date: ${data.end_date}`;
       })
       .catch(e => {
-        document.getElementById('ftcBody').innerHTML =
+        if (!silent) document.getElementById('ftcBody').innerHTML =
           `<tr><td colspan="12" class="text-center text-danger py-3">${e}</td></tr>`;
       })
       .finally(() => {
-        document.getElementById('spinner').classList.remove('active');
+        if (!silent) document.getElementById('spinner').classList.remove('active');
       });
   }
 
@@ -455,7 +457,7 @@
     const today = new Date().toISOString().split('T')[0];
     const endDate = document.getElementById('endDate').value;
     updateSyncBar();
-    if (endDate === today) loadData();
+    if (endDate === today) loadData(true);
   }, 60000);
 </script>
 <script src="https://instant.page/5.2.0/instantpage.min.js" type="module"></script>

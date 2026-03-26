@@ -923,14 +923,16 @@
   }
 
   // ── Sales API fetch ────────────────────────────────────────────────────
-  async function loadSalesData() {
+  async function loadSalesData(silent = false) {
     const df = document.getElementById('date-from').value;
     const dt = document.getElementById('date-to').value;
     if (!df || !dt) return;
 
-    document.getElementById('sal-loading').style.display = 'block';
-    document.getElementById('sal-table-wrapper').style.display = 'none';
-    document.getElementById('sal-error-msg').style.display = 'none';
+    if (!silent) {
+      document.getElementById('sal-loading').style.display = 'block';
+      document.getElementById('sal-table-wrapper').style.display = 'none';
+      document.getElementById('sal-error-msg').style.display = 'none';
+    }
 
     try {
       const res = await fetch(`/api/agent-bonuses/sales?date_from=${df}&date_to=${dt}`);
@@ -948,23 +950,29 @@
 
       renderSalesTable();
     } catch(e) {
-      document.getElementById('sal-error-msg').textContent = 'Error: ' + e.message;
-      document.getElementById('sal-error-msg').style.display = 'block';
+      if (!silent) {
+        document.getElementById('sal-error-msg').textContent = 'Error: ' + e.message;
+        document.getElementById('sal-error-msg').style.display = 'block';
+      }
     } finally {
-      document.getElementById('sal-loading').style.display = 'none';
-      document.getElementById('sal-table-wrapper').style.display = '';
+      if (!silent) {
+        document.getElementById('sal-loading').style.display = 'none';
+        document.getElementById('sal-table-wrapper').style.display = '';
+      }
     }
   }
 
   // ── Retention API fetch ────────────────────────────────────────────────
-  async function loadBonusData() {
+  async function loadBonusData(silent = false) {
     const df = document.getElementById('date-from').value;
     const dt = document.getElementById('date-to').value;
     if (!df || !dt) return;
 
-    document.getElementById('bon-loading').style.display = 'block';
-    document.getElementById('bon-table-wrapper').style.display = 'none';
-    document.getElementById('bon-error-msg').style.display = 'none';
+    if (!silent) {
+      document.getElementById('bon-loading').style.display = 'block';
+      document.getElementById('bon-table-wrapper').style.display = 'none';
+      document.getElementById('bon-error-msg').style.display = 'none';
+    }
 
     try {
       const res = await fetch(`/api/agent-bonuses/retention?date_from=${df}&date_to=${dt}`);
@@ -988,19 +996,23 @@
 
       renderBonusTable();
     } catch(e) {
-      document.getElementById('bon-error-msg').textContent = 'Error: ' + e.message;
-      document.getElementById('bon-error-msg').style.display = 'block';
+      if (!silent) {
+        document.getElementById('bon-error-msg').textContent = 'Error: ' + e.message;
+        document.getElementById('bon-error-msg').style.display = 'block';
+      }
     } finally {
-      document.getElementById('bon-loading').style.display = 'none';
-      document.getElementById('bon-table-wrapper').style.display = '';
+      if (!silent) {
+        document.getElementById('bon-loading').style.display = 'none';
+        document.getElementById('bon-table-wrapper').style.display = '';
+      }
     }
   }
 
   // ── Load all data ──────────────────────────────────────────────────────
-  async function loadAllData() {
+  async function loadAllData(silent = false) {
     const tasks = [];
-    if (SHOW_SALES)     tasks.push(loadSalesData());
-    if (SHOW_RETENTION) tasks.push(loadBonusData());
+    if (SHOW_SALES)     tasks.push(loadSalesData(silent));
+    if (SHOW_RETENTION) tasks.push(loadBonusData(silent));
     await Promise.all(tasks);
   }
 
@@ -1738,7 +1750,7 @@
     const today = new Date().toISOString().split('T')[0];
     const dt = document.getElementById('date-to').value;
     updateSyncBar();
-    if (dt === today) loadAllData();
+    if (dt === today) loadAllData(true);
   }, 60000);
 </script>
 

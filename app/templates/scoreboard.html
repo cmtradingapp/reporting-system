@@ -828,9 +828,9 @@
   }
 
   // ── Combined load ──────────────────────────────────────────────────────
-  function loadAll() {
-    if (SHOW_SALES)     loadData();
-    if (SHOW_RETENTION) loadRetentionData();
+  function loadAll(silent = false) {
+    if (SHOW_SALES)     loadData(silent);
+    if (SHOW_RETENTION) loadRetentionData(silent);
     try {
       const dt = document.getElementById('date-to') ? document.getElementById('date-to').value : null;
       loadLiveEquity(dt);
@@ -838,14 +838,16 @@
   }
 
   // ── API fetch + render (Sales) ─────────────────────────────────────────
-  async function loadData() {
+  async function loadData(silent = false) {
     const df = document.getElementById('date-from').value;
     const dt = document.getElementById('date-to').value;
     if (!df || !dt) return;
 
-    document.getElementById('loading').style.display = 'block';
-    document.getElementById('table-wrapper').style.display = 'none';
-    document.getElementById('error-msg').style.display = 'none';
+    if (!silent) {
+      document.getElementById('loading').style.display = 'block';
+      document.getElementById('table-wrapper').style.display = 'none';
+      document.getElementById('error-msg').style.display = 'none';
+    }
 
     try {
       const res = await fetch(`/api/performance?date_from=${df}&date_to=${dt}`);
@@ -880,11 +882,15 @@
       populateFilterDropdowns();
       renderTable();
     } catch(e) {
-      document.getElementById('error-msg').textContent = 'Error: ' + e.message;
-      document.getElementById('error-msg').style.display = 'block';
+      if (!silent) {
+        document.getElementById('error-msg').textContent = 'Error: ' + e.message;
+        document.getElementById('error-msg').style.display = 'block';
+      }
     } finally {
-      document.getElementById('loading').style.display = 'none';
-      document.getElementById('table-wrapper').style.display = '';
+      if (!silent) {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('table-wrapper').style.display = '';
+      }
     }
   }
 
@@ -1350,14 +1356,16 @@
   }
 
   // ── Retention API fetch ────────────────────────────────────────────────
-  async function loadRetentionData() {
+  async function loadRetentionData(silent = false) {
     const df = document.getElementById('date-from').value;
     const dt = document.getElementById('date-to').value;
     if (!df || !dt) return;
 
-    document.getElementById('ret-loading').style.display = 'block';
-    document.getElementById('ret-table-wrapper').style.display = 'none';
-    document.getElementById('ret-error-msg').style.display = 'none';
+    if (!silent) {
+      document.getElementById('ret-loading').style.display = 'block';
+      document.getElementById('ret-table-wrapper').style.display = 'none';
+      document.getElementById('ret-error-msg').style.display = 'none';
+    }
 
     try {
       const res = await fetch(`/api/performance/retention?date_from=${df}&date_to=${dt}`);
@@ -1408,11 +1416,15 @@
         const wdLMEl = document.getElementById('stat-wd-left-mob'); if (wdLMEl) wdLMEl.textContent = wd_left;
       }
     } catch(e) {
-      document.getElementById('ret-error-msg').textContent = 'Error: ' + e.message;
-      document.getElementById('ret-error-msg').style.display = 'block';
+      if (!silent) {
+        document.getElementById('ret-error-msg').textContent = 'Error: ' + e.message;
+        document.getElementById('ret-error-msg').style.display = 'block';
+      }
     } finally {
-      document.getElementById('ret-loading').style.display = 'none';
-      document.getElementById('ret-table-wrapper').style.display = '';
+      if (!silent) {
+        document.getElementById('ret-loading').style.display = 'none';
+        document.getElementById('ret-table-wrapper').style.display = '';
+      }
     }
   }
 
@@ -1950,7 +1962,7 @@
     const dt = document.getElementById('date-to').value;
     updateSyncBar();
     loadLiveEquity(dt);
-    if (dt === today) loadAll();
+    if (dt === today) loadAll(true);
   }, 60000);
 </script>
 
