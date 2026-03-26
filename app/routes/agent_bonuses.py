@@ -411,13 +411,16 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
                 "target_ftc":         target_ftc,
                 "ftc_count":          ftc_count,
                 "ftd100_count":       ftd100_count,
+                "ftd100_full_count":  ftd100_full_count,
+                "ftd100_half_count":  ftd100_half_count,
                 "ftc_net_usd":        ftc_net_usd,
                 "total_sales_net":    total_sales_net,
-                "basic_bonus":        basic_bonus,
+                "basic_bonus":        round(basic_bonus, 2),
                 "sales_target_bonus": sales_target_bonus,
                 "ftd_amount_bonus":   ftd_amount_bonus,
-                "total_sales_bonus":  total_sales_bonus,
+                "total_sales_bonus":  round(total_sales_bonus, 2),
                 "target_pct":         round(target_pct, 6) if target_pct is not None else None,
+                "multiplier":         multiplier,
             })
 
         _result = {"rows": data}
