@@ -99,12 +99,7 @@ def ensure_table():
         ALTER TABLE accounts ALTER COLUMN gender            TYPE VARCHAR(100);
         ALTER TABLE accounts ALTER COLUMN customer_language TYPE VARCHAR(100);
         ALTER TABLE accounts ALTER COLUMN country_iso       TYPE VARCHAR(100);
-        ALTER TABLE accounts ADD COLUMN IF NOT EXISTS classification_int SMALLINT
-            GENERATED ALWAYS AS (
-                CASE WHEN sales_client_potential ~ '^[0-9]+(\.[0-9]+)?$'
-                     THEN sales_client_potential::numeric::int
-                     ELSE NULL END
-            ) STORED;
+        ALTER TABLE accounts ADD COLUMN IF NOT EXISTS classification_int SMALLINT;
         CREATE INDEX IF NOT EXISTS idx_accounts_classification_int ON accounts (classification_int);
 
         CREATE TABLE IF NOT EXISTS sync_log (
@@ -676,8 +671,18 @@ def cleanup_accounts():
         conn.close()
 
 
+def _to_classification_int(v):
+    if v is None:
+        return None
+    try:
+        i = int(float(str(v).strip()))
+        return i if 1 <= i <= 10 else None
+    except (ValueError, TypeError, AttributeError):
+        return None
+
+
 def upsert_accounts(df: pd.DataFrame):
-    cols = [
+    src_cols = [
         "accountid", "is_test_account", "first_name", "last_name", "full_name",
         "email", "gender", "customer_language", "country_iso", "campaign",
         "campaign_code_legacy", "client_source", "original_affiliate",
@@ -694,8 +699,9 @@ def upsert_accounts(df: pd.DataFrame):
         "client_qualification_date", "segmentation", "google_uid", "birth_date",
         "customer_id", "regulation", "sales_client_potential",
     ]
+    cols = src_cols + ["classification_int"]
     rows = [
-        tuple(_clean(row.get(c)) for c in cols)
+        tuple(_clean(row.get(c)) for c in src_cols) + (_to_classification_int(row.get("sales_client_potential")),)
         for _, row in df.iterrows()
     ]
     update_cols = [c for c in cols if c != "accountid"]
@@ -737,6 +743,32 @@ def insert_records(df: pd.DataFrame):
         with conn.cursor() as cur:
             execute_values(cur, sql, rows)
         conn.commit()
+    finally:
+        conn.close()
+
+
+def backfill_classification_int():
+    """One-time backfill: compute classification_int for all rows where it is NULL.
+    Runs in a background thread at startup — safe to fail.
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE accounts
+                SET classification_int = CASE
+                    WHEN sales_client_potential ~ '^[0-9]+(\\.[0-9]+)?$'
+                         AND sales_client_potential::numeric::int BETWEEN 1 AND 10
+                    THEN sales_client_potential::numeric::int
+                    ELSE NULL
+                END
+                WHERE classification_int IS NULL
+            """)
+        conn.commit()
+        print("[backfill_classification_int] done")
+    except Exception as e:
+        conn.rollback()
+        print(f"[backfill_classification_int] error: {e}")
     finally:
         conn.close()
 
