@@ -55,13 +55,16 @@ _country_map_cache = None
 
 def _get_country_map() -> dict:
     global _country_map_cache
-    if _country_map_cache is None:
-        try:
-            from app.db.mssql_conn import get_country_map
-            _country_map_cache = get_country_map()
-        except Exception:
-            _country_map_cache = {}
-    return _country_map_cache
+    if _country_map_cache:          # already loaded and non-empty — use it
+        return _country_map_cache
+    try:
+        from app.db.mssql_conn import get_country_map
+        result = get_country_map()
+        if result:                  # only cache if MSSQL returned data
+            _country_map_cache = result
+        return result or {}
+    except Exception:
+        return {}                   # don't cache on failure — retry next call
 
 
 @router.get("/campaign-performance", response_class=HTMLResponse)
@@ -500,9 +503,9 @@ def _camp_table_calc(
             cmap = _get_country_map()
             for row in merged.values():
                 if group1 == "country" and row.get("g1") and row["g1"] != "(Unassigned)":
-                    row["g1"] = cmap.get(row["g1"].upper(), row["g1"])
+                    row["g1"] = cmap.get(row["g1"].strip().upper(), row["g1"])
                 if group2 == "country" and row.get("g2") and row["g2"] != "(Unassigned)":
-                    row["g2"] = cmap.get(row["g2"].upper(), row["g2"])
+                    row["g2"] = cmap.get(row["g2"].strip().upper(), row["g2"])
 
         def _cr(num, den):
             return round(num / den * 100, 2) if den else 0.0
