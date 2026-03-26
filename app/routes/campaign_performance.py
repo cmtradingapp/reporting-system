@@ -305,12 +305,26 @@ async def campaign_performance_table_api(
                 "traders": traders,
             })
 
+        def _cr(num, den):
+            return round(num / den * 100, 2) if den else 0.0
+
+        def _add_cr(row):
+            row["cr_lead_to_live"] = _cr(row["live_accounts"], row["leads"])
+            row["cr_live_to_ftd"]  = _cr(row["ftd"],           row["live_accounts"])
+            row["cr_lead_to_ftc"]  = _cr(row["ftc"],           row["leads"])
+            row["cr_live_to_ftc"]  = _cr(row["ftc"],           row["live_accounts"])
+            row["cr_ftd_to_ftc"]   = _cr(row["ftc"],           row["ftd"])
+            return row
+
+        for row in merged.values():
+            _add_cr(row)
+
         if has_period:
             rows = sorted(merged.values(), key=lambda r: (r["g1"] or "", r["g2"] or "", r["period"] or ""))
         else:
             rows = sorted(merged.values(), key=lambda r: r["deposits"], reverse=True)
 
-        totals = {
+        totals = _add_cr({
             "leads":         sum(r["leads"] for r in rows),
             "live_accounts": sum(r["live_accounts"] for r in rows),
             "ftd":           sum(r["ftd"] for r in rows),
@@ -319,7 +333,7 @@ async def campaign_performance_table_api(
             "withdrawals":   round(sum(r["withdrawals"] for r in rows), 2),
             "net_deposits":  round(sum(r["net_deposits"] for r in rows), 2),
             "traders":       sum(r["traders"] for r in rows),
-        }
+        })
 
         _result = {
             "rows":         rows,

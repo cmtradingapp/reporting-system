@@ -578,11 +578,22 @@
       <th class="text-end" onclick="tblSort('withdrawals')" style="cursor:pointer;">Withdrawals <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
       <th class="text-end" onclick="tblSort('net_deposits')" style="cursor:pointer;">Net Dep <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
       <th class="text-end" onclick="tblSort('traders')" style="cursor:pointer;">Traders <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+      <th class="text-end" onclick="tblSort('cr_lead_to_live')" style="cursor:pointer;white-space:nowrap;">CR% Lead→Live <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+      <th class="text-end" onclick="tblSort('cr_live_to_ftd')" style="cursor:pointer;white-space:nowrap;">CR% Live→FTD <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+      <th class="text-end" onclick="tblSort('cr_lead_to_ftc')" style="cursor:pointer;white-space:nowrap;">CR% Lead→FTC <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+      <th class="text-end" onclick="tblSort('cr_live_to_ftc')" style="cursor:pointer;white-space:nowrap;">CR% Live→FTC <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+      <th class="text-end" onclick="tblSort('cr_ftd_to_ftc')" style="cursor:pointer;white-space:nowrap;">CR% FTD→FTC <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
     </tr>`;
     document.getElementById('tbl-thead').innerHTML = html;
   }
 
   // ── Table render ─────────────────────────────────────────────────────────
+  function fmtCr(v) {
+    if (v === null || v === undefined) return '<span style="color:#484f58;">—</span>';
+    const color = v > 0 ? '#c9d1d9' : '#484f58';
+    return `<span style="color:${color};">${v.toFixed(2)}%</span>`;
+  }
+
   function metricCells(r, isTotal) {
     const net = r.net_deposits ?? 0;
     const style = isTotal ? 'font-weight:600;' : '';
@@ -596,6 +607,11 @@
       <td class="text-end" style="color:#f85149;${style}">${fmtMoney(r.withdrawals)}</td>
       <td class="text-end" style="color:${net >= 0 ? '#3fb950' : '#f85149'};${style}">${fmtMoney(net)}</td>
       <td class="text-end" style="${style}">${fmtN(r.traders)}</td>
+      <td class="text-end" style="${style}">${fmtCr(r.cr_lead_to_live)}</td>
+      <td class="text-end" style="${style}">${fmtCr(r.cr_live_to_ftd)}</td>
+      <td class="text-end" style="${style}">${fmtCr(r.cr_lead_to_ftc)}</td>
+      <td class="text-end" style="${style}">${fmtCr(r.cr_live_to_ftc)}</td>
+      <td class="text-end" style="${style}">${fmtCr(r.cr_ftd_to_ftc)}</td>
     `;
   }
 
@@ -762,7 +778,7 @@
     if (hasG1) headers.push(g1Label);
     if (hasG2) headers.push(g2Label);
     if (hasPer) headers.push(perLabel);
-    headers.push('Leads','Live Accounts','FTD','FTC','Deposits','Withdrawals','Net Deposits','Traders');
+    headers.push('Leads','Live Accounts','FTD','FTC','Deposits','Withdrawals','Net Deposits','Traders','CR% Lead→Live','CR% Live→FTD','CR% Lead→FTC','CR% Live→FTC','CR% FTD→FTC');
 
     const esc = v => '"' + String(v ?? '').replace(/"/g,'""') + '"';
     const lines = [headers.join(',')];
@@ -772,7 +788,8 @@
       if (hasG1) cols.push(esc(r.g1));
       if (hasG2) cols.push(esc(r.g2));
       if (hasPer) cols.push(esc(fmtPeriod(r.period, per)));
-      cols.push(r.leads, r.live_accounts, r.ftd, r.ftc, r.deposits, r.withdrawals, r.net_deposits, r.traders);
+      cols.push(r.leads, r.live_accounts, r.ftd, r.ftc, r.deposits, r.withdrawals, r.net_deposits, r.traders,
+                r.cr_lead_to_live, r.cr_live_to_ftd, r.cr_lead_to_ftc, r.cr_live_to_ftc, r.cr_ftd_to_ftc);
       lines.push(cols.join(','));
     });
 
