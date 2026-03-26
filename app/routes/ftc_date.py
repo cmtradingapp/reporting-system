@@ -87,11 +87,11 @@ async def ftc_date_api(
         team_clause = "AND u.department = %(team)s"
         params["team"] = team
     if classification == "Low Quality":
-        classification_clause = "AND cc.classification_value BETWEEN 1 AND 5"
+        classification_clause = "AND cc.classification_category = 'Low Quality'"
     elif classification == "High Quality":
-        classification_clause = "AND cc.classification_value BETWEEN 6 AND 10"
+        classification_clause = "AND cc.classification_category = 'High Quality'"
     elif classification == "No segmentation":
-        classification_clause = "AND (cc.accountid IS NULL OR cc.classification_value IS NULL OR cc.classification_value NOT BETWEEN 1 AND 10)"
+        classification_clause = "AND (cc.accountid IS NULL OR cc.classification_category = 'No segmentation')"
 
     sql = """
         WITH ftc_groups AS (

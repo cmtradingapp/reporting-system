@@ -309,11 +309,11 @@ def _build_filter_clauses(
     if f_classification:
         needs_cc_join = True
         if f_classification == "High Quality":
-            clauses.append("AND cc.classification_value BETWEEN 6 AND 10")
+            clauses.append("AND cc.classification_category = 'High Quality'")
         elif f_classification == "Low Quality":
-            clauses.append("AND cc.classification_value BETWEEN 1 AND 5")
+            clauses.append("AND cc.classification_category = 'Low Quality'")
         else:  # No segmentation
-            clauses.append("AND (cc.accountid IS NULL OR cc.classification_value IS NULL OR cc.classification_value NOT BETWEEN 1 AND 10)")
+            clauses.append("AND (cc.accountid IS NULL OR cc.classification_category = 'No segmentation')")
 
     if ftc_groups_list:
         ftc_conds = [FTC_GROUP_RANGES[g] for g in ftc_groups_list if g in FTC_GROUP_RANGES]
