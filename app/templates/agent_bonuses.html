@@ -890,25 +890,6 @@
     return `<span style="color:${color};font-weight:${fw};">${fmt}</span>`;
   }
 
-  // Basic bonus cell with split breakdown
-  function basicBonusHtml(r) {
-    const val = r.basic_bonus;
-    if (val === null || val === undefined) return `<span style="color:#484f58;">—</span>`;
-    const color = val > 0 ? '#3fb950' : '#8b949e';
-    const fmt = val >= 1000 ? '$' + Math.round(val).toLocaleString('en-US') : '$' + Math.round(val);
-    const full = r.ftd100_full_count ?? 0;
-    const half = r.ftd100_half_count ?? 0;
-    const rate = r.multiplier ?? 0;
-    let breakdown = '';
-    if (rate > 0 && (full > 0 || half > 0)) {
-      const parts = [];
-      if (full > 0) parts.push(`${full}×$${rate}`);
-      if (half > 0) parts.push(`${half}×$${rate/2}`);
-      breakdown = `<div style="font-size:0.72rem;color:#484f58;margin-top:2px;">${parts.join(' + ')}</div>`;
-    }
-    return `<span style="color:${color};font-weight:600;">${fmt}</span>${breakdown}`;
-  }
-
   // ── Sort value helpers ─────────────────────────────────────────────────
   function bonSortVal(o) {
     const m = {
@@ -1153,7 +1134,7 @@
           <td class="text-center">${countHtml(r.ftd100_count)}</td>
           <td class="text-center">${netHtml(r.ftc_net_usd)}</td>
           <td class="text-center">${netHtml(r.total_sales_net)}</td>
-          <td class="text-center">${basicBonusHtml(r)}</td>
+          <td class="text-center">${bonusDollarHtml(r.basic_bonus)}</td>
           <td class="text-center">${bonusDollarHtml(r.sales_target_bonus)}</td>
           <td class="text-center">${bonusDollarHtml(r.ftd_amount_bonus)}</td>
           <td class="text-center">${bonusDollarHtml(r.total_sales_bonus)}</td>
