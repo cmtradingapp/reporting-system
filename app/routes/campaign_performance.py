@@ -55,16 +55,20 @@ _country_map_cache = None
 
 def _get_country_map() -> dict:
     global _country_map_cache
-    if _country_map_cache:          # already loaded and non-empty — use it
+    if _country_map_cache:
         return _country_map_cache
     try:
         from app.db.mssql_conn import get_country_map
         result = get_country_map()
-        if result:                  # only cache if MSSQL returned data
+        if result:
             _country_map_cache = result
+            print(f"[country_map] loaded {len(result)} countries OK")
+        else:
+            print("[country_map] MSSQL returned empty result")
         return result or {}
-    except Exception:
-        return {}                   # don't cache on failure — retry next call
+    except Exception as e:
+        print(f"[country_map] ERROR: {e}")
+        return {}
 
 
 @router.get("/campaign-performance", response_class=HTMLResponse)
