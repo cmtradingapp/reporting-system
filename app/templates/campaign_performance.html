@@ -51,12 +51,13 @@
     .section-title { font-size: 1rem; font-weight: 600; color: #c9d1d9; border-left: 3px solid #238636; padding-left: 10px; }
 
     /* Table */
-    .table { color: #e0e0e0; }
+    .table { color: #e0e0e0; --bs-table-bg: transparent; }
     .table thead th { background-color: #21262d; color: #8b949e; border-color: #30363d; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.8px; cursor: pointer; user-select: none; white-space: nowrap; padding: 8px 10px; }
     .table thead th:hover { color: #c9d1d9; }
-    .table tbody tr { border-color: #21262d; }
-    .table tbody tr:hover { background-color: rgba(255,255,255,0.025); }
-    .table td { border-color: #21262d; vertical-align: middle; font-size: 0.85rem; padding: 7px 10px; }
+    .table tbody tr { border-color: #21262d; background-color: #0f1117; }
+    .table tbody tr:hover { background-color: #1c2128; }
+    .table tbody tr:hover td { background-color: #1c2128; }
+    .table td { border-color: #21262d; vertical-align: middle; font-size: 0.85rem; padding: 7px 10px; color: #e0e0e0; background-color: #0f1117; }
     .tbl-scroll { overflow-x: auto; overflow-y: auto; max-height: 65vh; -webkit-overflow-scrolling: touch; }
     #perf-table thead tr { position: sticky; top: 0; z-index: 2; }
     #perf-table tfoot tr { position: sticky; bottom: 0; z-index: 2; }
