@@ -75,10 +75,21 @@
     #filter-toggle:hover { background: rgba(255,255,255,0.03); }
     #filter-body { border-top: 1px solid #30363d; padding: 12px 16px 14px; }
 
-    /* Searchable filter inputs */
-    .filter-text { background-color: #21262d; border: 1px solid #30363d; color: #e0e0e0; border-radius: 6px; padding: 5px 10px; font-size: 0.82rem; width: 155px; }
-    .filter-text:focus { outline: none; border-color: #238636; box-shadow: 0 0 0 2px rgba(35,134,54,0.2); }
-    .filter-text::placeholder { color: #484f58; }
+    /* Searchable dropdown */
+    .sdd-wrap { position: relative; display: inline-block; }
+    .sdd-btn { background-color: #21262d; border: 1px solid #30363d; color: #484f58; border-radius: 6px; padding: 5px 26px 5px 10px; font-size: 0.82rem; width: 155px; cursor: pointer; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; position: relative; user-select: none; line-height: 1.4; }
+    .sdd-btn::after { content: '▾'; position: absolute; right: 8px; top: 50%; transform: translateY(-50%); color: #8b949e; font-size: 0.7rem; pointer-events: none; }
+    .sdd-btn.has-value { border-color: #238636; color: #e0e0e0; }
+    .sdd-panel { display: none; position: absolute; top: calc(100% + 4px); left: 0; z-index: 600; background: #1c2128; border: 1px solid #30363d; border-radius: 8px; min-width: 200px; width: max-content; max-width: 300px; box-shadow: 0 8px 24px rgba(0,0,0,0.55); }
+    .sdd-panel.open { display: block; }
+    .sdd-search { width: 100%; background: #21262d; border: none; border-bottom: 1px solid #30363d; color: #e0e0e0; padding: 7px 10px; font-size: 0.82rem; border-radius: 8px 8px 0 0; outline: none; box-sizing: border-box; }
+    .sdd-search::placeholder { color: #484f58; }
+    .sdd-list { max-height: 200px; overflow-y: auto; padding: 4px 0; }
+    .sdd-list::-webkit-scrollbar { width: 4px; } .sdd-list::-webkit-scrollbar-track { background: transparent; } .sdd-list::-webkit-scrollbar-thumb { background: #30363d; border-radius: 2px; }
+    .sdd-item { padding: 6px 12px; font-size: 0.82rem; color: #e0e0e0; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sdd-item:hover, .sdd-item.focused { background: #21262d; }
+    .sdd-item.selected { color: #3fb950; }
+    .sdd-item.sdd-all { color: #8b949e; }
     .group-cb-wrap { color: #8b949e; font-size: 0.78rem; cursor: pointer; display: flex; align-items: center; gap: 4px; }
     .group-cb-wrap input[type=checkbox] { accent-color: #238636; cursor: pointer; width: 13px; height: 13px; }
     .filter-row-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.8px; color: #8b949e; margin-bottom: 4px; display: block; }
@@ -267,33 +278,45 @@
     <div class="d-flex flex-wrap align-items-end gap-3" style="margin-top:10px;padding-top:10px;border-top:1px solid #21262d;">
       <div style="display:flex;flex-direction:column;">
         <span class="filter-row-label">Marketing Group</span>
-        <input class="filter-text" id="f-mkt-group" list="dl-mkt-group" placeholder="All" autocomplete="off" />
-        <datalist id="dl-mkt-group"></datalist>
+        <div class="sdd-wrap" id="f-mkt-group">
+          <button class="sdd-btn" type="button">All</button>
+          <div class="sdd-panel"><input class="sdd-search" placeholder="Search…" autocomplete="off"><div class="sdd-list"></div></div>
+        </div>
       </div>
       <div style="display:flex;flex-direction:column;">
         <span class="filter-row-label">Campaign Name</span>
-        <input class="filter-text" id="f-campaign-name" list="dl-campaign-name" placeholder="All" autocomplete="off" />
-        <datalist id="dl-campaign-name"></datalist>
+        <div class="sdd-wrap" id="f-campaign-name">
+          <button class="sdd-btn" type="button">All</button>
+          <div class="sdd-panel"><input class="sdd-search" placeholder="Search…" autocomplete="off"><div class="sdd-list"></div></div>
+        </div>
       </div>
       <div style="display:flex;flex-direction:column;">
         <span class="filter-row-label">Campaign Legacy ID</span>
-        <input class="filter-text" id="f-legacy-id" list="dl-legacy-id" placeholder="All" autocomplete="off" />
-        <datalist id="dl-legacy-id"></datalist>
+        <div class="sdd-wrap" id="f-legacy-id">
+          <button class="sdd-btn" type="button">All</button>
+          <div class="sdd-panel"><input class="sdd-search" placeholder="Search…" autocomplete="off"><div class="sdd-list"></div></div>
+        </div>
       </div>
       <div style="display:flex;flex-direction:column;">
         <span class="filter-row-label">Campaign Channel</span>
-        <input class="filter-text" id="f-channel" list="dl-channel" placeholder="All" autocomplete="off" />
-        <datalist id="dl-channel"></datalist>
+        <div class="sdd-wrap" id="f-channel">
+          <button class="sdd-btn" type="button">All</button>
+          <div class="sdd-panel"><input class="sdd-search" placeholder="Search…" autocomplete="off"><div class="sdd-list"></div></div>
+        </div>
       </div>
       <div style="display:flex;flex-direction:column;">
         <span class="filter-row-label">Campaign Sub-channel</span>
-        <input class="filter-text" id="f-sub-channel" list="dl-sub-channel" placeholder="All" autocomplete="off" />
-        <datalist id="dl-sub-channel"></datalist>
+        <div class="sdd-wrap" id="f-sub-channel">
+          <button class="sdd-btn" type="button">All</button>
+          <div class="sdd-panel"><input class="sdd-search" placeholder="Search…" autocomplete="off"><div class="sdd-list"></div></div>
+        </div>
       </div>
       <div style="display:flex;flex-direction:column;">
         <span class="filter-row-label">Original Affiliate</span>
-        <input class="filter-text" id="f-affiliate" list="dl-affiliate" placeholder="All" autocomplete="off" />
-        <datalist id="dl-affiliate"></datalist>
+        <div class="sdd-wrap" id="f-affiliate">
+          <button class="sdd-btn" type="button">All</button>
+          <div class="sdd-panel"><input class="sdd-search" placeholder="Search…" autocomplete="off"><div class="sdd-list"></div></div>
+        </div>
       </div>
       <div class="filter-sep" style="height:42px;"></div>
       <div style="display:flex;flex-direction:column;">
@@ -596,12 +619,12 @@
 
   // ── Table API fetch ──────────────────────────────────────────────────────
   function _getFilterParams() {
-    const fMktGroup    = (document.getElementById('f-mkt-group')?.value    || '').trim();
-    const fLegacyId    = (document.getElementById('f-legacy-id')?.value    || '').trim();
-    const fCampaignName= (document.getElementById('f-campaign-name')?.value|| '').trim();
-    const fChannel     = (document.getElementById('f-channel')?.value      || '').trim();
-    const fSubChannel  = (document.getElementById('f-sub-channel')?.value  || '').trim();
-    const fAffiliate   = (document.getElementById('f-affiliate')?.value    || '').trim();
+    const fMktGroup    = _sddGet('f-mkt-group');
+    const fLegacyId    = _sddGet('f-legacy-id');
+    const fCampaignName= _sddGet('f-campaign-name');
+    const fChannel     = _sddGet('f-channel');
+    const fSubChannel  = _sddGet('f-sub-channel');
+    const fAffiliate   = _sddGet('f-affiliate');
     const fClass       = (document.getElementById('f-classification')?.value || '');
     const allCbs       = document.querySelectorAll('.ftc-cb');
     const checkedCbs   = Array.from(allCbs).filter(cb => cb.checked).map(cb => cb.value);
@@ -979,15 +1002,84 @@
   document.getElementById('sel-group2').addEventListener('change', () => loadTable());
   document.getElementById('sel-period').addEventListener('change', () => loadTable());
 
-  // Campaign filter inputs + classification → reload table
-  ['f-mkt-group','f-legacy-id','f-campaign-name','f-channel','f-sub-channel','f-affiliate'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) {
-      // Reload only when user finishes typing (blur or Enter) or clears the field
-      el.addEventListener('change', () => loadTable());
-      el.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); loadTable(); } });
+  // ── Searchable dropdown (SDD) ────────────────────────────────────────────
+  const _sddRegistry = {};
+
+  function _sddInit(id, options) {
+    const wrap   = document.getElementById(id);
+    if (!wrap) return;
+    const btn    = wrap.querySelector('.sdd-btn');
+    const panel  = wrap.querySelector('.sdd-panel');
+    const search = wrap.querySelector('.sdd-search');
+    const list   = wrap.querySelector('.sdd-list');
+    let value    = '';
+    let opts     = options || [];
+    let focusIdx = -1;
+
+    function _render(filter) {
+      const q = (filter || '').toLowerCase();
+      const filtered = q ? opts.filter(o => o.toLowerCase().includes(q)) : opts;
+      focusIdx = -1;
+      list.innerHTML =
+        `<div class="sdd-item sdd-all" data-val="">All</div>` +
+        filtered.map(o => {
+          const esc = o.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+          return `<div class="sdd-item${o===value?' selected':''}" data-val="${esc}">${esc}</div>`;
+        }).join('');
+      list.querySelectorAll('.sdd-item').forEach(item => {
+        item.addEventListener('mousedown', e => {
+          e.preventDefault();
+          _select(item.dataset.val);
+          _close();
+          loadTable();
+        });
+      });
     }
+
+    function _select(val) {
+      value = val;
+      btn.textContent = val || 'All';
+      btn.classList.toggle('has-value', !!val);
+    }
+
+    function _open() {
+      // close any other open panels
+      document.querySelectorAll('.sdd-panel.open').forEach(p => { if (p !== panel) p.classList.remove('open'); });
+      _render('');
+      search.value = '';
+      panel.classList.add('open');
+      setTimeout(() => search.focus(), 0);
+    }
+
+    function _close() { panel.classList.remove('open'); focusIdx = -1; }
+
+    btn.addEventListener('click', e => { e.stopPropagation(); panel.classList.contains('open') ? _close() : _open(); });
+    panel.addEventListener('click', e => e.stopPropagation());
+    search.addEventListener('input', () => _render(search.value));
+    search.addEventListener('keydown', e => {
+      const items = list.querySelectorAll('.sdd-item');
+      if (e.key === 'ArrowDown') { e.preventDefault(); focusIdx = Math.min(focusIdx + 1, items.length - 1); items.forEach((el,i) => el.classList.toggle('focused', i === focusIdx)); items[focusIdx]?.scrollIntoView({block:'nearest'}); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); focusIdx = Math.max(focusIdx - 1, 0); items.forEach((el,i) => el.classList.toggle('focused', i === focusIdx)); items[focusIdx]?.scrollIntoView({block:'nearest'}); }
+      else if (e.key === 'Enter') { e.preventDefault(); if (focusIdx >= 0 && items[focusIdx]) { _select(items[focusIdx].dataset.val); _close(); loadTable(); } }
+      else if (e.key === 'Escape') { _close(); }
+    });
+
+    _sddRegistry[id] = {
+      getValue: () => value,
+      setOptions: (newOpts) => { opts = newOpts; },
+    };
+  }
+
+  function _sddGet(id) { return _sddRegistry[id]?.getValue() || ''; }
+
+  // Close all panels on outside click
+  document.addEventListener('click', () => {
+    document.querySelectorAll('.sdd-panel.open').forEach(p => p.classList.remove('open'));
   });
+
+  // Init all 6 dropdowns (empty options until API returns)
+  ['f-mkt-group','f-campaign-name','f-legacy-id','f-channel','f-sub-channel','f-affiliate'].forEach(id => _sddInit(id, []));
+
   document.getElementById('f-classification')?.addEventListener('change', () => loadTable());
   document.querySelectorAll('.ftc-cb').forEach(cb => cb.addEventListener('change', () => loadTable()));
 
@@ -996,23 +1088,18 @@
     loadTable();
   }
 
-  // ── Load filter options (populate datalists) ─────────────────────────────
+  // ── Load filter options (populate dropdowns) ──────────────────────────────
   async function loadFilterOptions() {
     try {
       const res = await fetch('/api/campaign-performance/filter-options');
       if (!res.ok) return;
       const d = await res.json();
-      const fill = (dlId, items) => {
-        const dl = document.getElementById(dlId);
-        if (!dl) return;
-        dl.innerHTML = items.map(v => `<option value="${v.replace(/"/g,'&quot;')}"></option>`).join('');
-      };
-      fill('dl-mkt-group',      d.marketing_groups    || []);
-      fill('dl-campaign-name',  d.campaign_names      || []);
-      fill('dl-legacy-id',      d.campaign_legacy_ids || []);
-      fill('dl-channel',        d.campaign_channels   || []);
-      fill('dl-sub-channel',    d.campaign_sub_channels || []);
-      fill('dl-affiliate',      d.original_affiliates || []);
+      _sddRegistry['f-mkt-group']?.setOptions(d.marketing_groups    || []);
+      _sddRegistry['f-campaign-name']?.setOptions(d.campaign_names  || []);
+      _sddRegistry['f-legacy-id']?.setOptions(d.campaign_legacy_ids || []);
+      _sddRegistry['f-channel']?.setOptions(d.campaign_channels     || []);
+      _sddRegistry['f-sub-channel']?.setOptions(d.campaign_sub_channels || []);
+      _sddRegistry['f-affiliate']?.setOptions(d.original_affiliates || []);
     } catch(e) {}
   }
   loadFilterOptions();
