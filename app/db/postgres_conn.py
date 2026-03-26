@@ -513,7 +513,7 @@ def ensure_table():
             campaign_channel            VARCHAR,
             campaign_sub_channel        VARCHAR,
             website                     VARCHAR,
-            active                      BOOLEAN,
+            active                      SMALLINT,
             start_date                  DATE,
             assigned_to                 VARCHAR,
             disable_email_verification  VARCHAR,
@@ -521,6 +521,7 @@ def ensure_table():
         );
         CREATE INDEX IF NOT EXISTS idx_campaigns_campaign_id ON campaigns (campaign_id);
         CREATE INDEX IF NOT EXISTS idx_campaigns_active      ON campaigns (active);
+        ALTER TABLE campaigns ALTER COLUMN active TYPE SMALLINT USING CASE WHEN active THEN 1 ELSE 0 END;
 
     """
     conn = get_connection()
