@@ -28,23 +28,15 @@
     .date-input:focus { outline: none; border-color: #238636; box-shadow: 0 0 0 2px rgba(35,134,54,0.2); }
     .date-input::-webkit-calendar-picker-indicator { filter: invert(0.7); cursor: pointer; }
 
+    /* Group selects */
+    .group-select { background-color: #21262d; border: 1px solid #30363d; color: #e0e0e0; border-radius: 6px; padding: 5px 10px; font-size: 0.82rem; cursor: pointer; }
+    .group-select:focus { outline: none; border-color: #238636; box-shadow: 0 0 0 2px rgba(35,134,54,0.2); }
+    .group-select option { background: #21262d; }
+
     /* Quick buttons */
     .quick-btn { background-color: #21262d; border: 1px solid #30363d; color: #8b949e; font-size: 0.78rem; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-weight: 600; letter-spacing: 0.5px; transition: all 0.15s; }
     .quick-btn:hover { background-color: #2d333a; color: #c9d1d9; border-color: #484f58; }
     .quick-btn.active-quick { background: linear-gradient(135deg,#1a4731,#238636); color: #3fb950; border-color: #238636; }
-
-    /* Custom searchable select */
-    .cs-wrap { position: relative; display: inline-block; }
-    .cs-trigger { background-color: #21262d; border: 1px solid #30363d; color: #e0e0e0; border-radius: 6px; padding: 4px 24px 4px 10px; font-size: 0.82rem; min-width: 130px; cursor: pointer; user-select: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23484f58'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-sizing: border-box; }
-    .cs-trigger:hover { border-color: #484f58; }
-    .cs-dropdown { display: none; position: absolute; top: calc(100% + 3px); left: 0; z-index: 1000; background: #21262d; border: 1px solid #30363d; border-radius: 6px; min-width: 170px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
-    .cs-dropdown.open { display: block; }
-    .cs-search { width: 100%; box-sizing: border-box; padding: 6px 8px; font-size: 0.8rem; background: #161b22; border: none; border-bottom: 1px solid #30363d; color: #e0e0e0; outline: none; border-radius: 6px 6px 0 0; }
-    .cs-search::placeholder { color: #484f58; }
-    .cs-optlist { max-height: 200px; overflow-y: auto; }
-    .cs-option { padding: 6px 10px; font-size: 0.82rem; color: #c9d1d9; cursor: pointer; }
-    .cs-option:hover { background: #30363d; }
-    .cs-option.selected { color: #388bfd; }
 
     /* Filter separator */
     .filter-sep { width: 1px; height: 28px; background-color: #30363d; margin: 0 6px; }
@@ -55,12 +47,21 @@
     .kpi-split .kpi-value { font-size: 1rem; }
     .kpi-label { font-size: 0.68rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.8px; margin-top: 3px; }
 
+    /* Section title */
+    .section-title { font-size: 1rem; font-weight: 600; color: #c9d1d9; border-left: 3px solid #238636; padding-left: 10px; }
+
+    /* Table */
+    .table { color: #e0e0e0; }
+    .table thead th { background-color: #21262d; color: #8b949e; border-color: #30363d; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.8px; cursor: pointer; user-select: none; white-space: nowrap; padding: 8px 10px; }
+    .table thead th:hover { color: #c9d1d9; }
+    .table tbody tr { border-color: #21262d; }
+    .table tbody tr:hover { background-color: rgba(255,255,255,0.025); }
+    .table td { border-color: #21262d; vertical-align: middle; font-size: 0.85rem; padding: 7px 10px; }
+    .tbl-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
     /* Spinner */
     #loading { display: none; text-align: center; padding: 60px; color: #8b949e; }
     #error-msg { display: none; }
-
-    /* Section title */
-    .section-title { font-size: 1rem; font-weight: 600; color: #c9d1d9; border-left: 3px solid #238636; padding-left: 10px; }
 
     /* Sidebar user block */
     .sidebar-user { padding: 14px 20px; border-top: 1px solid #30363d; }
@@ -154,7 +155,7 @@
     </div>
     <div id="filter-body">
 
-    <!-- Row 1: Year + Month + Office -->
+    <!-- Row 1: Year + Month -->
     <div class="d-flex flex-wrap align-items-center gap-1 mb-3">
       <button class="period-btn year-btn" data-year="2024">2024</button>
       <button class="period-btn year-btn" data-year="2025">2025</button>
@@ -174,8 +175,8 @@
       <button class="period-btn month-btn" data-month="12">Dec</button>
     </div>
 
-    <!-- Row 2: Date range -->
-    <div class="d-flex flex-wrap align-items-center gap-2">
+    <!-- Row 2: Date range + quick buttons -->
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
       <span class="text-muted small">From</span>
       <input type="date" id="date-from" class="date-input" />
       <span class="text-muted small">To</span>
@@ -189,12 +190,34 @@
       </button>
     </div>
 
+    <!-- Row 3: Grouping -->
+    <div class="d-flex flex-wrap align-items-center gap-2">
+      <span class="text-muted small">Group By</span>
+      <select id="sel-group1" class="group-select">
+        <option value="none">— None —</option>
+        <option value="campaign_name">Campaign Name</option>
+        <option value="campaign_legacy_id">Campaign Legacy ID</option>
+        <option value="campaign_channel">Campaign Channel</option>
+        <option value="campaign_sub_channel">Campaign Sub-channel</option>
+        <option value="original_affiliate">Original Affiliate</option>
+      </select>
+      <span class="text-muted small ms-2">Then By</span>
+      <select id="sel-group2" class="group-select">
+        <option value="none">— None —</option>
+        <option value="campaign_name">Campaign Name</option>
+        <option value="campaign_legacy_id">Campaign Legacy ID</option>
+        <option value="campaign_channel">Campaign Channel</option>
+        <option value="campaign_sub_channel">Campaign Sub-channel</option>
+        <option value="original_affiliate">Original Affiliate</option>
+      </select>
+    </div>
+
     </div><!-- /filter-body -->
   </div>
 
   <!-- KPI Cards — Row 1 -->
   <div class="row g-2 mb-2">
-    <div class="col-6 col-md-3" id="kpi-leads">
+    <div class="col-6 col-md-3">
       <div class="kpi-card text-center">
         <div class="kpi-split" style="display:flex;justify-content:center;align-items:center;gap:10px;">
           <div>
@@ -209,7 +232,7 @@
         </div>
       </div>
     </div>
-    <div class="col-6 col-md-3" id="kpi-live">
+    <div class="col-6 col-md-3">
       <div class="kpi-card text-center">
         <div class="kpi-split" style="display:flex;justify-content:center;align-items:center;gap:10px;">
           <div>
@@ -224,7 +247,7 @@
         </div>
       </div>
     </div>
-    <div class="col-6 col-md-3" id="kpi-ftd">
+    <div class="col-6 col-md-3">
       <div class="kpi-card text-center">
         <div class="kpi-split" style="display:flex;justify-content:center;align-items:center;gap:10px;">
           <div>
@@ -239,7 +262,7 @@
         </div>
       </div>
     </div>
-    <div class="col-6 col-md-3" id="kpi-ftc">
+    <div class="col-6 col-md-3">
       <div class="kpi-card text-center">
         <div class="kpi-split" style="display:flex;justify-content:center;align-items:center;gap:10px;">
           <div>
@@ -258,25 +281,25 @@
 
   <!-- KPI Cards — Row 2 -->
   <div class="row g-2 mb-4">
-    <div class="col-6 col-md-3" id="kpi-deposits">
+    <div class="col-6 col-md-3">
       <div class="kpi-card text-center">
         <div class="kpi-value" style="color:#3fb950;" id="stat-deposits">—</div>
         <div class="kpi-label">Deposits $</div>
       </div>
     </div>
-    <div class="col-6 col-md-3" id="kpi-withdrawals">
+    <div class="col-6 col-md-3">
       <div class="kpi-card text-center">
         <div class="kpi-value" style="color:#f85149;" id="stat-withdrawals">—</div>
         <div class="kpi-label">Withdrawals $</div>
       </div>
     </div>
-    <div class="col-6 col-md-3" id="kpi-net">
+    <div class="col-6 col-md-3">
       <div class="kpi-card text-center">
         <div class="kpi-value" style="color:#3fb950;" id="stat-net-deposits">—</div>
         <div class="kpi-label">Net Deposits $</div>
       </div>
     </div>
-    <div class="col-6 col-md-3" id="kpi-traders">
+    <div class="col-6 col-md-3">
       <div class="kpi-card text-center">
         <div class="kpi-value" style="color:#d29922;" id="stat-traders">—</div>
         <div class="kpi-label">No. of Traders</div>
@@ -284,12 +307,71 @@
     </div>
   </div>
 
-  <!-- Loading / Error -->
+  <!-- Loading / Error (KPI) -->
   <div id="loading" style="text-align:center;padding:40px;color:#8b949e;">
     <div class="spinner-border text-success mb-3" style="width:2rem;height:2rem;"></div>
     <div class="small">Loading...</div>
   </div>
   <div id="error-msg" class="text-danger text-center p-4 small"></div>
+
+  <!-- Table Section -->
+  <div id="tbl-section">
+    <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
+      <span class="section-title" id="tbl-title">Performance Table</span>
+      <div class="d-flex gap-2 flex-wrap align-items-center">
+        <div id="tbl-expand-btns" style="display:none;gap:6px;" class="d-flex">
+          <button onclick="expandAll()" class="quick-btn"><i class="bi bi-arrows-expand me-1"></i>Expand All</button>
+          <button onclick="collapseAll()" class="quick-btn"><i class="bi bi-arrows-collapse me-1"></i>Collapse All</button>
+        </div>
+        <button onclick="exportTbl()" class="quick-btn" style="background:linear-gradient(135deg,#1a4731,#238636);color:#3fb950;border-color:#238636;">
+          <i class="bi bi-file-earmark-excel me-1"></i>Export
+        </button>
+      </div>
+    </div>
+    <div class="card p-0">
+      <div class="tbl-scroll">
+        <table class="table table-sm mb-0" id="perf-table">
+          <thead>
+            <tr>
+              <th onclick="tblSort('g1')" style="min-width:160px;" id="th-group">
+                Group <i class="bi bi-arrow-down-up" style="font-size:0.65rem;" id="si-g1"></i>
+              </th>
+              <th onclick="tblSort('leads')" class="text-end">
+                Leads <i class="bi bi-arrow-down-up" style="font-size:0.65rem;" id="si-leads"></i>
+              </th>
+              <th onclick="tblSort('live_accounts')" class="text-end">
+                Live Accs <i class="bi bi-arrow-down-up" style="font-size:0.65rem;" id="si-live_accounts"></i>
+              </th>
+              <th onclick="tblSort('ftd')" class="text-end">
+                FTD <i class="bi bi-arrow-down-up" style="font-size:0.65rem;" id="si-ftd"></i>
+              </th>
+              <th onclick="tblSort('ftc')" class="text-end">
+                FTC <i class="bi bi-arrow-down-up" style="font-size:0.65rem;" id="si-ftc"></i>
+              </th>
+              <th onclick="tblSort('deposits')" class="text-end">
+                Deposits <i class="bi bi-arrow-down-up" style="font-size:0.65rem;" id="si-deposits"></i>
+              </th>
+              <th onclick="tblSort('withdrawals')" class="text-end">
+                Withdrawals <i class="bi bi-arrow-down-up" style="font-size:0.65rem;" id="si-withdrawals"></i>
+              </th>
+              <th onclick="tblSort('net_deposits')" class="text-end">
+                Net Dep <i class="bi bi-arrow-down-up" style="font-size:0.65rem;" id="si-net_deposits"></i>
+              </th>
+              <th onclick="tblSort('traders')" class="text-end">
+                Traders <i class="bi bi-arrow-down-up" style="font-size:0.65rem;" id="si-traders"></i>
+              </th>
+            </tr>
+          </thead>
+          <tbody id="tbl-tbody">
+            <tr><td colspan="9" class="text-center text-muted py-4">
+              <div class="spinner-border spinner-border-sm text-secondary me-2"></div>Loading…
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div id="tbl-error" class="text-danger text-center p-3 small" style="display:none;"></div>
+    </div>
+  </div>
 
 </div>
 </div>
@@ -321,6 +403,14 @@
     if (v === null || v === undefined) return '—';
     return (v < 0 ? '-$' : '$') + Math.round(Math.abs(v)).toLocaleString('en-US');
   }
+  function escHtml(s) {
+    if (s == null) return '—';
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function escAttr(s) {
+    if (s == null) return '';
+    return String(s).replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
 
   // ── Button highlight helpers ─────────────────────────────────────────────
   function activateYear(year) {
@@ -333,7 +423,7 @@
     ['btn-today','btn-ystrd'].forEach(i => document.getElementById(i).classList.toggle('active-quick', i === id));
   }
 
-  // ── API fetch + KPI update ───────────────────────────────────────────────
+  // ── KPI API fetch ────────────────────────────────────────────────────────
   async function loadData() {
     const df = document.getElementById('date-from').value;
     const dt = document.getElementById('date-to').value;
@@ -356,49 +446,285 @@
   }
 
   function updateStats(data) {
-    // Leads
-    const leadsD = document.getElementById('stat-leads-daily');
-    const leadsMtd = document.getElementById('stat-leads-mtd');
-    if (leadsD) leadsD.textContent = (data.leads?.daily ?? 0).toLocaleString();
-    if (leadsMtd) leadsMtd.textContent = (data.leads?.mtd ?? 0).toLocaleString();
+    const s = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    s('stat-leads-daily',  (data.leads?.daily       ?? 0).toLocaleString());
+    s('stat-leads-mtd',    (data.leads?.mtd          ?? 0).toLocaleString());
+    s('stat-live-daily',   (data.live_accounts?.daily ?? 0).toLocaleString());
+    s('stat-live-mtd',     (data.live_accounts?.mtd   ?? 0).toLocaleString());
+    s('stat-ftd-daily',    (data.ftd?.daily           ?? 0).toLocaleString());
+    s('stat-ftd-mtd',      (data.ftd?.mtd             ?? 0).toLocaleString());
+    s('stat-ftc-daily',    (data.ftc?.daily           ?? 0).toLocaleString());
+    s('stat-ftc-mtd',      (data.ftc?.mtd             ?? 0).toLocaleString());
+    s('stat-deposits',     fmtMoney(data.deposits     ?? 0));
+    s('stat-withdrawals',  fmtMoney(data.withdrawals  ?? 0));
 
-    // Live Accounts
-    const liveD = document.getElementById('stat-live-daily');
-    const liveMtd = document.getElementById('stat-live-mtd');
-    if (liveD) liveD.textContent = (data.live_accounts?.daily ?? 0).toLocaleString();
-    if (liveMtd) liveMtd.textContent = (data.live_accounts?.mtd ?? 0).toLocaleString();
-
-    // FTD
-    const ftdD = document.getElementById('stat-ftd-daily');
-    const ftdMtd = document.getElementById('stat-ftd-mtd');
-    if (ftdD) ftdD.textContent = (data.ftd?.daily ?? 0).toLocaleString();
-    if (ftdMtd) ftdMtd.textContent = (data.ftd?.mtd ?? 0).toLocaleString();
-
-    // FTC
-    const ftcD = document.getElementById('stat-ftc-daily');
-    const ftcMtd = document.getElementById('stat-ftc-mtd');
-    if (ftcD) ftcD.textContent = (data.ftc?.daily ?? 0).toLocaleString();
-    if (ftcMtd) ftcMtd.textContent = (data.ftc?.mtd ?? 0).toLocaleString();
-
-    // Deposits
-    const depEl = document.getElementById('stat-deposits');
-    if (depEl) depEl.textContent = fmtMoney(data.deposits ?? 0);
-
-    // Withdrawals
-    const wdEl = document.getElementById('stat-withdrawals');
-    if (wdEl) wdEl.textContent = fmtMoney(data.withdrawals ?? 0);
-
-    // Net Deposits
     const netEl = document.getElementById('stat-net-deposits');
     if (netEl) {
       const v = data.net_deposits ?? 0;
       netEl.textContent = fmtMoney(v);
       netEl.style.color = v >= 0 ? '#3fb950' : '#f85149';
     }
+    s('stat-traders', (data.traders_count ?? 0).toLocaleString());
+  }
 
-    // Traders
-    const tradersEl = document.getElementById('stat-traders');
-    if (tradersEl) tradersEl.textContent = (data.traders_count ?? 0).toLocaleString();
+  // ── Table state ──────────────────────────────────────────────────────────
+  let tblData = null;
+  let tblSortKey = 'deposits';
+  let tblSortDir = -1;
+  let tblExpanded = {};
+
+  const TBL_SORT_KEYS = ['g1','leads','live_accounts','ftd','ftc','deposits','withdrawals','net_deposits','traders'];
+
+  function tblSort(key) {
+    if (tblSortKey === key) tblSortDir *= -1;
+    else { tblSortKey = key; tblSortDir = -1; }
+    updateSortIcons();
+    renderTable();
+  }
+
+  function updateSortIcons() {
+    TBL_SORT_KEYS.forEach(k => {
+      const el = document.getElementById(`si-${k}`);
+      if (!el) return;
+      if (k === tblSortKey) {
+        el.className = tblSortDir > 0 ? 'bi bi-arrow-up' : 'bi bi-arrow-down';
+        el.style.color = '#388bfd';
+        el.style.fontSize = '0.7rem';
+      } else {
+        el.className = 'bi bi-arrow-down-up';
+        el.style.color = '';
+        el.style.fontSize = '0.65rem';
+      }
+    });
+  }
+
+  // ── Table API fetch ──────────────────────────────────────────────────────
+  async function loadTable() {
+    const df = document.getElementById('date-from').value;
+    const dt = document.getElementById('date-to').value;
+    const g1 = document.getElementById('sel-group1').value;
+    const g2 = document.getElementById('sel-group2').value;
+    if (!df || !dt) return;
+
+    const tbody = document.getElementById('tbl-tbody');
+    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">'
+      + '<div class="spinner-border spinner-border-sm text-secondary me-2"></div>Loading…</td></tr>';
+    document.getElementById('tbl-error').style.display = 'none';
+
+    // Update table title
+    const g1Label = document.getElementById('sel-group1').options[document.getElementById('sel-group1').selectedIndex].text;
+    const g2Label = document.getElementById('sel-group2').options[document.getElementById('sel-group2').selectedIndex].text;
+    const titleEl = document.getElementById('tbl-title');
+    if (g1 === 'none') {
+      titleEl.textContent = 'Performance Table';
+    } else if (g2 === 'none') {
+      titleEl.textContent = 'By ' + g1Label;
+    } else {
+      titleEl.textContent = 'By ' + g1Label + ' → ' + g2Label;
+    }
+
+    // Update group column header
+    const thGroup = document.getElementById('th-group');
+    if (thGroup) {
+      const icon = thGroup.querySelector('i');
+      thGroup.textContent = g1 === 'none' ? 'Group' : g1Label;
+      if (icon) thGroup.appendChild(icon);
+    }
+
+    try {
+      const res = await fetch(`/api/campaign-performance/table?date_from=${df}&date_to=${dt}&group1=${g1}&group2=${g2}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Server error');
+      tblData = data;
+      tblExpanded = {};
+      renderTable();
+    } catch(e) {
+      tbody.innerHTML = '';
+      document.getElementById('tbl-error').textContent = 'Error: ' + e.message;
+      document.getElementById('tbl-error').style.display = 'block';
+    }
+  }
+
+  // ── Table render ─────────────────────────────────────────────────────────
+  function metricCells(r, isTotal) {
+    const net = r.net_deposits ?? 0;
+    const style = isTotal ? 'font-weight:600;' : '';
+    const fmtN = v => (v ?? 0).toLocaleString('en-US');
+    return `
+      <td class="text-end" style="${style}">${fmtN(r.leads)}</td>
+      <td class="text-end" style="${style}">${fmtN(r.live_accounts)}</td>
+      <td class="text-end" style="${style}">${fmtN(r.ftd)}</td>
+      <td class="text-end" style="${style}">${fmtN(r.ftc)}</td>
+      <td class="text-end" style="color:#3fb950;${style}">${fmtMoney(r.deposits)}</td>
+      <td class="text-end" style="color:#f85149;${style}">${fmtMoney(r.withdrawals)}</td>
+      <td class="text-end" style="color:${net >= 0 ? '#3fb950' : '#f85149'};${style}">${fmtMoney(net)}</td>
+      <td class="text-end" style="${style}">${fmtN(r.traders)}</td>
+    `;
+  }
+
+  function renderFlatRow(r) {
+    return `<tr>
+      <td><span style="color:#c9d1d9;">${escHtml(r.g1)}</span></td>
+      ${metricCells(r, false)}
+    </tr>`;
+  }
+
+  function renderParentRow(g, expanded) {
+    const icon = expanded ? 'bi-chevron-down' : 'bi-chevron-right';
+    return `<tr style="background:rgba(63,185,80,0.02);">
+      <td>
+        <button class="expand-toggle" data-g1="${escAttr(g.g1)}"
+          style="background:none;border:none;color:#8b949e;padding:0 6px 0 0;font-size:0.8rem;vertical-align:middle;">
+          <i class="bi ${icon}"></i>
+        </button>
+        <strong style="color:#c9d1d9;">${escHtml(g.g1)}</strong>
+      </td>
+      ${metricCells(g, false)}
+    </tr>`;
+  }
+
+  function renderChildRow(r) {
+    return `<tr style="background:rgba(0,0,0,0.15);">
+      <td style="padding-left:32px;"><span style="color:#8b949e;">${escHtml(r.g2)}</span></td>
+      ${metricCells(r, false)}
+    </tr>`;
+  }
+
+  function renderTotalsRow(totals) {
+    return `<tr style="background:#1c2128;border-top:2px solid #30363d;">
+      <td><strong style="color:#388bfd;">Total</strong></td>
+      ${metricCells(totals, true)}
+    </tr>`;
+  }
+
+  function cmpRows(a, b) {
+    let av = a[tblSortKey], bv = b[tblSortKey];
+    if (tblSortKey === 'g1' || tblSortKey === 'g2') {
+      av = String(av ?? ''); bv = String(bv ?? '');
+      return tblSortDir * av.localeCompare(bv);
+    }
+    av = av ?? 0; bv = bv ?? 0;
+    return tblSortDir * (av > bv ? 1 : av < bv ? -1 : 0);
+  }
+
+  function renderTable() {
+    if (!tblData) return;
+    const g1 = document.getElementById('sel-group1').value;
+    const g2 = document.getElementById('sel-group2').value;
+    const hasG1 = g1 !== 'none';
+    const hasG2 = hasG1 && g2 !== 'none';
+    const rows = tblData.rows || [];
+    const totals = tblData.totals || {};
+    const tbody = document.getElementById('tbl-tbody');
+
+    // Show/hide expand/collapse buttons
+    document.getElementById('tbl-expand-btns').style.display = hasG2 ? 'flex' : 'none';
+
+    if (!hasG1) {
+      // No grouping — just totals row
+      tbody.innerHTML = renderTotalsRow(totals);
+      return;
+    }
+
+    if (!hasG2) {
+      // Flat list sorted by current sort key + totals
+      const sorted = [...rows].sort(cmpRows);
+      tbody.innerHTML = sorted.map(r => renderFlatRow(r)).join('') + renderTotalsRow(totals);
+      return;
+    }
+
+    // Group1 + Group2 — aggregate g1 parent rows, expand/collapse
+    const g1Map = {};
+    rows.forEach(r => {
+      const key = r.g1 ?? '(Unassigned)';
+      if (!g1Map[key]) {
+        g1Map[key] = {g1: r.g1, leads: 0, live_accounts: 0, ftd: 0, ftc: 0,
+                      deposits: 0, withdrawals: 0, net_deposits: 0, traders: 0, children: []};
+      }
+      const agg = g1Map[key];
+      agg.leads += r.leads; agg.live_accounts += r.live_accounts;
+      agg.ftd   += r.ftd;   agg.ftc           += r.ftc;
+      agg.deposits     += r.deposits;
+      agg.withdrawals  += r.withdrawals;
+      agg.net_deposits += r.net_deposits;
+      agg.traders      += r.traders;
+      agg.children.push(r);
+    });
+
+    const g1List = Object.values(g1Map).sort(cmpRows);
+
+    let html = '';
+    g1List.forEach(g => {
+      const expanded = !!tblExpanded[g.g1 ?? '(Unassigned)'];
+      html += renderParentRow(g, expanded);
+      if (expanded) {
+        g.children.sort(cmpRows);
+        g.children.forEach(c => { html += renderChildRow(c); });
+      }
+    });
+    html += renderTotalsRow(totals);
+    tbody.innerHTML = html;
+
+    // Attach expand toggle handlers
+    tbody.querySelectorAll('.expand-toggle').forEach(btn => {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        const key = this.dataset.g1;
+        tblExpanded[key] = !tblExpanded[key];
+        renderTable();
+      });
+    });
+  }
+
+  function expandAll() {
+    if (!tblData) return;
+    tblData.rows.forEach(r => { tblExpanded[r.g1 ?? '(Unassigned)'] = true; });
+    renderTable();
+  }
+  function collapseAll() {
+    tblExpanded = {};
+    renderTable();
+  }
+
+  function exportTbl() {
+    if (!tblData) return;
+    const g1 = document.getElementById('sel-group1').value;
+    const g2 = document.getElementById('sel-group2').value;
+    const hasG1 = g1 !== 'none';
+    const hasG2 = hasG1 && g2 !== 'none';
+    const g1Label = tblData.group1_label || 'Group';
+    const g2Label = tblData.group2_label || 'Sub-group';
+
+    const headers = [];
+    if (hasG1) headers.push(g1Label);
+    if (hasG2) headers.push(g2Label);
+    headers.push('Leads','Live Accounts','FTD','FTC','Deposits','Withdrawals','Net Deposits','Traders');
+
+    const esc = v => '"' + String(v ?? '').replace(/"/g,'""') + '"';
+    const lines = [headers.join(',')];
+
+    (tblData.rows || []).forEach(r => {
+      const cols = [];
+      if (hasG1) cols.push(esc(r.g1));
+      if (hasG2) cols.push(esc(r.g2));
+      cols.push(r.leads, r.live_accounts, r.ftd, r.ftc, r.deposits, r.withdrawals, r.net_deposits, r.traders);
+      lines.push(cols.join(','));
+    });
+
+    const t = tblData.totals || {};
+    const totCols = [];
+    if (hasG1) totCols.push('"Total"');
+    if (hasG2) totCols.push('""');
+    totCols.push(t.leads, t.live_accounts, t.ftd, t.ftc, t.deposits, t.withdrawals, t.net_deposits, t.traders);
+    lines.push(totCols.join(','));
+
+    const df = document.getElementById('date-from').value;
+    const dt = document.getElementById('date-to').value;
+    const blob = new Blob([lines.join('\r\n')], {type:'text/csv'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `campaign_perf_${df}_${dt}.csv`;
+    a.click();
   }
 
   // ── Year/Month/Quick buttons ─────────────────────────────────────────────
@@ -409,7 +735,7 @@
       setQuickActive(null);
       document.getElementById('date-from').value = firstOfMonth(state.year, state.month);
       document.getElementById('date-to').value   = dateToForMonth(state.year, state.month);
-      loadData();
+      loadData(); loadTable();
     });
   });
 
@@ -420,7 +746,7 @@
       setQuickActive(null);
       document.getElementById('date-from').value = firstOfMonth(state.year, state.month);
       document.getElementById('date-to').value   = dateToForMonth(state.year, state.month);
-      loadData();
+      loadData(); loadTable();
     });
   });
 
@@ -429,7 +755,7 @@
     document.getElementById('date-from').value = t;
     document.getElementById('date-to').value   = t;
     setQuickActive('btn-today');
-    loadData();
+    loadData(); loadTable();
   });
 
   document.getElementById('btn-ystrd').addEventListener('click', () => {
@@ -437,20 +763,26 @@
     document.getElementById('date-from').value = y;
     document.getElementById('date-to').value   = y;
     setQuickActive('btn-ystrd');
-    loadData();
+    loadData(); loadTable();
   });
 
   document.getElementById('btn-apply').addEventListener('click', () => {
     setQuickActive(null);
-    loadData();
+    loadData(); loadTable();
   });
+
+  // Group dropdown changes only reload the table (not KPI cards)
+  document.getElementById('sel-group1').addEventListener('change', () => loadTable());
+  document.getElementById('sel-group2').addEventListener('change', () => loadTable());
 
   // ── Init ─────────────────────────────────────────────────────────────────
   document.getElementById('date-from').value = firstOfMonth(state.year, state.month);
   document.getElementById('date-to').value   = todayStr();
   activateYear(state.year);
   activateMonth(state.month);
+  updateSortIcons();
   loadData();
+  loadTable();
 
   // ── Filter bar toggle ────────────────────────────────────────────────────
   (function(){
@@ -509,7 +841,7 @@
     updateSyncBar();
     const today = new Date().toISOString().split('T')[0];
     const dt = document.getElementById('date-to').value;
-    if (dt === today) loadData();
+    if (dt === today) { loadData(); loadTable(); }
   }, 60000);
 </script>
 
