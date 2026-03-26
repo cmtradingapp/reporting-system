@@ -12,6 +12,7 @@ router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
 VALID_GROUPS = {
+    "marketing_group":      "COALESCE(c.marketing_group, '(Unassigned)')",
     "campaign_legacy_id":   "COALESCE(c.campaign_legacy_id, '(Unassigned)')",
     "campaign_name":        "COALESCE(c.campaign_name, '(Unassigned)')",
     "campaign_channel":     "COALESCE(c.campaign_channel, '(Unassigned)')",
@@ -19,6 +20,7 @@ VALID_GROUPS = {
     "original_affiliate":   "COALESCE(a.original_affiliate, '(Unassigned)')",
 }
 GROUP_LABELS = {
+    "marketing_group":      "Marketing Group",
     "campaign_legacy_id":   "Campaign Legacy ID",
     "campaign_name":        "Campaign Name",
     "campaign_channel":     "Campaign Channel",

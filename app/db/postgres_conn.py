@@ -517,6 +517,21 @@ def ensure_table():
             start_date                  DATE,
             assigned_to                 VARCHAR,
             disable_email_verification  VARCHAR,
+            marketing_group             TEXT GENERATED ALWAYS AS (
+                CASE
+                    WHEN campaign_channel LIKE '%IB%'             THEN 'IB'
+                    WHEN campaign_channel LIKE '%PPC%'            THEN 'PPC'
+                    WHEN campaign_channel LIKE '%Media%'          THEN 'Media'
+                    WHEN campaign_channel LIKE '%Affiliate%'      THEN 'Affiliates'
+                    WHEN campaign_channel LIKE '%Direct%'         THEN 'Organic'
+                    WHEN campaign_channel LIKE '%Organic%'        THEN 'Organic'
+                    WHEN campaign_channel LIKE '%White%'          THEN 'White Label'
+                    WHEN campaign_channel LIKE '%GMT%'            THEN 'White Label'
+                    WHEN campaign_channel LIKE '%Refer a friend%' THEN 'FRF'
+                    WHEN campaign_channel LIKE '%Automation%'     THEN 'Automation'
+                    ELSE 'Other'
+                END
+            ) STORED,
             synced_at                   TIMESTAMP DEFAULT NOW()
         );
         CREATE INDEX IF NOT EXISTS idx_campaigns_campaign_id ON campaigns (campaign_id);
