@@ -218,15 +218,18 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None) -
                 ) if row else (0, 0, 0, 0)
 
             if not class_where:
+                # FTD + deposits from MV (join crm_users to exclude duplicated% agents, same as table)
                 cur.execute("""
                     SELECT
-                        COALESCE(SUM(deposit_usd),    0)                                                AS deposits,
-                        COALESCE(SUM(withdrawal_usd), 0)                                                AS withdrawals,
-                        COALESCE(SUM(net_usd),        0)                                                AS net_deposits,
-                        COALESCE(SUM(ftd_count),      0)                                                AS ftd_mtd,
-                        COALESCE(SUM(CASE WHEN tx_date = %(date_to)s THEN ftd_count ELSE 0 END), 0)     AS ftd_daily
-                    FROM mv_daily_kpis
-                    WHERE tx_date >= %(date_from)s AND tx_date < %(date_to_excl)s
+                        COALESCE(SUM(k.deposit_usd),    0)                                                          AS deposits,
+                        COALESCE(SUM(k.withdrawal_usd), 0)                                                          AS withdrawals,
+                        COALESCE(SUM(k.net_usd),        0)                                                          AS net_deposits,
+                        COALESCE(SUM(k.ftd_count),      0)                                                          AS ftd_mtd,
+                        COALESCE(SUM(CASE WHEN k.tx_date = %(date_to)s THEN k.ftd_count ELSE 0 END), 0)             AS ftd_daily
+                    FROM mv_daily_kpis k
+                    JOIN crm_users u ON u.id = k.agent_id
+                    WHERE k.tx_date >= %(date_from)s AND k.tx_date < %(date_to_excl)s
+                      AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'
                 """, {"date_from": date_from, "date_to_excl": date_to_exclusive, "date_to": date_to})
                 row = cur.fetchone()
                 if row:
@@ -238,12 +241,16 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None) -
                 else:
                     deposits_total = withdrawals_total = net_total = ftd_mtd = ftd_daily = 0
 
+                # FTC from accounts table directly — same logic as the performance table
                 cur.execute("""
                     SELECT
-                        COALESCE(SUM(ftc_count), 0)                                                     AS ftc_mtd,
-                        COALESCE(SUM(CASE WHEN qual_date = %(date_to)s THEN ftc_count ELSE 0 END), 0)   AS ftc_daily
-                    FROM mv_daily_kpis
-                    WHERE qual_date >= %(date_from)s AND qual_date < %(date_to_excl)s
+                        COUNT(*) FILTER (WHERE a.client_qualification_date::date >= %(date_from)s
+                                           AND a.client_qualification_date::date < %(date_to_excl)s) AS ftc_mtd,
+                        COUNT(*) FILTER (WHERE a.client_qualification_date::date = %(date_to)s)      AS ftc_daily
+                    FROM accounts a
+                    WHERE a.client_qualification_date IS NOT NULL
+                      AND a.is_test_account = 0
+                      AND (a.is_demo = 0 OR a.is_demo IS NULL)
                 """, {"date_from": date_from, "date_to_excl": date_to_exclusive, "date_to": date_to})
                 row = cur.fetchone()
                 ftc_mtd   = int(row[0] or 0) if row else 0
