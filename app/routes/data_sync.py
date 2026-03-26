@@ -12,7 +12,7 @@ from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 
 _stats_cache: dict = {}
-_CACHE_TTL = 60  # seconds
+_CACHE_TTL = 90  # seconds
 
 
 def _cached(key: str, fn):
@@ -79,17 +79,17 @@ async def data_sync_page(request: Request):
         "ddps_stats":      lambda: _cached("ddps_stats",      fetch_dealio_daily_profits_stats),
         "bonus_stats":     lambda: _cached("bonus_stats",     fetch_bonus_transactions_stats),
         "campaigns_stats": lambda: _cached("campaigns_stats", fetch_campaigns_stats),
-        "accounts_log":    lambda: fetch_sync_log("crm_accounts",      limit=50),
-        "users_log":       lambda: fetch_sync_log("crm_users",         limit=50),
-        "tx_log":          lambda: fetch_sync_log("transactions",       limit=50),
-        "targets_log":     lambda: fetch_sync_log("targets",           limit=50),
-        "ta_log":          lambda: fetch_sync_log("trading_accounts",  limit=50),
-        "ftd100_log":      lambda: fetch_sync_log("ftd100_clients",    limit=50),
-        "du_log":          lambda: fetch_sync_log("dealio_users",      limit=50),
-        "dtm4_log":        lambda: fetch_sync_log("dealio_trades_mt4", limit=50),
-        "ddps_log":        lambda: fetch_sync_log("dealio_daily_profits", limit=50),
-        "bonus_log":       lambda: fetch_sync_log("bonus_transactions",  limit=50),
-        "campaigns_log":   lambda: fetch_sync_log("campaigns",           limit=50),
+        "accounts_log":    lambda: _cached("accounts_log",    lambda: fetch_sync_log("crm_accounts",         limit=20)),
+        "users_log":       lambda: _cached("users_log",       lambda: fetch_sync_log("crm_users",            limit=20)),
+        "tx_log":          lambda: _cached("tx_log",          lambda: fetch_sync_log("transactions",         limit=20)),
+        "targets_log":     lambda: _cached("targets_log",     lambda: fetch_sync_log("targets",              limit=20)),
+        "ta_log":          lambda: _cached("ta_log",          lambda: fetch_sync_log("trading_accounts",     limit=20)),
+        "ftd100_log":      lambda: _cached("ftd100_log",      lambda: fetch_sync_log("ftd100_clients",       limit=20)),
+        "du_log":          lambda: _cached("du_log",          lambda: fetch_sync_log("dealio_users",         limit=20)),
+        "dtm4_log":        lambda: _cached("dtm4_log",        lambda: fetch_sync_log("dealio_trades_mt4",    limit=20)),
+        "ddps_log":        lambda: _cached("ddps_log",        lambda: fetch_sync_log("dealio_daily_profits", limit=20)),
+        "bonus_log":       lambda: _cached("bonus_log",       lambda: fetch_sync_log("bonus_transactions",   limit=20)),
+        "campaigns_log":   lambda: _cached("campaigns_log",   lambda: fetch_sync_log("campaigns",            limit=20)),
     }
 
     def _err_stats():
