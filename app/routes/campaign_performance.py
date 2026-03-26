@@ -158,7 +158,7 @@ async def campaign_filter_options(request: Request):
 
     try:
         result = _camp_filter_options_calc()
-        cache.set(_ck, result, ttl=3600)
+        cache.set(_ck, result)
         return JSONResponse(content=result)
     except Exception as e:
         return JSONResponse(status_code=500, content={"detail": str(e)})
