@@ -4,7 +4,7 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Campaign Performance</title>
+  <title>Marketing Performance</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet"/>
   <style>
@@ -110,7 +110,7 @@
 </head>
 <body>
 
-<div class="mob-topbar"><span class="mob-topbar-title">Campaign Performance</span></div>
+<div class="mob-topbar"><span class="mob-topbar-title">Marketing Performance</span></div>
 <div class="sidebar-overlay" id="sidebar-overlay"></div>
 <button class="sidebar-toggle" id="sidebar-toggle"><i class="bi bi-list"></i></button>
 <div class="sidebar">
@@ -121,7 +121,7 @@
     {% if current_user.role != 'marketing' %}
     <a href="/performance" class="sidebar-link"><i class="bi bi-trophy"></i>Performance Report</a>
     {% endif %}
-    <a href="/campaign-performance" class="sidebar-link active"><i class="bi bi-graph-up-arrow"></i>Campaign Performance</a>
+    <a href="/campaign-performance" class="sidebar-link active"><i class="bi bi-graph-up-arrow"></i>Marketing Performance</a>
     {% if current_user.role != 'marketing' %}
     <a href="/agent-bonuses" class="sidebar-link"><i class="bi bi-cash-stack"></i>Agent Bonuses</a>
     {% endif %}
@@ -148,7 +148,7 @@
 
   <!-- Header -->
   <div class="mb-1 d-none d-md-flex align-items-baseline gap-3">
-    <h4 class="fw-bold text-white mb-0">Campaign Performance</h4>
+    <h4 class="fw-bold text-white mb-0">Marketing Performance</h4>
   </div>
   <div id="sync-bar" style="font-size:0.73rem;color:#8b949e;margin-bottom:14px;display:flex;align-items:center;gap:12px;">
     <i class="bi bi-arrow-repeat me-1"></i>Last sync: <span id="sync-bar-val">—</span>
@@ -457,14 +457,14 @@
 
   function updateStats(data) {
     const s = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-    s('stat-leads-daily',  (data.leads?.daily       ?? 0).toLocaleString());
-    s('stat-leads-mtd',    (data.leads?.mtd          ?? 0).toLocaleString());
-    s('stat-live-daily',   (data.live_accounts?.daily ?? 0).toLocaleString());
-    s('stat-live-mtd',     (data.live_accounts?.mtd   ?? 0).toLocaleString());
-    s('stat-ftd-daily',    (data.ftd?.daily           ?? 0).toLocaleString());
-    s('stat-ftd-mtd',      (data.ftd?.mtd             ?? 0).toLocaleString());
-    s('stat-ftc-daily',    (data.ftc?.daily           ?? 0).toLocaleString());
-    s('stat-ftc-mtd',      (data.ftc?.mtd             ?? 0).toLocaleString());
+    s('stat-leads-daily',  (data.leads?.daily       ?? 0).toLocaleString('en-US'));
+    s('stat-leads-mtd',    (data.leads?.mtd          ?? 0).toLocaleString('en-US'));
+    s('stat-live-daily',   (data.live_accounts?.daily ?? 0).toLocaleString('en-US'));
+    s('stat-live-mtd',     (data.live_accounts?.mtd   ?? 0).toLocaleString('en-US'));
+    s('stat-ftd-daily',    (data.ftd?.daily           ?? 0).toLocaleString('en-US'));
+    s('stat-ftd-mtd',      (data.ftd?.mtd             ?? 0).toLocaleString('en-US'));
+    s('stat-ftc-daily',    (data.ftc?.daily           ?? 0).toLocaleString('en-US'));
+    s('stat-ftc-mtd',      (data.ftc?.mtd             ?? 0).toLocaleString('en-US'));
     s('stat-deposits',     fmtMoney(data.deposits     ?? 0));
     s('stat-withdrawals',  fmtMoney(data.withdrawals  ?? 0));
 
@@ -474,7 +474,7 @@
       netEl.textContent = fmtMoney(v);
       netEl.style.color = v >= 0 ? '#3fb950' : '#f85149';
     }
-    s('stat-traders', (data.traders_count ?? 0).toLocaleString());
+    s('stat-traders', (data.traders_count ?? 0).toLocaleString('en-US'));
   }
 
   // ── Table state ──────────────────────────────────────────────────────────
