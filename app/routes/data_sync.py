@@ -7,7 +7,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from app.auth.dependencies import get_current_user
-from app.db.postgres_conn import fetch_accounts_stats, fetch_crm_users_stats, fetch_transactions_stats, fetch_targets_stats, fetch_trading_accounts_stats, fetch_ftd100_stats, fetch_sync_log, fetch_dealio_users_stats, fetch_dealio_trades_mt4_stats, fetch_dealio_daily_profits_stats, fetch_bonus_transactions_stats
+from app.db.postgres_conn import fetch_accounts_stats, fetch_crm_users_stats, fetch_transactions_stats, fetch_targets_stats, fetch_trading_accounts_stats, fetch_ftd100_stats, fetch_sync_log, fetch_dealio_users_stats, fetch_dealio_trades_mt4_stats, fetch_dealio_daily_profits_stats, fetch_bonus_transactions_stats, fetch_campaigns_stats
 from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 
@@ -78,6 +78,7 @@ async def data_sync_page(request: Request):
         "dtm4_stats":      lambda: _cached("dtm4_stats",      fetch_dealio_trades_mt4_stats),
         "ddps_stats":      lambda: _cached("ddps_stats",      fetch_dealio_daily_profits_stats),
         "bonus_stats":     lambda: _cached("bonus_stats",     fetch_bonus_transactions_stats),
+        "campaigns_stats": lambda: _cached("campaigns_stats", fetch_campaigns_stats),
         "accounts_log":    lambda: fetch_sync_log("crm_accounts",      limit=50),
         "users_log":       lambda: fetch_sync_log("crm_users",         limit=50),
         "tx_log":          lambda: fetch_sync_log("transactions",       limit=50),
@@ -88,6 +89,7 @@ async def data_sync_page(request: Request):
         "dtm4_log":        lambda: fetch_sync_log("dealio_trades_mt4", limit=50),
         "ddps_log":        lambda: fetch_sync_log("dealio_daily_profits", limit=50),
         "bonus_log":       lambda: fetch_sync_log("bonus_transactions",  limit=50),
+        "campaigns_log":   lambda: fetch_sync_log("campaigns",           limit=50),
     }
 
     def _err_stats():
@@ -127,8 +129,10 @@ async def data_sync_page(request: Request):
     dtm4_log       = results["dtm4_log"]
     ddps_stats     = results["ddps_stats"]
     ddps_log       = results["ddps_log"]
-    bonus_stats    = results["bonus_stats"]
-    bonus_log      = results["bonus_log"]
+    bonus_stats      = results["bonus_stats"]
+    bonus_log        = results["bonus_log"]
+    campaigns_stats  = results["campaigns_stats"]
+    campaigns_log    = results["campaigns_log"]
 
     tables = [
         {
@@ -309,6 +313,24 @@ async def data_sync_page(request: Request):
             "primary_key": "(date, login, sourceid)",
             "incremental_columns": "date",
             "source": "Dealio PG → dealio.daily_profits",
+        },
+        {
+            "key": "campaigns",
+            "label": "campaigns",
+            "last_synced_at": campaigns_stats["last_synced_at"],
+            "stat_cards": [
+                {"label": "Total Campaigns",   "value": campaigns_stats["total_records"],    "color": "text-info",    "icon": "bi-database"},
+                {"label": "Active Campaigns",  "value": campaigns_stats["active_campaigns"], "color": "text-success", "icon": "bi-check-circle"},
+                {"label": "Unique Channels",   "value": campaigns_stats["unique_channels"],  "color": "text-warning", "icon": "bi-broadcast"},
+            ],
+            "sync_log": campaigns_log,
+            "healthy": _is_healthy(campaigns_log, 1),
+            "sync_interval_hours": 1,
+            "lookback_hours": "All",
+            "primary_key": "crmid",
+            "incremental_columns": "N/A — full refresh (no timestamp column)",
+            "source": "MySQL CRM → crmdb.tracking_campaign + selection (channel/sub-channel lookups)",
+            "note": "Joins to crm_accounts on crm_accounts.campaign = campaigns.crmid",
         },
     ]
 

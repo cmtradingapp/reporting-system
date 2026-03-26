@@ -826,3 +826,37 @@ def get_users() -> pd.DataFrame:
         return df
     finally:
         conn.close()
+
+
+def get_campaigns() -> pd.DataFrame:
+    conn = _get_connection()
+    try:
+        query = """
+            SELECT
+                t.id                          AS crmid,
+                t.campaign_id,
+                t.name                        AS campaign_name,
+                t.legacy_id                   AS campaign_legacy_id,
+                t.description                 AS campaign_description,
+                l1.display_value              AS campaign_channel,
+                l2.display_value              AS campaign_sub_channel,
+                t.website,
+                IF(t.is_deleted = 0, 1, 0)   AS active,
+                t.start_date,
+                NULL                          AS assigned_to,
+                NULL                          AS disable_email_verification
+            FROM crmdb.tracking_campaign t
+            LEFT JOIN (
+                SELECT selection_key, display_value
+                FROM crmdb.selection WHERE type = 48
+            ) l1 ON l1.selection_key = t.channel
+            LEFT JOIN (
+                SELECT selection_key, display_value
+                FROM crmdb.selection WHERE type = 49
+            ) l2 ON l2.selection_key = t.sub_channel
+            WHERE t.campaign_id IS NOT NULL
+        """
+        df = pd.read_sql(query, conn)
+        return df
+    finally:
+        conn.close()

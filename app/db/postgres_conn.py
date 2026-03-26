@@ -504,6 +504,24 @@ def ensure_table():
         CREATE INDEX IF NOT EXISTS idx_ddps_login ON dealio_daily_profits (login);
         CREATE INDEX IF NOT EXISTS idx_ddps_date  ON dealio_daily_profits (date);
 
+        CREATE TABLE IF NOT EXISTS campaigns (
+            crmid                       VARCHAR         PRIMARY KEY,
+            campaign_id                 VARCHAR,
+            campaign_name               VARCHAR,
+            campaign_legacy_id          VARCHAR,
+            campaign_description        TEXT,
+            campaign_channel            VARCHAR,
+            campaign_sub_channel        VARCHAR,
+            website                     VARCHAR,
+            active                      BOOLEAN,
+            start_date                  DATE,
+            assigned_to                 VARCHAR,
+            disable_email_verification  VARCHAR,
+            synced_at                   TIMESTAMP DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_campaigns_campaign_id ON campaigns (campaign_id);
+        CREATE INDEX IF NOT EXISTS idx_campaigns_active      ON campaigns (active);
+
     """
     conn = get_connection()
     try:
@@ -1161,6 +1179,56 @@ def fetch_crm_users_stats() -> dict:
                 "active_users": row[2] or 0,
                 "unique_desks": row[3] or 0,
                 "unique_offices": row[4] or 0,
+            }
+    finally:
+        conn.close()
+
+
+def upsert_campaigns(df: pd.DataFrame):
+    cols = [
+        "crmid", "campaign_id", "campaign_name", "campaign_legacy_id",
+        "campaign_description", "campaign_channel", "campaign_sub_channel",
+        "website", "active", "start_date", "assigned_to", "disable_email_verification",
+    ]
+    rows = [tuple(_clean(row.get(c)) for c in cols) for _, row in df.iterrows()]
+    update_cols = [c for c in cols if c != "crmid"]
+    update_set = ", ".join(f"{c} = EXCLUDED.{c}" for c in update_cols)
+    col_list = ", ".join(cols)
+    sql = f"""
+        INSERT INTO campaigns ({col_list})
+        VALUES %s
+        ON CONFLICT (crmid) DO UPDATE SET
+            {update_set},
+            synced_at = NOW()
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            execute_values(cur, sql, rows)
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def fetch_campaigns_stats() -> dict:
+    sql = """
+        SELECT
+            COUNT(*)                                        AS total_records,
+            MAX(synced_at)                                  AS last_synced_at,
+            COUNT(*) FILTER (WHERE active = TRUE)           AS active_campaigns,
+            COUNT(DISTINCT campaign_channel)                AS unique_channels
+        FROM campaigns
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+            row = cur.fetchone()
+            return {
+                "total_records":    row[0] or 0,
+                "last_synced_at":   row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else "Never",
+                "active_campaigns": row[2] or 0,
+                "unique_channels":  row[3] or 0,
             }
     finally:
         conn.close()
