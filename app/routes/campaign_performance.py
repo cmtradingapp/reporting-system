@@ -169,7 +169,8 @@ async def campaign_filter_options(request: Request):
 
 # ── KPI cards ─────────────────────────────────────────────────────────────────
 
-def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None) -> dict:
+def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
+                   q_date_from: str = None, q_date_to: str = None) -> dict:
     dt_to = datetime.strptime(date_to, "%Y-%m-%d").date()
     date_to_exclusive = (dt_to + timedelta(days=1)).strftime("%Y-%m-%d")
 
@@ -182,10 +183,22 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None) -
     else:
         class_where = ""
 
+    qual_where  = ""
+    qual_params: dict = {}
+    if q_date_from and q_date_to:
+        q_dt_to = datetime.strptime(q_date_to, "%Y-%m-%d").date()
+        q_date_to_excl = (q_dt_to + timedelta(days=1)).strftime("%Y-%m-%d")
+        qual_where = ("AND a.client_qualification_date IS NOT NULL"
+                      " AND a.client_qualification_date::date >= %(q_date_from)s"
+                      " AND a.client_qualification_date::date < %(q_date_to_excl)s")
+        qual_params = {"q_date_from": q_date_from, "q_date_to_excl": q_date_to_excl}
+
+    extra_where = f"{class_where} {qual_where}".strip()
+
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            if not class_where:
+            if not extra_where:
                 cur.execute("""
                     SELECT new_leads_today, new_leads_month, new_live_today, new_live_month
                     FROM mv_account_stats LIMIT 1
@@ -198,34 +211,35 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None) -
                 else:
                     leads_today = leads_mtd = live_today = live_mtd = 0
             else:
+                base_p = {"date_from": date_from, "date_to_excl": date_to_exclusive, "date_to": date_to, **qual_params}
                 cur.execute(f"""
                     SELECT
-                        COUNT(*) FILTER (WHERE a.createdtime::date = %(date_to)s)                                   AS leads_today,
+                        COUNT(*) FILTER (WHERE a.createdtime::date = %(date_to)s)                    AS leads_today,
                         COUNT(*) FILTER (WHERE a.createdtime::date >= %(date_from)s
-                                           AND a.createdtime::date < %(date_to_excl)s)                             AS leads_mtd,
+                                           AND a.createdtime::date < %(date_to_excl)s)               AS leads_mtd,
                         COUNT(*) FILTER (WHERE a.birth_date IS NOT NULL
-                                           AND a.createdtime::date = %(date_to)s)                                  AS live_today,
+                                           AND a.createdtime::date = %(date_to)s)                    AS live_today,
                         COUNT(*) FILTER (WHERE a.birth_date IS NOT NULL
                                            AND a.createdtime::date >= %(date_from)s
-                                           AND a.createdtime::date < %(date_to_excl)s)                             AS live_mtd
+                                           AND a.createdtime::date < %(date_to_excl)s)               AS live_mtd
                     FROM accounts a
                     WHERE a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)
-                    {class_where}
-                """, {"date_from": date_from, "date_to_excl": date_to_exclusive, "date_to": date_to})
+                    {extra_where}
+                """, base_p)
                 row = cur.fetchone()
                 leads_today, leads_mtd, live_today, live_mtd = (
                     int(row[0] or 0), int(row[1] or 0), int(row[2] or 0), int(row[3] or 0)
                 ) if row else (0, 0, 0, 0)
 
-            if not class_where:
+            if not extra_where:
                 # FTD + deposits from MV (join crm_users to exclude duplicated% agents, same as table)
                 cur.execute("""
                     SELECT
-                        COALESCE(SUM(k.deposit_usd),    0)                                                          AS deposits,
-                        COALESCE(SUM(k.withdrawal_usd), 0)                                                          AS withdrawals,
-                        COALESCE(SUM(k.net_usd),        0)                                                          AS net_deposits,
-                        COALESCE(SUM(k.ftd_count),      0)                                                          AS ftd_mtd,
-                        COALESCE(SUM(CASE WHEN k.tx_date = %(date_to)s THEN k.ftd_count ELSE 0 END), 0)             AS ftd_daily
+                        COALESCE(SUM(k.deposit_usd),    0)                                                      AS deposits,
+                        COALESCE(SUM(k.withdrawal_usd), 0)                                                      AS withdrawals,
+                        COALESCE(SUM(k.net_usd),        0)                                                      AS net_deposits,
+                        COALESCE(SUM(k.ftd_count),      0)                                                      AS ftd_mtd,
+                        COALESCE(SUM(CASE WHEN k.tx_date = %(date_to)s THEN k.ftd_count ELSE 0 END), 0)         AS ftd_daily
                     FROM mv_daily_kpis k
                     JOIN crm_users u ON u.id = k.agent_id
                     WHERE k.tx_date >= %(date_from)s AND k.tx_date < %(date_to_excl)s
@@ -256,13 +270,14 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None) -
                 ftc_mtd   = int(row[0] or 0) if row else 0
                 ftc_daily = int(row[1] or 0) if row else 0
             else:
+                base_p = {"date_from": date_from, "date_to_excl": date_to_exclusive, "date_to": date_to, **qual_params}
                 cur.execute(f"""
                     SELECT
-                        COALESCE(SUM(CASE WHEN t.transactiontype IN ('Deposit','Withdrawal Cancelled') THEN t.usdamount ELSE 0 END), 0)  AS deposits,
-                        COALESCE(SUM(CASE WHEN t.transactiontype IN ('Withdrawal','Deposit Cancelled') THEN t.usdamount ELSE 0 END), 0)  AS withdrawals,
-                        COALESCE(SUM(CASE WHEN t.ftd = 1 AND t.transactiontype = 'Deposit' THEN 1 ELSE 0 END), 0)                        AS ftd_mtd,
+                        COALESCE(SUM(CASE WHEN t.transactiontype IN ('Deposit','Withdrawal Cancelled') THEN t.usdamount ELSE 0 END), 0) AS deposits,
+                        COALESCE(SUM(CASE WHEN t.transactiontype IN ('Withdrawal','Deposit Cancelled') THEN t.usdamount ELSE 0 END), 0) AS withdrawals,
+                        COALESCE(SUM(CASE WHEN t.ftd = 1 AND t.transactiontype = 'Deposit' THEN 1 ELSE 0 END), 0)                       AS ftd_mtd,
                         COALESCE(SUM(CASE WHEN t.ftd = 1 AND t.transactiontype = 'Deposit'
-                                          AND t.confirmation_time::date = %(date_to)s THEN 1 ELSE 0 END), 0)                             AS ftd_daily
+                                          AND t.confirmation_time::date = %(date_to)s THEN 1 ELSE 0 END), 0)                            AS ftd_daily
                     FROM transactions t
                     JOIN accounts a ON a.accountid = t.vtigeraccountid
                     JOIN crm_users u ON u.id = t.original_deposit_owner
@@ -276,8 +291,8 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None) -
                       AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
                       AND t.confirmation_time::date >= %(date_from)s
                       AND t.confirmation_time::date <  %(date_to_excl)s
-                    {class_where}
-                """, {"date_from": date_from, "date_to_excl": date_to_exclusive, "date_to": date_to})
+                    {extra_where}
+                """, base_p)
                 row = cur.fetchone()
                 if row:
                     deposits_total    = float(row[0] or 0)
@@ -291,17 +306,19 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None) -
                 cur.execute(f"""
                     SELECT
                         COUNT(*) FILTER (WHERE a.client_qualification_date::date >= %(date_from)s
-                                           AND a.client_qualification_date::date < %(date_to_excl)s)   AS ftc_mtd,
-                        COUNT(*) FILTER (WHERE a.client_qualification_date::date = %(date_to)s)        AS ftc_daily
+                                           AND a.client_qualification_date::date < %(date_to_excl)s) AS ftc_mtd,
+                        COUNT(*) FILTER (WHERE a.client_qualification_date::date = %(date_to)s)      AS ftc_daily
                     FROM accounts a
                     WHERE a.client_qualification_date IS NOT NULL
                       AND a.is_test_account = 0
-                    {class_where}
-                """, {"date_from": date_from, "date_to_excl": date_to_exclusive, "date_to": date_to})
+                      AND (a.is_demo = 0 OR a.is_demo IS NULL)
+                    {extra_where}
+                """, base_p)
                 row = cur.fetchone()
                 ftc_mtd   = int(row[0] or 0) if row else 0
                 ftc_daily = int(row[1] or 0) if row else 0
 
+            base_p = {"date_from": date_from, "date_to_excl": date_to_exclusive, **qual_params}
             cur.execute(f"""
                 SELECT COUNT(DISTINCT t.vtigeraccountid)
                 FROM transactions t
@@ -318,8 +335,8 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None) -
                   AND t.confirmation_time::date >= %(date_from)s
                   AND t.confirmation_time::date <  %(date_to_excl)s
                   AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
-                {class_where}
-            """, {"date_from": date_from, "date_to_excl": date_to_exclusive})
+                {extra_where}
+            """, base_p)
             row = cur.fetchone()
             traders_count = int(row[0] or 0) if row else 0
 
@@ -340,12 +357,15 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None) -
 
 
 @router.get("/api/campaign-performance")
-async def campaign_performance_api(request: Request, date_from: str, date_to: str, f_classification: str = None):
+async def campaign_performance_api(
+    request: Request, date_from: str, date_to: str,
+    f_classification: str = None, q_date_from: str = None, q_date_to: str = None,
+):
     user = await get_current_user(request)
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
-    _ck = f"camp_perf_v1:{date_from}:{date_to}:{f_classification}"
+    _ck = f"camp_perf_v1:{date_from}:{date_to}:{f_classification}:{q_date_from}:{q_date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -356,7 +376,7 @@ async def campaign_performance_api(request: Request, date_from: str, date_to: st
         return JSONResponse(status_code=400, content={"detail": "Invalid date format"})
 
     try:
-        _result = _camp_kpi_calc(date_from, date_to, f_classification)
+        _result = _camp_kpi_calc(date_from, date_to, f_classification, q_date_from, q_date_to)
         cache.set(_ck, _result)
         return JSONResponse(content=_result)
     except Exception as e:
@@ -367,7 +387,8 @@ async def campaign_performance_api(request: Request, date_from: str, date_to: st
 
 def _build_filter_clauses(
     f_mkt_group, f_legacy_id, f_campaign_name, f_channel, f_sub_channel,
-    f_affiliate, f_classification, ftc_groups_list, date_to, params
+    f_affiliate, f_classification, ftc_groups_list, date_to, params,
+    q_date_from=None, q_date_to_excl=None
 ):
     """Returns (extra_where_str, needs_cc_join, needs_cu_join).
     Appends needed params to the `params` dict in-place."""
@@ -408,6 +429,13 @@ def _build_filter_clauses(
             clauses.append("AND a.client_qualification_date IS NOT NULL")
             clauses.append("AND (" + " OR ".join(ftc_conds) + ")")
 
+    if q_date_from and q_date_to_excl:
+        clauses.append("AND a.client_qualification_date IS NOT NULL")
+        clauses.append("AND a.client_qualification_date::date >= %(q_date_from)s")
+        clauses.append("AND a.client_qualification_date::date < %(q_date_to_excl)s")
+        params["q_date_from"]    = q_date_from
+        params["q_date_to_excl"] = q_date_to_excl
+
     return "\n".join(clauses), needs_cc_join
 
 
@@ -417,9 +445,15 @@ def _camp_table_calc(
     f_mkt_group: str = None, f_legacy_id: str = None, f_campaign_name: str = None,
     f_channel: str = None, f_sub_channel: str = None, f_affiliate: str = None,
     f_classification: str = None, ftc_groups: str = None,
+    q_date_from: str = None, q_date_to: str = None,
 ) -> dict:
     dt_to = datetime.strptime(date_to, "%Y-%m-%d").date()
     date_to_exclusive = (dt_to + timedelta(days=1)).strftime("%Y-%m-%d")
+
+    q_date_to_excl = None
+    if q_date_from and q_date_to:
+        q_dt_to = datetime.strptime(q_date_to, "%Y-%m-%d").date()
+        q_date_to_excl = (q_dt_to + timedelta(days=1)).strftime("%Y-%m-%d")
 
     ftc_groups_list = [g.strip() for g in ftc_groups.split(",")] if ftc_groups else None
 
@@ -452,9 +486,9 @@ def _camp_table_calc(
     acct_params = {"date_from": date_from, "date_to_excl": date_to_exclusive}
     filter_where, needs_cc_join_for_filter = _build_filter_clauses(
         f_mkt_group, f_legacy_id, f_campaign_name, f_channel, f_sub_channel,
-        f_affiliate, f_classification, ftc_groups_list, date_to, acct_params
+        f_affiliate, f_classification, ftc_groups_list, date_to, acct_params,
+        q_date_from=q_date_from, q_date_to_excl=q_date_to_excl
     )
-    # date_to may have been added by _build_filter_clauses
     needs_cc_join = needs_cc_join_for_group or needs_cc_join_for_filter
 
     # Extra JOINs
@@ -507,7 +541,8 @@ def _camp_table_calc(
             txn_params = {"date_from": date_from, "date_to_excl": date_to_exclusive}
             txn_filter_where, _ = _build_filter_clauses(
                 f_mkt_group, f_legacy_id, f_campaign_name, f_channel, f_sub_channel,
-                f_affiliate, f_classification, ftc_groups_list, date_to, txn_params
+                f_affiliate, f_classification, ftc_groups_list, date_to, txn_params,
+                q_date_from=q_date_from, q_date_to_excl=q_date_to_excl
             )
 
             txn_sel, txn_grp = [], []
@@ -652,6 +687,7 @@ async def campaign_performance_table_api(
     f_mkt_group: str = None, f_legacy_id: str = None, f_campaign_name: str = None,
     f_channel: str = None, f_sub_channel: str = None, f_affiliate: str = None,
     f_classification: str = None, ftc_groups: str = None,
+    q_date_from: str = None, q_date_to: str = None,
 ):
     user = await get_current_user(request)
     if isinstance(user, RedirectResponse):
@@ -666,7 +702,8 @@ async def campaign_performance_table_api(
 
     _ck = (f"camp_tbl_v3:{date_from}:{date_to}:{group1}:{group2}:{period}"
            f":{f_mkt_group}:{f_legacy_id}:{f_campaign_name}:{f_channel}"
-           f":{f_sub_channel}:{f_affiliate}:{f_classification}:{ftc_groups}")
+           f":{f_sub_channel}:{f_affiliate}:{f_classification}:{ftc_groups}"
+           f":{q_date_from}:{q_date_to}")
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -681,6 +718,7 @@ async def campaign_performance_table_api(
             date_from, date_to, group1, group2, period,
             f_mkt_group, f_legacy_id, f_campaign_name, f_channel,
             f_sub_channel, f_affiliate, f_classification, ftc_groups,
+            q_date_from, q_date_to,
         )
         cache.set(_ck, _result)
         return JSONResponse(content=_result)

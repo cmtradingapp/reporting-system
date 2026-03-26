@@ -278,6 +278,16 @@
           <option value="day">Day</option>
         </select>
       </div>
+      <div class="filter-sep" style="height:42px;"></div>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <span style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.8px;color:#8b949e;">Qual. Date Range</span>
+        <div style="display:flex;align-items:center;gap:5px;">
+          <input type="date" id="qual-date-from" class="date-input" style="width:130px;" />
+          <span style="color:#484f58;font-size:0.8rem;">–</span>
+          <input type="date" id="qual-date-to" class="date-input" style="width:130px;" />
+          <button id="btn-clear-qual" class="quick-btn" style="padding:4px 8px;font-size:0.75rem;line-height:1;" title="Clear qualification date filter">✕</button>
+        </div>
+      </div>
     </div>
 
     <!-- Row 4: Campaign Filters -->
@@ -555,8 +565,13 @@
     }
 
     try {
-      const fClass = (document.getElementById('f-classification')?.value || '');
-      const kpiUrl = `/api/campaign-performance?date_from=${df}&date_to=${dt}` + (fClass ? `&f_classification=${encodeURIComponent(fClass)}` : '');
+      const fClass    = (document.getElementById('f-classification')?.value || '');
+      const qDateFrom = document.getElementById('qual-date-from')?.value || '';
+      const qDateTo   = document.getElementById('qual-date-to')?.value   || '';
+      let kpiUrl = `/api/campaign-performance?date_from=${df}&date_to=${dt}`;
+      if (fClass)    kpiUrl += `&f_classification=${encodeURIComponent(fClass)}`;
+      if (qDateFrom) kpiUrl += `&q_date_from=${qDateFrom}`;
+      if (qDateTo)   kpiUrl += `&q_date_to=${qDateTo}`;
       const res = await fetch(kpiUrl);
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Server error');
@@ -638,6 +653,8 @@
     const ftcGroups    = (checkedCbs.length > 0 && checkedCbs.length < allCbs.length)
                          ? checkedCbs.join(',') : null;
     let extra = '';
+    const qDateFrom = document.getElementById('qual-date-from')?.value || '';
+    const qDateTo   = document.getElementById('qual-date-to')?.value   || '';
     if (fMktGroup)     extra += `&f_mkt_group=${encodeURIComponent(fMktGroup)}`;
     if (fLegacyId)     extra += `&f_legacy_id=${encodeURIComponent(fLegacyId)}`;
     if (fCampaignName) extra += `&f_campaign_name=${encodeURIComponent(fCampaignName)}`;
@@ -646,6 +663,8 @@
     if (fAffiliate)    extra += `&f_affiliate=${encodeURIComponent(fAffiliate)}`;
     if (fClass)        extra += `&f_classification=${encodeURIComponent(fClass)}`;
     if (ftcGroups)     extra += `&ftc_groups=${encodeURIComponent(ftcGroups)}`;
+    if (qDateFrom)     extra += `&q_date_from=${qDateFrom}`;
+    if (qDateTo)       extra += `&q_date_to=${qDateTo}`;
     return extra;
   }
 
@@ -1088,6 +1107,13 @@
   ['f-mkt-group','f-campaign-name','f-legacy-id','f-channel','f-sub-channel','f-affiliate'].forEach(id => _sddInit(id, []));
 
   document.getElementById('f-classification')?.addEventListener('change', () => { loadData(); loadTable(); });
+  document.getElementById('qual-date-from').addEventListener('change', () => { loadData(); loadTable(); });
+  document.getElementById('qual-date-to').addEventListener('change',   () => { loadData(); loadTable(); });
+  document.getElementById('btn-clear-qual').addEventListener('click',  () => {
+    document.getElementById('qual-date-from').value = '';
+    document.getElementById('qual-date-to').value   = '';
+    loadData(); loadTable();
+  });
   document.querySelectorAll('.ftc-cb').forEach(cb => cb.addEventListener('change', () => loadTable()));
 
   function toggleAllFtc(state) {
