@@ -11,6 +11,9 @@ _TZ = ZoneInfo("Europe/Nicosia")
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
+VALID_PERIODS = {"day", "month", "year"}
+PERIOD_LABELS = {"day": "Day", "month": "Month", "year": "Year", "none": ""}
+
 VALID_GROUPS = {
     "marketing_group":      "COALESCE(c.marketing_group, '(Unassigned)')",
     "campaign_legacy_id":   "COALESCE(c.campaign_legacy_id, '(Unassigned)')",
@@ -151,7 +154,7 @@ async def campaign_performance_api(request: Request, date_from: str, date_to: st
 @router.get("/api/campaign-performance/table")
 async def campaign_performance_table_api(
     request: Request, date_from: str, date_to: str,
-    group1: str = "none", group2: str = "none",
+    group1: str = "none", group2: str = "none", period: str = "none",
 ):
     user = await get_current_user(request)
     if isinstance(user, RedirectResponse):
@@ -161,8 +164,10 @@ async def campaign_performance_table_api(
         return JSONResponse(status_code=400, content={"detail": "Invalid group1"})
     if group2 not in VALID_GROUPS and group2 != "none":
         return JSONResponse(status_code=400, content={"detail": "Invalid group2"})
+    if period not in VALID_PERIODS and period != "none":
+        return JSONResponse(status_code=400, content={"detail": "Invalid period"})
 
-    _ck = f"camp_tbl_v1:{date_from}:{date_to}:{group1}:{group2}"
+    _ck = f"camp_tbl_v2:{date_from}:{date_to}:{group1}:{group2}:{period}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -173,10 +178,24 @@ async def campaign_performance_table_api(
     except ValueError:
         return JSONResponse(status_code=400, content={"detail": "Invalid date format"})
 
+    has_period = period != "none"
     has_g1 = group1 != "none"
     has_g2 = group2 != "none" and has_g1
     g1_sql = VALID_GROUPS.get(group1, "")
     g2_sql = VALID_GROUPS.get(group2, "")
+
+    # Period SQL — different date axes per query
+    if period == "day":
+        acct_period_sql = "a.createdtime::date"
+        txn_period_sql  = "t.confirmation_time::date"
+    elif period == "month":
+        acct_period_sql = "date_trunc('month', a.createdtime)::date"
+        txn_period_sql  = "date_trunc('month', t.confirmation_time)::date"
+    elif period == "year":
+        acct_period_sql = "date_trunc('year', a.createdtime)::date"
+        txn_period_sql  = "date_trunc('year', t.confirmation_time)::date"
+    else:
+        acct_period_sql = txn_period_sql = ""
 
     conn = get_connection()
     try:
@@ -185,6 +204,7 @@ async def campaign_performance_table_api(
             # ── Accounts query (leads, live_accounts, ftc) ──────────────────
             acct_sel, acct_grp = [], []
             p = 1
+            if has_period: acct_sel.append(f"{acct_period_sql} AS period"); acct_grp.append(str(p)); p += 1
             if has_g1: acct_sel.append(f"{g1_sql} AS g1"); acct_grp.append(str(p)); p += 1
             if has_g2: acct_sel.append(f"{g2_sql} AS g2"); acct_grp.append(str(p)); p += 1
             acct_sel += [
@@ -213,6 +233,7 @@ async def campaign_performance_table_api(
             # ── Transactions query (ftd, deposits, withdrawals, traders) ────
             txn_sel, txn_grp = [], []
             p = 1
+            if has_period: txn_sel.append(f"{txn_period_sql} AS period"); txn_grp.append(str(p)); p += 1
             if has_g1: txn_sel.append(f"{g1_sql} AS g1"); txn_grp.append(str(p)); p += 1
             if has_g2: txn_sel.append(f"{g2_sql} AS g2"); txn_grp.append(str(p)); p += 1
             txn_sel += [
@@ -251,28 +272,30 @@ async def campaign_performance_table_api(
         # ── Merge rows ───────────────────────────────────────────────────────
         def _parse_acct(r):
             off = 0
-            g1 = r[off] if has_g1 else None; off += int(has_g1)
-            g2 = r[off] if has_g2 else None; off += int(has_g2)
-            return g1, g2, int(r[off] or 0), int(r[off + 1] or 0), int(r[off + 2] or 0)
+            per = str(r[off]) if has_period else None; off += int(has_period)
+            g1  = r[off] if has_g1 else None;          off += int(has_g1)
+            g2  = r[off] if has_g2 else None;          off += int(has_g2)
+            return per, g1, g2, int(r[off] or 0), int(r[off + 1] or 0), int(r[off + 2] or 0)
 
         def _parse_txn(r):
             off = 0
-            g1 = r[off] if has_g1 else None; off += int(has_g1)
-            g2 = r[off] if has_g2 else None; off += int(has_g2)
-            return g1, g2, int(r[off] or 0), float(r[off + 1] or 0), float(r[off + 2] or 0), int(r[off + 3] or 0)
+            per = str(r[off]) if has_period else None; off += int(has_period)
+            g1  = r[off] if has_g1 else None;          off += int(has_g1)
+            g2  = r[off] if has_g2 else None;          off += int(has_g2)
+            return per, g1, g2, int(r[off] or 0), float(r[off + 1] or 0), float(r[off + 2] or 0), int(r[off + 3] or 0)
 
         merged: dict = {}
         for r in acct_rows:
-            g1, g2, leads, live, ftc = _parse_acct(r)
-            k = (g1, g2)
-            merged[k] = {"g1": g1, "g2": g2, "leads": leads, "live_accounts": live, "ftc": ftc,
+            per, g1, g2, leads, live, ftc = _parse_acct(r)
+            k = (per, g1, g2)
+            merged[k] = {"period": per, "g1": g1, "g2": g2, "leads": leads, "live_accounts": live, "ftc": ftc,
                          "ftd": 0, "deposits": 0.0, "withdrawals": 0.0, "net_deposits": 0.0, "traders": 0}
 
         for r in txn_rows:
-            g1, g2, ftd, deps, wds, traders = _parse_txn(r)
-            k = (g1, g2)
+            per, g1, g2, ftd, deps, wds, traders = _parse_txn(r)
+            k = (per, g1, g2)
             if k not in merged:
-                merged[k] = {"g1": g1, "g2": g2, "leads": 0, "live_accounts": 0, "ftc": 0,
+                merged[k] = {"period": per, "g1": g1, "g2": g2, "leads": 0, "live_accounts": 0, "ftc": 0,
                               "ftd": 0, "deposits": 0.0, "withdrawals": 0.0, "net_deposits": 0.0, "traders": 0}
             merged[k].update({
                 "ftd": ftd,
@@ -282,7 +305,10 @@ async def campaign_performance_table_api(
                 "traders": traders,
             })
 
-        rows = sorted(merged.values(), key=lambda r: r["deposits"], reverse=True)
+        if has_period:
+            rows = sorted(merged.values(), key=lambda r: (r["g1"] or "", r["g2"] or "", r["period"] or ""))
+        else:
+            rows = sorted(merged.values(), key=lambda r: r["deposits"], reverse=True)
 
         totals = {
             "leads":         sum(r["leads"] for r in rows),
@@ -300,6 +326,8 @@ async def campaign_performance_table_api(
             "totals":       totals,
             "group1_label": GROUP_LABELS.get(group1, ""),
             "group2_label": GROUP_LABELS.get(group2, ""),
+            "period":       period,
+            "period_label": PERIOD_LABELS.get(period, ""),
             "date_from":    date_from,
             "date_to":      date_to,
         }

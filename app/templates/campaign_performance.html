@@ -215,6 +215,14 @@
         <option value="campaign_sub_channel">Campaign Sub-channel</option>
         <option value="original_affiliate">Original Affiliate</option>
       </select>
+      <div class="filter-sep"></div>
+      <span class="text-muted small ms-2">Period</span>
+      <select id="sel-period" class="group-select">
+        <option value="none">— None —</option>
+        <option value="year">Year</option>
+        <option value="month">Month</option>
+        <option value="day">Day</option>
+      </select>
     </div>
 
     </div><!-- /filter-body -->
@@ -336,37 +344,19 @@
     <div class="card p-0">
       <div class="tbl-scroll">
         <table class="table table-sm mb-0" id="perf-table">
-          <thead>
-            <tr>
-              <th onclick="tblSort('g1')" style="min-width:160px;" id="th-group">
-                Group <i class="bi bi-arrow-down-up" style="font-size:0.65rem;" id="si-g1"></i>
-              </th>
-              <th onclick="tblSort('leads')" class="text-end">
-                Leads <i class="bi bi-arrow-down-up" style="font-size:0.65rem;" id="si-leads"></i>
-              </th>
-              <th onclick="tblSort('live_accounts')" class="text-end">
-                Live Accs <i class="bi bi-arrow-down-up" style="font-size:0.65rem;" id="si-live_accounts"></i>
-              </th>
-              <th onclick="tblSort('ftd')" class="text-end">
-                FTD <i class="bi bi-arrow-down-up" style="font-size:0.65rem;" id="si-ftd"></i>
-              </th>
-              <th onclick="tblSort('ftc')" class="text-end">
-                FTC <i class="bi bi-arrow-down-up" style="font-size:0.65rem;" id="si-ftc"></i>
-              </th>
-              <th onclick="tblSort('deposits')" class="text-end">
-                Deposits <i class="bi bi-arrow-down-up" style="font-size:0.65rem;" id="si-deposits"></i>
-              </th>
-              <th onclick="tblSort('withdrawals')" class="text-end">
-                Withdrawals <i class="bi bi-arrow-down-up" style="font-size:0.65rem;" id="si-withdrawals"></i>
-              </th>
-              <th onclick="tblSort('net_deposits')" class="text-end">
-                Net Dep <i class="bi bi-arrow-down-up" style="font-size:0.65rem;" id="si-net_deposits"></i>
-              </th>
-              <th onclick="tblSort('traders')" class="text-end">
-                Traders <i class="bi bi-arrow-down-up" style="font-size:0.65rem;" id="si-traders"></i>
-              </th>
-            </tr>
-          </thead>
+          <thead id="tbl-thead"><tr>
+            <th onclick="tblSort('g1')" style="min-width:160px;" id="th-group">
+              Group <i class="bi bi-arrow-down-up" style="font-size:0.65rem;" id="si-g1"></i>
+            </th>
+            <th onclick="tblSort('leads')" class="text-end">Leads <i class="bi bi-arrow-down-up" style="font-size:0.65rem;" id="si-leads"></i></th>
+            <th onclick="tblSort('live_accounts')" class="text-end">Live Accs <i class="bi bi-arrow-down-up" style="font-size:0.65rem;" id="si-live_accounts"></i></th>
+            <th onclick="tblSort('ftd')" class="text-end">FTD <i class="bi bi-arrow-down-up" style="font-size:0.65rem;" id="si-ftd"></i></th>
+            <th onclick="tblSort('ftc')" class="text-end">FTC <i class="bi bi-arrow-down-up" style="font-size:0.65rem;" id="si-ftc"></i></th>
+            <th onclick="tblSort('deposits')" class="text-end">Deposits <i class="bi bi-arrow-down-up" style="font-size:0.65rem;" id="si-deposits"></i></th>
+            <th onclick="tblSort('withdrawals')" class="text-end">Withdrawals <i class="bi bi-arrow-down-up" style="font-size:0.65rem;" id="si-withdrawals"></i></th>
+            <th onclick="tblSort('net_deposits')" class="text-end">Net Dep <i class="bi bi-arrow-down-up" style="font-size:0.65rem;" id="si-net_deposits"></i></th>
+            <th onclick="tblSort('traders')" class="text-end">Traders <i class="bi bi-arrow-down-up" style="font-size:0.65rem;" id="si-traders"></i></th>
+          </tr></thead>
           <tbody id="tbl-tbody">
             <tr><td colspan="9" class="text-center text-muted py-4">
               <div class="spinner-border spinner-border-sm text-secondary me-2"></div>Loading…
@@ -510,31 +500,33 @@
 
   // ── Table API fetch ──────────────────────────────────────────────────────
   async function loadTable(silent = false) {
-    const df = document.getElementById('date-from').value;
-    const dt = document.getElementById('date-to').value;
-    const g1 = document.getElementById('sel-group1').value;
-    const g2 = document.getElementById('sel-group2').value;
+    const df  = document.getElementById('date-from').value;
+    const dt  = document.getElementById('date-to').value;
+    const g1  = document.getElementById('sel-group1').value;
+    const g2  = document.getElementById('sel-group2').value;
+    const per = document.getElementById('sel-period').value;
     if (!df || !dt) return;
+
+    const colCount = 9 + (g1 !== 'none' ? 1 : 0) + (g1 !== 'none' && g2 !== 'none' ? 1 : 0) + (per !== 'none' ? 1 : 0);
 
     if (!silent) {
       const tbody = document.getElementById('tbl-tbody');
-      tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">'
+      tbody.innerHTML = `<tr><td colspan="${colCount}" class="text-center text-muted py-4">`
         + '<div class="spinner-border spinner-border-sm text-secondary me-2"></div>Loading…</td></tr>';
       document.getElementById('tbl-tfoot').innerHTML = '';
       document.getElementById('tbl-error').style.display = 'none';
     }
 
     // Update table title
-    const g1Label = document.getElementById('sel-group1').options[document.getElementById('sel-group1').selectedIndex].text;
-    const g2Label = document.getElementById('sel-group2').options[document.getElementById('sel-group2').selectedIndex].text;
-    const titleEl = document.getElementById('tbl-title');
-    if (g1 === 'none') {
-      titleEl.textContent = 'Performance Table';
-    } else if (g2 === 'none') {
-      titleEl.textContent = 'By ' + g1Label;
-    } else {
-      titleEl.textContent = 'By ' + g1Label + ' → ' + g2Label;
-    }
+    const g1Label  = document.getElementById('sel-group1').options[document.getElementById('sel-group1').selectedIndex].text;
+    const g2Label  = document.getElementById('sel-group2').options[document.getElementById('sel-group2').selectedIndex].text;
+    const perLabel = document.getElementById('sel-period').options[document.getElementById('sel-period').selectedIndex].text;
+    const titleEl  = document.getElementById('tbl-title');
+    const parts = [];
+    if (g1 !== 'none') parts.push(g1Label);
+    if (g1 !== 'none' && g2 !== 'none') parts.push(g2Label);
+    if (per !== 'none') parts.push(perLabel);
+    titleEl.textContent = parts.length ? 'By ' + parts.join(' → ') : 'Performance Table';
 
     // Update group column header
     const thGroup = document.getElementById('th-group');
@@ -545,7 +537,7 @@
     }
 
     try {
-      const res = await fetch(`/api/campaign-performance/table?date_from=${df}&date_to=${dt}&group1=${g1}&group2=${g2}`);
+      const res = await fetch(`/api/campaign-performance/table?date_from=${df}&date_to=${dt}&group1=${g1}&group2=${g2}&period=${per}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Server error');
       tblData = data;
@@ -558,6 +550,36 @@
         document.getElementById('tbl-error').style.display = 'block';
       }
     }
+  }
+
+  // ── Period formatter ─────────────────────────────────────────────────────
+  const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  function fmtPeriod(val, periodType) {
+    if (!val) return '—';
+    const d = new Date(val + 'T00:00:00');
+    if (periodType === 'year')  return String(d.getFullYear());
+    if (periodType === 'month') return MONTHS[d.getMonth()] + ' ' + d.getFullYear();
+    return val; // day: already YYYY-MM-DD
+  }
+
+  // ── Rebuild thead with period/group columns ───────────────────────────────
+  function rebuildThead(g1Label, g2Label, perLabel, hasG1, hasG2, hasPer) {
+    let html = '<tr>';
+    if (hasG1) html += `<th onclick="tblSort('g1')" style="min-width:140px;cursor:pointer;">${escHtml(g1Label)} <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>`;
+    if (hasG2) html += `<th onclick="tblSort('g2')" style="min-width:120px;cursor:pointer;">${escHtml(g2Label)} <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>`;
+    if (hasPer) html += `<th onclick="tblSort('period')" style="min-width:110px;cursor:pointer;">${escHtml(perLabel)} <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>`;
+    if (!hasG1 && !hasPer) html += `<th style="min-width:160px;">Group</th>`;
+    html += `
+      <th class="text-end" onclick="tblSort('leads')" style="cursor:pointer;">Leads <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+      <th class="text-end" onclick="tblSort('live_accounts')" style="cursor:pointer;">Live Accs <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+      <th class="text-end" onclick="tblSort('ftd')" style="cursor:pointer;">FTD <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+      <th class="text-end" onclick="tblSort('ftc')" style="cursor:pointer;">FTC <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+      <th class="text-end" onclick="tblSort('deposits')" style="cursor:pointer;">Deposits <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+      <th class="text-end" onclick="tblSort('withdrawals')" style="cursor:pointer;">Withdrawals <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+      <th class="text-end" onclick="tblSort('net_deposits')" style="cursor:pointer;">Net Dep <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+      <th class="text-end" onclick="tblSort('traders')" style="cursor:pointer;">Traders <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+    </tr>`;
+    document.getElementById('tbl-thead').innerHTML = html;
   }
 
   // ── Table render ─────────────────────────────────────────────────────────
@@ -577,14 +599,16 @@
     `;
   }
 
-  function renderFlatRow(r) {
-    return `<tr>
-      <td><span style="color:#c9d1d9;">${escHtml(r.g1)}</span></td>
-      ${metricCells(r, false)}
-    </tr>`;
+  function renderFlatRow(r, ctx) {
+    let cells = '';
+    if (ctx.hasG1) cells += `<td><span style="color:#c9d1d9;">${escHtml(r.g1)}</span></td>`;
+    if (ctx.hasG2) cells += `<td><span style="color:#8b949e;">${escHtml(r.g2)}</span></td>`;
+    if (ctx.hasPer) cells += `<td><span style="color:#d29922;">${escHtml(fmtPeriod(r.period, ctx.period))}</span></td>`;
+    if (!ctx.hasG1 && !ctx.hasPer) cells += `<td>—</td>`;
+    return `<tr>${cells}${metricCells(r, false)}</tr>`;
   }
 
-  function renderParentRow(g, expanded) {
+  function renderParentRow(g, expanded, ctx) {
     const icon = expanded ? 'bi-chevron-down' : 'bi-chevron-right';
     return `<tr style="background:rgba(63,185,80,0.02);">
       <td>
@@ -594,28 +618,29 @@
         </button>
         <strong style="color:#c9d1d9;">${escHtml(g.g1)}</strong>
       </td>
+      ${ctx.hasG2 ? '<td></td>' : ''}
+      ${ctx.hasPer ? '<td></td>' : ''}
       ${metricCells(g, false)}
     </tr>`;
   }
 
-  function renderChildRow(r) {
-    return `<tr style="background:rgba(0,0,0,0.15);">
-      <td style="padding-left:32px;"><span style="color:#8b949e;">${escHtml(r.g2)}</span></td>
-      ${metricCells(r, false)}
-    </tr>`;
+  function renderChildRow(r, ctx) {
+    let cells = `<td style="padding-left:32px;"><span style="color:#8b949e;">${escHtml(r.g2)}</span></td>`;
+    if (ctx.hasPer) cells += `<td><span style="color:#d29922;">${escHtml(fmtPeriod(r.period, ctx.period))}</span></td>`;
+    return `<tr style="background:rgba(0,0,0,0.15);">${cells}${metricCells(r, false)}</tr>`;
   }
 
-  function renderTotalsRow(totals) {
+  function renderTotalsRow(totals, colsBefore) {
     document.getElementById('tbl-tfoot').innerHTML =
       `<tr style="background:#1c2128;border-top:2px solid #388bfd;">
-        <td><strong style="color:#388bfd;">Total</strong></td>
+        <td colspan="${colsBefore}"><strong style="color:#388bfd;">Total</strong></td>
         ${metricCells(totals, true)}
       </tr>`;
   }
 
   function cmpRows(a, b) {
     let av = a[tblSortKey], bv = b[tblSortKey];
-    if (tblSortKey === 'g1' || tblSortKey === 'g2') {
+    if (tblSortKey === 'g1' || tblSortKey === 'g2' || tblSortKey === 'period') {
       av = String(av ?? ''); bv = String(bv ?? '');
       return tblSortDir * av.localeCompare(bv);
     }
@@ -625,33 +650,50 @@
 
   function renderTable() {
     if (!tblData) return;
-    const g1 = document.getElementById('sel-group1').value;
-    const g2 = document.getElementById('sel-group2').value;
+    const g1  = document.getElementById('sel-group1').value;
+    const g2  = document.getElementById('sel-group2').value;
+    const per = document.getElementById('sel-period').value;
+    const g1Label  = document.getElementById('sel-group1').options[document.getElementById('sel-group1').selectedIndex].text;
+    const g2Label  = document.getElementById('sel-group2').options[document.getElementById('sel-group2').selectedIndex].text;
+    const perLabel = document.getElementById('sel-period').options[document.getElementById('sel-period').selectedIndex].text;
     const hasG1 = g1 !== 'none';
     const hasG2 = hasG1 && g2 !== 'none';
+    const hasPer = per !== 'none';
+    const ctx = { hasG1, hasG2, hasPer, period: per };
+
+    // Rebuild thead
+    rebuildThead(g1Label, g2Label, perLabel, hasG1, hasG2, hasPer);
+
+    const colsBefore = (hasG1 ? 1 : 0) + (hasG2 ? 1 : 0) + (hasPer ? 1 : 0) || 1;
     const rows = tblData.rows || [];
     const totals = tblData.totals || {};
     const tbody = document.getElementById('tbl-tbody');
 
-    // Show/hide expand/collapse buttons
-    document.getElementById('tbl-expand-btns').style.display = hasG2 ? 'flex' : 'none';
+    // Show/hide expand/collapse buttons (only for g1+g2 without period)
+    document.getElementById('tbl-expand-btns').style.display = (hasG2 && !hasPer) ? 'flex' : 'none';
 
-    if (!hasG1) {
-      // No grouping — just totals row
-      tbody.innerHTML = '';
-      renderTotalsRow(totals);
+    // With period: always flat rows
+    if (hasPer || !hasG1) {
+      if (!hasG1 && !hasPer) {
+        tbody.innerHTML = '';
+        renderTotalsRow(totals, colsBefore);
+        return;
+      }
+      const sorted = [...rows].sort(cmpRows);
+      tbody.innerHTML = sorted.map(r => renderFlatRow(r, ctx)).join('');
+      renderTotalsRow(totals, colsBefore);
       return;
     }
 
     if (!hasG2) {
-      // Flat list sorted by current sort key + totals
+      // Flat list: g1 only
       const sorted = [...rows].sort(cmpRows);
-      tbody.innerHTML = sorted.map(r => renderFlatRow(r)).join('');
-      renderTotalsRow(totals);
+      tbody.innerHTML = sorted.map(r => renderFlatRow(r, ctx)).join('');
+      renderTotalsRow(totals, colsBefore);
       return;
     }
 
-    // Group1 + Group2 — aggregate g1 parent rows, expand/collapse
+    // Group1 + Group2, no period — aggregate g1 parent rows, expand/collapse
     const g1Map = {};
     rows.forEach(r => {
       const key = r.g1 ?? '(Unassigned)';
@@ -674,14 +716,14 @@
     let html = '';
     g1List.forEach(g => {
       const expanded = !!tblExpanded[g.g1 ?? '(Unassigned)'];
-      html += renderParentRow(g, expanded);
+      html += renderParentRow(g, expanded, ctx);
       if (expanded) {
         g.children.sort(cmpRows);
-        g.children.forEach(c => { html += renderChildRow(c); });
+        g.children.forEach(c => { html += renderChildRow(c, ctx); });
       }
     });
     tbody.innerHTML = html;
-    renderTotalsRow(totals);
+    renderTotalsRow(totals, colsBefore);
 
     // Attach expand toggle handlers
     tbody.querySelectorAll('.expand-toggle').forEach(btn => {
@@ -706,16 +748,20 @@
 
   function exportTbl() {
     if (!tblData) return;
-    const g1 = document.getElementById('sel-group1').value;
-    const g2 = document.getElementById('sel-group2').value;
+    const g1  = document.getElementById('sel-group1').value;
+    const g2  = document.getElementById('sel-group2').value;
+    const per = document.getElementById('sel-period').value;
     const hasG1 = g1 !== 'none';
     const hasG2 = hasG1 && g2 !== 'none';
-    const g1Label = tblData.group1_label || 'Group';
-    const g2Label = tblData.group2_label || 'Sub-group';
+    const hasPer = per !== 'none';
+    const g1Label  = tblData.group1_label || 'Group';
+    const g2Label  = tblData.group2_label || 'Sub-group';
+    const perLabel = tblData.period_label  || 'Period';
 
     const headers = [];
     if (hasG1) headers.push(g1Label);
     if (hasG2) headers.push(g2Label);
+    if (hasPer) headers.push(perLabel);
     headers.push('Leads','Live Accounts','FTD','FTC','Deposits','Withdrawals','Net Deposits','Traders');
 
     const esc = v => '"' + String(v ?? '').replace(/"/g,'""') + '"';
@@ -725,6 +771,7 @@
       const cols = [];
       if (hasG1) cols.push(esc(r.g1));
       if (hasG2) cols.push(esc(r.g2));
+      if (hasPer) cols.push(esc(fmtPeriod(r.period, per)));
       cols.push(r.leads, r.live_accounts, r.ftd, r.ftc, r.deposits, r.withdrawals, r.net_deposits, r.traders);
       lines.push(cols.join(','));
     });
@@ -789,9 +836,10 @@
     loadData(); loadTable();
   });
 
-  // Group dropdown changes only reload the table (not KPI cards)
+  // Group/period dropdown changes only reload the table (not KPI cards)
   document.getElementById('sel-group1').addEventListener('change', () => loadTable());
   document.getElementById('sel-group2').addEventListener('change', () => loadTable());
+  document.getElementById('sel-period').addEventListener('change', () => loadTable());
 
   // ── Init ─────────────────────────────────────────────────────────────────
   document.getElementById('date-from').value = firstOfMonth(state.year, state.month);
