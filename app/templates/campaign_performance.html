@@ -57,7 +57,9 @@
     .table tbody tr { border-color: #21262d; }
     .table tbody tr:hover { background-color: rgba(255,255,255,0.025); }
     .table td { border-color: #21262d; vertical-align: middle; font-size: 0.85rem; padding: 7px 10px; }
-    .tbl-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .tbl-scroll { overflow-x: auto; overflow-y: auto; max-height: 65vh; -webkit-overflow-scrolling: touch; }
+    #perf-table thead tr { position: sticky; top: 0; z-index: 2; }
+    #perf-table tfoot tr { position: sticky; bottom: 0; z-index: 2; }
 
     /* Spinner */
     #loading { display: none; text-align: center; padding: 60px; color: #8b949e; }
@@ -367,6 +369,7 @@
               <div class="spinner-border spinner-border-sm text-secondary me-2"></div>Loading…
             </td></tr>
           </tbody>
+        <tfoot id="tbl-tfoot"></tfoot>
         </table>
       </div>
       <div id="tbl-error" class="text-danger text-center p-3 small" style="display:none;"></div>
@@ -509,6 +512,7 @@
     const tbody = document.getElementById('tbl-tbody');
     tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">'
       + '<div class="spinner-border spinner-border-sm text-secondary me-2"></div>Loading…</td></tr>';
+    document.getElementById('tbl-tfoot').innerHTML = '';
     document.getElementById('tbl-error').style.display = 'none';
 
     // Update table title
@@ -591,10 +595,11 @@
   }
 
   function renderTotalsRow(totals) {
-    return `<tr style="background:#1c2128;border-top:2px solid #30363d;">
-      <td><strong style="color:#388bfd;">Total</strong></td>
-      ${metricCells(totals, true)}
-    </tr>`;
+    document.getElementById('tbl-tfoot').innerHTML =
+      `<tr style="background:#1c2128;border-top:2px solid #388bfd;">
+        <td><strong style="color:#388bfd;">Total</strong></td>
+        ${metricCells(totals, true)}
+      </tr>`;
   }
 
   function cmpRows(a, b) {
@@ -622,14 +627,16 @@
 
     if (!hasG1) {
       // No grouping — just totals row
-      tbody.innerHTML = renderTotalsRow(totals);
+      tbody.innerHTML = '';
+      renderTotalsRow(totals);
       return;
     }
 
     if (!hasG2) {
       // Flat list sorted by current sort key + totals
       const sorted = [...rows].sort(cmpRows);
-      tbody.innerHTML = sorted.map(r => renderFlatRow(r)).join('') + renderTotalsRow(totals);
+      tbody.innerHTML = sorted.map(r => renderFlatRow(r)).join('');
+      renderTotalsRow(totals);
       return;
     }
 
@@ -662,8 +669,8 @@
         g.children.forEach(c => { html += renderChildRow(c); });
       }
     });
-    html += renderTotalsRow(totals);
     tbody.innerHTML = html;
+    renderTotalsRow(totals);
 
     // Attach expand toggle handlers
     tbody.querySelectorAll('.expand-toggle').forEach(btn => {
