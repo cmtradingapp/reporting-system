@@ -62,12 +62,8 @@ def _get_country_map() -> dict:
         result = get_country_map()
         if result:
             _country_map_cache = result
-            print(f"[country_map] loaded {len(result)} countries OK")
-        else:
-            print("[country_map] MSSQL returned empty result")
         return result or {}
-    except Exception as e:
-        print(f"[country_map] ERROR: {e}")
+    except Exception:
         return {}
 
 
@@ -505,10 +501,6 @@ def _camp_table_calc(
         # Translate country ISO codes to full names
         if group1 == "country" or group2 == "country":
             cmap = _get_country_map()
-            sample_keys = list(cmap.keys())[:5]
-            sample_g1   = [r.get("g1") for r in list(merged.values())[:3]]
-            print(f"[country_map] cmap sample keys: {sample_keys}")
-            print(f"[country_map] g1 sample values: {sample_g1}")
             for row in merged.values():
                 if group1 == "country" and row.get("g1") and row["g1"] != "(Unassigned)":
                     row["g1"] = cmap.get(row["g1"].strip().upper(), row["g1"])

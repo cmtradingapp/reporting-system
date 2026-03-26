@@ -202,7 +202,7 @@ def get_country_map() -> dict:
     try:
         query = "SELECT iso2code, name FROM report.countries WHERE iso2code IS NOT NULL AND iso2code <> ''"
         df = pd.read_sql(query, conn)
-        return {str(r.iso2code).strip().upper(): str(r.name).strip() for _, r in df.iterrows()}
+        return {str(r['iso2code']).strip().upper(): str(r['name']).strip() for _, r in df.iterrows()}
     except Exception:
         return {}
     finally:
