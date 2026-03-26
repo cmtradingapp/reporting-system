@@ -93,12 +93,16 @@ async def campaign_performance_api(request: Request, date_from: str, date_to: st
             cur.execute("""
                 SELECT COUNT(DISTINCT t.vtigeraccountid)
                 FROM transactions t
-                JOIN accounts a ON a.accountid = t.vtigeraccountid
+                JOIN accounts a  ON a.accountid = t.vtigeraccountid
+                JOIN crm_users u ON u.id = t.original_deposit_owner
                 WHERE t.transactionapproval = 'Approved'
                   AND (t.deleted = 0 OR t.deleted IS NULL)
                   AND t.transactiontype IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
                   AND t.vtigeraccountid IS NOT NULL
                   AND a.is_test_account = 0
+                  AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
+                  AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
+                  AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'
                   AND t.confirmation_time::date >= %(date_from)s
                   AND t.confirmation_time::date <  %(date_to_excl)s
                   AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
