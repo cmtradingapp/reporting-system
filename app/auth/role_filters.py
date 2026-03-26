@@ -19,7 +19,7 @@ ROLE_MAP = {
 
 def get_role_filter(user: dict) -> dict:
     role = user['role']
-    if role in ('admin', 'general'):
+    if role in ('admin', 'general', 'marketing'):
         return {'crm_where': '', 'crm_params': [], 'is_full_access': True, 'filter_type': 'none'}
     if role == 'agent':
         return {

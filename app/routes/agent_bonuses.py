@@ -128,6 +128,8 @@ async def agent_bonuses_page(request: Request):
     if isinstance(user, RedirectResponse):
         return user
     role = user.get("role", "")
+    if role == "marketing":
+        return RedirectResponse(url="/campaign-performance", status_code=302)
     if role == "agent":
         dept = user.get("department_") or ""
         show_sales = dept != "Retention"
