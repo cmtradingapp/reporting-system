@@ -521,7 +521,15 @@ def ensure_table():
         );
         CREATE INDEX IF NOT EXISTS idx_campaigns_campaign_id ON campaigns (campaign_id);
         CREATE INDEX IF NOT EXISTS idx_campaigns_active      ON campaigns (active);
-        ALTER TABLE campaigns ALTER COLUMN active TYPE SMALLINT USING CASE WHEN active THEN 1 ELSE 0 END;
+        DO $$ BEGIN
+            IF EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'campaigns' AND column_name = 'active'
+                  AND data_type = 'boolean'
+            ) THEN
+                ALTER TABLE campaigns ALTER COLUMN active TYPE SMALLINT USING active::int;
+            END IF;
+        END $$;
 
     """
     conn = get_connection()
