@@ -60,6 +60,32 @@ def _is_healthy(sync_log: list, interval_hours: int) -> bool:
     return last_ran >= threshold
 
 
+def warm_data_sync_cache():
+    """Pre-heat all stats and log caches for the data sync page."""
+    _cached("accounts_stats",  fetch_accounts_stats)
+    _cached("users_stats",     fetch_crm_users_stats)
+    _cached("tx_stats",        fetch_transactions_stats)
+    _cached("targets_stats",   fetch_targets_stats)
+    _cached("ta_stats",        fetch_trading_accounts_stats)
+    _cached("ftd100_stats",    fetch_ftd100_stats)
+    _cached("du_stats",        fetch_dealio_users_stats)
+    _cached("dtm4_stats",      fetch_dealio_trades_mt4_stats)
+    _cached("ddps_stats",      fetch_dealio_daily_profits_stats)
+    _cached("bonus_stats",     fetch_bonus_transactions_stats)
+    _cached("campaigns_stats", fetch_campaigns_stats)
+    _cached("accounts_log",    lambda: fetch_sync_log("crm_accounts",         limit=20))
+    _cached("users_log",       lambda: fetch_sync_log("crm_users",            limit=20))
+    _cached("tx_log",          lambda: fetch_sync_log("transactions",         limit=20))
+    _cached("targets_log",     lambda: fetch_sync_log("targets",              limit=20))
+    _cached("ta_log",          lambda: fetch_sync_log("trading_accounts",     limit=20))
+    _cached("ftd100_log",      lambda: fetch_sync_log("ftd100_clients",       limit=20))
+    _cached("du_log",          lambda: fetch_sync_log("dealio_users",         limit=20))
+    _cached("dtm4_log",        lambda: fetch_sync_log("dealio_trades_mt4",    limit=20))
+    _cached("ddps_log",        lambda: fetch_sync_log("dealio_daily_profits", limit=20))
+    _cached("bonus_log",       lambda: fetch_sync_log("bonus_transactions",   limit=20))
+    _cached("campaigns_log",   lambda: fetch_sync_log("campaigns",            limit=20))
+
+
 @router.get("/data-sync", response_class=HTMLResponse)
 async def data_sync_page(request: Request):
     user = await get_current_user(request)

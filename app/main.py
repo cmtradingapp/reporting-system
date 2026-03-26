@@ -16,6 +16,7 @@ from app.routes.holidays import router as holidays_router
 from app.routes.auth import router as auth_router
 from app.routes.users_mgmt import router as users_mgmt_router
 from app.routes.dashboard import router as dashboard_router, _dashboard_calc
+from app.routes.data_sync import warm_data_sync_cache
 from app.routes.last_sync import router as last_sync_router
 from app.routes.client_classification_sync import router as client_classification_sync_router
 from app.routes.dealio_new_sync import router as dealio_new_sync_router
@@ -50,6 +51,11 @@ def warm_cache():
         cache.set(_ck, _live_calc(today))
     except Exception as e:
         print(f"[warm_cache] live_eez: {e}")
+
+    try:
+        warm_data_sync_cache()
+    except Exception as e:
+        print(f"[warm_cache] data_sync: {e}")
 
 SYNC_INTERVAL_MINUTES          = int(os.getenv("SYNC_INTERVAL_MINUTES", "1"))
 TRANSACTIONS_SYNC_INTERVAL_MINUTES = int(os.getenv("TRANSACTIONS_SYNC_INTERVAL_MINUTES", "1"))
