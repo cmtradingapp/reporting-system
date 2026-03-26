@@ -429,13 +429,15 @@
   }
 
   // ── KPI API fetch ────────────────────────────────────────────────────────
-  async function loadData() {
+  async function loadData(silent = false) {
     const df = document.getElementById('date-from').value;
     const dt = document.getElementById('date-to').value;
     if (!df || !dt) return;
 
-    document.getElementById('loading').style.display = 'block';
-    document.getElementById('error-msg').style.display = 'none';
+    if (!silent) {
+      document.getElementById('loading').style.display = 'block';
+      document.getElementById('error-msg').style.display = 'none';
+    }
 
     try {
       const res = await fetch(`/api/campaign-performance?date_from=${df}&date_to=${dt}`);
@@ -443,10 +445,12 @@
       if (!res.ok) throw new Error(data.detail || 'Server error');
       updateStats(data);
     } catch(e) {
-      document.getElementById('error-msg').textContent = 'Error: ' + e.message;
-      document.getElementById('error-msg').style.display = 'block';
+      if (!silent) {
+        document.getElementById('error-msg').textContent = 'Error: ' + e.message;
+        document.getElementById('error-msg').style.display = 'block';
+      }
     } finally {
-      document.getElementById('loading').style.display = 'none';
+      if (!silent) document.getElementById('loading').style.display = 'none';
     }
   }
 
@@ -504,18 +508,20 @@
   }
 
   // ── Table API fetch ──────────────────────────────────────────────────────
-  async function loadTable() {
+  async function loadTable(silent = false) {
     const df = document.getElementById('date-from').value;
     const dt = document.getElementById('date-to').value;
     const g1 = document.getElementById('sel-group1').value;
     const g2 = document.getElementById('sel-group2').value;
     if (!df || !dt) return;
 
-    const tbody = document.getElementById('tbl-tbody');
-    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">'
-      + '<div class="spinner-border spinner-border-sm text-secondary me-2"></div>Loading…</td></tr>';
-    document.getElementById('tbl-tfoot').innerHTML = '';
-    document.getElementById('tbl-error').style.display = 'none';
+    if (!silent) {
+      const tbody = document.getElementById('tbl-tbody');
+      tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">'
+        + '<div class="spinner-border spinner-border-sm text-secondary me-2"></div>Loading…</td></tr>';
+      document.getElementById('tbl-tfoot').innerHTML = '';
+      document.getElementById('tbl-error').style.display = 'none';
+    }
 
     // Update table title
     const g1Label = document.getElementById('sel-group1').options[document.getElementById('sel-group1').selectedIndex].text;
@@ -542,12 +548,14 @@
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Server error');
       tblData = data;
-      tblExpanded = {};
+      if (!silent) tblExpanded = {};
       renderTable();
     } catch(e) {
-      tbody.innerHTML = '';
-      document.getElementById('tbl-error').textContent = 'Error: ' + e.message;
-      document.getElementById('tbl-error').style.display = 'block';
+      if (!silent) {
+        document.getElementById('tbl-tbody').innerHTML = '';
+        document.getElementById('tbl-error').textContent = 'Error: ' + e.message;
+        document.getElementById('tbl-error').style.display = 'block';
+      }
     }
   }
 
@@ -850,7 +858,7 @@
     updateSyncBar();
     const today = new Date().toISOString().split('T')[0];
     const dt = document.getElementById('date-to').value;
-    if (dt === today) { loadData(); loadTable(); }
+    if (dt === today) { loadData(true); loadTable(true); }
   }, 60000);
 </script>
 
