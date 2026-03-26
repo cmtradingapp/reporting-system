@@ -46,27 +46,13 @@ async def campaign_performance_page(request: Request):
     })
 
 
-@router.get("/api/campaign-performance")
-async def campaign_performance_api(request: Request, date_from: str, date_to: str):
-    user = await get_current_user(request)
-    if isinstance(user, RedirectResponse):
-        return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
-
-    _ck = f"camp_perf_v1:{date_from}:{date_to}"
-    _hit = cache.get(_ck)
-    if _hit is not None:
-        return JSONResponse(content=_hit)
-
-    try:
-        dt_to = datetime.strptime(date_to, "%Y-%m-%d").date()
-        date_to_exclusive = (dt_to + timedelta(days=1)).strftime("%Y-%m-%d")
-    except ValueError:
-        return JSONResponse(status_code=400, content={"detail": "Invalid date format"})
+def _camp_kpi_calc(date_from: str, date_to: str) -> dict:
+    dt_to = datetime.strptime(date_to, "%Y-%m-%d").date()
+    date_to_exclusive = (dt_to + timedelta(days=1)).strftime("%Y-%m-%d")
 
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            # Leads + Live Accounts (always today / MTD from mv_account_stats)
             cur.execute("""
                 SELECT new_leads_today, new_leads_month, new_live_today, new_live_month
                 FROM mv_account_stats LIMIT 1
@@ -79,7 +65,6 @@ async def campaign_performance_api(request: Request, date_from: str, date_to: st
             else:
                 leads_today = leads_mtd = live_today = live_mtd = 0
 
-            # Deposits, Withdrawals, Net, FTD daily + MTD (tx_date axis)
             cur.execute("""
                 SELECT
                     COALESCE(SUM(deposit_usd),    0)                                                AS deposits,
@@ -100,7 +85,6 @@ async def campaign_performance_api(request: Request, date_from: str, date_to: st
             else:
                 deposits_total = withdrawals_total = net_total = ftd_mtd = ftd_daily = 0
 
-            # FTC daily + MTD (qual_date axis)
             cur.execute("""
                 SELECT
                     COALESCE(SUM(ftc_count), 0)                                                     AS ftc_mtd,
@@ -112,7 +96,6 @@ async def campaign_performance_api(request: Request, date_from: str, date_to: st
             ftc_mtd   = int(row[0] or 0) if row else 0
             ftc_daily = int(row[1] or 0) if row else 0
 
-            # Number of Traders — distinct non-test accounts with approved transactions
             cur.execute("""
                 SELECT COUNT(DISTINCT t.vtigeraccountid)
                 FROM transactions t
@@ -133,7 +116,7 @@ async def campaign_performance_api(request: Request, date_from: str, date_to: st
             row = cur.fetchone()
             traders_count = int(row[0] or 0) if row else 0
 
-        _result = {
+        return {
             "leads":         {"daily": leads_today, "mtd": leads_mtd},
             "live_accounts": {"daily": live_today,  "mtd": live_mtd},
             "ftd":           {"daily": ftd_daily,   "mtd": ftd_mtd},
@@ -145,40 +128,37 @@ async def campaign_performance_api(request: Request, date_from: str, date_to: st
             "date_from":     date_from,
             "date_to":       date_to,
         }
-        cache.set(_ck, _result)
-        return JSONResponse(content=_result)
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"detail": str(e)})
     finally:
         conn.close()
 
 
-@router.get("/api/campaign-performance/table")
-async def campaign_performance_table_api(
-    request: Request, date_from: str, date_to: str,
-    group1: str = "none", group2: str = "none", period: str = "none",
-):
+@router.get("/api/campaign-performance")
+async def campaign_performance_api(request: Request, date_from: str, date_to: str):
     user = await get_current_user(request)
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
-    if group1 not in VALID_GROUPS and group1 != "none":
-        return JSONResponse(status_code=400, content={"detail": "Invalid group1"})
-    if group2 not in VALID_GROUPS and group2 != "none":
-        return JSONResponse(status_code=400, content={"detail": "Invalid group2"})
-    if period not in VALID_PERIODS and period != "none":
-        return JSONResponse(status_code=400, content={"detail": "Invalid period"})
-
-    _ck = f"camp_tbl_v2:{date_from}:{date_to}:{group1}:{group2}:{period}"
+    _ck = f"camp_perf_v1:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
 
     try:
-        dt_to = datetime.strptime(date_to, "%Y-%m-%d").date()
-        date_to_exclusive = (dt_to + timedelta(days=1)).strftime("%Y-%m-%d")
+        datetime.strptime(date_to, "%Y-%m-%d")
     except ValueError:
         return JSONResponse(status_code=400, content={"detail": "Invalid date format"})
+
+    try:
+        _result = _camp_kpi_calc(date_from, date_to)
+        cache.set(_ck, _result)
+        return JSONResponse(content=_result)
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+
+
+def _camp_table_calc(date_from: str, date_to: str, group1: str = "none", group2: str = "none", period: str = "none") -> dict:
+    dt_to = datetime.strptime(date_to, "%Y-%m-%d").date()
+    date_to_exclusive = (dt_to + timedelta(days=1)).strftime("%Y-%m-%d")
 
     has_period = period != "none"
     has_g1 = group1 != "none"
@@ -186,7 +166,6 @@ async def campaign_performance_table_api(
     g1_sql = VALID_GROUPS.get(group1, "")
     g2_sql = VALID_GROUPS.get(group2, "")
 
-    # Period SQL — different date axes per query
     if period == "day":
         acct_period_sql = "a.createdtime::date"
         txn_period_sql  = "t.confirmation_time::date"
@@ -202,8 +181,6 @@ async def campaign_performance_table_api(
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-
-            # ── Accounts query (leads, live_accounts, ftc) ──────────────────
             acct_sel, acct_grp = [], []
             p = 1
             if has_period: acct_sel.append(f"{acct_period_sql} AS period"); acct_grp.append(str(p)); p += 1
@@ -228,11 +205,9 @@ async def campaign_performance_table_api(
             )
             if acct_grp:
                 acct_sql += f" GROUP BY {', '.join(acct_grp)}"
-
             cur.execute(acct_sql, {"date_from": date_from, "date_to_excl": date_to_exclusive})
             acct_rows = cur.fetchall()
 
-            # ── Transactions query (ftd, deposits, withdrawals, traders) ────
             txn_sel, txn_grp = [], []
             p = 1
             if has_period: txn_sel.append(f"{txn_period_sql} AS period"); txn_grp.append(str(p)); p += 1
@@ -267,11 +242,9 @@ async def campaign_performance_table_api(
             )
             if txn_grp:
                 txn_sql += f" GROUP BY {', '.join(txn_grp)}"
-
             cur.execute(txn_sql, {"date_from": date_from, "date_to_excl": date_to_exclusive})
             txn_rows = cur.fetchall()
 
-        # ── Merge rows ───────────────────────────────────────────────────────
         def _parse_acct(r):
             off = 0
             per = str(r[off]) if has_period else None; off += int(has_period)
@@ -337,7 +310,7 @@ async def campaign_performance_table_api(
             "traders":       sum(r["traders"] for r in rows),
         })
 
-        _result = {
+        return {
             "rows":         rows,
             "totals":       totals,
             "group1_label": GROUP_LABELS.get(group1, ""),
@@ -347,9 +320,39 @@ async def campaign_performance_table_api(
             "date_from":    date_from,
             "date_to":      date_to,
         }
+    finally:
+        conn.close()
+
+
+@router.get("/api/campaign-performance/table")
+async def campaign_performance_table_api(
+    request: Request, date_from: str, date_to: str,
+    group1: str = "none", group2: str = "none", period: str = "none",
+):
+    user = await get_current_user(request)
+    if isinstance(user, RedirectResponse):
+        return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+
+    if group1 not in VALID_GROUPS and group1 != "none":
+        return JSONResponse(status_code=400, content={"detail": "Invalid group1"})
+    if group2 not in VALID_GROUPS and group2 != "none":
+        return JSONResponse(status_code=400, content={"detail": "Invalid group2"})
+    if period not in VALID_PERIODS and period != "none":
+        return JSONResponse(status_code=400, content={"detail": "Invalid period"})
+
+    _ck = f"camp_tbl_v2:{date_from}:{date_to}:{group1}:{group2}:{period}"
+    _hit = cache.get(_ck)
+    if _hit is not None:
+        return JSONResponse(content=_hit)
+
+    try:
+        datetime.strptime(date_to, "%Y-%m-%d")
+    except ValueError:
+        return JSONResponse(status_code=400, content={"detail": "Invalid date format"})
+
+    try:
+        _result = _camp_table_calc(date_from, date_to, group1, group2, period)
         cache.set(_ck, _result)
         return JSONResponse(content=_result)
     except Exception as e:
         return JSONResponse(status_code=500, content={"detail": str(e)})
-    finally:
-        conn.close()
