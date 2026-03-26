@@ -570,19 +570,19 @@
     if (hasPer) html += `<th onclick="tblSort('period')" style="min-width:110px;cursor:pointer;">${escHtml(perLabel)} <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>`;
     if (!hasG1 && !hasPer) html += `<th style="min-width:160px;">Group</th>`;
     html += `
-      <th class="text-end" onclick="tblSort('leads')" style="cursor:pointer;">Leads <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
-      <th class="text-end" onclick="tblSort('live_accounts')" style="cursor:pointer;">Live Accs <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
-      <th class="text-end" onclick="tblSort('ftd')" style="cursor:pointer;">FTD <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
-      <th class="text-end" onclick="tblSort('ftc')" style="cursor:pointer;">FTC <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
-      <th class="text-end" onclick="tblSort('deposits')" style="cursor:pointer;">Deposits <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
-      <th class="text-end" onclick="tblSort('withdrawals')" style="cursor:pointer;">Withdrawals <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
-      <th class="text-end" onclick="tblSort('net_deposits')" style="cursor:pointer;">Net Dep <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
-      <th class="text-end" onclick="tblSort('traders')" style="cursor:pointer;">Traders <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
-      <th class="text-end" onclick="tblSort('cr_lead_to_live')" style="cursor:pointer;white-space:nowrap;">CR% Lead→Live <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
-      <th class="text-end" onclick="tblSort('cr_live_to_ftd')" style="cursor:pointer;white-space:nowrap;">CR% Live→FTD <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
-      <th class="text-end" onclick="tblSort('cr_lead_to_ftc')" style="cursor:pointer;white-space:nowrap;">CR% Lead→FTC <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
-      <th class="text-end" onclick="tblSort('cr_live_to_ftc')" style="cursor:pointer;white-space:nowrap;">CR% Live→FTC <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
-      <th class="text-end" onclick="tblSort('cr_ftd_to_ftc')" style="cursor:pointer;white-space:nowrap;">CR% FTD→FTC <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+      <th class="text-center" onclick="tblSort('leads')" style="cursor:pointer;">Leads <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+      <th class="text-center" onclick="tblSort('live_accounts')" style="cursor:pointer;">Live Accs <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+      <th class="text-center" onclick="tblSort('ftd')" style="cursor:pointer;">FTD <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+      <th class="text-center" onclick="tblSort('ftc')" style="cursor:pointer;">FTC <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+      <th class="text-center" onclick="tblSort('cr_lead_to_live')" style="cursor:pointer;white-space:nowrap;">CR% Lead→Live <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+      <th class="text-center" onclick="tblSort('cr_live_to_ftd')" style="cursor:pointer;white-space:nowrap;">CR% Live→FTD <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+      <th class="text-center" onclick="tblSort('cr_lead_to_ftc')" style="cursor:pointer;white-space:nowrap;">CR% Lead→FTC <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+      <th class="text-center" onclick="tblSort('cr_live_to_ftc')" style="cursor:pointer;white-space:nowrap;">CR% Live→FTC <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+      <th class="text-center" onclick="tblSort('cr_ftd_to_ftc')" style="cursor:pointer;white-space:nowrap;">CR% FTD→FTC <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+      <th class="text-center" onclick="tblSort('deposits')" style="cursor:pointer;">Deposits <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+      <th class="text-center" onclick="tblSort('withdrawals')" style="cursor:pointer;">Withdrawals <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+      <th class="text-center" onclick="tblSort('net_deposits')" style="cursor:pointer;">Net Dep <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+      <th class="text-center" onclick="tblSort('traders')" style="cursor:pointer;">Traders <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
     </tr>`;
     document.getElementById('tbl-thead').innerHTML = html;
   }
@@ -599,19 +599,19 @@
     const style = isTotal ? 'font-weight:600;' : '';
     const fmtN = v => (v ?? 0).toLocaleString('en-US');
     return `
-      <td class="text-end" style="${style}">${fmtN(r.leads)}</td>
-      <td class="text-end" style="${style}">${fmtN(r.live_accounts)}</td>
-      <td class="text-end" style="${style}">${fmtN(r.ftd)}</td>
-      <td class="text-end" style="${style}">${fmtN(r.ftc)}</td>
-      <td class="text-end" style="color:#3fb950;${style}">${fmtMoney(r.deposits)}</td>
-      <td class="text-end" style="color:#f85149;${style}">${fmtMoney(r.withdrawals)}</td>
-      <td class="text-end" style="color:${net >= 0 ? '#3fb950' : '#f85149'};${style}">${fmtMoney(net)}</td>
-      <td class="text-end" style="${style}">${fmtN(r.traders)}</td>
-      <td class="text-end" style="${style}">${fmtCr(r.cr_lead_to_live)}</td>
-      <td class="text-end" style="${style}">${fmtCr(r.cr_live_to_ftd)}</td>
-      <td class="text-end" style="${style}">${fmtCr(r.cr_lead_to_ftc)}</td>
-      <td class="text-end" style="${style}">${fmtCr(r.cr_live_to_ftc)}</td>
-      <td class="text-end" style="${style}">${fmtCr(r.cr_ftd_to_ftc)}</td>
+      <td class="text-center" style="${style}">${fmtN(r.leads)}</td>
+      <td class="text-center" style="${style}">${fmtN(r.live_accounts)}</td>
+      <td class="text-center" style="${style}">${fmtN(r.ftd)}</td>
+      <td class="text-center" style="${style}">${fmtN(r.ftc)}</td>
+      <td class="text-center" style="${style}">${fmtCr(r.cr_lead_to_live)}</td>
+      <td class="text-center" style="${style}">${fmtCr(r.cr_live_to_ftd)}</td>
+      <td class="text-center" style="${style}">${fmtCr(r.cr_lead_to_ftc)}</td>
+      <td class="text-center" style="${style}">${fmtCr(r.cr_live_to_ftc)}</td>
+      <td class="text-center" style="${style}">${fmtCr(r.cr_ftd_to_ftc)}</td>
+      <td class="text-center" style="color:#3fb950;${style}">${fmtMoney(r.deposits)}</td>
+      <td class="text-center" style="color:#f85149;${style}">${fmtMoney(r.withdrawals)}</td>
+      <td class="text-center" style="color:${net >= 0 ? '#3fb950' : '#f85149'};${style}">${fmtMoney(net)}</td>
+      <td class="text-center" style="${style}">${fmtN(r.traders)}</td>
     `;
   }
 
@@ -778,7 +778,7 @@
     if (hasG1) headers.push(g1Label);
     if (hasG2) headers.push(g2Label);
     if (hasPer) headers.push(perLabel);
-    headers.push('Leads','Live Accounts','FTD','FTC','Deposits','Withdrawals','Net Deposits','Traders','CR% Lead→Live','CR% Live→FTD','CR% Lead→FTC','CR% Live→FTC','CR% FTD→FTC');
+    headers.push('Leads','Live Accounts','FTD','FTC','CR% Lead→Live','CR% Live→FTD','CR% Lead→FTC','CR% Live→FTC','CR% FTD→FTC','Deposits','Withdrawals','Net Deposits','Traders');
 
     const esc = v => '"' + String(v ?? '').replace(/"/g,'""') + '"';
     const lines = [headers.join(',')];
@@ -788,8 +788,9 @@
       if (hasG1) cols.push(esc(r.g1));
       if (hasG2) cols.push(esc(r.g2));
       if (hasPer) cols.push(esc(fmtPeriod(r.period, per)));
-      cols.push(r.leads, r.live_accounts, r.ftd, r.ftc, r.deposits, r.withdrawals, r.net_deposits, r.traders,
-                r.cr_lead_to_live, r.cr_live_to_ftd, r.cr_lead_to_ftc, r.cr_live_to_ftc, r.cr_ftd_to_ftc);
+      cols.push(r.leads, r.live_accounts, r.ftd, r.ftc,
+                r.cr_lead_to_live, r.cr_live_to_ftd, r.cr_lead_to_ftc, r.cr_live_to_ftc, r.cr_ftd_to_ftc,
+                r.deposits, r.withdrawals, r.net_deposits, r.traders);
       lines.push(cols.join(','));
     });
 
