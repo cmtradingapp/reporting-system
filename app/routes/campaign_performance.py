@@ -478,11 +478,16 @@ def _camp_table_calc(
                 " AND a.client_qualification_date::date >= %(date_from)s"
                 " AND a.client_qualification_date::date < %(date_to_excl)s) AS ftc",
             ]
+            acct_date_filter = (
+                " AND a.createdtime::date >= %(date_from)s AND a.createdtime::date < %(date_to_excl)s"
+                if has_period else ""
+            )
             acct_sql = (
                 f"SELECT {', '.join(acct_sel)}"
                 " FROM accounts a LEFT JOIN campaigns c ON SPLIT_PART(a.campaign, '.', 1) = c.crmid"
                 f"{extra_joins}"
                 " WHERE a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)"
+                f"{acct_date_filter}"
                 f"\n{filter_where}"
             )
             if acct_grp:
@@ -598,7 +603,13 @@ def _camp_table_calc(
             _add_cr(row)
 
         if has_period:
-            rows = sorted(merged.values(), key=lambda r: (r["g1"] or "", r["g2"] or "", r["period"] or ""))
+            dt_from = datetime.strptime(date_from, "%Y-%m-%d").date()
+            rows = sorted(
+                (r for r in merged.values()
+                 if r.get("period") and datetime.strptime(r["period"][:10], "%Y-%m-%d").date() >= dt_from
+                 and datetime.strptime(r["period"][:10], "%Y-%m-%d").date() <= dt_to),
+                key=lambda r: (r["g1"] or "", r["g2"] or "", r["period"] or "")
+            )
         else:
             rows = sorted(merged.values(), key=lambda r: r["deposits"], reverse=True)
 

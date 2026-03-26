@@ -41,6 +41,12 @@
     /* Filter separator */
     .filter-sep { width: 1px; height: 28px; background-color: #30363d; margin: 0 6px; }
 
+    /* Filter grid for campaign filter row */
+    .filter-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; margin-top: 10px; padding-top: 10px; border-top: 1px solid #21262d; }
+    .filter-grid .sdd-wrap { display: block; width: 100%; }
+    .filter-grid .sdd-btn { width: 100%; box-sizing: border-box; }
+    .filter-grid .group-select { width: 100%; box-sizing: border-box; }
+
     /* KPI cards */
     .kpi-card { background-color: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 10px 14px; height: 100%; display: flex; flex-direction: column; justify-content: center; }
     .kpi-value { font-size: 1.3rem; font-weight: 700; line-height: 1.2; }
@@ -275,7 +281,7 @@
     </div>
 
     <!-- Row 4: Campaign Filters -->
-    <div class="d-flex flex-wrap align-items-end gap-3" style="margin-top:10px;padding-top:10px;border-top:1px solid #21262d;">
+    <div class="filter-grid">
       <div style="display:flex;flex-direction:column;">
         <span class="filter-row-label">Marketing Group</span>
         <div class="sdd-wrap" id="f-mkt-group">
@@ -318,10 +324,9 @@
           <div class="sdd-panel"><input class="sdd-search" placeholder="Search…" autocomplete="off"><div class="sdd-list"></div></div>
         </div>
       </div>
-      <div class="filter-sep" style="height:42px;"></div>
       <div style="display:flex;flex-direction:column;">
         <span class="filter-row-label">Client Classification</span>
-        <select id="f-classification" class="group-select">
+        <select id="f-classification" class="group-select" style="width:100%;box-sizing:border-box;">
           <option value="">All</option>
           <option value="High Quality">High Quality</option>
           <option value="Low Quality">Low Quality</option>
