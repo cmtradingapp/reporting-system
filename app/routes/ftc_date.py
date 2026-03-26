@@ -86,12 +86,13 @@ async def ftc_date_api(
     if team:
         team_clause = "AND u.department = %(team)s"
         params["team"] = team
+    _cv = "COALESCE(cc.classification_value, CASE WHEN a.sales_client_potential ~ '^[0-9]+$' THEN a.sales_client_potential::int END)"
     if classification == "Low Quality":
-        classification_clause = "AND cc.classification_category = 'Low Quality'"
+        classification_clause = f"AND {_cv} BETWEEN 1 AND 5"
     elif classification == "High Quality":
-        classification_clause = "AND cc.classification_category = 'High Quality'"
+        classification_clause = f"AND {_cv} BETWEEN 6 AND 10"
     elif classification == "No segmentation":
-        classification_clause = "AND (cc.accountid IS NULL OR cc.classification_category = 'No segmentation')"
+        classification_clause = f"AND ({_cv} IS NULL OR {_cv} NOT BETWEEN 1 AND 10)"
 
     sql = """
         WITH ftc_groups AS (

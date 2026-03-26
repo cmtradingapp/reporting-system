@@ -24,7 +24,7 @@ VALID_GROUPS = {
     "office_name":          "COALESCE(cu.office_name, '(Unassigned)')",
     "agent_name":           "COALESCE(cu.agent_name, '(Unassigned)')",
     "country":              "COALESCE(a.country_iso, '(Unassigned)')",
-    "client_classification": "COALESCE(cc.classification_category, 'No segmentation')",
+    "client_classification": "COALESCE(cc.classification_value::text, a.sales_client_potential, '(Unassigned)')",
 }
 GROUP_LABELS = {
     "marketing_group":      "Marketing Group",
@@ -308,15 +308,16 @@ def _build_filter_clauses(
         clauses.append("AND a.original_affiliate = %(f_affiliate)s")
         params["f_affiliate"] = f_affiliate
 
+    _cv = "COALESCE(cc.classification_value, CASE WHEN a.sales_client_potential ~ '^[0-9]+$' THEN a.sales_client_potential::int END)"
     needs_cc_join = False
     if f_classification:
         needs_cc_join = True
         if f_classification == "High Quality":
-            clauses.append("AND cc.classification_category = 'High Quality'")
+            clauses.append(f"AND {_cv} BETWEEN 6 AND 10")
         elif f_classification == "Low Quality":
-            clauses.append("AND cc.classification_category = 'Low Quality'")
+            clauses.append(f"AND {_cv} BETWEEN 1 AND 5")
         else:  # No segmentation
-            clauses.append("AND (cc.accountid IS NULL OR cc.classification_category = 'No segmentation')")
+            clauses.append(f"AND ({_cv} IS NULL OR {_cv} NOT BETWEEN 1 AND 10)")
 
     if ftc_groups_list:
         ftc_conds = [FTC_GROUP_RANGES[g] for g in ftc_groups_list if g in FTC_GROUP_RANGES]
