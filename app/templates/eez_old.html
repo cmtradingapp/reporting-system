@@ -51,7 +51,9 @@
   <div class="sidebar-brand"><i class="bi bi-bar-chart-fill text-success me-2"></i>Reporting System</div>
   <nav class="sidebar-nav">
     <a href="/performance" class="sidebar-link"><i class="bi bi-trophy"></i>Performance Report</a>
+    {% if current_user.role in ('admin', 'marketing') %}
     <a href="/campaign-performance" class="sidebar-link"><i class="bi bi-graph-up-arrow"></i>Marketing Performance</a>
+    {% endif %}
     <a href="/agent-bonuses" class="sidebar-link"><i class="bi bi-cash-stack"></i>Agent Bonuses</a>
     {% if current_user.role == 'admin' %}
     <a href="/dashboard" class="sidebar-link"><i class="bi bi-speedometer2"></i>Dashboard</a>
