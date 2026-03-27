@@ -2370,7 +2370,7 @@ _MV_SETUP_SQL = [
         1                                                                           AS id,
         COUNT(*) FILTER (WHERE createdtime::date = CURRENT_DATE)                    AS new_leads_today,
         COUNT(*) FILTER (WHERE createdtime >= date_trunc('month', CURRENT_DATE))    AS new_leads_month,
-        COUNT(*) FILTER (WHERE birth_date::date = CURRENT_DATE)                     AS new_live_today,
+        COUNT(*) FILTER (WHERE createdtime::date = CURRENT_DATE AND birth_date IS NOT NULL) AS new_live_today,
         COUNT(*) FILTER (WHERE createdtime >= date_trunc('month', CURRENT_DATE)
                            AND birth_date IS NOT NULL)                              AS new_live_month
     FROM accounts
