@@ -190,7 +190,7 @@
     </div>
     <div id="filter-body">
 
-    <!-- Row 1: Year + Month -->
+    <!-- Row 1: Year + Month + Date range + quick buttons -->
     <div class="d-flex flex-wrap align-items-center gap-1 mb-3">
       <button class="period-btn year-btn" data-year="2024">2024</button>
       <button class="period-btn year-btn" data-year="2025">2025</button>
@@ -208,10 +208,7 @@
       <button class="period-btn month-btn" data-month="10">Oct</button>
       <button class="period-btn month-btn" data-month="11">Nov</button>
       <button class="period-btn month-btn" data-month="12">Dec</button>
-    </div>
-
-    <!-- Row 2: Date range + quick buttons -->
-    <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+      <div class="filter-sep"></div>
       <span class="text-muted small">From</span>
       <input type="date" id="date-from" class="date-input" />
       <span class="text-muted small">To</span>
@@ -225,8 +222,63 @@
       </button>
     </div>
 
+    <!-- Row 2: Campaign Filters -->
+    <div class="filter-grid">
+      <div style="display:flex;flex-direction:column;">
+        <span class="filter-row-label">Marketing Group</span>
+        <div class="sdd-wrap" id="f-mkt-group">
+          <button class="sdd-btn" type="button">All</button>
+          <div class="sdd-panel"><input class="sdd-search" placeholder="Search…" autocomplete="off"><div class="sdd-list"></div></div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;">
+        <span class="filter-row-label">Campaign Name</span>
+        <div class="sdd-wrap" id="f-campaign-name">
+          <button class="sdd-btn" type="button">All</button>
+          <div class="sdd-panel"><input class="sdd-search" placeholder="Search…" autocomplete="off"><div class="sdd-list"></div></div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;">
+        <span class="filter-row-label">Campaign Legacy ID</span>
+        <div class="sdd-wrap" id="f-legacy-id">
+          <button class="sdd-btn" type="button">All</button>
+          <div class="sdd-panel"><input class="sdd-search" placeholder="Search…" autocomplete="off"><div class="sdd-list"></div></div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;">
+        <span class="filter-row-label">Campaign Channel</span>
+        <div class="sdd-wrap" id="f-channel">
+          <button class="sdd-btn" type="button">All</button>
+          <div class="sdd-panel"><input class="sdd-search" placeholder="Search…" autocomplete="off"><div class="sdd-list"></div></div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;">
+        <span class="filter-row-label">Campaign Sub-channel</span>
+        <div class="sdd-wrap" id="f-sub-channel">
+          <button class="sdd-btn" type="button">All</button>
+          <div class="sdd-panel"><input class="sdd-search" placeholder="Search…" autocomplete="off"><div class="sdd-list"></div></div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;">
+        <span class="filter-row-label">Original Affiliate</span>
+        <div class="sdd-wrap" id="f-affiliate">
+          <button class="sdd-btn" type="button">All</button>
+          <div class="sdd-panel"><input class="sdd-search" placeholder="Search…" autocomplete="off"><div class="sdd-list"></div></div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;">
+        <span class="filter-row-label">Client Classification</span>
+        <select id="f-classification" class="group-select" style="width:100%;box-sizing:border-box;">
+          <option value="">All</option>
+          <option value="High Quality">High Quality</option>
+          <option value="Low Quality">Low Quality</option>
+          <option value="No segmentation">No segmentation</option>
+        </select>
+      </div>
+    </div>
+
     <!-- Row 3: Grouping -->
-    <div class="d-flex flex-wrap align-items-end gap-3">
+    <div class="d-flex flex-wrap align-items-end gap-3" style="margin-top:10px;">
       <div style="display:flex;flex-direction:column;gap:4px;">
         <span style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.8px;color:#8b949e;">View By</span>
         <select id="sel-group1" class="group-select">
@@ -290,61 +342,6 @@
           <input type="date" id="qual-date-to" class="date-input" style="width:130px;" />
           <button id="btn-clear-qual" class="quick-btn" style="padding:4px 8px;font-size:0.75rem;line-height:1;" title="Clear qualification date filter">✕</button>
         </div>
-      </div>
-    </div>
-
-    <!-- Row 4: Campaign Filters -->
-    <div class="filter-grid">
-      <div style="display:flex;flex-direction:column;">
-        <span class="filter-row-label">Marketing Group</span>
-        <div class="sdd-wrap" id="f-mkt-group">
-          <button class="sdd-btn" type="button">All</button>
-          <div class="sdd-panel"><input class="sdd-search" placeholder="Search…" autocomplete="off"><div class="sdd-list"></div></div>
-        </div>
-      </div>
-      <div style="display:flex;flex-direction:column;">
-        <span class="filter-row-label">Campaign Name</span>
-        <div class="sdd-wrap" id="f-campaign-name">
-          <button class="sdd-btn" type="button">All</button>
-          <div class="sdd-panel"><input class="sdd-search" placeholder="Search…" autocomplete="off"><div class="sdd-list"></div></div>
-        </div>
-      </div>
-      <div style="display:flex;flex-direction:column;">
-        <span class="filter-row-label">Campaign Legacy ID</span>
-        <div class="sdd-wrap" id="f-legacy-id">
-          <button class="sdd-btn" type="button">All</button>
-          <div class="sdd-panel"><input class="sdd-search" placeholder="Search…" autocomplete="off"><div class="sdd-list"></div></div>
-        </div>
-      </div>
-      <div style="display:flex;flex-direction:column;">
-        <span class="filter-row-label">Campaign Channel</span>
-        <div class="sdd-wrap" id="f-channel">
-          <button class="sdd-btn" type="button">All</button>
-          <div class="sdd-panel"><input class="sdd-search" placeholder="Search…" autocomplete="off"><div class="sdd-list"></div></div>
-        </div>
-      </div>
-      <div style="display:flex;flex-direction:column;">
-        <span class="filter-row-label">Campaign Sub-channel</span>
-        <div class="sdd-wrap" id="f-sub-channel">
-          <button class="sdd-btn" type="button">All</button>
-          <div class="sdd-panel"><input class="sdd-search" placeholder="Search…" autocomplete="off"><div class="sdd-list"></div></div>
-        </div>
-      </div>
-      <div style="display:flex;flex-direction:column;">
-        <span class="filter-row-label">Original Affiliate</span>
-        <div class="sdd-wrap" id="f-affiliate">
-          <button class="sdd-btn" type="button">All</button>
-          <div class="sdd-panel"><input class="sdd-search" placeholder="Search…" autocomplete="off"><div class="sdd-list"></div></div>
-        </div>
-      </div>
-      <div style="display:flex;flex-direction:column;">
-        <span class="filter-row-label">Client Classification</span>
-        <select id="f-classification" class="group-select" style="width:100%;box-sizing:border-box;">
-          <option value="">All</option>
-          <option value="High Quality">High Quality</option>
-          <option value="Low Quality">Low Quality</option>
-          <option value="No segmentation">No segmentation</option>
-        </select>
       </div>
     </div>
 
