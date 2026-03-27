@@ -4,13 +4,73 @@ from fastapi.templating import Jinja2Templates
 from app.auth.dependencies import get_current_user
 from app.db.postgres_conn import get_connection
 from app import cache
-from datetime import date, datetime
+from datetime import datetime
 from zoneinfo import ZoneInfo
 
 _TZ = ZoneInfo("Europe/Nicosia")
-
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
+
+# ── Group dimension SQL fragments ─────────────────────────────────────────────
+
+_DAYS_FTC_VAL = (
+    "CASE"
+    " WHEN (%(end_date)s::date - a.client_qualification_date::date) BETWEEN 0   AND 7   THEN '0 - 7 days'"
+    " WHEN (%(end_date)s::date - a.client_qualification_date::date) BETWEEN 8   AND 14  THEN '8 - 14 days'"
+    " WHEN (%(end_date)s::date - a.client_qualification_date::date) BETWEEN 15  AND 30  THEN '15 - 30 days'"
+    " WHEN (%(end_date)s::date - a.client_qualification_date::date) BETWEEN 31  AND 60  THEN '31 - 60 days'"
+    " WHEN (%(end_date)s::date - a.client_qualification_date::date) BETWEEN 61  AND 90  THEN '61 - 90 days'"
+    " WHEN (%(end_date)s::date - a.client_qualification_date::date) BETWEEN 91  AND 120 THEN '91 - 120 days'"
+    " WHEN (%(end_date)s::date - a.client_qualification_date::date) > 120               THEN '120+ days'"
+    " ELSE '(Unknown)' END"
+)
+_DAYS_FTC_SORT = (
+    "CASE"
+    " WHEN (%(end_date)s::date - a.client_qualification_date::date) BETWEEN 0   AND 7   THEN 1"
+    " WHEN (%(end_date)s::date - a.client_qualification_date::date) BETWEEN 8   AND 14  THEN 2"
+    " WHEN (%(end_date)s::date - a.client_qualification_date::date) BETWEEN 15  AND 30  THEN 3"
+    " WHEN (%(end_date)s::date - a.client_qualification_date::date) BETWEEN 31  AND 60  THEN 4"
+    " WHEN (%(end_date)s::date - a.client_qualification_date::date) BETWEEN 61  AND 90  THEN 5"
+    " WHEN (%(end_date)s::date - a.client_qualification_date::date) BETWEEN 91  AND 120 THEN 6"
+    " WHEN (%(end_date)s::date - a.client_qualification_date::date) > 120               THEN 7"
+    " ELSE 99 END"
+)
+_AGE_GROUP_VAL = (
+    "CASE"
+    " WHEN a.birth_date IS NULL THEN '(Unknown)'"
+    " WHEN DATE_PART('year', AGE(%(end_date)s::date, a.birth_date)) BETWEEN 18 AND 24 THEN '18-24'"
+    " WHEN DATE_PART('year', AGE(%(end_date)s::date, a.birth_date)) BETWEEN 25 AND 29 THEN '25-29'"
+    " WHEN DATE_PART('year', AGE(%(end_date)s::date, a.birth_date)) BETWEEN 30 AND 34 THEN '30-34'"
+    " WHEN DATE_PART('year', AGE(%(end_date)s::date, a.birth_date)) BETWEEN 35 AND 39 THEN '35-39'"
+    " WHEN DATE_PART('year', AGE(%(end_date)s::date, a.birth_date)) BETWEEN 40 AND 44 THEN '40-44'"
+    " WHEN DATE_PART('year', AGE(%(end_date)s::date, a.birth_date)) BETWEEN 45 AND 49 THEN '45-49'"
+    " WHEN DATE_PART('year', AGE(%(end_date)s::date, a.birth_date)) >= 50             THEN '50+'"
+    " ELSE '(Unknown)' END"
+)
+_AGE_GROUP_SORT = (
+    "CASE"
+    " WHEN a.birth_date IS NULL THEN 99"
+    " WHEN DATE_PART('year', AGE(%(end_date)s::date, a.birth_date)) BETWEEN 18 AND 24 THEN 1"
+    " WHEN DATE_PART('year', AGE(%(end_date)s::date, a.birth_date)) BETWEEN 25 AND 29 THEN 2"
+    " WHEN DATE_PART('year', AGE(%(end_date)s::date, a.birth_date)) BETWEEN 30 AND 34 THEN 3"
+    " WHEN DATE_PART('year', AGE(%(end_date)s::date, a.birth_date)) BETWEEN 35 AND 39 THEN 4"
+    " WHEN DATE_PART('year', AGE(%(end_date)s::date, a.birth_date)) BETWEEN 40 AND 44 THEN 5"
+    " WHEN DATE_PART('year', AGE(%(end_date)s::date, a.birth_date)) BETWEEN 45 AND 49 THEN 6"
+    " WHEN DATE_PART('year', AGE(%(end_date)s::date, a.birth_date)) >= 50             THEN 7"
+    " ELSE 99 END"
+)
+
+_DIMS = {
+    "days_from_ftc":          {"val": _DAYS_FTC_VAL,                                              "sort": _DAYS_FTC_SORT,  "cu": False, "camp": False},
+    "marketing_group":        {"val": "COALESCE(c.marketing_group,        '(Unassigned)')",       "sort": "NULL::int",     "cu": False, "camp": True },
+    "campaign_legacy":        {"val": "COALESCE(c.campaign_legacy_id,     '(Unassigned)')",       "sort": "NULL::int",     "cu": False, "camp": True },
+    "office_name":            {"val": "COALESCE(u.office_name,            '(Unassigned)')",       "sort": "NULL::int",     "cu": True,  "camp": False},
+    "team":                   {"val": "COALESCE(u.department,             '(Unassigned)')",       "sort": "NULL::int",     "cu": True,  "camp": False},
+    "agent":                  {"val": "COALESCE(u.agent_name,             '(Unassigned)')",       "sort": "NULL::int",     "cu": True,  "camp": False},
+    "age_group":              {"val": _AGE_GROUP_VAL,                                             "sort": _AGE_GROUP_SORT, "cu": False, "camp": False},
+    "sales_client_potential": {"val": "COALESCE(a.sales_client_potential, '(Unassigned)')",       "sort": "NULL::int",     "cu": False, "camp": False},
+    "country_name":           {"val": "COALESCE(a.country_iso,            '(Unassigned)')",       "sort": "NULL::int",     "cu": False, "camp": False},
+}
 
 
 @router.get("/ftc-date", response_class=HTMLResponse)
@@ -44,9 +104,9 @@ async def ftc_date_options(request: Request):
         with conn.cursor() as cur:
             cur.execute(sql)
             rows = cur.fetchall()
-        agents = [{"id": r[0], "name": r[1]} for r in rows]
+        agents  = [{"id": r[0], "name": r[1]} for r in rows]
         offices = sorted(set(r[2] for r in rows if r[2]))
-        teams = sorted(set(r[3] for r in rows if r[3]))
+        teams   = sorted(set(r[3] for r in rows if r[3]))
         return JSONResponse(content={"agents": agents, "offices": offices, "teams": teams})
     except Exception as e:
         return JSONResponse(status_code=500, content={"detail": str(e)})
@@ -58,10 +118,11 @@ async def ftc_date_options(request: Request):
 async def ftc_date_api(
     request: Request,
     end_date: str = None,
+    group1: str = "days_from_ftc",
+    group2: str = "none",
     agent_id: int = None,
     office: str = None,
     team: str = None,
-    groups: str = None,
     classification: str = None,
 ):
     user = await get_current_user(request)
@@ -70,201 +131,189 @@ async def ftc_date_api(
 
     if not end_date:
         end_date = datetime.now(_TZ).date().strftime("%Y-%m-%d")
-    _ck = f"ftc_v4:{end_date}:{agent_id}:{office}:{team}:{groups}:{classification}"
+
+    if group1 not in _DIMS:
+        group1 = "days_from_ftc"
+    if group2 not in _DIMS:
+        group2 = "none"
+    has_g2 = group2 != "none"
+
+    _ck = f"ftc_v5:{end_date}:{group1}:{group2}:{agent_id}:{office}:{team}:{classification}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
 
+    d1 = _DIMS[group1]
+    d2 = _DIMS.get(group2)
+
+    needs_cu   = d1["cu"] or (d2 and d2["cu"]) or bool(agent_id or office or team)
+    needs_camp = d1["camp"] or (d2 and d2["camp"])
+
+    cu_join   = "LEFT JOIN crm_users u ON u.id = a.assigned_to" if needs_cu   else ""
+    camp_join = "LEFT JOIN campaigns c ON SPLIT_PART(a.campaign, '.', 1) = c.crmid" if needs_camp else ""
+
     params = {"end_date": end_date}
-    agent_clause = office_clause = team_clause = classification_clause = ""
+    filter_parts = []
     if agent_id:
-        agent_clause = "AND u.id = %(agent_id)s"
+        filter_parts.append("AND u.id = %(agent_id)s")
         params["agent_id"] = agent_id
     if office:
-        office_clause = "AND u.office_name = %(office)s"
+        filter_parts.append("AND u.office_name = %(office)s")
         params["office"] = office
     if team:
-        team_clause = "AND u.department = %(team)s"
+        filter_parts.append("AND u.department = %(team)s")
         params["team"] = team
     if classification == "Low Quality":
-        classification_clause = "AND a.classification_int BETWEEN 1 AND 5"
+        filter_parts.append("AND a.classification_int BETWEEN 1 AND 5")
     elif classification == "High Quality":
-        classification_clause = "AND a.classification_int BETWEEN 6 AND 10"
+        filter_parts.append("AND a.classification_int BETWEEN 6 AND 10")
     elif classification == "No segmentation":
-        classification_clause = "AND (a.classification_int IS NULL OR a.classification_int NOT BETWEEN 1 AND 10)"
+        filter_parts.append("AND (a.classification_int IS NULL OR a.classification_int NOT BETWEEN 1 AND 10)")
+    filter_sql = "\n      ".join(filter_parts)
 
-    sql = """
-        WITH ftc_groups AS (
-            SELECT
-                a.accountid,
-                a.client_qualification_date::date AS qual_date,
-                (%(end_date)s::date - a.client_qualification_date::date) AS days_diff
-            FROM accounts a
-            LEFT JOIN crm_users u ON u.id = a.assigned_to
-            LEFT JOIN client_classification cc ON cc.accountid = a.accountid::BIGINT
-            WHERE a.client_qualification_date IS NOT NULL
-              AND a.client_qualification_date::date >= '2024-01-01'
-              AND a.client_qualification_date::date <= %(end_date)s::date
-              AND a.is_test_account = 0
-              {agent_clause}
-              {office_clause}
-              {team_clause}
-              {classification_clause}
-        ),
-        tx_per_account AS (
-            SELECT
-                t.vtigeraccountid AS accountid,
-                SUM(CASE WHEN t.transactiontype IN ('Deposit', 'Withdrawal Cancelled') THEN t.usdamount ELSE 0 END) AS deposit_usd,
-                SUM(CASE WHEN t.transactiontype IN ('Withdrawal', 'Deposit Cancelled') THEN t.usdamount ELSE 0 END) AS withdrawal_usd
-            FROM transactions t
-            WHERE t.transactionapproval = 'Approved'
-              AND (t.deleted = 0 OR t.deleted IS NULL)
-              AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
-              AND COALESCE(t.confirmation_time, t.created_time)::date >= '2024-01-01'
-              AND COALESCE(t.confirmation_time, t.created_time)::date <= %(end_date)s::date
-            GROUP BY t.vtigeraccountid
-        ),
-        rdp AS (
-            SELECT DISTINCT accountid
-            FROM mv_std_clients
-            WHERE has_second_deposit = 1
-              AND second_deposit_date::date <= %(end_date)s::date
-        ),
-        withdrawalers AS (
-            SELECT DISTINCT t.vtigeraccountid AS accountid
-            FROM transactions t
-            JOIN accounts a ON a.accountid = t.vtigeraccountid
-            WHERE t.transactiontype = 'Withdrawal'
-              AND t.transactionapproval = 'Approved'
-              AND (t.deleted = 0 OR t.deleted IS NULL)
-              AND COALESCE(t.confirmation_time, t.created_time)::date <= %(end_date)s::date
-              AND a.is_test_account = 0
-        ),
-        traders AS (
-            SELECT DISTINCT ta.vtigeraccountid AS accountid
-            FROM dealio_trades_mt4 d
-            JOIN trading_accounts ta ON ta.login::bigint = d.login::bigint
-            JOIN accounts a ON a.accountid = ta.vtigeraccountid
-            WHERE d.notional_value > 0
-              AND ta.vtigeraccountid IS NOT NULL
-              AND ta.vtigeraccountid::text != ''
-              AND d.open_time::date <= %(end_date)s::date
-              AND a.is_test_account = 0
-        ),
-        grouped AS (
-            SELECT
-                CASE
-                    WHEN fg.days_diff BETWEEN 0   AND 7   THEN 1
-                    WHEN fg.days_diff BETWEEN 8   AND 14  THEN 2
-                    WHEN fg.days_diff BETWEEN 15  AND 30  THEN 3
-                    WHEN fg.days_diff BETWEEN 31  AND 60  THEN 4
-                    WHEN fg.days_diff BETWEEN 61  AND 90  THEN 5
-                    WHEN fg.days_diff BETWEEN 91  AND 120 THEN 6
-                    WHEN fg.days_diff > 120               THEN 7
-                END AS group_order,
-                CASE
-                    WHEN fg.days_diff BETWEEN 0   AND 7   THEN '0 - 7 days'
-                    WHEN fg.days_diff BETWEEN 8   AND 14  THEN '8 - 14 days'
-                    WHEN fg.days_diff BETWEEN 15  AND 30  THEN '15 - 30 days'
-                    WHEN fg.days_diff BETWEEN 31  AND 60  THEN '31 - 60 days'
-                    WHEN fg.days_diff BETWEEN 61  AND 90  THEN '61 - 90 days'
-                    WHEN fg.days_diff BETWEEN 91  AND 120 THEN '91 - 120 days'
-                    WHEN fg.days_diff > 120               THEN '120+ days'
-                END AS day_group,
-                fg.accountid,
-                COALESCE(tx.deposit_usd,    0) AS deposit_usd,
-                COALESCE(tx.withdrawal_usd, 0) AS withdrawal_usd,
-                CASE WHEN rdp.accountid IS NOT NULL THEN 1 ELSE 0 END AS is_rdp,
-                CASE WHEN wd.accountid  IS NOT NULL THEN 1 ELSE 0 END AS is_withdrawaler,
-                CASE WHEN tr.accountid  IS NOT NULL THEN 1 ELSE 0 END AS is_trader
-            FROM ftc_groups fg
-            LEFT JOIN tx_per_account tx ON tx.accountid = fg.accountid
-            LEFT JOIN rdp              ON rdp.accountid = fg.accountid
-            LEFT JOIN withdrawalers wd ON wd.accountid  = fg.accountid
-            LEFT JOIN traders tr       ON tr.accountid  = fg.accountid
-        )
-        SELECT
-            group_order,
-            day_group,
-            COUNT(DISTINCT accountid)        AS ftc_count,
-            SUM(is_rdp)                      AS rdp_count,
-            COALESCE(SUM(deposit_usd),    0) AS deposit_usd,
-            COALESCE(SUM(withdrawal_usd), 0) AS withdrawal_usd,
-            SUM(is_withdrawaler)             AS wd_count,
-            SUM(is_trader)                   AS trader_count
-        FROM grouped
-        GROUP BY group_order, day_group
-        ORDER BY group_order
-    """.format(
-        agent_clause=agent_clause,
-        office_clause=office_clause,
-        team_clause=team_clause,
-        classification_clause=classification_clause,
+    g2_sel    = (", (" + d2["val"] + ") AS g2, (" + d2["sort"] + ") AS g2_sort") if has_g2 else ""
+    g2_joined = ", b.g2, b.g2_sort" if has_g2 else ""
+    g2_grp    = ", g2, g2_sort" if has_g2 else ""
+    g2_ord    = ", COALESCE(g2_sort, 0), g2" if has_g2 else ""
+
+    sql = (
+        "WITH base_accounts AS (\n"
+        "    SELECT a.accountid,\n"
+        "           (" + d1["val"]  + ") AS g1,\n"
+        "           (" + d1["sort"] + ") AS g1_sort"
+        + (",\n           " + g2_sel.lstrip(", ") if has_g2 else "") + "\n"
+        "    FROM accounts a\n"
+        "    LEFT JOIN client_classification cc ON cc.accountid = a.accountid::BIGINT\n"
+        + ("    " + cu_join   + "\n" if cu_join   else "")
+        + ("    " + camp_join + "\n" if camp_join else "")
+        + "    WHERE a.client_qualification_date IS NOT NULL\n"
+        "      AND a.client_qualification_date::date >= '2024-01-01'\n"
+        "      AND a.client_qualification_date::date <= %(end_date)s::date\n"
+        "      AND a.is_test_account = 0\n"
+        + (("      " + filter_sql + "\n") if filter_sql else "")
+        + "),\n"
+        "tx_per_account AS (\n"
+        "    SELECT t.vtigeraccountid AS accountid,\n"
+        "           SUM(CASE WHEN t.transactiontype IN ('Deposit','Withdrawal Cancelled') THEN t.usdamount ELSE 0 END) AS deposit_usd,\n"
+        "           SUM(CASE WHEN t.transactiontype IN ('Withdrawal','Deposit Cancelled') THEN t.usdamount ELSE 0 END) AS withdrawal_usd\n"
+        "    FROM transactions t\n"
+        "    WHERE t.transactionapproval = 'Approved'\n"
+        "      AND (t.deleted = 0 OR t.deleted IS NULL)\n"
+        "      AND LOWER(COALESCE(t.comment,'')) NOT LIKE '%%bonus%%'\n"
+        "      AND COALESCE(t.confirmation_time, t.created_time)::date >= '2024-01-01'\n"
+        "      AND COALESCE(t.confirmation_time, t.created_time)::date <= %(end_date)s::date\n"
+        "    GROUP BY t.vtigeraccountid\n"
+        "),\n"
+        "rdp AS (\n"
+        "    SELECT DISTINCT accountid FROM mv_std_clients\n"
+        "    WHERE has_second_deposit = 1\n"
+        "      AND second_deposit_date::date <= %(end_date)s::date\n"
+        "),\n"
+        "withdrawalers AS (\n"
+        "    SELECT DISTINCT t.vtigeraccountid AS accountid\n"
+        "    FROM transactions t\n"
+        "    JOIN accounts a ON a.accountid = t.vtigeraccountid\n"
+        "    WHERE t.transactiontype = 'Withdrawal'\n"
+        "      AND t.transactionapproval = 'Approved'\n"
+        "      AND (t.deleted = 0 OR t.deleted IS NULL)\n"
+        "      AND COALESCE(t.confirmation_time, t.created_time)::date <= %(end_date)s::date\n"
+        "      AND a.is_test_account = 0\n"
+        "),\n"
+        "traders AS (\n"
+        "    SELECT DISTINCT ta.vtigeraccountid AS accountid\n"
+        "    FROM dealio_trades_mt4 d\n"
+        "    JOIN trading_accounts ta ON ta.login::bigint = d.login::bigint\n"
+        "    JOIN accounts a ON a.accountid = ta.vtigeraccountid\n"
+        "    WHERE d.notional_value > 0\n"
+        "      AND ta.vtigeraccountid IS NOT NULL\n"
+        "      AND ta.vtigeraccountid::text != ''\n"
+        "      AND d.open_time::date <= %(end_date)s::date\n"
+        "      AND a.is_test_account = 0\n"
+        "),\n"
+        "joined AS (\n"
+        "    SELECT b.g1, b.g1_sort" + g2_joined + ",\n"
+        "           b.accountid,\n"
+        "           COALESCE(tx.deposit_usd,    0) AS deposit_usd,\n"
+        "           COALESCE(tx.withdrawal_usd, 0) AS withdrawal_usd,\n"
+        "           CASE WHEN rdp.accountid IS NOT NULL THEN 1 ELSE 0 END AS is_rdp,\n"
+        "           CASE WHEN wd.accountid  IS NOT NULL THEN 1 ELSE 0 END AS is_withdrawaler,\n"
+        "           CASE WHEN tr.accountid  IS NOT NULL THEN 1 ELSE 0 END AS is_trader\n"
+        "    FROM base_accounts b\n"
+        "    LEFT JOIN tx_per_account tx ON tx.accountid = b.accountid\n"
+        "    LEFT JOIN rdp              ON rdp.accountid = b.accountid\n"
+        "    LEFT JOIN withdrawalers wd ON wd.accountid  = b.accountid\n"
+        "    LEFT JOIN traders tr       ON tr.accountid  = b.accountid\n"
+        ")\n"
+        "SELECT g1, g1_sort" + g2_grp + ",\n"
+        "       COUNT(DISTINCT accountid)        AS ftc_count,\n"
+        "       SUM(is_rdp)                      AS rdp_count,\n"
+        "       COALESCE(SUM(deposit_usd),    0) AS deposit_usd,\n"
+        "       COALESCE(SUM(withdrawal_usd), 0) AS withdrawal_usd,\n"
+        "       SUM(is_withdrawaler)             AS wd_count,\n"
+        "       SUM(is_trader)                   AS trader_count\n"
+        "FROM joined\n"
+        "GROUP BY g1, g1_sort" + g2_grp + "\n"
+        "ORDER BY COALESCE(g1_sort, 0), g1" + g2_ord
     )
 
     conn = get_connection()
     try:
         with conn.cursor() as cur:
             cur.execute(sql, params)
-            rows = cur.fetchall()
+            db_rows = cur.fetchall()
+
+        def _build(g1, g2, ftc, rdp_cnt, dep, wd, wdcount, traders):
+            ftc = int(ftc or 0); rdp_cnt = int(rdp_cnt or 0)
+            dep = float(dep or 0); wd = float(wd or 0)
+            wdcount = int(wdcount or 0); traders = int(traders or 0)
+            net = dep - wd
+            return {
+                "g1": g1, "g2": g2,
+                "ftc": ftc, "rdp": rdp_cnt,
+                "deposit": round(dep), "withdrawal": round(wd),
+                "net_deposit": round(net),
+                "ltv": round(net / ftc, 2) if ftc > 0 else 0,
+                "pct_std": round(rdp_cnt / ftc * 100) if ftc > 0 else 0,
+                "wd_count": wdcount,
+                "pct_wd_clients": round(wdcount / ftc * 100) if ftc > 0 else 0,
+                "pct_wd_usd": round(wd / dep * 100) if dep > 0 else 0,
+                "traders": traders,
+                "traders_pct": round(traders / ftc * 100) if ftc > 0 else 0,
+            }
 
         data = []
-        for r in rows:
-            group_order, day_group, ftc, rdp_cnt, dep, wd, wdcount, trader_count = r
-            ftc = int(ftc or 0)
-            rdp_cnt = int(rdp_cnt or 0)
-            dep = float(dep or 0)
-            wd = float(wd or 0)
-            wdcount = int(wdcount or 0)
-            traders = int(trader_count or 0)
-            net_dep = dep - wd
-            data.append({
-                "day_group":      day_group,
-                "ftc":            ftc,
-                "rdp":            rdp_cnt,
-                "deposit":        round(dep),
-                "withdrawal":     round(wd),
-                "net_deposit":    round(net_dep),
-                "ltv":            round(net_dep / ftc, 2) if ftc > 0 else 0,
-                "pct_std":        round(rdp_cnt / ftc * 100) if ftc > 0 else 0,
-                "wd_count":       wdcount,
-                "pct_wd_clients": round(wdcount / ftc * 100) if ftc > 0 else 0,
-                "pct_wd_usd":     round(wd / dep * 100) if dep > 0 else 0,
-                "traders":        traders,
-                "traders_pct":    round(traders / ftc * 100) if ftc > 0 else 0,
-            })
+        for r in db_rows:
+            if has_g2:
+                g1, g1_sort, g2_val, g2_sort, ftc, rdp, dep, wd, wdc, traders = r
+            else:
+                g1, g1_sort, ftc, rdp, dep, wd, wdc, traders = r
+                g2_val = None
+            data.append(_build(g1, g2_val, ftc, rdp, dep, wd, wdc, traders))
 
-        if groups:
-            allowed = set(groups.split(','))
-            data = [r for r in data if r['day_group'] in allowed]
-
-        total_ftc = total_rdp = total_dep = total_wd = total_wdcount = total_traders = 0
+        total_ftc = total_rdp = total_dep = total_wd = total_wdc = total_traders = 0
         for r in data:
-            total_ftc     += r['ftc']
-            total_rdp     += r['rdp']
-            total_dep     += r['deposit']
-            total_wd      += r['withdrawal']
-            total_wdcount += r['wd_count']
-            total_traders += r['traders']
-
-        total_net = total_dep - total_wd
+            total_ftc     += r["ftc"];      total_rdp     += r["rdp"]
+            total_dep     += r["deposit"];  total_wd      += r["withdrawal"]
+            total_wdc     += r["wd_count"]; total_traders += r["traders"]
+        net = total_dep - total_wd
         grand = {
-            "day_group":      "Grand Total",
-            "ftc":            total_ftc,
-            "rdp":            total_rdp,
-            "deposit":        round(total_dep),
-            "withdrawal":     round(total_wd),
-            "net_deposit":    round(total_net),
-            "ltv":            round(total_net / total_ftc, 2) if total_ftc > 0 else 0,
-            "pct_std":        round(total_rdp / total_ftc * 100) if total_ftc > 0 else 0,
-            "wd_count":       total_wdcount,
-            "pct_wd_clients": round(total_wdcount / total_ftc * 100) if total_ftc > 0 else 0,
-            "pct_wd_usd":     round(total_wd / total_dep * 100) if total_dep > 0 else 0,
-            "traders":        total_traders,
-            "traders_pct":    round(total_traders / total_ftc * 100) if total_ftc > 0 else 0,
+            "g1": "Grand Total", "g2": None,
+            "ftc": total_ftc, "rdp": total_rdp,
+            "deposit": round(total_dep), "withdrawal": round(total_wd),
+            "net_deposit": round(net),
+            "ltv": round(net / total_ftc, 2) if total_ftc > 0 else 0,
+            "pct_std": round(total_rdp / total_ftc * 100) if total_ftc > 0 else 0,
+            "wd_count": total_wdc,
+            "pct_wd_clients": round(total_wdc / total_ftc * 100) if total_ftc > 0 else 0,
+            "pct_wd_usd": round(total_wd / total_dep * 100) if total_dep > 0 else 0,
+            "traders": total_traders,
+            "traders_pct": round(total_traders / total_ftc * 100) if total_ftc > 0 else 0,
         }
 
-        _result = {"rows": data, "grand_total": grand, "end_date": end_date}
+        _result = {
+            "rows": data, "grand_total": grand,
+            "end_date": end_date, "group1": group1, "group2": group2,
+        }
         cache.set(_ck, _result)
         return JSONResponse(content=_result)
     except Exception as e:

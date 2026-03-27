@@ -26,30 +26,26 @@
     .table td { border-color: #21262d; vertical-align: middle; white-space: nowrap; font-size: 0.88rem; }
     .row-grand { background-color: #1c2128 !important; font-weight: 700; border-top: 2px solid #30363d !important; }
     .row-grand td { border-top: 2px solid #30363d !important; }
+    .row-parent { background-color: #1a1f27; cursor: pointer; font-weight: 600; }
+    .row-parent:hover { background-color: #262c36 !important; }
+    .row-child td:first-child { padding-left: 28px !important; color: #8b949e; font-size: 0.83rem; }
     .text-num { text-align: center; font-variant-numeric: tabular-nums; }
-    .text-green { color: #3fb950; }
-    .text-red { color: #f85149; }
-    .text-blue { color: #58a6ff; }
-    .text-yellow { color: #e3b341; }
-    .text-purple { color: #bc8cff; }
     .filter-card { background-color: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 16px 20px; margin-bottom: 24px; }
     .form-control, .form-select { background-color: #0f1117; border: 1px solid #30363d; color: #e0e0e0; border-radius: 8px; font-size: 0.88rem; }
     .form-control:focus, .form-select:focus { background-color: #0f1117; border-color: #238636; color: #e0e0e0; box-shadow: 0 0 0 3px rgba(35,134,54,0.2); }
     .form-select option { background-color: #161b22; }
     .btn-apply { background: linear-gradient(135deg, #238636, #2ea043); border: none; color: #fff; font-weight: 600; border-radius: 8px; padding: 7px 20px; font-size: 0.88rem; }
     .btn-apply:hover { background: linear-gradient(135deg, #2ea043, #3fb950); color: #fff; }
+    .btn-toolbar-sm { background: #21262d; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px; padding: 4px 12px; font-size: 0.78rem; cursor: pointer; }
+    .btn-toolbar-sm:hover { background: #2d333b; color: #e0e0e0; }
+    .btn-excel { background: #21262d; border: 1px solid #30363d; color: #3fb950; border-radius: 6px; padding: 4px 12px; font-size: 0.78rem; cursor: pointer; }
+    .btn-excel:hover { background: #2d333b; }
     .spinner-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 9998; align-items: center; justify-content: center; }
     .spinner-overlay.active { display: flex; }
-    .section-title { font-size: 1.05rem; font-weight: 600; color: #c9d1d9; border-left: 3px solid #238636; padding-left: 12px; margin-bottom: 16px; }
-    .legend-card { background-color: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 16px 20px; font-size: 0.82rem; color: #8b949e; line-height: 1.8; }
-    .legend-card strong { color: #e0e0e0; }
     .filter-label { font-size: 0.78rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.8px; display: block; margin-bottom: 4px; }
     .group-cb-wrap { display: flex; align-items: center; gap: 5px; font-size: 0.8rem; color: #c9d1d9; white-space: nowrap; }
     .group-cb-wrap input[type=checkbox] { accent-color: #3fb950; width: 14px; height: 14px; cursor: pointer; }
-    /* Flatpickr dark override fixes */
     .flatpickr-calendar { font-family: 'Segoe UI', sans-serif; }
-
-    /* ── Mobile Responsive ─────────────────────────── */
     .sidebar-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:99; }
     .sidebar-overlay.show { display:block; }
     .sidebar-toggle { display:none; position:fixed; top:12px; left:12px; z-index:300; background:#161b22; border:1px solid #30363d; color:#e0e0e0; border-radius:8px; padding:7px 10px; cursor:pointer; font-size:1.1rem; line-height:1; }
@@ -63,9 +59,6 @@
       .mob-topbar-title { font-size:0.92rem; font-weight:700; color:#e0e0e0; padding:0 44px; }
       .main-content { margin-left:0 !important; padding-top:48px; }
       .table-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
-      .kpi-card { padding:8px 10px; }
-      .kpi-value { font-size:1.1rem; }
-      .date-input { width:120px; }
       h4.fw-bold { display:none; }
     }
     @media (min-width: 768px) and (max-width: 1024px) {
@@ -85,11 +78,8 @@
 <div class="mob-topbar"><span class="mob-topbar-title">FTC Date</span></div>
 <div class="sidebar-overlay" id="sidebar-overlay"></div>
 <button class="sidebar-toggle" id="sidebar-toggle"><i class="bi bi-list"></i></button>
-<!-- Sidebar -->
 <div class="sidebar">
-  <div class="sidebar-brand">
-    <i class="bi bi-bar-chart-fill text-success me-2"></i>Reporting System
-  </div>
+  <div class="sidebar-brand"><i class="bi bi-bar-chart-fill text-success me-2"></i>Reporting System</div>
   <nav class="sidebar-nav">
     <a href="/performance" class="sidebar-link"><i class="bi bi-trophy"></i>Performance Report</a>
     {% if current_user.role in ('admin', 'marketing', 'general') %}
@@ -118,7 +108,6 @@
 
 <div class="main-content">
 
-<!-- Loading Overlay -->
 <div class="spinner-overlay" id="spinner">
   <div class="text-center text-white">
     <div class="spinner-border text-success mb-3" style="width:3rem;height:3rem;"></div>
@@ -128,7 +117,6 @@
 
 <div class="container-fluid px-4 py-4">
 
-  <!-- Header -->
   <div class="mb-1 d-none d-md-block">
     <h4 class="fw-bold text-white mb-0">FTC Date Report</h4>
   </div>
@@ -141,59 +129,95 @@
       <i class="bi bi-chevron-up" id="ftc-filter-chevron" style="color:#8b949e;font-size:0.8rem;transition:transform 0.2s;"></i>
     </div>
     <div id="ftc-filter-body" style="padding:0 16px 16px;">
-    <!-- Row 1: Date + Apply -->
-    <div class="d-flex align-items-end gap-4 flex-wrap mb-3">
-      <div>
-        <label class="filter-label">End Date</label>
-        <input type="text" id="endDate" class="form-control" style="width:175px; cursor:pointer;" placeholder="Select date…" readonly />
+
+      <!-- Row 1: Date + grouping + Apply -->
+      <div class="d-flex align-items-end gap-3 flex-wrap mb-3">
+        <div>
+          <label class="filter-label">End Date</label>
+          <input type="text" id="endDate" class="form-control" style="width:160px;cursor:pointer;" placeholder="Select date…" readonly />
+        </div>
+        <div>
+          <label class="filter-label">View By</label>
+          <select id="group1" class="form-select" style="width:190px;" onchange="onGroup1Change()">
+            <option value="days_from_ftc">Days from FTC</option>
+            <option value="marketing_group">Marketing Group</option>
+            <option value="campaign_legacy">Campaign Legacy</option>
+            <option value="office_name">Office</option>
+            <option value="team">Team</option>
+            <option value="agent">Agent</option>
+            <option value="age_group">Age Group</option>
+            <option value="sales_client_potential">Sales Client Potential</option>
+            <option value="country_name">Country</option>
+          </select>
+        </div>
+        <div>
+          <label class="filter-label">Sub-group</label>
+          <select id="group2" class="form-select" style="width:190px;" onchange="loadData()">
+            <option value="none">None</option>
+            <option value="days_from_ftc">Days from FTC</option>
+            <option value="marketing_group">Marketing Group</option>
+            <option value="campaign_legacy">Campaign Legacy</option>
+            <option value="office_name">Office</option>
+            <option value="team">Team</option>
+            <option value="agent">Agent</option>
+            <option value="age_group">Age Group</option>
+            <option value="sales_client_potential">Sales Client Potential</option>
+            <option value="country_name">Country</option>
+          </select>
+        </div>
+        <div>
+          <button class="btn-apply" onclick="loadData()"><i class="bi bi-arrow-clockwise me-1"></i>Apply</button>
+        </div>
+        <div id="appliedDate" style="font-size:0.8rem;color:#8b949e;margin-bottom:2px;"></div>
       </div>
-      <div>
-        <button class="btn-apply" onclick="loadData()"><i class="bi bi-arrow-clockwise me-1"></i>Apply</button>
-      </div>
-      <div id="appliedDate" style="font-size:0.8rem; color:#8b949e; margin-bottom:2px;"></div>
-    </div>
-    <!-- Row 2: Agent / Office / Team dropdowns + group checkboxes -->
-    <div class="d-flex align-items-end gap-3 flex-wrap">
-      <div>
-        <label class="filter-label">Agent</label>
-        <select id="filterAgent" class="form-select" style="width:200px;" onchange="loadData()">
-          <option value="">All</option>
-        </select>
-      </div>
-      <div>
-        <label class="filter-label">Office</label>
-        <select id="filterOffice" class="form-select" style="width:160px;" onchange="loadData()">
-          <option value="">All</option>
-        </select>
-      </div>
-      <div>
-        <label class="filter-label">Team</label>
-        <select id="filterTeam" class="form-select" style="width:160px;" onchange="loadData()">
-          <option value="">All</option>
-        </select>
-      </div>
-      <div>
-        <label class="filter-label">Client Classification</label>
-        <select id="filterClassification" class="form-select" style="width:190px;" onchange="loadData()">
-          <option value="">All</option>
-          <option value="Low Quality">Low Quality</option>
-          <option value="High Quality">High Quality</option>
-          <option value="No segmentation">No segmentation</option>
-        </select>
-      </div>
-      <div class="ms-2">
-        <label class="filter-label">FTC Groups</label>
-        <div class="d-flex gap-3 flex-wrap" style="padding-top:2px;">
-          <label class="group-cb-wrap"><input type="checkbox" class="group-cb" value="0 - 7 days" checked onchange="renderWithFilters()"> 0–7</label>
-          <label class="group-cb-wrap"><input type="checkbox" class="group-cb" value="8 - 14 days" checked onchange="renderWithFilters()"> 8–14</label>
-          <label class="group-cb-wrap"><input type="checkbox" class="group-cb" value="15 - 30 days" checked onchange="renderWithFilters()"> 15–30</label>
-          <label class="group-cb-wrap"><input type="checkbox" class="group-cb" value="31 - 60 days" checked onchange="renderWithFilters()"> 31–60</label>
-          <label class="group-cb-wrap"><input type="checkbox" class="group-cb" value="61 - 90 days" checked onchange="renderWithFilters()"> 61–90</label>
-          <label class="group-cb-wrap"><input type="checkbox" class="group-cb" value="91 - 120 days" checked onchange="renderWithFilters()"> 91–120</label>
-          <label class="group-cb-wrap"><input type="checkbox" class="group-cb" value="120+ days" onchange="renderWithFilters()"> 120+</label>
+
+      <!-- Row 2: Agent / Office / Team / Classification -->
+      <div class="d-flex align-items-end gap-3 flex-wrap mb-3">
+        <div>
+          <label class="filter-label">Agent</label>
+          <select id="filterAgent" class="form-select" style="width:200px;" onchange="loadData()">
+            <option value="">All</option>
+          </select>
+        </div>
+        <div>
+          <label class="filter-label">Office</label>
+          <select id="filterOffice" class="form-select" style="width:160px;" onchange="loadData()">
+            <option value="">All</option>
+          </select>
+        </div>
+        <div>
+          <label class="filter-label">Team</label>
+          <select id="filterTeam" class="form-select" style="width:160px;" onchange="loadData()">
+            <option value="">All</option>
+          </select>
+        </div>
+        <div>
+          <label class="filter-label">Client Classification</label>
+          <select id="filterClassification" class="form-select" style="width:190px;" onchange="loadData()">
+            <option value="">All</option>
+            <option value="Low Quality">Low Quality</option>
+            <option value="High Quality">High Quality</option>
+            <option value="No segmentation">No segmentation</option>
+          </select>
         </div>
       </div>
-    </div>
+
+      <!-- Row 3: FTC Groups (only shown when View By = Days from FTC) -->
+      <div id="ftc-groups-wrap" class="d-flex align-items-end gap-3 flex-wrap">
+        <div>
+          <label class="filter-label">FTC Groups</label>
+          <div class="d-flex gap-3 flex-wrap" style="padding-top:2px;">
+            <label class="group-cb-wrap"><input type="checkbox" class="group-cb" value="0 - 7 days"   checked onchange="renderWithFilters()"> 0–7</label>
+            <label class="group-cb-wrap"><input type="checkbox" class="group-cb" value="8 - 14 days"  checked onchange="renderWithFilters()"> 8–14</label>
+            <label class="group-cb-wrap"><input type="checkbox" class="group-cb" value="15 - 30 days" checked onchange="renderWithFilters()"> 15–30</label>
+            <label class="group-cb-wrap"><input type="checkbox" class="group-cb" value="31 - 60 days" checked onchange="renderWithFilters()"> 31–60</label>
+            <label class="group-cb-wrap"><input type="checkbox" class="group-cb" value="61 - 90 days" checked onchange="renderWithFilters()"> 61–90</label>
+            <label class="group-cb-wrap"><input type="checkbox" class="group-cb" value="91 - 120 days" checked onchange="renderWithFilters()"> 91–120</label>
+            <label class="group-cb-wrap"><input type="checkbox" class="group-cb" value="120+ days" onchange="renderWithFilters()"> 120+</label>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -201,12 +225,21 @@
     <!-- Main table -->
     <div class="col-12 col-xl-9">
       <div class="card">
+        <!-- Toolbar -->
+        <div class="d-flex align-items-center justify-content-between px-3 py-2" style="border-bottom:1px solid #30363d;">
+          <div id="matrix-controls" style="display:none;gap:8px;">
+            <button class="btn-toolbar-sm" onclick="expandAll()"><i class="bi bi-arrows-expand me-1"></i>Expand All</button>
+            <button class="btn-toolbar-sm" onclick="collapseAll()"><i class="bi bi-arrows-collapse me-1"></i>Collapse All</button>
+          </div>
+          <div></div>
+          <button class="btn-excel" onclick="exportExcel()"><i class="bi bi-file-earmark-excel me-1"></i>Export Excel</button>
+        </div>
         <div class="card-body p-0">
           <div class="table-responsive">
             <table class="table table-hover mb-0" id="ftcTable">
               <thead>
                 <tr>
-                  <th style="min-width:130px;">Days from FTC</th>
+                  <th id="col-group1-header" style="min-width:150px;">Days from FTC</th>
                   <th class="text-num"># FTC</th>
                   <th class="text-num"># Traders</th>
                   <th class="text-num">Traders %</th>
@@ -222,7 +255,6 @@
               </thead>
               <tbody id="ftcBody">
                 <tr><td colspan="12" class="text-center text-secondary py-4">Select an end date and click Apply</td></tr>
-
               </tbody>
             </table>
           </div>
@@ -230,7 +262,7 @@
       </div>
     </div>
 
-    <!-- Legend -->
+    <!-- Terms -->
     <div class="col-12 col-xl-3">
       <div class="filter-card" style="padding:0;">
         <div id="terms-toggle" style="cursor:pointer;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;user-select:none;border-radius:10px;">
@@ -259,60 +291,54 @@
 
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 <script>
   const today = new Date().toISOString().split('T')[0];
-  flatpickr('#endDate', {
-    dateFormat: 'Y-m-d',
-    defaultDate: today,
-    disableMobile: true,
-  });
+  flatpickr('#endDate', { dateFormat: 'Y-m-d', defaultDate: today, disableMobile: true });
 
-  let lastData = null;
+  let lastData    = null;
+  let expandState = {};
 
-  function fmt(n) {
-    if (n === null || n === undefined) return '—';
-    return Number(n).toLocaleString('en-US');
-  }
-  function fmtUsd(n) {
-    if (n === null || n === undefined) return '—';
-    return '$' + Number(n).toLocaleString('en-US');
-  }
-  function fmtPct(n) {
-    if (n === null || n === undefined) return '—';
-    return n + '%';
-  }
+  const GROUP_LABELS = {
+    'days_from_ftc':          'Days from FTC',
+    'marketing_group':        'Marketing Group',
+    'campaign_legacy':        'Campaign Legacy',
+    'office_name':            'Office',
+    'team':                   'Team',
+    'agent':                  'Agent',
+    'age_group':              'Age Group',
+    'sales_client_potential': 'Sales Client Potential',
+    'country_name':           'Country',
+  };
 
-  function computeGrand(rows) {
-    let t = { ftc: 0, rdp: 0, deposit: 0, withdrawal: 0, wd_count: 0, traders: 0 };
+  function fmt(n)    { if (n == null) return '—'; return Number(n).toLocaleString('en-US'); }
+  function fmtUsd(n) { if (n == null) return '—'; return '$' + Number(n).toLocaleString('en-US'); }
+  function fmtPct(n) { if (n == null) return '—'; return n + '%'; }
+  function fmtLtv(n) { if (n == null) return '—'; return '$' + Math.round(n).toLocaleString('en-US'); }
+
+  function aggRows(rows) {
+    let t = { ftc:0, rdp:0, deposit:0, withdrawal:0, wd_count:0, traders:0 };
     for (const r of rows) {
-      t.ftc        += r.ftc;
-      t.rdp        += r.rdp;
-      t.deposit    += r.deposit;
-      t.withdrawal += r.withdrawal;
-      t.wd_count   += r.wd_count;
-      t.traders    += r.traders;
+      t.ftc += r.ftc; t.rdp += r.rdp;
+      t.deposit += r.deposit; t.withdrawal += r.withdrawal;
+      t.wd_count += r.wd_count; t.traders += r.traders;
     }
     const net = t.deposit - t.withdrawal;
     return {
-      day_group:      'Grand Total',
-      ftc:            t.ftc,
-      rdp:            t.rdp,
-      deposit:        t.deposit,
-      withdrawal:     t.withdrawal,
-      net_deposit:    net,
-      ltv:            t.ftc > 0 ? Math.round(net / t.ftc) : 0,
-      pct_std:        t.ftc > 0 ? Math.round(t.rdp / t.ftc * 100) : 0,
-      wd_count:       t.wd_count,
+      ftc: t.ftc, rdp: t.rdp,
+      deposit: t.deposit, withdrawal: t.withdrawal, net_deposit: net,
+      ltv:            t.ftc > 0 ? Math.round(net / t.ftc)           : 0,
+      pct_std:        t.ftc > 0 ? Math.round(t.rdp / t.ftc * 100)   : 0,
+      wd_count: t.wd_count,
       pct_wd_clients: t.ftc > 0 ? Math.round(t.wd_count / t.ftc * 100) : 0,
       pct_wd_usd:     t.deposit > 0 ? Math.round(t.withdrawal / t.deposit * 100) : 0,
-      traders:        t.traders,
+      traders: t.traders,
       traders_pct:    t.ftc > 0 ? Math.round(t.traders / t.ftc * 100) : 0,
     };
   }
 
-  function renderRow(r, isGrand) {
-    return `<tr class="${isGrand ? 'row-grand' : ''}">
-      <td>${r.day_group}</td>
+  function dataCells(r) {
+    return `
       <td class="text-num">${fmt(r.ftc)}</td>
       <td class="text-num">${fmt(r.traders)}</td>
       <td class="text-num">${fmtPct(r.traders_pct)}</td>
@@ -321,32 +347,114 @@
       <td class="text-num">${fmtUsd(r.deposit)}</td>
       <td class="text-num">${fmtUsd(r.withdrawal)}</td>
       <td class="text-num">${fmtUsd(r.net_deposit)}</td>
-      <td class="text-num">${r.ltv !== null && r.ltv !== undefined ? '$' + Math.round(r.ltv).toLocaleString('en-US') : '—'}</td>
+      <td class="text-num">${fmtLtv(r.ltv)}</td>
       <td class="text-num">${fmtPct(r.pct_wd_clients)}</td>
-      <td class="text-num">${fmtPct(r.pct_wd_usd)}</td>
-    </tr>`;
+      <td class="text-num">${fmtPct(r.pct_wd_usd)}</td>`;
   }
 
-  function renderWithFilters() {
+  function getFilteredRows() {
+    if (!lastData) return [];
+    let rows = lastData.rows;
+    const g1 = lastData.group1;
+    const isMatrix = lastData.group2 !== 'none';
+    if (!isMatrix && g1 === 'days_from_ftc') {
+      const checked = [...document.querySelectorAll('.group-cb:checked')].map(e => e.value);
+      if (checked.length) rows = rows.filter(r => checked.includes(r.g1));
+    }
+    return rows;
+  }
+
+  function renderTable() {
     if (!lastData) return;
-    const checkedGroups = [...document.querySelectorAll('.group-cb:checked')].map(e => e.value);
-    const rows = checkedGroups.length ? lastData.rows.filter(r => checkedGroups.includes(r.day_group)) : lastData.rows;
-    const grand = computeGrand(rows);
-    let html = renderRow(grand, true);
-    rows.forEach(r => { html += renderRow(r, false); });
+    const isMatrix = lastData.group2 !== 'none';
+    const g1Key    = lastData.group1;
+
+    // Update column header
+    document.getElementById('col-group1-header').textContent = GROUP_LABELS[g1Key] || g1Key;
+
+    // Show/hide matrix controls
+    document.getElementById('matrix-controls').style.display = isMatrix ? 'flex' : 'none';
+
+    const rows = getFilteredRows();
+    const grand = aggRows(rows);
+    let html = `<tr class="row-grand"><td>Grand Total</td>${dataCells(grand)}</tr>`;
+
+    if (!isMatrix) {
+      for (const r of rows) {
+        html += `<tr><td>${r.g1 ?? '(Unknown)'}</td>${dataCells(r)}</tr>`;
+      }
+    } else {
+      // Build ordered g1 groups
+      const groups = {}, order = [];
+      for (const r of rows) {
+        const key = r.g1 ?? '(Unknown)';
+        if (!groups[key]) { groups[key] = []; order.push(key); }
+        groups[key].push(r);
+      }
+      for (const g1 of order) {
+        const children = groups[g1];
+        const sub      = aggRows(children);
+        const expanded = expandState[g1] !== false;
+        const icon     = expanded ? '▾' : '▸';
+        html += `<tr class="row-parent" data-g1="${encodeURIComponent(g1)}">`;
+        html += `<td><span style="margin-right:6px;color:#8b949e;">${icon}</span>${g1}</td>`;
+        html += dataCells(sub);
+        html += `</tr>`;
+        if (expanded) {
+          for (const c of children) {
+            html += `<tr class="row-child"><td>${c.g2 ?? '(Unknown)'}</td>${dataCells(c)}</tr>`;
+          }
+        }
+      }
+    }
+
     document.getElementById('ftcBody').innerHTML = html;
+
+    if (isMatrix) {
+      document.querySelectorAll('.row-parent').forEach(tr => {
+        tr.addEventListener('click', () => {
+          const g1 = decodeURIComponent(tr.dataset.g1);
+          expandState[g1] = expandState[g1] === false;
+          renderTable();
+        });
+      });
+    }
+  }
+
+  function renderWithFilters() { renderTable(); }
+
+  function expandAll() {
+    if (!lastData) return;
+    expandState = {};
+    lastData.rows.forEach(r => { expandState[r.g1 ?? '(Unknown)'] = true; });
+    renderTable();
+  }
+
+  function collapseAll() {
+    if (!lastData) return;
+    expandState = {};
+    lastData.rows.forEach(r => { expandState[r.g1 ?? '(Unknown)'] = false; });
+    renderTable();
+  }
+
+  function onGroup1Change() {
+    const g1 = document.getElementById('group1').value;
+    document.getElementById('ftc-groups-wrap').style.display = (g1 === 'days_from_ftc') ? '' : 'none';
+    loadData();
   }
 
   function loadData(silent = false) {
     const endDate = document.getElementById('endDate').value;
     if (!endDate) return;
 
-    const agentId        = document.getElementById('filterAgent').value;
-    const office         = document.getElementById('filterOffice').value;
-    const team           = document.getElementById('filterTeam').value;
+    const group1 = document.getElementById('group1').value;
+    const group2 = document.getElementById('group2').value;
+    const agentId = document.getElementById('filterAgent').value;
+    const office  = document.getElementById('filterOffice').value;
+    const team    = document.getElementById('filterTeam').value;
     const classification = document.getElementById('filterClassification').value;
 
-    let url = `/api/ftc-date?end_date=${endDate}`;
+    let url = `/api/ftc-date?end_date=${endDate}&group1=${group1}&group2=${group2}`;
     if (agentId)        url += `&agent_id=${agentId}`;
     if (office)         url += `&office=${encodeURIComponent(office)}`;
     if (team)           url += `&team=${encodeURIComponent(team)}`;
@@ -365,8 +473,9 @@
             `<tr><td colspan="12" class="text-center text-danger py-3">${data.detail}</td></tr>`;
           return;
         }
-        lastData = data;
-        renderWithFilters();
+        lastData    = data;
+        expandState = {};
+        renderTable();
         if (!silent) document.getElementById('appliedDate').textContent = `End date: ${data.end_date}`;
       })
       .catch(e => {
@@ -378,6 +487,52 @@
       });
   }
 
+  function exportExcel() {
+    if (!lastData) { alert('No data to export.'); return; }
+    const isMatrix  = lastData.group2 !== 'none';
+    const col1Label = GROUP_LABELS[lastData.group1] || lastData.group1;
+    const col2Label = isMatrix ? (GROUP_LABELS[lastData.group2] || lastData.group2) : null;
+
+    const headers = [col1Label];
+    if (isMatrix) headers.push(col2Label);
+    headers.push('# FTC','# Traders','Traders %','# Redepositors','% STD',
+                 '$ Deposit','$ Withdrawal','$ Net Deposit','$ LTV','% WD','% WD $');
+
+    function toArr(label, sub, r) {
+      const row = [label];
+      if (isMatrix) row.push(sub ?? '');
+      row.push(r.ftc, r.traders, r.traders_pct, r.rdp, r.pct_std,
+               r.deposit, r.withdrawal, r.net_deposit, r.ltv,
+               r.pct_wd_clients, r.pct_wd_usd);
+      return row;
+    }
+
+    const rows  = getFilteredRows();
+    const grand = aggRows(rows);
+    const aoa   = [headers, toArr('Grand Total', isMatrix ? '' : null, grand)];
+
+    if (!isMatrix) {
+      rows.forEach(r => aoa.push(toArr(r.g1 ?? '(Unknown)', null, r)));
+    } else {
+      const groups = {}, order = [];
+      for (const r of rows) {
+        const key = r.g1 ?? '(Unknown)';
+        if (!groups[key]) { groups[key] = []; order.push(key); }
+        groups[key].push(r);
+      }
+      for (const g1 of order) {
+        const sub = aggRows(groups[g1]);
+        aoa.push(toArr(g1, '(Total)', sub));
+        groups[g1].forEach(c => aoa.push(toArr(g1, c.g2 ?? '(Unknown)', c)));
+      }
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'FTC Date');
+    XLSX.writeFile(wb, `ftc_date_${lastData.end_date}.xlsx`);
+  }
+
   function loadOptions() {
     fetch('/api/ftc-date/options')
       .then(r => r.json())
@@ -386,29 +541,25 @@
         const agentSel = document.getElementById('filterAgent');
         opts.agents.forEach(a => {
           const o = document.createElement('option');
-          o.value = a.id;
-          o.textContent = a.name;
+          o.value = a.id; o.textContent = a.name;
           agentSel.appendChild(o);
         });
         const officeSel = document.getElementById('filterOffice');
         opts.offices.forEach(v => {
           const o = document.createElement('option');
-          o.value = v;
-          o.textContent = v;
+          o.value = v; o.textContent = v;
           officeSel.appendChild(o);
         });
         const teamSel = document.getElementById('filterTeam');
         opts.teams.forEach(v => {
           const o = document.createElement('option');
-          o.value = v;
-          o.textContent = v;
+          o.value = v; o.textContent = v;
           teamSel.appendChild(o);
         });
       })
       .catch(() => {});
   }
 
-  // Load options then auto-load data on page open
   loadOptions();
   loadData();
 
@@ -447,7 +598,7 @@
     });
   })();
 
-  // Mobile sidebar toggle
+  // Mobile sidebar
   (function(){
     var toggle = document.getElementById('sidebar-toggle');
     var sb = document.querySelector('.sidebar');
@@ -457,7 +608,7 @@
     overlay.addEventListener('click', function(){ sb.classList.remove('open'); overlay.classList.remove('show'); });
   })();
 
-  // ── Last sync bar ──────────────────────────────────────────────────────
+  // Sync bar
   function fmtRelTime(iso) {
     if (!iso) return '—';
     const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
@@ -471,9 +622,8 @@
       const res = await fetch('/api/last-sync');
       if (!res.ok) return;
       const d = await res.json();
-      const tables = ['transactions', 'accounts'];
       let latest = null;
-      tables.forEach(t => { if (d[t]) { const ts = new Date(d[t]); if (!latest || ts > latest) latest = ts; } });
+      ['transactions','accounts'].forEach(t => { if (d[t]) { const ts = new Date(d[t]); if (!latest || ts > latest) latest = ts; } });
       const el = document.getElementById('sync-bar-val');
       if (el) el.textContent = latest ? fmtRelTime(latest.toISOString()) : '—';
     } catch(e) {}
@@ -481,10 +631,8 @@
   updateSyncBar();
   setInterval(function() {
     if (document.visibilityState !== 'visible') return;
-    const today = new Date().toISOString().split('T')[0];
-    const endDate = document.getElementById('endDate').value;
     updateSyncBar();
-    if (endDate === today) loadData(true);
+    if (document.getElementById('endDate').value === today) loadData(true);
   }, 60000);
 </script>
 <script src="https://instant.page/5.2.0/instantpage.min.js" type="module"></script>
