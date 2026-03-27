@@ -208,6 +208,8 @@
                 <tr>
                   <th style="min-width:130px;">Days from FTC</th>
                   <th class="text-num"># FTC</th>
+                  <th class="text-num"># Traders</th>
+                  <th class="text-num">Traders %</th>
                   <th class="text-num"># Loaders</th>
                   <th class="text-num">$ Deposit</th>
                   <th class="text-num">$ Withdrawal</th>
@@ -216,12 +218,11 @@
                   <th class="text-num">% STD</th>
                   <th class="text-num">% WD</th>
                   <th class="text-num">% WD $</th>
-                  <th class="text-num"># Traders</th>
-                  <th class="text-num">Traders %</th>
                 </tr>
               </thead>
               <tbody id="ftcBody">
                 <tr><td colspan="12" class="text-center text-secondary py-4">Select an end date and click Apply</td></tr>
+
               </tbody>
             </table>
           </div>
@@ -234,7 +235,7 @@
       <div class="section-title">Terms</div>
       <div class="legend-card">
         <div><strong># FTC</strong> — count of unique clients per group</div>
-        <div><strong># Loaders</strong> — clients who deposited after qualification date, before End Date</div>
+        <div><strong># Loaders</strong> — clients whose running deposits first hit $240, then made a further deposit before End Date</div>
         <div><strong>$ Deposit</strong> — sum of Deposits minus Deposit Cancelled, before End Date</div>
         <div><strong>$ Withdrawal</strong> — sum of Withdrawals minus Withdrawal Cancelled, before End Date</div>
         <div><strong>$ Net Deposit</strong> — $ Deposit − $ Withdrawal</div>
@@ -308,6 +309,8 @@
     return `<tr class="${isGrand ? 'row-grand' : ''}">
       <td>${r.day_group}</td>
       <td class="text-num">${fmt(r.ftc)}</td>
+      <td class="text-num">${fmt(r.traders)}</td>
+      <td class="text-num">${fmtPct(r.traders_pct)}</td>
       <td class="text-num">${fmt(r.rdp)}</td>
       <td class="text-num">${fmtUsd(r.deposit)}</td>
       <td class="text-num">${fmtUsd(r.withdrawal)}</td>
@@ -316,8 +319,6 @@
       <td class="text-num">${fmtPct(r.pct_std)}</td>
       <td class="text-num">${fmtPct(r.pct_wd_clients)}</td>
       <td class="text-num">${fmtPct(r.pct_wd_usd)}</td>
-      <td class="text-num">${fmt(r.traders)}</td>
-      <td class="text-num">${fmtPct(r.traders_pct)}</td>
     </tr>`;
   }
 

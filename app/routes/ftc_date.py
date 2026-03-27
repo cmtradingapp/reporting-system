@@ -70,7 +70,7 @@ async def ftc_date_api(
 
     if not end_date:
         end_date = datetime.now(_TZ).date().strftime("%Y-%m-%d")
-    _ck = f"ftc_v3:{end_date}:{agent_id}:{office}:{team}:{groups}:{classification}"
+    _ck = f"ftc_v4:{end_date}:{agent_id}:{office}:{team}:{groups}:{classification}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -125,16 +125,10 @@ async def ftc_date_api(
             GROUP BY t.vtigeraccountid
         ),
         rdp AS (
-            SELECT DISTINCT t.vtigeraccountid AS accountid
-            FROM transactions t
-            JOIN accounts a ON a.accountid = t.vtigeraccountid
-            WHERE t.transactiontype = 'Deposit'
-              AND t.transactionapproval = 'Approved'
-              AND (t.deleted = 0 OR t.deleted IS NULL)
-              AND a.client_qualification_date IS NOT NULL
-              AND COALESCE(t.confirmation_time, t.created_time)::date > a.client_qualification_date::date
-              AND COALESCE(t.confirmation_time, t.created_time)::date <= %(end_date)s::date
-              AND a.is_test_account = 0
+            SELECT DISTINCT accountid
+            FROM mv_std_clients
+            WHERE has_second_deposit = 1
+              AND second_deposit_date::date <= %(end_date)s::date
         ),
         withdrawalers AS (
             SELECT DISTINCT t.vtigeraccountid AS accountid
