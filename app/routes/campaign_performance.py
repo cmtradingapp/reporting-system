@@ -171,7 +171,9 @@ async def campaign_filter_options(request: Request):
 # ── KPI cards ─────────────────────────────────────────────────────────────────
 
 def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
-                   q_date_from: str = None, q_date_to: str = None) -> dict:
+                   q_date_from: str = None, q_date_to: str = None,
+                   f_mkt_group=None, f_legacy_id=None, f_campaign_name=None,
+                   f_channel=None, f_sub_channel=None, f_affiliate=None) -> dict:
     dt_to = datetime.strptime(date_to, "%Y-%m-%d").date()
     date_to_exclusive = (dt_to + timedelta(days=1)).strftime("%Y-%m-%d")
 
@@ -196,10 +198,21 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
 
     extra_where = f"{class_where} {qual_where}".strip()
 
+    # Marketing / campaign filters
+    camp_filter_params: dict = {}
+    camp_filter_where, _ = _build_filter_clauses(
+        f_mkt_group, f_legacy_id, f_campaign_name, f_channel, f_sub_channel,
+        f_affiliate, None, None, date_to, camp_filter_params
+    )
+    camp_filter_where = camp_filter_where.strip()
+    needs_camp_join = bool(f_mkt_group or f_legacy_id or f_campaign_name or f_channel or f_sub_channel)
+    camp_join = "LEFT JOIN campaigns c ON SPLIT_PART(a.campaign, '.', 1) = c.crmid" if needs_camp_join else ""
+    all_extra = f"{extra_where} {camp_filter_where}".strip()
+
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            if not extra_where:
+            if not all_extra:
                 cur.execute("""
                     SELECT new_leads_today, new_leads_month, new_live_today, new_live_month
                     FROM mv_account_stats LIMIT 1
@@ -212,7 +225,8 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
                 else:
                     leads_today = leads_mtd = live_today = live_mtd = 0
             else:
-                base_p = {"date_from": date_from, "date_to_excl": date_to_exclusive, "date_to": date_to, **qual_params}
+                base_p = {"date_from": date_from, "date_to_excl": date_to_exclusive, "date_to": date_to,
+                          **qual_params, **camp_filter_params}
                 cur.execute(f"""
                     SELECT
                         COUNT(*) FILTER (WHERE a.createdtime::date = %(date_to)s)                    AS leads_today,
@@ -224,15 +238,17 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
                                            AND a.createdtime::date >= %(date_from)s
                                            AND a.createdtime::date < %(date_to_excl)s)               AS live_mtd
                     FROM accounts a
+                    {camp_join}
                     WHERE a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)
                     {extra_where}
+                    {camp_filter_where}
                 """, base_p)
                 row = cur.fetchone()
                 leads_today, leads_mtd, live_today, live_mtd = (
                     int(row[0] or 0), int(row[1] or 0), int(row[2] or 0), int(row[3] or 0)
                 ) if row else (0, 0, 0, 0)
 
-            if not extra_where:
+            if not all_extra:
                 # FTD + deposits from MV (join crm_users to exclude duplicated% agents, same as table)
                 cur.execute("""
                     SELECT
@@ -271,7 +287,8 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
                 ftc_mtd   = int(row[0] or 0) if row else 0
                 ftc_daily = int(row[1] or 0) if row else 0
             else:
-                base_p = {"date_from": date_from, "date_to_excl": date_to_exclusive, "date_to": date_to, **qual_params}
+                base_p = {"date_from": date_from, "date_to_excl": date_to_exclusive, "date_to": date_to,
+                          **qual_params, **camp_filter_params}
                 cur.execute(f"""
                     SELECT
                         COALESCE(SUM(CASE WHEN t.transactiontype IN ('Deposit','Withdrawal Cancelled') THEN t.usdamount ELSE 0 END), 0) AS deposits,
@@ -281,6 +298,7 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
                                           AND t.confirmation_time::date = %(date_to)s THEN 1 ELSE 0 END), 0)                            AS ftd_daily
                     FROM transactions t
                     JOIN accounts a ON a.accountid = t.vtigeraccountid
+                    {camp_join}
                     JOIN crm_users u ON u.id = t.original_deposit_owner
                     WHERE t.transactionapproval = 'Approved'
                       AND (t.deleted = 0 OR t.deleted IS NULL)
@@ -293,6 +311,7 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
                       AND t.confirmation_time::date >= %(date_from)s
                       AND t.confirmation_time::date <  %(date_to_excl)s
                     {extra_where}
+                    {camp_filter_where}
                 """, base_p)
                 row = cur.fetchone()
                 if row:
@@ -310,20 +329,24 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
                                            AND a.client_qualification_date::date < %(date_to_excl)s) AS ftc_mtd,
                         COUNT(*) FILTER (WHERE a.client_qualification_date::date = %(date_to)s)      AS ftc_daily
                     FROM accounts a
+                    {camp_join}
                     WHERE a.client_qualification_date IS NOT NULL
                       AND a.is_test_account = 0
                       AND (a.is_demo = 0 OR a.is_demo IS NULL)
                     {extra_where}
+                    {camp_filter_where}
                 """, base_p)
                 row = cur.fetchone()
                 ftc_mtd   = int(row[0] or 0) if row else 0
                 ftc_daily = int(row[1] or 0) if row else 0
 
-            base_p = {"date_from": date_from, "date_to_excl": date_to_exclusive, **qual_params}
+            base_p = {"date_from": date_from, "date_to_excl": date_to_exclusive,
+                      **qual_params, **camp_filter_params}
             cur.execute(f"""
                 SELECT COUNT(DISTINCT t.vtigeraccountid)
                 FROM transactions t
                 JOIN accounts a  ON a.accountid = t.vtigeraccountid
+                {camp_join}
                 JOIN crm_users u ON u.id = t.original_deposit_owner
                 WHERE t.transactionapproval = 'Approved'
                   AND (t.deleted = 0 OR t.deleted IS NULL)
@@ -337,6 +360,7 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
                   AND t.confirmation_time::date <  %(date_to_excl)s
                   AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
                 {extra_where}
+                {camp_filter_where}
             """, base_p)
             row = cur.fetchone()
             traders_count = int(row[0] or 0) if row else 0
@@ -361,12 +385,21 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
 async def campaign_performance_api(
     request: Request, date_from: str, date_to: str,
     f_classification: str = None, q_date_from: str = None, q_date_to: str = None,
+    f_mkt_group: Optional[List[str]] = Query(default=None),
+    f_legacy_id: Optional[List[str]] = Query(default=None),
+    f_campaign_name: Optional[List[str]] = Query(default=None),
+    f_channel: Optional[List[str]] = Query(default=None),
+    f_sub_channel: Optional[List[str]] = Query(default=None),
+    f_affiliate: Optional[List[str]] = Query(default=None),
 ):
     user = await get_current_user(request)
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
-    _ck = f"camp_perf_v1:{date_from}:{date_to}:{f_classification}:{q_date_from}:{q_date_to}"
+    def _ck_part(v): return ','.join(sorted(v)) if v else ''
+    _ck = (f"camp_perf_v2:{date_from}:{date_to}:{f_classification}:{q_date_from}:{q_date_to}"
+           f":{_ck_part(f_mkt_group)}:{_ck_part(f_legacy_id)}:{_ck_part(f_campaign_name)}"
+           f":{_ck_part(f_channel)}:{_ck_part(f_sub_channel)}:{_ck_part(f_affiliate)}")
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -377,7 +410,10 @@ async def campaign_performance_api(
         return JSONResponse(status_code=400, content={"detail": "Invalid date format"})
 
     try:
-        _result = _camp_kpi_calc(date_from, date_to, f_classification, q_date_from, q_date_to)
+        _result = _camp_kpi_calc(
+            date_from, date_to, f_classification, q_date_from, q_date_to,
+            f_mkt_group, f_legacy_id, f_campaign_name, f_channel, f_sub_channel, f_affiliate
+        )
         cache.set(_ck, _result)
         return JSONResponse(content=_result)
     except Exception as e:

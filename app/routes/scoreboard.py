@@ -74,7 +74,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"perf_v12:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"perf_v13:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -98,7 +98,10 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
             COALESCE(tgt.target_ftc, 0)                  AS target_ftc,
             COALESCE(f100.ftd100_cnt, 0)                 AS ftd100,
             COALESCE(mv.net_usd, 0)::float               AS net_deposits,
-            COALESCE(mv.ftd_count, 0)::int               AS ftd_count
+            COALESCE(mv.ftd_count, 0)::int               AS ftd_count,
+            COALESCE(dk.daily_ftd, 0)::int               AS daily_ftd,
+            COALESCE(dk.daily_ftc, 0)::int               AS daily_ftc,
+            COALESCE(dk.daily_net, 0)::float             AS daily_net
         FROM crm_users u
         LEFT JOIN (
             -- Combined FTC + NET + FTD from mv_daily_kpis in a single scan
@@ -115,6 +118,17 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
                OR (k.tx_date   >= %(date_from)s AND k.tx_date   < %(date_to_excl)s)
             GROUP BY k.agent_id
         ) mv ON mv.agent_id = u.id
+        LEFT JOIN (
+            -- Per-agent daily stats for the date_to day only
+            SELECT
+                k.agent_id,
+                SUM(CASE WHEN k.tx_date  = %(date_to)s THEN k.ftd_count ELSE 0 END)::int   AS daily_ftd,
+                SUM(CASE WHEN k.qual_date = %(date_to)s THEN k.ftc_count ELSE 0 END)::int   AS daily_ftc,
+                SUM(CASE WHEN k.tx_date  = %(date_to)s THEN k.net_usd   ELSE 0 END)::float  AS daily_net
+            FROM mv_daily_kpis k
+            WHERE k.tx_date = %(date_to)s OR k.qual_date = %(date_to)s
+            GROUP BY k.agent_id
+        ) dk ON dk.agent_id = u.id
         LEFT JOIN (
             SELECT agent_id::bigint, SUM(ftc)::int AS target_ftc
             FROM targets
@@ -149,7 +163,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
                 conn.rollback()
                 holidays = set()
 
-            base_params = {"date_from": date_from, "date_to_excl": date_to_exclusive}
+            base_params = {"date_from": date_from, "date_to_excl": date_to_exclusive, "date_to": date_to}
             final_sql, final_params = _apply_role_filter(sql, base_params, role_filter)
             cur.execute(final_sql, final_params)
             rows = cur.fetchall()
@@ -275,14 +289,17 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
 
         data = [
             {
-                "office_name": r[0],
-                "agent_name":  r[1],
-                "department":  r[2],
+                "office_name":  r[0],
+                "agent_name":   r[1],
+                "department":   r[2],
                 "ftc":          r[3],
                 "target_ftc":   r[4],
                 "ftd100":       r[5],
                 "net_deposits": round(r[6], 2),
                 "ftd_count":    r[7],
+                "daily_ftd":    int(r[8] or 0),
+                "daily_ftc":    int(r[9] or 0),
+                "daily_net":    round(float(r[10] or 0), 2),
             }
             for r in rows
         ]
@@ -327,7 +344,7 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"perf_ret_v6:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"perf_ret_v7:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -349,7 +366,8 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
             COALESCE(tgt.monthly_target_net, 0)::float        AS target_net,
             COALESCE(mv.net_usd, 0)::float                    AS net_usd,
             COALESCE(mv.deposit_usd, 0)::float                AS deposit_usd,
-            COALESCE(vol.open_volume_usd, 0)::float           AS open_volume_usd
+            COALESCE(vol.open_volume_usd, 0)::float           AS open_volume_usd,
+            COALESCE(dk.daily_net_usd, 0)::float              AS daily_net_usd
         FROM crm_users u
         LEFT JOIN (
             SELECT agent_id::bigint, SUM(net)::float AS monthly_target_net
@@ -372,6 +390,12 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
             WHERE open_date >= %(date_from)s AND open_date <= %(date_to)s
             GROUP BY agent_id
         ) vol ON vol.agent_id = u.id
+        LEFT JOIN (
+            SELECT agent_id, SUM(net_usd)::float AS daily_net_usd
+            FROM mv_daily_kpis
+            WHERE tx_date = %(date_to)s
+            GROUP BY agent_id
+        ) dk ON dk.agent_id = u.id
         WHERE u.department_ = 'Retention'
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
@@ -494,6 +518,7 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
                 "net_usd":         round(r[4], 2),
                 "deposit_usd":     round(r[5], 2),
                 "open_volume_usd": round(r[6], 2),
+                "daily_net_usd":   round(float(r[7] or 0), 2),
             }
             for r in rows
         ]

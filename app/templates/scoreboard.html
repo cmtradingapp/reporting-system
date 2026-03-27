@@ -745,11 +745,16 @@
       if (fAgent  && !fAgent.has(r.agent_name))   return false;
       return true;
     });
-    const ftc  = fSales.reduce((s,r) => s + (r.ftc         ?? 0), 0);
-    const ftd  = fSales.reduce((s,r) => s + (r.ftd_count   ?? 0), 0);
-    const net  = fSales.reduce((s,r) => s + (r.net_deposits ?? 0), 0)
-               + fRet.reduce((s,r)   => s + (r.net_usd      ?? 0), 0);
-    const ovol = fRet.reduce((s,r)   => s + (r.open_volume_usd ?? 0), 0);
+    const ftc        = fSales.reduce((s,r) => s + (r.ftc          ?? 0), 0);
+    const ftd        = fSales.reduce((s,r) => s + (r.ftd_count    ?? 0), 0);
+    const net        = fSales.reduce((s,r) => s + (r.net_deposits  ?? 0), 0)
+                     + fRet.reduce((s,r)   => s + (r.net_usd       ?? 0), 0);
+    const ovol       = fRet.reduce((s,r)   => s + (r.open_volume_usd ?? 0), 0);
+    const dFtd       = fSales.reduce((s,r) => s + (r.daily_ftd    ?? 0), 0);
+    const dFtc       = fSales.reduce((s,r) => s + (r.daily_ftc    ?? 0), 0);
+    const dNetSal    = fSales.reduce((s,r) => s + (r.daily_net    ?? 0), 0);
+    const dNetRet    = fRet.reduce((s,r)   => s + (r.daily_net_usd ?? 0), 0);
+    const dNet       = dNetSal + dNetRet;
     const netFmt = v => (v < 0 ? '-$' : '$') + Math.round(Math.abs(v)).toLocaleString();
     document.getElementById('stat-grand-ftc').textContent    = ftc.toLocaleString();
     document.getElementById('stat-grand-ftc-rr').textContent = Math.round(ftc / safeWdp * workingDays).toLocaleString();
@@ -762,6 +767,10 @@
     document.getElementById('stat-open-volume').textContent  = Math.round(ovol).toLocaleString();
     const ovRrEl = document.getElementById('stat-open-volume-rr');
     if (ovRrEl) ovRrEl.textContent = Math.round(ovol / safeWdp * workingDays).toLocaleString();
+    const dFtdEl = document.getElementById('stat-daily-ftd'); if (dFtdEl) dFtdEl.textContent = dFtd.toLocaleString();
+    const dFtcEl = document.getElementById('stat-daily-ftc'); if (dFtcEl) dFtcEl.textContent = dFtc.toLocaleString();
+    const dNetEl = document.getElementById('stat-daily-net'); if (dNetEl) dNetEl.textContent = netFmt(dNet);
+    const dNetRetEl = document.getElementById('stat-daily-net-ret'); if (dNetRetEl) dNetRetEl.textContent = netFmt(dNetRet);
   }
 
   function onFilterChange() {

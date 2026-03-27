@@ -568,13 +568,7 @@
     }
 
     try {
-      const fClass    = (document.getElementById('f-classification')?.value || '');
-      const qDateFrom = document.getElementById('qual-date-from')?.value || '';
-      const qDateTo   = document.getElementById('qual-date-to')?.value   || '';
-      let kpiUrl = `/api/campaign-performance?date_from=${df}&date_to=${dt}`;
-      if (fClass)    kpiUrl += `&f_classification=${encodeURIComponent(fClass)}`;
-      if (qDateFrom) kpiUrl += `&q_date_from=${qDateFrom}`;
-      if (qDateTo)   kpiUrl += `&q_date_to=${qDateTo}`;
+      const kpiUrl = `/api/campaign-performance?date_from=${df}&date_to=${dt}${_getFilterParams()}`;
       const res = await fetch(kpiUrl);
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Server error');
@@ -1096,7 +1090,7 @@
           }
           _updateBtn();
           _render(search.value);
-          loadTable();
+          loadData(); loadTable();
         });
       });
     }
