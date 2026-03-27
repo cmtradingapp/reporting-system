@@ -92,10 +92,11 @@
     .sdd-search::placeholder { color: #484f58; }
     .sdd-list { max-height: 200px; overflow-y: auto; padding: 4px 0; }
     .sdd-list::-webkit-scrollbar { width: 4px; } .sdd-list::-webkit-scrollbar-track { background: transparent; } .sdd-list::-webkit-scrollbar-thumb { background: #30363d; border-radius: 2px; }
-    .sdd-item { padding: 6px 12px; font-size: 0.82rem; color: #e0e0e0; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sdd-item { padding: 6px 12px; font-size: 0.82rem; color: #e0e0e0; cursor: pointer; display: flex; align-items: center; gap: 7px; user-select: none; }
     .sdd-item:hover, .sdd-item.focused { background: #21262d; }
-    .sdd-item.selected { color: #3fb950; }
     .sdd-item.sdd-all { color: #8b949e; }
+    .sdd-cb { width: 13px; height: 13px; border: 1.5px solid #484f58; border-radius: 3px; flex-shrink: 0; display: inline-block; }
+    .sdd-cb.sdd-cb-on { background: #238636; border-color: #238636; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 6l3 3 5-5' stroke='white' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: center; }
     .group-cb-wrap { color: #8b949e; font-size: 0.78rem; cursor: pointer; display: flex; align-items: center; gap: 4px; }
     .group-cb-wrap input[type=checkbox] { accent-color: #238636; cursor: pointer; width: 13px; height: 13px; }
     .filter-row-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.8px; color: #8b949e; margin-bottom: 4px; display: block; }
@@ -657,12 +658,12 @@
     let extra = '';
     const qDateFrom = document.getElementById('qual-date-from')?.value || '';
     const qDateTo   = document.getElementById('qual-date-to')?.value   || '';
-    if (fMktGroup)     extra += `&f_mkt_group=${encodeURIComponent(fMktGroup)}`;
-    if (fLegacyId)     extra += `&f_legacy_id=${encodeURIComponent(fLegacyId)}`;
-    if (fCampaignName) extra += `&f_campaign_name=${encodeURIComponent(fCampaignName)}`;
-    if (fChannel)      extra += `&f_channel=${encodeURIComponent(fChannel)}`;
-    if (fSubChannel)   extra += `&f_sub_channel=${encodeURIComponent(fSubChannel)}`;
-    if (fAffiliate)    extra += `&f_affiliate=${encodeURIComponent(fAffiliate)}`;
+    fMktGroup.forEach(v     => extra += `&f_mkt_group=${encodeURIComponent(v)}`);
+    fLegacyId.forEach(v     => extra += `&f_legacy_id=${encodeURIComponent(v)}`);
+    fCampaignName.forEach(v => extra += `&f_campaign_name=${encodeURIComponent(v)}`);
+    fChannel.forEach(v      => extra += `&f_channel=${encodeURIComponent(v)}`);
+    fSubChannel.forEach(v   => extra += `&f_sub_channel=${encodeURIComponent(v)}`);
+    fAffiliate.forEach(v    => extra += `&f_affiliate=${encodeURIComponent(v)}`);
     if (fClass)        extra += `&f_classification=${encodeURIComponent(fClass)}`;
     if (ftcGroups)     extra += `&ftc_groups=${encodeURIComponent(ftcGroups)}`;
     if (qDateFrom)     extra += `&q_date_from=${qDateFrom}`;
@@ -1040,38 +1041,48 @@
     const panel  = wrap.querySelector('.sdd-panel');
     const search = wrap.querySelector('.sdd-search');
     const list   = wrap.querySelector('.sdd-list');
-    let value    = '';
+    let values   = new Set();
     let opts     = options || [];
-    let focusIdx = -1;
+
+    function _updateBtn() {
+      if (values.size === 0 || values.size === opts.length) {
+        btn.textContent = 'All'; btn.classList.remove('has-value');
+      } else if (values.size === 1) {
+        btn.textContent = [...values][0]; btn.classList.add('has-value');
+      } else {
+        btn.textContent = values.size + ' selected'; btn.classList.add('has-value');
+      }
+    }
 
     function _render(filter) {
       const q = (filter || '').toLowerCase();
       const filtered = q ? opts.filter(o => o.toLowerCase().includes(q)) : opts;
-      focusIdx = -1;
+      const allOn = values.size === 0 || values.size === opts.length;
       list.innerHTML =
-        `<div class="sdd-item sdd-all" data-val="">All</div>` +
+        `<div class="sdd-item sdd-all" data-val=""><span class="sdd-cb${allOn?' sdd-cb-on':''}"></span>All</div>` +
         filtered.map(o => {
           const esc = o.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
-          return `<div class="sdd-item${o===value?' selected':''}" data-val="${esc}">${esc}</div>`;
+          const on = values.has(o);
+          return `<div class="sdd-item" data-val="${esc}"><span class="sdd-cb${on?' sdd-cb-on':''}"></span>${esc}</div>`;
         }).join('');
       list.querySelectorAll('.sdd-item').forEach(item => {
         item.addEventListener('mousedown', e => {
           e.preventDefault();
-          _select(item.dataset.val);
-          _close();
+          const val = item.dataset.val;
+          if (val === '') {
+            values.clear();
+          } else {
+            if (values.has(val)) values.delete(val); else values.add(val);
+            if (values.size === opts.length) values.clear();
+          }
+          _updateBtn();
+          _render(search.value);
           loadTable();
         });
       });
     }
 
-    function _select(val) {
-      value = val;
-      btn.textContent = val || 'All';
-      btn.classList.toggle('has-value', !!val);
-    }
-
     function _open() {
-      // close any other open panels
       document.querySelectorAll('.sdd-panel.open').forEach(p => { if (p !== panel) p.classList.remove('open'); });
       _render('');
       search.value = '';
@@ -1079,26 +1090,20 @@
       setTimeout(() => search.focus(), 0);
     }
 
-    function _close() { panel.classList.remove('open'); focusIdx = -1; }
+    function _close() { panel.classList.remove('open'); }
 
     btn.addEventListener('click', e => { e.stopPropagation(); panel.classList.contains('open') ? _close() : _open(); });
     panel.addEventListener('click', e => e.stopPropagation());
     search.addEventListener('input', () => _render(search.value));
-    search.addEventListener('keydown', e => {
-      const items = list.querySelectorAll('.sdd-item');
-      if (e.key === 'ArrowDown') { e.preventDefault(); focusIdx = Math.min(focusIdx + 1, items.length - 1); items.forEach((el,i) => el.classList.toggle('focused', i === focusIdx)); items[focusIdx]?.scrollIntoView({block:'nearest'}); }
-      else if (e.key === 'ArrowUp') { e.preventDefault(); focusIdx = Math.max(focusIdx - 1, 0); items.forEach((el,i) => el.classList.toggle('focused', i === focusIdx)); items[focusIdx]?.scrollIntoView({block:'nearest'}); }
-      else if (e.key === 'Enter') { e.preventDefault(); if (focusIdx >= 0 && items[focusIdx]) { _select(items[focusIdx].dataset.val); _close(); loadTable(); } }
-      else if (e.key === 'Escape') { _close(); }
-    });
+    search.addEventListener('keydown', e => { if (e.key === 'Escape') _close(); });
 
     _sddRegistry[id] = {
-      getValue: () => value,
-      setOptions: (newOpts) => { opts = newOpts; },
+      getValue: () => values.size === 0 ? [] : [...values],
+      setOptions: (newOpts) => { opts = newOpts; for (const v of [...values]) { if (!newOpts.includes(v)) values.delete(v); } _updateBtn(); },
     };
   }
 
-  function _sddGet(id) { return _sddRegistry[id]?.getValue() || ''; }
+  function _sddGet(id) { return _sddRegistry[id]?.getValue() || []; }
 
   // Close all panels on outside click
   document.addEventListener('click', () => {

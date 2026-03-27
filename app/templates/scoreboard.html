@@ -74,10 +74,11 @@
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-sizing: border-box;
     }
     .cs-trigger:hover { border-color: #484f58; }
+    .cs-trigger.cs-has-value { border-color: #238636; color: #3fb950; }
     .cs-dropdown {
       display: none; position: absolute; top: calc(100% + 3px); left: 0; z-index: 1000;
       background: #21262d; border: 1px solid #30363d; border-radius: 6px;
-      min-width: 170px; box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      min-width: 200px; max-width: 280px; box-shadow: 0 4px 12px rgba(0,0,0,0.5);
     }
     .cs-dropdown.open { display: block; }
     .cs-search {
@@ -86,10 +87,13 @@
       color: #e0e0e0; outline: none; border-radius: 6px 6px 0 0;
     }
     .cs-search::placeholder { color: #484f58; }
-    .cs-optlist { max-height: 200px; overflow-y: auto; }
-    .cs-option { padding: 6px 10px; font-size: 0.82rem; color: #c9d1d9; cursor: pointer; }
+    .cs-optlist { max-height: 220px; overflow-y: auto; padding: 3px 0; }
+    .cs-option { padding: 5px 10px; font-size: 0.82rem; color: #c9d1d9; cursor: pointer; display: flex; align-items: center; gap: 7px; user-select: none; }
     .cs-option:hover { background: #30363d; }
-    .cs-option.selected { color: #388bfd; }
+    .cs-option-all { color: #8b949e; }
+    .cs-cb { width: 13px; height: 13px; border: 1.5px solid #484f58; border-radius: 3px; flex-shrink: 0; display: inline-block; }
+    .cs-cb.cs-cb-on { background: #238636; border-color: #238636; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 6l3 3 5-5' stroke='white' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: center; }
+    .cs-sep { height: 1px; background: #30363d; margin: 3px 0; }
 
     /* Filter separator */
     .filter-sep { width: 1px; height: 28px; background-color: #30363d; margin: 0 6px; }
@@ -662,9 +666,10 @@
   let workingDaysPassed = 0;
   let workingDaysLeft = 0;
 
-  // ── Custom searchable select ────────────────────────────────────────────
+  // ── Custom searchable select (multi) ────────────────────────────────────
   function makeCustomSelect(triggerId, dropId, searchId, optsId, allLabel, onChange) {
-    let _value = '';
+    let _values = new Set();
+    let _allValues = [];
     const trigger = document.getElementById(triggerId);
     const drop    = document.getElementById(dropId);
     const search  = document.getElementById(searchId);
@@ -673,38 +678,53 @@
       e.stopPropagation();
       const wasOpen = drop.classList.contains('open');
       document.querySelectorAll('.cs-dropdown.open').forEach(d => d.classList.remove('open'));
-      if (!wasOpen) { drop.classList.add('open'); search.value = ''; _filterOpts(''); search.focus(); }
+      if (!wasOpen) { drop.classList.add('open'); search.value = ''; _render(''); search.focus(); }
     });
-    search.addEventListener('input', () => _filterOpts(search.value));
+    search.addEventListener('input', () => _render(search.value));
     search.addEventListener('click', e => e.stopPropagation());
-    function _filterOpts(q) {
-      q = q.trim().toLowerCase();
-      optList.querySelectorAll('.cs-option').forEach(el => {
-        el.style.display = (!q || el.dataset.value === '' || el.textContent.toLowerCase().includes(q)) ? '' : 'none';
-      });
+    drop.addEventListener('click', e => e.stopPropagation());
+    function _updateTrigger() {
+      if (_values.size === 0 || _values.size === _allValues.length) {
+        trigger.textContent = allLabel; trigger.classList.remove('cs-has-value');
+      } else if (_values.size === 1) {
+        trigger.textContent = [..._values][0]; trigger.classList.add('cs-has-value');
+      } else {
+        trigger.textContent = _values.size + ' selected'; trigger.classList.add('cs-has-value');
+      }
     }
-    function _select(value, label) {
-      _value = value; trigger.textContent = label;
-      optList.querySelectorAll('.cs-option').forEach(el => el.classList.toggle('selected', el.dataset.value === value));
-      drop.classList.remove('open'); onChange();
+    function _render(q) {
+      q = (q || '').trim().toLowerCase();
+      const filtered = q ? _allValues.filter(v => v.toLowerCase().includes(q)) : _allValues;
+      optList.innerHTML = '';
+      const allOn = _values.size === 0 || _values.size === _allValues.length;
+      const allEl = document.createElement('div');
+      allEl.className = 'cs-option cs-option-all';
+      allEl.innerHTML = '<span class="cs-cb' + (allOn ? ' cs-cb-on' : '') + '"></span><span>' + allLabel + '</span>';
+      allEl.addEventListener('click', e => { e.stopPropagation(); _values.clear(); _updateTrigger(); _render(search.value); onChange(); });
+      optList.appendChild(allEl);
+      if (filtered.length) {
+        const sep = document.createElement('div'); sep.className = 'cs-sep'; optList.appendChild(sep);
+        filtered.forEach(v => {
+          const el = document.createElement('div');
+          el.className = 'cs-option';
+          const on = _values.has(v);
+          el.innerHTML = '<span class="cs-cb' + (on ? ' cs-cb-on' : '') + '"></span><span>' + v.replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</span>';
+          el.addEventListener('click', e => {
+            e.stopPropagation();
+            if (_values.has(v)) _values.delete(v); else _values.add(v);
+            if (_values.size === _allValues.length) _values.clear();
+            _updateTrigger(); _render(search.value); onChange();
+          });
+          optList.appendChild(el);
+        });
+      }
     }
     function populate(values) {
-      optList.innerHTML = '';
-      const allOpt = document.createElement('div');
-      allOpt.className = 'cs-option' + (_value === '' ? ' selected' : '');
-      allOpt.dataset.value = ''; allOpt.textContent = allLabel;
-      allOpt.addEventListener('click', () => _select('', allLabel));
-      optList.appendChild(allOpt);
-      values.forEach(v => {
-        const el = document.createElement('div');
-        el.className = 'cs-option' + (v === _value ? ' selected' : '');
-        el.dataset.value = v; el.textContent = v;
-        el.addEventListener('click', () => _select(v, v));
-        optList.appendChild(el);
-      });
-      if (_value && !values.includes(_value)) _select('', allLabel);
+      _allValues = values;
+      for (const v of [..._values]) { if (!values.includes(v)) _values.delete(v); }
+      _updateTrigger();
     }
-    return { populate, getValue: () => _value };
+    return { populate, getValue: () => new Set(_values) };
   }
 
   function onFilterChange() {
@@ -936,9 +956,9 @@
     const fAgent  = csAgent.getValue();
     const filtered = allRows.filter(r => {
       if (!(r.ftc > 0 || r.target_ftc > 0 || r.ftd100 > 0 || r.net_deposits !== 0 || r.ftd_count > 0)) return false;
-      if (fOffice && r.office_name !== fOffice) return false;
-      if (fTeam   && r.dept_name   !== fTeam)   return false;
-      if (fAgent  && r.agent_name  !== fAgent)  return false;
+      if (fOffice.size > 0 && !fOffice.has(r.office_name)) return false;
+      if (fTeam.size   > 0 && !fTeam.has(r.dept_name))     return false;
+      if (fAgent.size  > 0 && !fAgent.has(r.agent_name))   return false;
       return true;
     });
 
@@ -1460,9 +1480,9 @@
     const fAgent  = csAgent.getValue();
     const filtered = retAllRows.filter(r => {
       if (!(r.target_net > 0 || r.net_usd !== 0 || r.deposit_usd > 0 || r.open_volume_usd > 0)) return false;
-      if (fOffice && r.office_name !== fOffice) return false;
-      if (fTeam   && r.dept_name   !== fTeam)   return false;
-      if (fAgent  && r.agent_name  !== fAgent)  return false;
+      if (fOffice.size > 0 && !fOffice.has(r.office_name)) return false;
+      if (fTeam.size   > 0 && !fTeam.has(r.dept_name))     return false;
+      if (fAgent.size  > 0 && !fAgent.has(r.agent_name))   return false;
       return true;
     });
 

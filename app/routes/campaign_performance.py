@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Query
+from typing import List, Optional
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from app.auth.dependencies import get_current_user
@@ -395,23 +396,29 @@ def _build_filter_clauses(
     clauses = []
 
     if f_mkt_group:
-        clauses.append("AND c.marketing_group = %(f_mkt_group)s")
-        params["f_mkt_group"] = f_mkt_group
+        vals = list(f_mkt_group) if not isinstance(f_mkt_group, str) else [f_mkt_group]
+        clauses.append("AND c.marketing_group = ANY(%(f_mkt_group)s)")
+        params["f_mkt_group"] = vals
     if f_legacy_id:
-        clauses.append("AND c.campaign_legacy_id = %(f_legacy_id)s")
-        params["f_legacy_id"] = f_legacy_id
+        vals = list(f_legacy_id) if not isinstance(f_legacy_id, str) else [f_legacy_id]
+        clauses.append("AND c.campaign_legacy_id = ANY(%(f_legacy_id)s)")
+        params["f_legacy_id"] = vals
     if f_campaign_name:
-        clauses.append("AND c.campaign_name = %(f_campaign_name)s")
-        params["f_campaign_name"] = f_campaign_name
+        vals = list(f_campaign_name) if not isinstance(f_campaign_name, str) else [f_campaign_name]
+        clauses.append("AND c.campaign_name = ANY(%(f_campaign_name)s)")
+        params["f_campaign_name"] = vals
     if f_channel:
-        clauses.append("AND c.campaign_channel = %(f_channel)s")
-        params["f_channel"] = f_channel
+        vals = list(f_channel) if not isinstance(f_channel, str) else [f_channel]
+        clauses.append("AND c.campaign_channel = ANY(%(f_channel)s)")
+        params["f_channel"] = vals
     if f_sub_channel:
-        clauses.append("AND c.campaign_sub_channel = %(f_sub_channel)s")
-        params["f_sub_channel"] = f_sub_channel
+        vals = list(f_sub_channel) if not isinstance(f_sub_channel, str) else [f_sub_channel]
+        clauses.append("AND c.campaign_sub_channel = ANY(%(f_sub_channel)s)")
+        params["f_sub_channel"] = vals
     if f_affiliate:
-        clauses.append("AND a.original_affiliate = %(f_affiliate)s")
-        params["f_affiliate"] = f_affiliate
+        vals = list(f_affiliate) if not isinstance(f_affiliate, str) else [f_affiliate]
+        clauses.append("AND a.original_affiliate = ANY(%(f_affiliate)s)")
+        params["f_affiliate"] = vals
 
     needs_cc_join = False
     if f_classification:
@@ -442,8 +449,8 @@ def _build_filter_clauses(
 def _camp_table_calc(
     date_from: str, date_to: str,
     group1: str = "none", group2: str = "none", period: str = "none",
-    f_mkt_group: str = None, f_legacy_id: str = None, f_campaign_name: str = None,
-    f_channel: str = None, f_sub_channel: str = None, f_affiliate: str = None,
+    f_mkt_group=None, f_legacy_id=None, f_campaign_name=None,
+    f_channel=None, f_sub_channel=None, f_affiliate=None,
     f_classification: str = None, ftc_groups: str = None,
     q_date_from: str = None, q_date_to: str = None,
 ) -> dict:
@@ -684,8 +691,12 @@ def _camp_table_calc(
 async def campaign_performance_table_api(
     request: Request, date_from: str, date_to: str,
     group1: str = "none", group2: str = "none", period: str = "none",
-    f_mkt_group: str = None, f_legacy_id: str = None, f_campaign_name: str = None,
-    f_channel: str = None, f_sub_channel: str = None, f_affiliate: str = None,
+    f_mkt_group: Optional[List[str]] = Query(default=None),
+    f_legacy_id: Optional[List[str]] = Query(default=None),
+    f_campaign_name: Optional[List[str]] = Query(default=None),
+    f_channel: Optional[List[str]] = Query(default=None),
+    f_sub_channel: Optional[List[str]] = Query(default=None),
+    f_affiliate: Optional[List[str]] = Query(default=None),
     f_classification: str = None, ftc_groups: str = None,
     q_date_from: str = None, q_date_to: str = None,
 ):
@@ -700,9 +711,10 @@ async def campaign_performance_table_api(
     if period not in VALID_PERIODS and period != "none":
         return JSONResponse(status_code=400, content={"detail": "Invalid period"})
 
-    _ck = (f"camp_tbl_v3:{date_from}:{date_to}:{group1}:{group2}:{period}"
-           f":{f_mkt_group}:{f_legacy_id}:{f_campaign_name}:{f_channel}"
-           f":{f_sub_channel}:{f_affiliate}:{f_classification}:{ftc_groups}"
+    def _ck_part(v): return ','.join(sorted(v)) if v else ''
+    _ck = (f"camp_tbl_v4:{date_from}:{date_to}:{group1}:{group2}:{period}"
+           f":{_ck_part(f_mkt_group)}:{_ck_part(f_legacy_id)}:{_ck_part(f_campaign_name)}:{_ck_part(f_channel)}"
+           f":{_ck_part(f_sub_channel)}:{_ck_part(f_affiliate)}:{f_classification}:{ftc_groups}"
            f":{q_date_from}:{q_date_to}")
     _hit = cache.get(_ck)
     if _hit is not None:
