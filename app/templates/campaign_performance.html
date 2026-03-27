@@ -339,6 +339,7 @@
           <optgroup label="Agent">
             <option value="office_name">Office</option>
             <option value="agent_name">Agent</option>
+            <option value="agent_team">Agent Team</option>
           </optgroup>
           <optgroup label="Account">
             <option value="country">Country</option>
@@ -362,6 +363,7 @@
           <optgroup label="Agent">
             <option value="office_name">Office</option>
             <option value="agent_name">Agent</option>
+            <option value="agent_team">Agent Team</option>
           </optgroup>
           <optgroup label="Account">
             <option value="country">Country</option>
@@ -821,6 +823,7 @@
       <th class="text-center" onclick="tblSort('withdrawals')" style="cursor:pointer;">Withdrawals <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
       <th class="text-center" onclick="tblSort('net_deposits')" style="cursor:pointer;">Net Dep <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
       <th class="text-center" onclick="tblSort('traders')" style="cursor:pointer;">Traders <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+      <th class="text-center" onclick="tblSort('ltv')" style="cursor:pointer;">LTV <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
     </tr>`;
     document.getElementById('tbl-thead').innerHTML = html;
   }
@@ -850,6 +853,7 @@
       <td class="text-center" style="color:#f85149;${style}">${fmtMoney(r.withdrawals)}</td>
       <td class="text-center" style="color:${net >= 0 ? '#3fb950' : '#f85149'};${style}">${fmtMoney(net)}</td>
       <td class="text-center" style="${style}">${fmtN(r.traders)}</td>
+      <td class="text-center" style="${style}">${fmtMoney(r.ltv ?? 0)}</td>
     `;
   }
 
@@ -953,7 +957,7 @@
       const key = r.g1 ?? '(Unassigned)';
       if (!g1Map[key]) {
         g1Map[key] = {g1: r.g1, leads: 0, live_accounts: 0, ftd: 0, ftc: 0,
-                      deposits: 0, withdrawals: 0, net_deposits: 0, traders: 0, children: []};
+                      deposits: 0, withdrawals: 0, net_deposits: 0, traders: 0, ltv: 0, children: []};
       }
       const agg = g1Map[key];
       agg.leads += r.leads; agg.live_accounts += r.live_accounts;
@@ -962,6 +966,7 @@
       agg.withdrawals  += r.withdrawals;
       agg.net_deposits += r.net_deposits;
       agg.traders      += r.traders;
+      agg.ltv = agg.ftc > 0 ? Math.round(agg.net_deposits / agg.ftc * 100) / 100 : 0;
       agg.children.push(r);
     });
 
@@ -1016,7 +1021,7 @@
     if (hasG1) headers.push(g1Label);
     if (hasG2) headers.push(g2Label);
     if (hasPer) headers.push(perLabel);
-    headers.push('Leads','Live Accounts','FTD','FTC','CR% Lead→Live','CR% Live→FTD','CR% Lead→FTC','CR% Live→FTC','CR% FTD→FTC','Deposits','Withdrawals','Net Deposits','Traders');
+    headers.push('Leads','Live Accounts','FTD','FTC','CR% Lead→Live','CR% Live→FTD','CR% Lead→FTC','CR% Live→FTC','CR% FTD→FTC','Deposits','Withdrawals','Net Deposits','Traders','LTV');
 
     const esc = v => '"' + String(v ?? '').replace(/"/g,'""') + '"';
     const lines = [headers.join(',')];

@@ -24,6 +24,7 @@ VALID_GROUPS = {
     "original_affiliate":   "COALESCE(a.original_affiliate, '(Unassigned)')",
     "office_name":          "COALESCE(cu.office_name, '(Unassigned)')",
     "agent_name":           "COALESCE(cu.agent_name, '(Unassigned)')",
+    "agent_team":           "COALESCE(cu.team, '(Unassigned)')",
     "country":              "COALESCE(a.country_iso, '(Unassigned)')",
     "client_classification": "COALESCE(a.classification_int::text, '(Unassigned)')",
     "segmentation":         "COALESCE(CASE a.segmentation WHEN '1' THEN '-A' WHEN '2' THEN 'B' WHEN '3' THEN 'C' WHEN '4' THEN '+A' END, '(Unassigned)')",
@@ -37,6 +38,7 @@ GROUP_LABELS = {
     "original_affiliate":   "Original Affiliate",
     "office_name":          "Office",
     "agent_name":           "Agent",
+    "agent_team":           "Agent Team",
     "country":              "Country",
     "client_classification": "Client Classification Category",
     "segmentation":         "Segmentation",
@@ -460,7 +462,7 @@ async def campaign_performance_api(
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
     def _ck_part(v): return ','.join(sorted(v)) if v else ''
-    _ck = (f"camp_perf_v5:{date_from}:{date_to}:{f_classification}:{q_date_from}:{q_date_to}"
+    _ck = (f"camp_perf_v6:{date_from}:{date_to}:{f_classification}:{q_date_from}:{q_date_to}"
            f":{_ck_part(f_mkt_group)}:{_ck_part(f_legacy_id)}:{_ck_part(f_campaign_name)}"
            f":{_ck_part(f_channel)}:{_ck_part(f_sub_channel)}:{_ck_part(f_affiliate)}"
            f":{_ck_part(f_country)}:{_ck_part(f_office)}:{_ck_part(f_agent)}:{_ck_part(f_team)}"
@@ -790,6 +792,7 @@ def _camp_table_calc(
             row["cr_lead_to_ftc"]  = _cr(row["ftc"],           row["leads"])
             row["cr_live_to_ftc"]  = _cr(row["ftc"],           row["live_accounts"])
             row["cr_ftd_to_ftc"]   = _cr(row["ftc"],           row["ftd"])
+            row["ltv"]             = round(row["net_deposits"] / row["ftc"], 2) if row["ftc"] else 0.0
             return row
 
         for row in merged.values():
@@ -861,7 +864,7 @@ async def campaign_performance_table_api(
         return JSONResponse(status_code=400, content={"detail": "Invalid period"})
 
     def _ck_part(v): return ','.join(sorted(v)) if v else ''
-    _ck = (f"camp_tbl_v7:{date_from}:{date_to}:{group1}:{group2}:{period}"
+    _ck = (f"camp_tbl_v8:{date_from}:{date_to}:{group1}:{group2}:{period}"
            f":{_ck_part(f_mkt_group)}:{_ck_part(f_legacy_id)}:{_ck_part(f_campaign_name)}:{_ck_part(f_channel)}"
            f":{_ck_part(f_sub_channel)}:{_ck_part(f_affiliate)}:{f_classification}:{ftc_groups}"
            f":{q_date_from}:{q_date_to}:{_ck_part(f_country)}:{_ck_part(f_office)}:{_ck_part(f_agent)}:{_ck_part(f_team)}"
