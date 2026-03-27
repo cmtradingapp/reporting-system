@@ -1631,7 +1631,7 @@
         <td class="text-center">${retPctHtml(office.netRrPct, true)}</td>
         <td class="text-center">${wDollarHtml(office.miss100Rr, true)}</td>
         <td class="text-center">${wDollarHtml(office.depUsd, true)}</td>
-        <td class="text-center"><span class="office-total">${office.stdCount}</span></td>
+        <td class="text-center"><span class="office-total">${office.stdCount.toLocaleString()}</span></td>
         <td class="text-center">${blueHtml(office.netUsd, true)}</td>
         <td class="text-center"><span class="office-total">${wDollarHtml(office.netRr, true)}</span></td>
         <td class="text-center">${retPctHtml(office.netTgtPct, true)}</td>
@@ -1695,7 +1695,7 @@
           <td class="text-center">${retPctHtml(dept.netRrPct)}</td>
           <td class="text-center">${wDollarHtml(dept.miss100Rr)}</td>
           <td class="text-center">${wDollarHtml(dept.depUsd)}</td>
-          <td class="text-center">${dept.stdCount}</td>
+          <td class="text-center">${dept.stdCount.toLocaleString()}</td>
           <td class="text-center">${blueHtml(dept.netUsd)}</td>
           <td class="text-center">${wDollarHtml(dept.netRr)}</td>
           <td class="text-center">${retPctHtml(dept.netTgtPct)}</td>
@@ -1738,7 +1738,7 @@
             <td class="text-center">${retPctHtml(r.net_rr_pct)}</td>
             <td class="text-center">${wDollarHtml(r.missing_100_rr)}</td>
             <td class="text-center">${wDollarHtml(r.deposit_usd)}</td>
-            <td class="text-center">${r.std_count ?? 0}</td>
+            <td class="text-center">${(r.std_count ?? 0).toLocaleString()}</td>
             <td class="text-center">${blueHtml(r.net_usd)}</td>
             <td class="text-center">${wDollarHtml(r.net_rr)}</td>
             <td class="text-center">${retPctHtml(r.target_net_pct)}</td>
@@ -1807,7 +1807,7 @@
         <td class="text-center">${retPctHtml(gNetRrPct, true)}</td>
         <td class="text-center">${wDollarHtml(gMiss100Rr, true)}</td>
         <td class="text-center">${wDollarHtml(gDepositUsd, true)}</td>
-        <td class="text-center">${gStdCount}</td>
+        <td class="text-center">${gStdCount.toLocaleString()}</td>
         <td class="text-center">${blueHtml(gNetUsd, true)}</td>
         <td class="text-center">${wDollarHtml(gNetRr, true)}</td>
         <td class="text-center">${retPctHtml(gNetTgtPct, true)}</td>
