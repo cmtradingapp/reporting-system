@@ -42,7 +42,7 @@
     .filter-sep { width: 1px; height: 28px; background-color: #30363d; margin: 0 6px; }
 
     /* Filter grid for campaign filter row */
-    .filter-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 10px; margin-top: 10px; padding-top: 10px; border-top: 1px solid #21262d; }
+    .filter-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-top: 10px; padding-top: 10px; border-top: 1px solid #21262d; }
     .filter-grid .sdd-wrap { display: block; width: 100%; }
     .filter-grid .sdd-btn { width: 100%; box-sizing: border-box; }
     .filter-grid .group-select { width: 100%; box-sizing: border-box; }
@@ -266,6 +266,10 @@
           <div class="sdd-panel"><input class="sdd-search" placeholder="Search…" autocomplete="off"><div class="sdd-list"></div></div>
         </div>
       </div>
+    </div>
+
+    <!-- Row 3: Account / Agent filters -->
+    <div class="filter-grid" style="grid-template-columns:repeat(6,1fr);margin-top:10px;">
       <div style="display:flex;flex-direction:column;">
         <span class="filter-row-label">Client Classification</span>
         <select id="f-classification" class="group-select" style="width:100%;box-sizing:border-box;">
@@ -285,10 +289,6 @@
           <option value="+A">+A</option>
         </select>
       </div>
-    </div>
-
-    <!-- Row 3: Country / Office / Agent / Team filters -->
-    <div class="filter-grid" style="grid-template-columns:repeat(4,1fr);margin-top:10px;">
       <div style="display:flex;flex-direction:column;">
         <span class="filter-row-label">Country</span>
         <div class="sdd-wrap" id="f-country">
@@ -398,8 +398,6 @@
           <label class="group-cb-wrap"><input type="checkbox" class="ftc-cb" value="61 - 90 days" checked> 61–90</label>
           <label class="group-cb-wrap"><input type="checkbox" class="ftc-cb" value="91 - 120 days" checked> 91–120</label>
           <label class="group-cb-wrap"><input type="checkbox" class="ftc-cb" value="120+ days" checked> 120+</label>
-          <button onclick="toggleAllFtc(true)" class="quick-btn" style="padding:3px 8px;font-size:0.72rem;">All</button>
-          <button onclick="toggleAllFtc(false)" class="quick-btn" style="padding:3px 8px;font-size:0.72rem;">None</button>
         </div>
       </div>
     </div>
@@ -1189,11 +1187,6 @@
     loadData(); loadTable();
   });
   document.querySelectorAll('.ftc-cb').forEach(cb => cb.addEventListener('change', () => loadTable()));
-
-  function toggleAllFtc(state) {
-    document.querySelectorAll('.ftc-cb').forEach(cb => { cb.checked = state; });
-    loadTable();
-  }
 
   // ── Load filter options (populate dropdowns) ──────────────────────────────
   async function loadFilterOptions() {
