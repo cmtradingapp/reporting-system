@@ -2379,6 +2379,59 @@ _MV_SETUP_SQL = [
       AND createdtime IS NOT NULL
     """,
     "CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_account_stats_u ON mv_account_stats (id)",
+
+    # ── mv_std_clients  (STD — second deposit after running total hits $240) ───
+    "DROP MATERIALIZED VIEW IF EXISTS mv_std_clients CASCADE",
+    """
+    CREATE MATERIALIZED VIEW mv_std_clients AS
+    WITH ordered_tx AS (
+        SELECT
+            t.vtigeraccountid AS accountid,
+            t.confirmation_time,
+            t.usdamount,
+            SUM(t.usdamount) OVER (
+                PARTITION BY t.vtigeraccountid
+                ORDER BY t.confirmation_time
+                ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+            ) AS running_total
+        FROM transactions t
+        JOIN accounts a ON t.vtigeraccountid = a.accountid
+        WHERE t.transactionapproval = 'Approved'
+          AND t.transactiontype IN ('Deposit', 'Withdrawal Cancelled')
+          AND (t.deleted = 0 OR t.deleted IS NULL)
+          AND a.is_test_account = 0
+    ),
+    ftd_event AS (
+        SELECT
+            accountid,
+            MIN(confirmation_time) AS ftd_240_date
+        FROM ordered_tx
+        WHERE running_total >= 240
+        GROUP BY accountid
+    ),
+    second_tx AS (
+        SELECT
+            f.accountid,
+            MIN(t.confirmation_time) AS second_deposit_date
+        FROM ftd_event f
+        JOIN transactions t ON t.vtigeraccountid = f.accountid
+          AND t.confirmation_time > f.ftd_240_date
+          AND t.transactionapproval = 'Approved'
+          AND t.transactiontype IN ('Deposit', 'Withdrawal Cancelled')
+          AND (t.deleted = 0 OR t.deleted IS NULL)
+        GROUP BY f.accountid
+    )
+    SELECT
+        f.accountid,
+        CASE WHEN s.second_deposit_date IS NOT NULL THEN 1 ELSE 0 END AS has_second_deposit,
+        s.second_deposit_date,
+        a.assigned_to
+    FROM ftd_event f
+    LEFT JOIN second_tx s ON f.accountid = s.accountid
+    LEFT JOIN accounts a ON f.accountid = a.accountid
+    """,
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_std_clients_u   ON mv_std_clients (accountid)",
+    "CREATE INDEX IF NOT EXISTS idx_mv_std_clients_agent      ON mv_std_clients (assigned_to, second_deposit_date) WHERE has_second_deposit = 1",
 ]
 
 
@@ -2406,6 +2459,7 @@ _MV_ORDER = [
     "mv_sales_bonuses",   # independent
     "mv_run_rate",        # depends on mv_daily_kpis — must be last
     "mv_account_stats",   # independent — new leads + live accounts
+    "mv_std_clients",     # independent — STD (second deposit after $240 running total)
 ]
 
 # Module-level status dict updated by refresh_materialized_views()

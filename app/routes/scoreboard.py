@@ -346,7 +346,7 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"perf_ret_v9:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"perf_ret_v10:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -401,18 +401,12 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
             GROUP BY agent_id
         ) dk ON dk.agent_id = u.id
         LEFT JOIN (
-            SELECT a.assigned_to AS agent_id, COUNT(DISTINCT a.accountid) AS std_count
-            FROM accounts a
-            JOIN transactions t ON t.vtigeraccountid = a.accountid
-            WHERE t.transactiontype = 'Deposit'
-              AND t.transactionapproval = 'Approved'
-              AND (t.deleted = 0 OR t.deleted IS NULL)
-              AND a.client_qualification_date IS NOT NULL
-              AND a.is_test_account = 0
-              AND t.confirmation_time::date > a.client_qualification_date::date
-              AND t.confirmation_time::date >= %(date_from)s::date
-              AND t.confirmation_time::date < %(date_to_excl)s::date
-            GROUP BY a.assigned_to
+            SELECT assigned_to AS agent_id, COUNT(DISTINCT accountid) AS std_count
+            FROM mv_std_clients
+            WHERE has_second_deposit = 1
+              AND second_deposit_date::date >= %(date_from)s::date
+              AND second_deposit_date::date < %(date_to_excl)s::date
+            GROUP BY assigned_to
         ) std ON std.agent_id = u.id
         WHERE u.department_ = 'Retention'
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
