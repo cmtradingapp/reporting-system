@@ -1,20 +1,52 @@
 import psycopg2
+import psycopg2.extensions
+from psycopg2.pool import ThreadedConnectionPool
 from psycopg2.extras import execute_values
 import pandas as pd
+import threading
 from app.config import (
     POSTGRES_HOST, POSTGRES_PORT, POSTGRES_USER,
     POSTGRES_PASSWORD, POSTGRES_DB,
 )
 
+_pool: ThreadedConnectionPool | None = None
+_pool_lock = threading.Lock()
+
+
+def _get_pool() -> ThreadedConnectionPool:
+    global _pool
+    if _pool is None:
+        with _pool_lock:
+            if _pool is None:
+                _pool = ThreadedConnectionPool(
+                    minconn=2,
+                    maxconn=25,
+                    host=POSTGRES_HOST,
+                    port=POSTGRES_PORT,
+                    user=POSTGRES_USER,
+                    password=POSTGRES_PASSWORD,
+                    dbname=POSTGRES_DB,
+                    connect_timeout=10,
+                    options="-c statement_timeout=90000",  # 90s max per query
+                )
+    return _pool
+
 
 def get_connection():
-    return psycopg2.connect(
-        host=POSTGRES_HOST,
-        port=POSTGRES_PORT,
-        user=POSTGRES_USER,
-        password=POSTGRES_PASSWORD,
-        dbname=POSTGRES_DB,
-    )
+    """Get a connection from the pool.  Call conn.close() as normal — it returns
+    the connection to the pool rather than closing the underlying socket."""
+    pool = _get_pool()
+    conn = pool.getconn()
+    # Wrap close() so callers don't need to change — returns to pool instead
+    def _return():
+        try:
+            if not conn.closed and conn.status != psycopg2.extensions.STATUS_READY:
+                conn.rollback()
+        except Exception:
+            pass
+        pool.putconn(conn)
+    conn.close = _return
+    return conn
 
 
 def ensure_table():
