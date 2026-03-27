@@ -375,20 +375,21 @@
           <button id="btn-clear-qual" class="quick-btn" style="padding:4px 8px;font-size:0.75rem;line-height:1;" title="Clear qualification date filter">✕</button>
         </div>
       </div>
-    </div>
-
-    <!-- Row 5: FTC Groups -->
-    <div class="d-flex flex-wrap align-items-center gap-3" style="margin-top:10px;">
-      <span style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.8px;color:#8b949e;white-space:nowrap;">FTC Groups</span>
-      <label class="group-cb-wrap"><input type="checkbox" class="ftc-cb" value="0 - 7 days" checked> 0–7</label>
-      <label class="group-cb-wrap"><input type="checkbox" class="ftc-cb" value="8 - 14 days" checked> 8–14</label>
-      <label class="group-cb-wrap"><input type="checkbox" class="ftc-cb" value="15 - 30 days" checked> 15–30</label>
-      <label class="group-cb-wrap"><input type="checkbox" class="ftc-cb" value="31 - 60 days" checked> 31–60</label>
-      <label class="group-cb-wrap"><input type="checkbox" class="ftc-cb" value="61 - 90 days" checked> 61–90</label>
-      <label class="group-cb-wrap"><input type="checkbox" class="ftc-cb" value="91 - 120 days" checked> 91–120</label>
-      <label class="group-cb-wrap"><input type="checkbox" class="ftc-cb" value="120+ days" checked> 120+</label>
-      <button onclick="toggleAllFtc(true)" class="quick-btn" style="padding:3px 8px;font-size:0.72rem;">All</button>
-      <button onclick="toggleAllFtc(false)" class="quick-btn" style="padding:3px 8px;font-size:0.72rem;">None</button>
+      <div class="filter-sep" style="height:42px;"></div>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <span style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.8px;color:#8b949e;white-space:nowrap;">FTC Groups</span>
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;">
+          <label class="group-cb-wrap"><input type="checkbox" class="ftc-cb" value="0 - 7 days" checked> 0–7</label>
+          <label class="group-cb-wrap"><input type="checkbox" class="ftc-cb" value="8 - 14 days" checked> 8–14</label>
+          <label class="group-cb-wrap"><input type="checkbox" class="ftc-cb" value="15 - 30 days" checked> 15–30</label>
+          <label class="group-cb-wrap"><input type="checkbox" class="ftc-cb" value="31 - 60 days" checked> 31–60</label>
+          <label class="group-cb-wrap"><input type="checkbox" class="ftc-cb" value="61 - 90 days" checked> 61–90</label>
+          <label class="group-cb-wrap"><input type="checkbox" class="ftc-cb" value="91 - 120 days" checked> 91–120</label>
+          <label class="group-cb-wrap"><input type="checkbox" class="ftc-cb" value="120+ days" checked> 120+</label>
+          <button onclick="toggleAllFtc(true)" class="quick-btn" style="padding:3px 8px;font-size:0.72rem;">All</button>
+          <button onclick="toggleAllFtc(false)" class="quick-btn" style="padding:3px 8px;font-size:0.72rem;">None</button>
+        </div>
+      </div>
     </div>
 
     </div><!-- /filter-body -->

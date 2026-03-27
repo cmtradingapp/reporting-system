@@ -142,9 +142,13 @@ def _camp_filter_options_calc() -> dict:
                 FROM accounts
                 WHERE country_iso IS NOT NULL AND country_iso <> ''
                   AND is_test_account = 0
-                ORDER BY country_iso
             """)
-            countries = [r[0] for r in cur.fetchall()]
+            _cmap = _get_country_map()
+            countries = sorted({
+                _cmap.get(r[0].upper(), r[0])
+                for r in cur.fetchall()
+                if r[0]
+            })
 
             cur.execute("""
                 SELECT DISTINCT office_name
@@ -194,7 +198,7 @@ async def campaign_filter_options(request: Request):
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
-    _ck = "camp_filter_opts_v2"
+    _ck = "camp_filter_opts_v3"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -514,9 +518,12 @@ def _build_filter_clauses(
         clauses.append("AND a.original_affiliate = ANY(%(f_affiliate)s)")
         params["f_affiliate"] = vals
     if f_country:
-        vals = list(f_country) if not isinstance(f_country, str) else [f_country]
+        names = list(f_country) if not isinstance(f_country, str) else [f_country]
+        _cmap = _get_country_map()
+        _rev  = {v.upper(): k for k, v in _cmap.items()}
+        iso_vals = [_rev.get(n.upper(), n) for n in names]
         clauses.append("AND a.country_iso = ANY(%(f_country)s)")
-        params["f_country"] = vals
+        params["f_country"] = iso_vals
 
     needs_cu_join = False
     if f_office:
