@@ -210,12 +210,12 @@
                   <th class="text-num"># FTC</th>
                   <th class="text-num"># Traders</th>
                   <th class="text-num">Traders %</th>
-                  <th class="text-num"># Loaders</th>
+                  <th class="text-num"># Redepositors</th>
+                  <th class="text-num">% STD</th>
                   <th class="text-num">$ Deposit</th>
                   <th class="text-num">$ Withdrawal</th>
                   <th class="text-num">$ Net Deposit</th>
                   <th class="text-num">$ LTV</th>
-                  <th class="text-num">% STD</th>
                   <th class="text-num">% WD</th>
                   <th class="text-num">% WD $</th>
                 </tr>
@@ -232,19 +232,24 @@
 
     <!-- Legend -->
     <div class="col-12 col-xl-3">
-      <div class="section-title">Terms</div>
-      <div class="legend-card">
-        <div><strong># FTC</strong> — count of unique clients per group</div>
-        <div><strong># Loaders</strong> — clients whose running deposits first hit $240, then made a further deposit before End Date</div>
-        <div><strong>$ Deposit</strong> — sum of Deposits minus Deposit Cancelled, before End Date</div>
-        <div><strong>$ Withdrawal</strong> — sum of Withdrawals minus Withdrawal Cancelled, before End Date</div>
-        <div><strong>$ Net Deposit</strong> — $ Deposit − $ Withdrawal</div>
-        <div><strong>$ LTV</strong> — $ Net Deposit / # FTC</div>
-        <div><strong>% STD</strong> — # Loaders / # FTC</div>
-        <div><strong>% WD</strong> — # Withdrawalers / # FTC</div>
-        <div><strong>% WD $</strong> — $ Withdrawal / $ Deposit</div>
-        <div><strong># Traders</strong> — unique clients who placed ≥1 trade (notional_value > 0) before End Date</div>
-        <div><strong>Traders %</strong> — # Traders / # FTC</div>
+      <div class="filter-card" style="padding:0;">
+        <div id="terms-toggle" style="cursor:pointer;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;user-select:none;border-radius:10px;">
+          <span style="font-size:0.8rem;color:#8b949e;font-weight:600;"><i class="bi bi-info-circle me-2" style="color:#388bfd;"></i>Terms</span>
+          <i class="bi bi-chevron-up" id="terms-chevron" style="color:#8b949e;font-size:0.8rem;transition:transform 0.2s;"></i>
+        </div>
+        <div id="terms-body" style="padding:0 16px 16px;font-size:0.82rem;color:#c9d1d9;display:flex;flex-direction:column;gap:6px;">
+          <div><strong># FTC</strong> — count of unique clients per group</div>
+          <div><strong># Traders</strong> — unique clients who placed ≥1 trade (notional_value > 0) before End Date</div>
+          <div><strong>Traders %</strong> — # Traders / # FTC</div>
+          <div><strong># Redepositors</strong> — clients whose running deposits first hit $240, then made a further deposit before End Date</div>
+          <div><strong>% STD</strong> — # Redepositors / # FTC</div>
+          <div><strong>$ Deposit</strong> — sum of Deposits &amp; Withdrawal Cancelled, before End Date</div>
+          <div><strong>$ Withdrawal</strong> — sum of Withdrawals &amp; Deposit Cancelled, before End Date</div>
+          <div><strong>$ Net Deposit</strong> — $ Deposit − $ Withdrawal</div>
+          <div><strong>$ LTV</strong> — $ Net Deposit / # FTC</div>
+          <div><strong>% WD</strong> — # Withdrawalers / # FTC</div>
+          <div><strong>% WD $</strong> — $ Withdrawal / $ Deposit</div>
+        </div>
       </div>
     </div>
   </div>
@@ -312,11 +317,11 @@
       <td class="text-num">${fmt(r.traders)}</td>
       <td class="text-num">${fmtPct(r.traders_pct)}</td>
       <td class="text-num">${fmt(r.rdp)}</td>
+      <td class="text-num">${fmtPct(r.pct_std)}</td>
       <td class="text-num">${fmtUsd(r.deposit)}</td>
       <td class="text-num">${fmtUsd(r.withdrawal)}</td>
       <td class="text-num">${fmtUsd(r.net_deposit)}</td>
       <td class="text-num">${r.ltv !== null && r.ltv !== undefined ? '$' + Math.round(r.ltv).toLocaleString('en-US') : '—'}</td>
-      <td class="text-num">${fmtPct(r.pct_std)}</td>
       <td class="text-num">${fmtPct(r.pct_wd_clients)}</td>
       <td class="text-num">${fmtPct(r.pct_wd_usd)}</td>
     </tr>`;
@@ -422,6 +427,23 @@
       fbody.style.display = open ? 'none' : '';
       fchev.style.transform = open ? 'rotate(180deg)' : '';
       localStorage.setItem(FKEY, open ? '0' : '1');
+    });
+  })();
+
+  // Terms collapse
+  (function(){
+    const TKEY = 'ftc_terms_open';
+    const tbody = document.getElementById('terms-body');
+    const tchev = document.getElementById('terms-chevron');
+    if (localStorage.getItem(TKEY) === '0') {
+      tbody.style.display = 'none';
+      tchev.style.transform = 'rotate(180deg)';
+    }
+    document.getElementById('terms-toggle').addEventListener('click', function() {
+      const open = tbody.style.display !== 'none';
+      tbody.style.display = open ? 'none' : '';
+      tchev.style.transform = open ? 'rotate(180deg)' : '';
+      localStorage.setItem(TKEY, open ? '0' : '1');
     });
   })();
 
