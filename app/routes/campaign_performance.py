@@ -188,6 +188,9 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
 
     qual_where  = ""
     qual_params: dict = {}
+    ftc_date_from    = date_from
+    ftc_date_to_excl = date_to_exclusive
+    ftc_date_daily   = date_to
     if q_date_from and q_date_to:
         q_dt_to = datetime.strptime(q_date_to, "%Y-%m-%d").date()
         q_date_to_excl = (q_dt_to + timedelta(days=1)).strftime("%Y-%m-%d")
@@ -195,6 +198,9 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
                       " AND a.client_qualification_date::date >= %(q_date_from)s"
                       " AND a.client_qualification_date::date < %(q_date_to_excl)s")
         qual_params = {"q_date_from": q_date_from, "q_date_to_excl": q_date_to_excl}
+        ftc_date_from    = q_date_from
+        ftc_date_to_excl = q_date_to_excl
+        ftc_date_daily   = q_date_to
 
     extra_where = f"{class_where} {qual_where}".strip()
 
@@ -288,6 +294,7 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
                 ftc_daily = int(row[1] or 0) if row else 0
             else:
                 base_p = {"date_from": date_from, "date_to_excl": date_to_exclusive, "date_to": date_to,
+                          "ftc_date_from": ftc_date_from, "ftc_date_to_excl": ftc_date_to_excl, "ftc_date_daily": ftc_date_daily,
                           **qual_params, **camp_filter_params}
                 cur.execute(f"""
                     SELECT
@@ -325,15 +332,15 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
 
                 cur.execute(f"""
                     SELECT
-                        COUNT(*) FILTER (WHERE a.client_qualification_date::date >= %(date_from)s
-                                           AND a.client_qualification_date::date < %(date_to_excl)s) AS ftc_mtd,
-                        COUNT(*) FILTER (WHERE a.client_qualification_date::date = %(date_to)s)      AS ftc_daily
+                        COUNT(*) FILTER (WHERE a.client_qualification_date::date >= %(ftc_date_from)s
+                                           AND a.client_qualification_date::date < %(ftc_date_to_excl)s) AS ftc_mtd,
+                        COUNT(*) FILTER (WHERE a.client_qualification_date::date = %(ftc_date_daily)s)   AS ftc_daily
                     FROM accounts a
                     {camp_join}
                     WHERE a.client_qualification_date IS NOT NULL
                       AND a.is_test_account = 0
                       AND (a.is_demo = 0 OR a.is_demo IS NULL)
-                    {extra_where}
+                    {class_where}
                     {camp_filter_where}
                 """, base_p)
                 row = cur.fetchone()
@@ -397,7 +404,7 @@ async def campaign_performance_api(
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
     def _ck_part(v): return ','.join(sorted(v)) if v else ''
-    _ck = (f"camp_perf_v2:{date_from}:{date_to}:{f_classification}:{q_date_from}:{q_date_to}"
+    _ck = (f"camp_perf_v3:{date_from}:{date_to}:{f_classification}:{q_date_from}:{q_date_to}"
            f":{_ck_part(f_mkt_group)}:{_ck_part(f_legacy_id)}:{_ck_part(f_campaign_name)}"
            f":{_ck_part(f_channel)}:{_ck_part(f_sub_channel)}:{_ck_part(f_affiliate)}")
     _hit = cache.get(_ck)
@@ -526,7 +533,9 @@ def _camp_table_calc(
         acct_period_sql = txn_period_sql = ""
 
     # Build filter clauses
-    acct_params = {"date_from": date_from, "date_to_excl": date_to_exclusive}
+    ftc_from    = q_date_from    if q_date_from    else date_from
+    ftc_to_excl = q_date_to_excl if q_date_to_excl else date_to_exclusive
+    acct_params = {"date_from": date_from, "date_to_excl": date_to_exclusive, "ftc_from": ftc_from, "ftc_to_excl": ftc_to_excl}
     filter_where, needs_cc_join_for_filter = _build_filter_clauses(
         f_mkt_group, f_legacy_id, f_campaign_name, f_channel, f_sub_channel,
         f_affiliate, f_classification, ftc_groups_list, date_to, acct_params,
@@ -559,8 +568,8 @@ def _camp_table_calc(
                 " AND a.createdtime::date < %(date_to_excl)s"
                 " AND a.birth_date IS NOT NULL) AS live_accounts",
                 "COUNT(*) FILTER (WHERE a.client_qualification_date IS NOT NULL"
-                " AND a.client_qualification_date::date >= %(date_from)s"
-                " AND a.client_qualification_date::date < %(date_to_excl)s) AS ftc",
+                " AND a.client_qualification_date::date >= %(ftc_from)s"
+                " AND a.client_qualification_date::date < %(ftc_to_excl)s) AS ftc",
             ]
             acct_date_filter = (
                 " AND a.createdtime::date >= %(date_from)s AND a.createdtime::date < %(date_to_excl)s"
@@ -748,7 +757,7 @@ async def campaign_performance_table_api(
         return JSONResponse(status_code=400, content={"detail": "Invalid period"})
 
     def _ck_part(v): return ','.join(sorted(v)) if v else ''
-    _ck = (f"camp_tbl_v4:{date_from}:{date_to}:{group1}:{group2}:{period}"
+    _ck = (f"camp_tbl_v5:{date_from}:{date_to}:{group1}:{group2}:{period}"
            f":{_ck_part(f_mkt_group)}:{_ck_part(f_legacy_id)}:{_ck_part(f_campaign_name)}:{_ck_part(f_channel)}"
            f":{_ck_part(f_sub_channel)}:{_ck_part(f_affiliate)}:{f_classification}:{ftc_groups}"
            f":{q_date_from}:{q_date_to}")
