@@ -277,7 +277,39 @@
       </div>
     </div>
 
-    <!-- Row 3: Grouping -->
+    <!-- Row 3: Country / Office / Agent / Team filters -->
+    <div class="filter-grid" style="grid-template-columns:repeat(4,1fr);margin-top:10px;">
+      <div style="display:flex;flex-direction:column;">
+        <span class="filter-row-label">Country</span>
+        <div class="sdd-wrap" id="f-country">
+          <button class="sdd-btn" type="button">All</button>
+          <div class="sdd-panel"><input class="sdd-search" placeholder="Search…" autocomplete="off"><div class="sdd-list"></div></div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;">
+        <span class="filter-row-label">Office</span>
+        <div class="sdd-wrap" id="f-office">
+          <button class="sdd-btn" type="button">All</button>
+          <div class="sdd-panel"><input class="sdd-search" placeholder="Search…" autocomplete="off"><div class="sdd-list"></div></div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;">
+        <span class="filter-row-label">Agent</span>
+        <div class="sdd-wrap" id="f-agent">
+          <button class="sdd-btn" type="button">All</button>
+          <div class="sdd-panel"><input class="sdd-search" placeholder="Search…" autocomplete="off"><div class="sdd-list"></div></div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;">
+        <span class="filter-row-label">Team</span>
+        <div class="sdd-wrap" id="f-team">
+          <button class="sdd-btn" type="button">All</button>
+          <div class="sdd-panel"><input class="sdd-search" placeholder="Search…" autocomplete="off"><div class="sdd-list"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 4: Grouping -->
     <div class="d-flex flex-wrap align-items-end gap-3" style="margin-top:10px;">
       <div style="display:flex;flex-direction:column;gap:4px;">
         <span style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.8px;color:#8b949e;">View By</span>
@@ -659,6 +691,10 @@
     const fChannel     = _sddGet('f-channel');
     const fSubChannel  = _sddGet('f-sub-channel');
     const fAffiliate   = _sddGet('f-affiliate');
+    const fCountry     = _sddGet('f-country');
+    const fOffice      = _sddGet('f-office');
+    const fAgent       = _sddGet('f-agent');
+    const fTeam        = _sddGet('f-team');
     const fClass       = (document.getElementById('f-classification')?.value || '');
     const allCbs       = document.querySelectorAll('.ftc-cb');
     const checkedCbs   = Array.from(allCbs).filter(cb => cb.checked).map(cb => cb.value);
@@ -673,6 +709,10 @@
     fChannel.forEach(v      => extra += `&f_channel=${encodeURIComponent(v)}`);
     fSubChannel.forEach(v   => extra += `&f_sub_channel=${encodeURIComponent(v)}`);
     fAffiliate.forEach(v    => extra += `&f_affiliate=${encodeURIComponent(v)}`);
+    fCountry.forEach(v      => extra += `&f_country=${encodeURIComponent(v)}`);
+    fOffice.forEach(v       => extra += `&f_office=${encodeURIComponent(v)}`);
+    fAgent.forEach(v        => extra += `&f_agent=${encodeURIComponent(v)}`);
+    fTeam.forEach(v         => extra += `&f_team=${encodeURIComponent(v)}`);
     if (fClass)        extra += `&f_classification=${encodeURIComponent(fClass)}`;
     if (ftcGroups)     extra += `&ftc_groups=${encodeURIComponent(ftcGroups)}`;
     if (qDateFrom)     extra += `&q_date_from=${qDateFrom}`;
@@ -1120,8 +1160,9 @@
     document.querySelectorAll('.sdd-panel.open').forEach(p => p.classList.remove('open'));
   });
 
-  // Init all 6 dropdowns (empty options until API returns)
-  ['f-mkt-group','f-campaign-name','f-legacy-id','f-channel','f-sub-channel','f-affiliate'].forEach(id => _sddInit(id, []));
+  // Init all dropdowns (empty options until API returns)
+  ['f-mkt-group','f-campaign-name','f-legacy-id','f-channel','f-sub-channel','f-affiliate',
+   'f-country','f-office','f-agent','f-team'].forEach(id => _sddInit(id, []));
 
   document.getElementById('f-classification')?.addEventListener('change', () => { loadData(); loadTable(); });
   document.getElementById('qual-date-from').addEventListener('change', () => { loadData(); loadTable(); });
@@ -1144,12 +1185,16 @@
       const res = await fetch('/api/campaign-performance/filter-options');
       if (!res.ok) return;
       const d = await res.json();
-      _sddRegistry['f-mkt-group']?.setOptions(d.marketing_groups    || []);
-      _sddRegistry['f-campaign-name']?.setOptions(d.campaign_names  || []);
-      _sddRegistry['f-legacy-id']?.setOptions(d.campaign_legacy_ids || []);
-      _sddRegistry['f-channel']?.setOptions(d.campaign_channels     || []);
+      _sddRegistry['f-mkt-group']?.setOptions(d.marketing_groups       || []);
+      _sddRegistry['f-campaign-name']?.setOptions(d.campaign_names     || []);
+      _sddRegistry['f-legacy-id']?.setOptions(d.campaign_legacy_ids    || []);
+      _sddRegistry['f-channel']?.setOptions(d.campaign_channels        || []);
       _sddRegistry['f-sub-channel']?.setOptions(d.campaign_sub_channels || []);
-      _sddRegistry['f-affiliate']?.setOptions(d.original_affiliates || []);
+      _sddRegistry['f-affiliate']?.setOptions(d.original_affiliates    || []);
+      _sddRegistry['f-country']?.setOptions(d.countries               || []);
+      _sddRegistry['f-office']?.setOptions(d.offices                  || []);
+      _sddRegistry['f-agent']?.setOptions(d.agents                    || []);
+      _sddRegistry['f-team']?.setOptions(d.teams                      || []);
     } catch(e) {}
   }
   loadFilterOptions();

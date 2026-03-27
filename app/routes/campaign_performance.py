@@ -137,13 +137,52 @@ def _camp_filter_options_calc() -> dict:
             """)
             affiliates = [r[0] for r in cur.fetchall()]
 
+            cur.execute("""
+                SELECT DISTINCT country_iso
+                FROM accounts
+                WHERE country_iso IS NOT NULL AND country_iso <> ''
+                  AND is_test_account = 0
+                ORDER BY country_iso
+            """)
+            countries = [r[0] for r in cur.fetchall()]
+
+            cur.execute("""
+                SELECT DISTINCT office_name
+                FROM crm_users
+                WHERE office_name IS NOT NULL AND office_name <> ''
+                ORDER BY office_name
+            """)
+            offices = [r[0] for r in cur.fetchall()]
+
+            cur.execute("""
+                SELECT DISTINCT agent_name
+                FROM crm_users
+                WHERE agent_name IS NOT NULL AND agent_name <> ''
+                  AND TRIM(agent_name) NOT ILIKE 'test%'
+                  AND TRIM(agent_name) NOT ILIKE 'duplicated%'
+                ORDER BY agent_name
+            """)
+            agents = [r[0] for r in cur.fetchall()]
+
+            cur.execute("""
+                SELECT DISTINCT desk_name
+                FROM crm_users
+                WHERE desk_name IS NOT NULL AND desk_name <> ''
+                ORDER BY desk_name
+            """)
+            teams = [r[0] for r in cur.fetchall()]
+
         return {
-            "marketing_groups":    marketing_groups,
-            "campaign_legacy_ids": legacy_ids,
-            "campaign_names":      campaign_names,
-            "campaign_channels":   channels,
+            "marketing_groups":      marketing_groups,
+            "campaign_legacy_ids":   legacy_ids,
+            "campaign_names":        campaign_names,
+            "campaign_channels":     channels,
             "campaign_sub_channels": sub_channels,
-            "original_affiliates": affiliates,
+            "original_affiliates":   affiliates,
+            "countries":             countries,
+            "offices":               offices,
+            "agents":                agents,
+            "teams":                 teams,
         }
     finally:
         conn.close()
@@ -155,7 +194,7 @@ async def campaign_filter_options(request: Request):
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
-    _ck = "camp_filter_opts_v1"
+    _ck = "camp_filter_opts_v2"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -173,7 +212,8 @@ async def campaign_filter_options(request: Request):
 def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
                    q_date_from: str = None, q_date_to: str = None,
                    f_mkt_group=None, f_legacy_id=None, f_campaign_name=None,
-                   f_channel=None, f_sub_channel=None, f_affiliate=None) -> dict:
+                   f_channel=None, f_sub_channel=None, f_affiliate=None,
+                   f_country=None, f_office=None, f_agent=None, f_team=None) -> dict:
     dt_to = datetime.strptime(date_to, "%Y-%m-%d").date()
     date_to_exclusive = (dt_to + timedelta(days=1)).strftime("%Y-%m-%d")
 
@@ -206,13 +246,15 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
 
     # Marketing / campaign filters
     camp_filter_params: dict = {}
-    camp_filter_where, _ = _build_filter_clauses(
+    camp_filter_where, _, kpi_needs_cu = _build_filter_clauses(
         f_mkt_group, f_legacy_id, f_campaign_name, f_channel, f_sub_channel,
-        f_affiliate, None, None, date_to, camp_filter_params
+        f_affiliate, None, None, date_to, camp_filter_params,
+        f_country=f_country, f_office=f_office, f_agent=f_agent, f_team=f_team
     )
     camp_filter_where = camp_filter_where.strip()
     needs_camp_join = bool(f_mkt_group or f_legacy_id or f_campaign_name or f_channel or f_sub_channel)
     camp_join = "LEFT JOIN campaigns c ON SPLIT_PART(a.campaign, '.', 1) = c.crmid" if needs_camp_join else ""
+    kpi_cu_join = "LEFT JOIN crm_users cu ON cu.id = a.assigned_to" if kpi_needs_cu else ""
     all_extra = f"{extra_where} {camp_filter_where}".strip()
 
     conn = get_connection()
@@ -245,6 +287,7 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
                                            AND a.createdtime::date < %(date_to_excl)s)               AS live_mtd
                     FROM accounts a
                     {camp_join}
+                    {kpi_cu_join}
                     WHERE a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)
                     {extra_where}
                     {camp_filter_where}
@@ -337,6 +380,7 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
                         COUNT(*) FILTER (WHERE a.client_qualification_date::date = %(ftc_date_daily)s)   AS ftc_daily
                     FROM accounts a
                     {camp_join}
+                    {kpi_cu_join}
                     WHERE a.client_qualification_date IS NOT NULL
                       AND a.is_test_account = 0
                       AND (a.is_demo = 0 OR a.is_demo IS NULL)
@@ -398,15 +442,20 @@ async def campaign_performance_api(
     f_channel: Optional[List[str]] = Query(default=None),
     f_sub_channel: Optional[List[str]] = Query(default=None),
     f_affiliate: Optional[List[str]] = Query(default=None),
+    f_country: Optional[List[str]] = Query(default=None),
+    f_office: Optional[List[str]] = Query(default=None),
+    f_agent: Optional[List[str]] = Query(default=None),
+    f_team: Optional[List[str]] = Query(default=None),
 ):
     user = await get_current_user(request)
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
     def _ck_part(v): return ','.join(sorted(v)) if v else ''
-    _ck = (f"camp_perf_v3:{date_from}:{date_to}:{f_classification}:{q_date_from}:{q_date_to}"
+    _ck = (f"camp_perf_v4:{date_from}:{date_to}:{f_classification}:{q_date_from}:{q_date_to}"
            f":{_ck_part(f_mkt_group)}:{_ck_part(f_legacy_id)}:{_ck_part(f_campaign_name)}"
-           f":{_ck_part(f_channel)}:{_ck_part(f_sub_channel)}:{_ck_part(f_affiliate)}")
+           f":{_ck_part(f_channel)}:{_ck_part(f_sub_channel)}:{_ck_part(f_affiliate)}"
+           f":{_ck_part(f_country)}:{_ck_part(f_office)}:{_ck_part(f_agent)}:{_ck_part(f_team)}")
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -419,7 +468,8 @@ async def campaign_performance_api(
     try:
         _result = _camp_kpi_calc(
             date_from, date_to, f_classification, q_date_from, q_date_to,
-            f_mkt_group, f_legacy_id, f_campaign_name, f_channel, f_sub_channel, f_affiliate
+            f_mkt_group, f_legacy_id, f_campaign_name, f_channel, f_sub_channel, f_affiliate,
+            f_country, f_office, f_agent, f_team
         )
         cache.set(_ck, _result)
         return JSONResponse(content=_result)
@@ -432,7 +482,8 @@ async def campaign_performance_api(
 def _build_filter_clauses(
     f_mkt_group, f_legacy_id, f_campaign_name, f_channel, f_sub_channel,
     f_affiliate, f_classification, ftc_groups_list, date_to, params,
-    q_date_from=None, q_date_to_excl=None
+    q_date_from=None, q_date_to_excl=None,
+    f_country=None, f_office=None, f_agent=None, f_team=None
 ):
     """Returns (extra_where_str, needs_cc_join, needs_cu_join).
     Appends needed params to the `params` dict in-place."""
@@ -462,6 +513,27 @@ def _build_filter_clauses(
         vals = list(f_affiliate) if not isinstance(f_affiliate, str) else [f_affiliate]
         clauses.append("AND a.original_affiliate = ANY(%(f_affiliate)s)")
         params["f_affiliate"] = vals
+    if f_country:
+        vals = list(f_country) if not isinstance(f_country, str) else [f_country]
+        clauses.append("AND a.country_iso = ANY(%(f_country)s)")
+        params["f_country"] = vals
+
+    needs_cu_join = False
+    if f_office:
+        vals = list(f_office) if not isinstance(f_office, str) else [f_office]
+        clauses.append("AND cu.office_name = ANY(%(f_office)s)")
+        params["f_office"] = vals
+        needs_cu_join = True
+    if f_agent:
+        vals = list(f_agent) if not isinstance(f_agent, str) else [f_agent]
+        clauses.append("AND cu.agent_name = ANY(%(f_agent)s)")
+        params["f_agent"] = vals
+        needs_cu_join = True
+    if f_team:
+        vals = list(f_team) if not isinstance(f_team, str) else [f_team]
+        clauses.append("AND cu.desk_name = ANY(%(f_team)s)")
+        params["f_team"] = vals
+        needs_cu_join = True
 
     needs_cc_join = False
     if f_classification:
@@ -486,7 +558,7 @@ def _build_filter_clauses(
         params["q_date_from"]    = q_date_from
         params["q_date_to_excl"] = q_date_to_excl
 
-    return "\n".join(clauses), needs_cc_join
+    return "\n".join(clauses), needs_cc_join, needs_cu_join
 
 
 def _camp_table_calc(
@@ -496,6 +568,7 @@ def _camp_table_calc(
     f_channel=None, f_sub_channel=None, f_affiliate=None,
     f_classification: str = None, ftc_groups: str = None,
     q_date_from: str = None, q_date_to: str = None,
+    f_country=None, f_office=None, f_agent=None, f_team=None,
 ) -> dict:
     dt_to = datetime.strptime(date_to, "%Y-%m-%d").date()
     date_to_exclusive = (dt_to + timedelta(days=1)).strftime("%Y-%m-%d")
@@ -516,7 +589,7 @@ def _camp_table_calc(
     # Determine which extra JOINs are needed
     groups_needing_cu = {"office_name", "agent_name"}
     groups_needing_cc = set()
-    needs_cu_join = group1 in groups_needing_cu or group2 in groups_needing_cu
+    needs_cu_join_for_group = group1 in groups_needing_cu or group2 in groups_needing_cu
     needs_cc_join_for_group = group1 in groups_needing_cc or group2 in groups_needing_cc
 
     # Period SQL
@@ -536,11 +609,13 @@ def _camp_table_calc(
     ftc_from    = q_date_from    if q_date_from    else date_from
     ftc_to_excl = q_date_to_excl if q_date_to_excl else date_to_exclusive
     acct_params = {"date_from": date_from, "date_to_excl": date_to_exclusive, "ftc_from": ftc_from, "ftc_to_excl": ftc_to_excl}
-    filter_where, needs_cc_join_for_filter = _build_filter_clauses(
+    filter_where, needs_cc_join_for_filter, needs_cu_join_for_filter = _build_filter_clauses(
         f_mkt_group, f_legacy_id, f_campaign_name, f_channel, f_sub_channel,
         f_affiliate, f_classification, ftc_groups_list, date_to, acct_params,
-        q_date_from=q_date_from, q_date_to_excl=q_date_to_excl
+        q_date_from=q_date_from, q_date_to_excl=q_date_to_excl,
+        f_country=f_country, f_office=f_office, f_agent=f_agent, f_team=f_team
     )
+    needs_cu_join = needs_cu_join_for_group or needs_cu_join_for_filter
     needs_cc_join = needs_cc_join_for_group or needs_cc_join_for_filter
 
     # Extra JOINs
@@ -591,10 +666,11 @@ def _camp_table_calc(
 
             # ── Transactions query ─────────────────────────────────────────
             txn_params = {"date_from": date_from, "date_to_excl": date_to_exclusive}
-            txn_filter_where, _ = _build_filter_clauses(
+            txn_filter_where, _, _ = _build_filter_clauses(
                 f_mkt_group, f_legacy_id, f_campaign_name, f_channel, f_sub_channel,
                 f_affiliate, f_classification, ftc_groups_list, date_to, txn_params,
-                q_date_from=q_date_from, q_date_to_excl=q_date_to_excl
+                q_date_from=q_date_from, q_date_to_excl=q_date_to_excl,
+                f_country=f_country, f_office=f_office, f_agent=f_agent, f_team=f_team
             )
 
             txn_sel, txn_grp = [], []
@@ -744,6 +820,10 @@ async def campaign_performance_table_api(
     f_affiliate: Optional[List[str]] = Query(default=None),
     f_classification: str = None, ftc_groups: str = None,
     q_date_from: str = None, q_date_to: str = None,
+    f_country: Optional[List[str]] = Query(default=None),
+    f_office: Optional[List[str]] = Query(default=None),
+    f_agent: Optional[List[str]] = Query(default=None),
+    f_team: Optional[List[str]] = Query(default=None),
 ):
     user = await get_current_user(request)
     if isinstance(user, RedirectResponse):
@@ -757,10 +837,10 @@ async def campaign_performance_table_api(
         return JSONResponse(status_code=400, content={"detail": "Invalid period"})
 
     def _ck_part(v): return ','.join(sorted(v)) if v else ''
-    _ck = (f"camp_tbl_v5:{date_from}:{date_to}:{group1}:{group2}:{period}"
+    _ck = (f"camp_tbl_v6:{date_from}:{date_to}:{group1}:{group2}:{period}"
            f":{_ck_part(f_mkt_group)}:{_ck_part(f_legacy_id)}:{_ck_part(f_campaign_name)}:{_ck_part(f_channel)}"
            f":{_ck_part(f_sub_channel)}:{_ck_part(f_affiliate)}:{f_classification}:{ftc_groups}"
-           f":{q_date_from}:{q_date_to}")
+           f":{q_date_from}:{q_date_to}:{_ck_part(f_country)}:{_ck_part(f_office)}:{_ck_part(f_agent)}:{_ck_part(f_team)}")
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -776,6 +856,7 @@ async def campaign_performance_table_api(
             f_mkt_group, f_legacy_id, f_campaign_name, f_channel,
             f_sub_channel, f_affiliate, f_classification, ftc_groups,
             q_date_from, q_date_to,
+            f_country=f_country, f_office=f_office, f_agent=f_agent, f_team=f_team,
         )
         cache.set(_ck, _result)
         return JSONResponse(content=_result)
