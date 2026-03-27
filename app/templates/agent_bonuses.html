@@ -325,6 +325,13 @@
           <div class="cs-optlist" id="cs-agent-opts"></div>
         </div>
       </div>
+      <div class="cs-wrap">
+        <div class="cs-trigger" id="cs-status-trigger">All Status</div>
+        <div class="cs-dropdown" id="cs-status-drop">
+          <input type="text" class="cs-search" id="cs-status-search" placeholder="Search…" autocomplete="off" />
+          <div class="cs-optlist" id="cs-status-opts"></div>
+        </div>
+      </div>
     </div>
     <!-- Row 2: Date range -->
     <div class="d-flex flex-wrap align-items-center gap-2">
@@ -812,16 +819,19 @@
     const fOffice = csOffice.getValue();
     const fTeam   = csTeam.getValue();
     const fAgent  = csAgent.getValue();
+    const fStatus = csStatus.getValue();
     const fSales = salAllRows.filter(r => {
       if (fOffice && !fOffice.has(r.office_name)) return false;
       if (fTeam   && !fTeam.has(r.dept_name))     return false;
       if (fAgent  && !fAgent.has(r.agent_name))   return false;
+      if (fStatus && !fStatus.has(r.status))       return false;
       return true;
     });
     const fBon = bonAllRows.filter(r => {
       if (fOffice && !fOffice.has(r.office_name)) return false;
       if (fTeam   && !fTeam.has(r.dept_name))     return false;
       if (fAgent  && !fAgent.has(r.agent_name))   return false;
+      if (fStatus && !fStatus.has(r.status))       return false;
       return true;
     });
     const totalSales = fSales.reduce((s,r) => s + (r.total_sales_bonus ?? 0), 0);
@@ -841,17 +851,20 @@
   const csOffice = makeCustomSelect('cs-office-trigger','cs-office-drop','cs-office-search','cs-office-opts','All Offices', onFilterChange);
   const csTeam   = makeCustomSelect('cs-team-trigger',  'cs-team-drop',  'cs-team-search',  'cs-team-opts',  'All Teams',   onFilterChange);
   const csAgent  = makeCustomSelect('cs-agent-trigger', 'cs-agent-drop', 'cs-agent-search', 'cs-agent-opts', 'All Agents',  onFilterChange);
+  const csStatus = makeCustomSelect('cs-status-trigger','cs-status-drop','cs-status-search','cs-status-opts','All Status',  onFilterChange);
 
   function populateFilterDropdowns() {
-    const offices = new Set(), teams = new Set(), agents = new Set();
+    const offices = new Set(), teams = new Set(), agents = new Set(), statuses = new Set();
     [...salAllRows, ...bonAllRows].forEach(r => {
       if (r.office_name) offices.add(r.office_name);
       if (r.dept_name)   teams.add(r.dept_name);
       if (r.agent_name)  agents.add(r.agent_name);
+      if (r.status)      statuses.add(r.status);
     });
     csOffice.populate([...offices].sort());
     csTeam.populate([...teams].sort());
     csAgent.populate([...agents].sort());
+    csStatus.populate([...statuses].sort());
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────
@@ -1072,10 +1085,12 @@
   function renderSalesTable() {
     const fOffice = csOffice.getValue();
     const fAgent  = csAgent.getValue();
+    const fStatus = csStatus.getValue();
     const filtered = salAllRows.filter(r => {
       if (!(r.target_ftc > 0 || r.ftd100_count > 0 || r.ftc_count > 0)) return false;
       if (fOffice && !fOffice.has(r.office_name)) return false;
       if (fAgent  && !fAgent.has(r.agent_name))   return false;
+      if (fStatus && !fStatus.has(r.status))       return false;
       return true;
     });
 
@@ -1240,11 +1255,13 @@
     const fOffice = csOffice.getValue();
     const fTeam   = csTeam.getValue();
     const fAgent  = csAgent.getValue();
+    const fStatus = csStatus.getValue();
     const filtered = bonAllRows.filter(r => {
       if (!(r.target_net > 0 || r.net_usd !== 0 || r.open_volume_usd > 0)) return false;
       if (fOffice && !fOffice.has(r.office_name)) return false;
       if (fTeam   && !fTeam.has(r.dept_name))     return false;
       if (fAgent  && !fAgent.has(r.agent_name))   return false;
+      if (fStatus && !fStatus.has(r.status))       return false;
       return true;
     });
 
