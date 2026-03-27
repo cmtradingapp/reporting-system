@@ -288,8 +288,7 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
                         COUNT(*) FILTER (WHERE a.createdtime::date = %(date_to)s)                    AS leads_today,
                         COUNT(*) FILTER (WHERE a.createdtime::date >= %(date_from)s
                                            AND a.createdtime::date < %(date_to_excl)s)               AS leads_mtd,
-                        COUNT(*) FILTER (WHERE a.birth_date IS NOT NULL
-                                           AND a.createdtime::date = %(date_to)s)                    AS live_today,
+                        COUNT(*) FILTER (WHERE a.birth_date::date = %(date_to)s)                     AS live_today,
                         COUNT(*) FILTER (WHERE a.birth_date IS NOT NULL
                                            AND a.createdtime::date >= %(date_from)s
                                            AND a.createdtime::date < %(date_to_excl)s)               AS live_mtd

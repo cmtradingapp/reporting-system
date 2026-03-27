@@ -2353,14 +2353,15 @@ _MV_SETUP_SQL = [
     "CREATE INDEX IF NOT EXISTS idx_mv_run_rate_qual          ON mv_run_rate (qual_date) WHERE qual_date IS NOT NULL",
 
     # ── mv_account_stats  (new leads + live accounts — today and MTD) ─────────
+    # Drop first so the definition can be updated on restart
+    "DROP MATERIALIZED VIEW IF EXISTS mv_account_stats CASCADE",
     """
-    CREATE MATERIALIZED VIEW IF NOT EXISTS mv_account_stats AS
+    CREATE MATERIALIZED VIEW mv_account_stats AS
     SELECT
         1                                                                           AS id,
         COUNT(*) FILTER (WHERE createdtime::date = CURRENT_DATE)                    AS new_leads_today,
         COUNT(*) FILTER (WHERE createdtime >= date_trunc('month', CURRENT_DATE))    AS new_leads_month,
-        COUNT(*) FILTER (WHERE createdtime::date = CURRENT_DATE
-                           AND birth_date IS NOT NULL)                              AS new_live_today,
+        COUNT(*) FILTER (WHERE birth_date::date = CURRENT_DATE)                     AS new_live_today,
         COUNT(*) FILTER (WHERE createdtime >= date_trunc('month', CURRENT_DATE)
                            AND birth_date IS NOT NULL)                              AS new_live_month
     FROM accounts
