@@ -67,6 +67,7 @@
     .tbl-scroll { overflow-x: auto; overflow-y: auto; max-height: 65vh; -webkit-overflow-scrolling: touch; }
     #perf-table thead tr { position: sticky; top: 0; z-index: 2; }
     #perf-table tfoot tr { position: sticky; bottom: 0; z-index: 2; }
+    #perf-table tfoot td { background-color: #21262d; color: #e0e0e0; }
 
     /* Spinner */
     #loading { display: none; text-align: center; padding: 60px; color: #8b949e; }
@@ -890,8 +891,8 @@
 
   function renderTotalsRow(totals, colsBefore) {
     document.getElementById('tbl-tfoot').innerHTML =
-      `<tr style="background:#1c2128;border-top:2px solid #388bfd;">
-        <td colspan="${colsBefore}"><strong style="color:#388bfd;">Total</strong></td>
+      `<tr style="border-top:2px solid #30363d;">
+        <td colspan="${colsBefore}"><strong style="color:#e0e0e0;">Total</strong></td>
         ${metricCells(totals, true)}
       </tr>`;
   }
