@@ -32,21 +32,47 @@ def _get_pool() -> ThreadedConnectionPool:
     return _pool
 
 
-def get_connection():
-    """Get a connection from the pool.  Call conn.close() as normal — it returns
-    the connection to the pool rather than closing the underlying socket."""
-    pool = _get_pool()
-    conn = pool.getconn()
-    # Wrap close() so callers don't need to change — returns to pool instead
-    def _return():
+class _PooledConnection:
+    """Thin proxy around a psycopg2 connection that returns it to the pool on close()."""
+    __slots__ = ("_conn", "_pool")
+
+    def __init__(self, conn, pool):
+        object.__setattr__(self, "_conn", conn)
+        object.__setattr__(self, "_pool", pool)
+
+    # Proxy all attribute access to the real connection
+    def __getattr__(self, name):
+        return getattr(object.__getattribute__(self, "_conn"), name)
+
+    def __setattr__(self, name, value):
+        setattr(object.__getattribute__(self, "_conn"), name, value)
+
+    def close(self):
+        conn = object.__getattribute__(self, "_conn")
+        pool = object.__getattribute__(self, "_pool")
         try:
             if not conn.closed and conn.status != psycopg2.extensions.STATUS_READY:
                 conn.rollback()
         except Exception:
             pass
         pool.putconn(conn)
-    conn.close = _return
-    return conn
+
+    def cursor(self, *args, **kwargs):
+        return object.__getattribute__(self, "_conn").cursor(*args, **kwargs)
+
+    def commit(self):
+        return object.__getattribute__(self, "_conn").commit()
+
+    def rollback(self):
+        return object.__getattribute__(self, "_conn").rollback()
+
+
+def get_connection() -> "_PooledConnection":
+    """Get a connection from the pool. Call conn.close() as normal —
+    it returns the connection to the pool instead of closing the socket."""
+    pool = _get_pool()
+    conn = pool.getconn()
+    return _PooledConnection(conn, pool)
 
 
 def ensure_table():
