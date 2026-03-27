@@ -67,7 +67,7 @@ def get_vol_bonus_pct(vol_pct: float, group: str) -> float:
         if vol_pct >= 1.0:  return 0.01
         if vol_pct >= 0.75: return 0.005
         if vol_pct >= 0.5:  return 0.002
-        return -0.005
+        return 0.0
     return 0.0
 
 
