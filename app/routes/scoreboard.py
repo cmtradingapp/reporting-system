@@ -346,7 +346,7 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"perf_ret_v8:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"perf_ret_v9:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -370,7 +370,8 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
             COALESCE(mv.deposit_usd, 0)::float                AS deposit_usd,
             COALESCE(vol.open_volume_usd, 0)::float           AS open_volume_usd,
             COALESCE(dk.daily_net_usd, 0)::float              AS daily_net_usd,
-            COALESCE(u.status, '')                             AS status
+            COALESCE(u.status, '')                             AS status,
+            COALESCE(std.std_count, 0)::int                   AS std_count
         FROM crm_users u
         LEFT JOIN (
             SELECT agent_id::bigint, SUM(net)::float AS monthly_target_net
@@ -399,6 +400,20 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
             WHERE tx_date = %(date_to)s
             GROUP BY agent_id
         ) dk ON dk.agent_id = u.id
+        LEFT JOIN (
+            SELECT a.assigned_to AS agent_id, COUNT(DISTINCT a.accountid) AS std_count
+            FROM accounts a
+            JOIN transactions t ON t.vtigeraccountid = a.accountid
+            WHERE t.transactiontype = 'Deposit'
+              AND t.transactionapproval = 'Approved'
+              AND (t.deleted = 0 OR t.deleted IS NULL)
+              AND a.client_qualification_date IS NOT NULL
+              AND a.is_test_account = 0
+              AND t.confirmation_time::date > a.client_qualification_date::date
+              AND t.confirmation_time::date >= %(date_from)s::date
+              AND t.confirmation_time::date < %(date_to_excl)s::date
+            GROUP BY a.assigned_to
+        ) std ON std.agent_id = u.id
         WHERE u.department_ = 'Retention'
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
@@ -523,6 +538,7 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
                 "open_volume_usd": round(r[6], 2),
                 "daily_net_usd":   round(float(r[7] or 0), 2),
                 "status":          r[8] or '',
+                "std_count":       int(r[9] or 0),
             }
             for r in rows
         ]
