@@ -1287,7 +1287,7 @@ def fetch_campaigns_stats() -> dict:
         SELECT
             COUNT(*)                                        AS total_records,
             MAX(synced_at)                                  AS last_synced_at,
-            COUNT(*) FILTER (WHERE active = TRUE)           AS active_campaigns,
+            COUNT(*) FILTER (WHERE active = 1)              AS active_campaigns,
             COUNT(DISTINCT campaign_channel)                AS unique_channels
         FROM campaigns
     """
