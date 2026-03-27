@@ -70,7 +70,7 @@ async def ftc_date_api(
 
     if not end_date:
         end_date = datetime.now(_TZ).date().strftime("%Y-%m-%d")
-    _ck = f"ftc_v2:{end_date}:{agent_id}:{office}:{team}:{groups}:{classification}"
+    _ck = f"ftc_v3:{end_date}:{agent_id}:{office}:{team}:{groups}:{classification}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -121,6 +121,7 @@ async def ftc_date_api(
               AND (t.deleted = 0 OR t.deleted IS NULL)
               AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
               AND COALESCE(t.confirmation_time, t.created_time)::date >= '2024-01-01'
+              AND COALESCE(t.confirmation_time, t.created_time)::date <= %(end_date)s::date
             GROUP BY t.vtigeraccountid
         ),
         rdp AS (
