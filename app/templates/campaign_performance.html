@@ -1045,19 +1045,20 @@
     let opts     = options || [];
 
     function _updateBtn() {
-      if (values.size === 0 || values.size === opts.length) {
+      const n = values.size, t = opts.length;
+      if (n === 0 || n === t) {
         btn.textContent = 'All'; btn.classList.remove('has-value');
-      } else if (values.size === 1) {
+      } else if (n === 1) {
         btn.textContent = [...values][0]; btn.classList.add('has-value');
       } else {
-        btn.textContent = values.size + ' selected'; btn.classList.add('has-value');
+        btn.textContent = n + ' selected'; btn.classList.add('has-value');
       }
     }
 
     function _render(filter) {
       const q = (filter || '').toLowerCase();
       const filtered = q ? opts.filter(o => o.toLowerCase().includes(q)) : opts;
-      const allOn = values.size === 0 || values.size === opts.length;
+      const allOn = values.size === opts.length;
       list.innerHTML =
         `<div class="sdd-item sdd-all" data-val=""><span class="sdd-cb${allOn?' sdd-cb-on':''}"></span>All</div>` +
         filtered.map(o => {
@@ -1070,10 +1071,9 @@
           e.preventDefault();
           const val = item.dataset.val;
           if (val === '') {
-            values.clear();
+            values = new Set(opts);
           } else {
             if (values.has(val)) values.delete(val); else values.add(val);
-            if (values.size === opts.length) values.clear();
           }
           _updateBtn();
           _render(search.value);
@@ -1098,8 +1098,8 @@
     search.addEventListener('keydown', e => { if (e.key === 'Escape') _close(); });
 
     _sddRegistry[id] = {
-      getValue: () => values.size === 0 ? [] : [...values],
-      setOptions: (newOpts) => { opts = newOpts; for (const v of [...values]) { if (!newOpts.includes(v)) values.delete(v); } _updateBtn(); },
+      getValue: () => values.size === opts.length ? [] : [...values],
+      setOptions: (newOpts) => { opts = newOpts; values = new Set(newOpts); _updateBtn(); },
     };
   }
 
