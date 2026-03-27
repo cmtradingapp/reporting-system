@@ -99,6 +99,15 @@ def ensure_table():
         ALTER TABLE accounts ALTER COLUMN gender            TYPE VARCHAR(100);
         ALTER TABLE accounts ALTER COLUMN customer_language TYPE VARCHAR(100);
         ALTER TABLE accounts ALTER COLUMN country_iso       TYPE VARCHAR(100);
+        DO $$ BEGIN
+            IF EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = 'accounts'
+                  AND column_name = 'classification_int' AND is_generated = 'ALWAYS'
+            ) THEN
+                ALTER TABLE accounts DROP COLUMN classification_int;
+            END IF;
+        END $$;
         ALTER TABLE accounts ADD COLUMN IF NOT EXISTS classification_int SMALLINT;
         CREATE INDEX IF NOT EXISTS idx_accounts_classification_int ON accounts (classification_int);
 
