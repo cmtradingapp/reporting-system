@@ -589,6 +589,24 @@
     }
   }
 
+  function updateKpiFromTableTotals(totals) {
+    if (!totals) return;
+    const s = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    s('stat-leads-mtd',   (totals.leads         ?? 0).toLocaleString('en-US'));
+    s('stat-live-mtd',    (totals.live_accounts ?? 0).toLocaleString('en-US'));
+    s('stat-ftd-mtd',     (totals.ftd           ?? 0).toLocaleString('en-US'));
+    s('stat-ftc-mtd',     (totals.ftc           ?? 0).toLocaleString('en-US'));
+    s('stat-deposits',    fmtMoney(totals.deposits    ?? 0));
+    s('stat-withdrawals', fmtMoney(totals.withdrawals ?? 0));
+    const netEl = document.getElementById('stat-net-deposits');
+    if (netEl) {
+      const v = totals.net_deposits ?? 0;
+      netEl.textContent = fmtMoney(v);
+      netEl.style.color = v >= 0 ? '#3fb950' : '#f85149';
+    }
+    s('stat-traders', (totals.traders ?? 0).toLocaleString('en-US'));
+  }
+
   function updateStats(data) {
     const s = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
     s('stat-leads-daily',  (data.leads?.daily       ?? 0).toLocaleString('en-US'));
@@ -715,6 +733,7 @@
       tblData = data;
       if (!silent) tblExpanded = {};
       renderTable();
+      updateKpiFromTableTotals(tblData?.totals);
     } catch(e) {
       if (!silent) {
         document.getElementById('tbl-tbody').innerHTML = '';

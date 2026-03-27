@@ -807,9 +807,36 @@
     return { populate, getValue: () => _values.size === _allValues.length ? null : new Set(_values) };
   }
 
+  function updateBonusStatsFromFiltered() {
+    if (!salAllRows.length && !bonAllRows.length) return;
+    const fOffice = csOffice.getValue();
+    const fTeam   = csTeam.getValue();
+    const fAgent  = csAgent.getValue();
+    const fSales = salAllRows.filter(r => {
+      if (fOffice && !fOffice.has(r.office_name)) return false;
+      if (fTeam   && !fTeam.has(r.dept_name))     return false;
+      if (fAgent  && !fAgent.has(r.agent_name))   return false;
+      return true;
+    });
+    const fBon = bonAllRows.filter(r => {
+      if (fOffice && !fOffice.has(r.office_name)) return false;
+      if (fTeam   && !fTeam.has(r.dept_name))     return false;
+      if (fAgent  && !fAgent.has(r.agent_name))   return false;
+      return true;
+    });
+    const totalSales = fSales.reduce((s,r) => s + (r.total_sales_bonus ?? 0), 0);
+    const sfmt = totalSales >= 1000
+      ? '$' + Math.round(totalSales).toLocaleString('en-US')
+      : '$' + Math.round(totalSales);
+    document.getElementById('stat-sales-bonus').textContent = sfmt;
+    const totalBon = fBon.reduce((s,r) => s + (r.basic_bonus_usd ?? 0), 0);
+    document.getElementById('stat-ret-bonus').textContent = '$' + Math.round(totalBon).toLocaleString('en-US');
+  }
+
   function onFilterChange() {
     if (salAllRows.length) renderSalesTable();
     if (bonAllRows.length) renderBonusTable();
+    updateBonusStatsFromFiltered();
   }
   const csOffice = makeCustomSelect('cs-office-trigger','cs-office-drop','cs-office-search','cs-office-opts','All Offices', onFilterChange);
   const csTeam   = makeCustomSelect('cs-team-trigger',  'cs-team-drop',  'cs-team-search',  'cs-team-opts',  'All Teams',   onFilterChange);
