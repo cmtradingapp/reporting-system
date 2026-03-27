@@ -220,6 +220,9 @@
       <button class="btn btn-sm text-white px-3" style="background:linear-gradient(135deg,#238636,#2ea043);border:none;border-radius:6px;" id="btn-apply">
         <i class="bi bi-arrow-clockwise me-1"></i>Apply
       </button>
+      <button class="btn btn-sm px-3" style="background:#21262d;border:1px solid #30363d;color:#8b949e;border-radius:6px;" id="btn-reset-filters">
+        <i class="bi bi-x-circle me-1"></i>Reset Filters
+      </button>
     </div>
 
     <!-- Row 2: Campaign Filters -->
@@ -271,7 +274,7 @@
     <!-- Row 3: Account / Agent filters -->
     <div class="filter-grid" style="grid-template-columns:repeat(6,1fr);margin-top:10px;">
       <div style="display:flex;flex-direction:column;">
-        <span class="filter-row-label">Client Classification</span>
+        <span class="filter-row-label">Client Classification Category</span>
         <select id="f-classification" class="group-select" style="width:100%;box-sizing:border-box;">
           <option value="">All</option>
           <option value="High Quality">High Quality</option>
@@ -339,7 +342,7 @@
           </optgroup>
           <optgroup label="Account">
             <option value="country">Country</option>
-            <option value="client_classification">Client Classification</option>
+            <option value="client_classification">Client Classification Category</option>
             <option value="segmentation">Segmentation</option>
           </optgroup>
         </select>
@@ -362,7 +365,7 @@
           </optgroup>
           <optgroup label="Account">
             <option value="country">Country</option>
-            <option value="client_classification">Client Classification</option>
+            <option value="client_classification">Client Classification Category</option>
             <option value="segmentation">Segmentation</option>
           </optgroup>
         </select>
@@ -1089,6 +1092,19 @@
     loadData(); loadTable();
   });
 
+  document.getElementById('btn-reset-filters').addEventListener('click', () => {
+    ['f-mkt-group','f-campaign-name','f-legacy-id','f-channel','f-sub-channel',
+     'f-affiliate','f-country','f-office','f-agent','f-team'].forEach(id => {
+      _sddRegistry[id]?.reset();
+    });
+    document.getElementById('f-classification').value = '';
+    document.getElementById('f-segmentation').value = '';
+    document.getElementById('qual-date-from').value = '';
+    document.getElementById('qual-date-to').value = '';
+    document.querySelectorAll('.ftc-cb').forEach(cb => { cb.checked = true; });
+    loadData(); loadTable();
+  });
+
   // Group/period dropdown changes only reload the table (not KPI cards)
   document.getElementById('sel-group1').addEventListener('change', () => loadTable());
   document.getElementById('sel-group2').addEventListener('change', () => loadTable());
@@ -1163,6 +1179,7 @@
     _sddRegistry[id] = {
       getValue: () => values.size === opts.length ? [] : [...values],
       setOptions: (newOpts) => { opts = newOpts; values = new Set(newOpts); _updateBtn(); },
+      reset: () => { values = new Set(opts); _updateBtn(); },
     };
   }
 

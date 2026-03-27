@@ -38,7 +38,7 @@ GROUP_LABELS = {
     "office_name":          "Office",
     "agent_name":           "Agent",
     "country":              "Country",
-    "client_classification": "Client Classification",
+    "client_classification": "Client Classification Category",
     "segmentation":         "Segmentation",
     "none":                 "",
 }
