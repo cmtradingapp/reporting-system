@@ -42,7 +42,7 @@
     .filter-sep { width: 1px; height: 28px; background-color: #30363d; margin: 0 6px; }
 
     /* Filter grid for campaign filter row */
-    .filter-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; margin-top: 10px; padding-top: 10px; border-top: 1px solid #21262d; }
+    .filter-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 10px; margin-top: 10px; padding-top: 10px; border-top: 1px solid #21262d; }
     .filter-grid .sdd-wrap { display: block; width: 100%; }
     .filter-grid .sdd-btn { width: 100%; box-sizing: border-box; }
     .filter-grid .group-select { width: 100%; box-sizing: border-box; }
@@ -273,6 +273,16 @@
           <option value="High Quality">High Quality</option>
           <option value="Low Quality">Low Quality</option>
           <option value="No segmentation">No segmentation</option>
+        </select>
+      </div>
+      <div style="display:flex;flex-direction:column;">
+        <span class="filter-row-label">Segmentation</span>
+        <select id="f-segmentation" class="group-select" style="width:100%;box-sizing:border-box;">
+          <option value="">All</option>
+          <option value="-A">-A</option>
+          <option value="B">B</option>
+          <option value="C">C</option>
+          <option value="+A">+A</option>
         </select>
       </div>
     </div>
@@ -697,6 +707,7 @@
     const fAgent       = _sddGet('f-agent');
     const fTeam        = _sddGet('f-team');
     const fClass       = (document.getElementById('f-classification')?.value || '');
+    const fSegmentation = (document.getElementById('f-segmentation')?.value || '');
     const allCbs       = document.querySelectorAll('.ftc-cb');
     const checkedCbs   = Array.from(allCbs).filter(cb => cb.checked).map(cb => cb.value);
     const ftcGroups    = (checkedCbs.length > 0 && checkedCbs.length < allCbs.length)
@@ -715,6 +726,7 @@
     fAgent.forEach(v        => extra += `&f_agent=${encodeURIComponent(v)}`);
     fTeam.forEach(v         => extra += `&f_team=${encodeURIComponent(v)}`);
     if (fClass)        extra += `&f_classification=${encodeURIComponent(fClass)}`;
+    if (fSegmentation) extra += `&f_segmentation=${encodeURIComponent(fSegmentation)}`;
     if (ftcGroups)     extra += `&ftc_groups=${encodeURIComponent(ftcGroups)}`;
     if (qDateFrom)     extra += `&q_date_from=${qDateFrom}`;
     if (qDateTo)       extra += `&q_date_to=${qDateTo}`;
@@ -1166,6 +1178,7 @@
    'f-country','f-office','f-agent','f-team'].forEach(id => _sddInit(id, []));
 
   document.getElementById('f-classification')?.addEventListener('change', () => { loadData(); loadTable(); });
+  document.getElementById('f-segmentation')?.addEventListener('change', () => { loadData(); loadTable(); });
   document.getElementById('qual-date-from').addEventListener('change', () => { loadData(); loadTable(); });
   document.getElementById('qual-date-to').addEventListener('change',   () => { loadData(); loadTable(); });
   document.getElementById('btn-clear-qual').addEventListener('click',  () => {

@@ -217,7 +217,8 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
                    q_date_from: str = None, q_date_to: str = None,
                    f_mkt_group=None, f_legacy_id=None, f_campaign_name=None,
                    f_channel=None, f_sub_channel=None, f_affiliate=None,
-                   f_country=None, f_office=None, f_agent=None, f_team=None) -> dict:
+                   f_country=None, f_office=None, f_agent=None, f_team=None,
+                   f_segmentation: str = None) -> dict:
     dt_to = datetime.strptime(date_to, "%Y-%m-%d").date()
     date_to_exclusive = (dt_to + timedelta(days=1)).strftime("%Y-%m-%d")
 
@@ -253,7 +254,8 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
     camp_filter_where, _, kpi_needs_cu = _build_filter_clauses(
         f_mkt_group, f_legacy_id, f_campaign_name, f_channel, f_sub_channel,
         f_affiliate, None, None, date_to, camp_filter_params,
-        f_country=f_country, f_office=f_office, f_agent=f_agent, f_team=f_team
+        f_country=f_country, f_office=f_office, f_agent=f_agent, f_team=f_team,
+        f_segmentation=f_segmentation
     )
     camp_filter_where = camp_filter_where.strip()
     needs_camp_join = bool(f_mkt_group or f_legacy_id or f_campaign_name or f_channel or f_sub_channel)
@@ -450,16 +452,18 @@ async def campaign_performance_api(
     f_office: Optional[List[str]] = Query(default=None),
     f_agent: Optional[List[str]] = Query(default=None),
     f_team: Optional[List[str]] = Query(default=None),
+    f_segmentation: str = None,
 ):
     user = await get_current_user(request)
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
     def _ck_part(v): return ','.join(sorted(v)) if v else ''
-    _ck = (f"camp_perf_v4:{date_from}:{date_to}:{f_classification}:{q_date_from}:{q_date_to}"
+    _ck = (f"camp_perf_v5:{date_from}:{date_to}:{f_classification}:{q_date_from}:{q_date_to}"
            f":{_ck_part(f_mkt_group)}:{_ck_part(f_legacy_id)}:{_ck_part(f_campaign_name)}"
            f":{_ck_part(f_channel)}:{_ck_part(f_sub_channel)}:{_ck_part(f_affiliate)}"
-           f":{_ck_part(f_country)}:{_ck_part(f_office)}:{_ck_part(f_agent)}:{_ck_part(f_team)}")
+           f":{_ck_part(f_country)}:{_ck_part(f_office)}:{_ck_part(f_agent)}:{_ck_part(f_team)}"
+           f":{f_segmentation}")
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -473,7 +477,7 @@ async def campaign_performance_api(
         _result = _camp_kpi_calc(
             date_from, date_to, f_classification, q_date_from, q_date_to,
             f_mkt_group, f_legacy_id, f_campaign_name, f_channel, f_sub_channel, f_affiliate,
-            f_country, f_office, f_agent, f_team
+            f_country, f_office, f_agent, f_team, f_segmentation=f_segmentation
         )
         cache.set(_ck, _result)
         return JSONResponse(content=_result)
@@ -487,7 +491,8 @@ def _build_filter_clauses(
     f_mkt_group, f_legacy_id, f_campaign_name, f_channel, f_sub_channel,
     f_affiliate, f_classification, ftc_groups_list, date_to, params,
     q_date_from=None, q_date_to_excl=None,
-    f_country=None, f_office=None, f_agent=None, f_team=None
+    f_country=None, f_office=None, f_agent=None, f_team=None,
+    f_segmentation=None
 ):
     """Returns (extra_where_str, needs_cc_join, needs_cu_join).
     Appends needed params to the `params` dict in-place."""
@@ -565,6 +570,13 @@ def _build_filter_clauses(
         params["q_date_from"]    = q_date_from
         params["q_date_to_excl"] = q_date_to_excl
 
+    if f_segmentation:
+        _seg_map = {'-A': '1', 'B': '2', 'C': '3', '+A': '4'}
+        db_val = _seg_map.get(f_segmentation)
+        if db_val:
+            clauses.append("AND a.segmentation = %(f_segmentation)s")
+            params["f_segmentation"] = db_val
+
     return "\n".join(clauses), needs_cc_join, needs_cu_join
 
 
@@ -576,6 +588,7 @@ def _camp_table_calc(
     f_classification: str = None, ftc_groups: str = None,
     q_date_from: str = None, q_date_to: str = None,
     f_country=None, f_office=None, f_agent=None, f_team=None,
+    f_segmentation: str = None,
 ) -> dict:
     dt_to = datetime.strptime(date_to, "%Y-%m-%d").date()
     date_to_exclusive = (dt_to + timedelta(days=1)).strftime("%Y-%m-%d")
@@ -620,7 +633,8 @@ def _camp_table_calc(
         f_mkt_group, f_legacy_id, f_campaign_name, f_channel, f_sub_channel,
         f_affiliate, f_classification, ftc_groups_list, date_to, acct_params,
         q_date_from=q_date_from, q_date_to_excl=q_date_to_excl,
-        f_country=f_country, f_office=f_office, f_agent=f_agent, f_team=f_team
+        f_country=f_country, f_office=f_office, f_agent=f_agent, f_team=f_team,
+        f_segmentation=f_segmentation
     )
     needs_cu_join = needs_cu_join_for_group or needs_cu_join_for_filter
     needs_cc_join = needs_cc_join_for_group or needs_cc_join_for_filter
@@ -677,7 +691,8 @@ def _camp_table_calc(
                 f_mkt_group, f_legacy_id, f_campaign_name, f_channel, f_sub_channel,
                 f_affiliate, f_classification, ftc_groups_list, date_to, txn_params,
                 q_date_from=q_date_from, q_date_to_excl=q_date_to_excl,
-                f_country=f_country, f_office=f_office, f_agent=f_agent, f_team=f_team
+                f_country=f_country, f_office=f_office, f_agent=f_agent, f_team=f_team,
+                f_segmentation=f_segmentation
             )
 
             txn_sel, txn_grp = [], []
@@ -831,6 +846,7 @@ async def campaign_performance_table_api(
     f_office: Optional[List[str]] = Query(default=None),
     f_agent: Optional[List[str]] = Query(default=None),
     f_team: Optional[List[str]] = Query(default=None),
+    f_segmentation: str = None,
 ):
     user = await get_current_user(request)
     if isinstance(user, RedirectResponse):
@@ -844,10 +860,11 @@ async def campaign_performance_table_api(
         return JSONResponse(status_code=400, content={"detail": "Invalid period"})
 
     def _ck_part(v): return ','.join(sorted(v)) if v else ''
-    _ck = (f"camp_tbl_v6:{date_from}:{date_to}:{group1}:{group2}:{period}"
+    _ck = (f"camp_tbl_v7:{date_from}:{date_to}:{group1}:{group2}:{period}"
            f":{_ck_part(f_mkt_group)}:{_ck_part(f_legacy_id)}:{_ck_part(f_campaign_name)}:{_ck_part(f_channel)}"
            f":{_ck_part(f_sub_channel)}:{_ck_part(f_affiliate)}:{f_classification}:{ftc_groups}"
-           f":{q_date_from}:{q_date_to}:{_ck_part(f_country)}:{_ck_part(f_office)}:{_ck_part(f_agent)}:{_ck_part(f_team)}")
+           f":{q_date_from}:{q_date_to}:{_ck_part(f_country)}:{_ck_part(f_office)}:{_ck_part(f_agent)}:{_ck_part(f_team)}"
+           f":{f_segmentation}")
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -864,6 +881,7 @@ async def campaign_performance_table_api(
             f_sub_channel, f_affiliate, f_classification, ftc_groups,
             q_date_from, q_date_to,
             f_country=f_country, f_office=f_office, f_agent=f_agent, f_team=f_team,
+            f_segmentation=f_segmentation,
         )
         cache.set(_ck, _result)
         return JSONResponse(content=_result)
