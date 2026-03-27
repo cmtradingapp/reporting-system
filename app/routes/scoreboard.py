@@ -74,7 +74,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"perf_v13:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"perf_v14:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -101,7 +101,8 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
             COALESCE(mv.ftd_count, 0)::int               AS ftd_count,
             COALESCE(dk.daily_ftd, 0)::int               AS daily_ftd,
             COALESCE(dk.daily_ftc, 0)::int               AS daily_ftc,
-            COALESCE(dk.daily_net, 0)::float             AS daily_net
+            COALESCE(dk.daily_net, 0)::float             AS daily_net,
+            COALESCE(u.status, '')                        AS status
         FROM crm_users u
         LEFT JOIN (
             -- Combined FTC + NET + FTD from mv_daily_kpis in a single scan
@@ -300,6 +301,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
                 "daily_ftd":    int(r[8] or 0),
                 "daily_ftc":    int(r[9] or 0),
                 "daily_net":    round(float(r[10] or 0), 2),
+                "status":       r[11] or '',
             }
             for r in rows
         ]
@@ -344,7 +346,7 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"perf_ret_v7:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"perf_ret_v8:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -367,7 +369,8 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
             COALESCE(mv.net_usd, 0)::float                    AS net_usd,
             COALESCE(mv.deposit_usd, 0)::float                AS deposit_usd,
             COALESCE(vol.open_volume_usd, 0)::float           AS open_volume_usd,
-            COALESCE(dk.daily_net_usd, 0)::float              AS daily_net_usd
+            COALESCE(dk.daily_net_usd, 0)::float              AS daily_net_usd,
+            COALESCE(u.status, '')                             AS status
         FROM crm_users u
         LEFT JOIN (
             SELECT agent_id::bigint, SUM(net)::float AS monthly_target_net
@@ -519,6 +522,7 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
                 "deposit_usd":     round(r[5], 2),
                 "open_volume_usd": round(r[6], 2),
                 "daily_net_usd":   round(float(r[7] or 0), 2),
+                "status":          r[8] or '',
             }
             for r in rows
         ]

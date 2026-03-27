@@ -854,7 +854,8 @@
   const csStatus = makeCustomSelect('cs-status-trigger','cs-status-drop','cs-status-search','cs-status-opts','All Status',  onFilterChange);
 
   function populateFilterDropdowns() {
-    const offices = new Set(), teams = new Set(), agents = new Set(), statuses = new Set();
+    const offices = new Set(), teams = new Set(), agents = new Set();
+    const statuses = new Set(['Active', 'Inactive']);
     [...salAllRows, ...bonAllRows].forEach(r => {
       if (r.office_name) offices.add(r.office_name);
       if (r.dept_name)   teams.add(r.dept_name);

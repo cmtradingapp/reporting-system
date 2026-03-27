@@ -151,7 +151,7 @@ async def agent_bonuses_retention_api(request: Request, date_from: str, date_to:
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"bon_ret_v5:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"bon_ret_v6:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -173,7 +173,8 @@ async def agent_bonuses_retention_api(request: Request, date_from: str, date_to:
             COALESCE(u.office, '')                             AS office,
             COALESCE(tgt.monthly_target_net, 0)::float        AS target_net,
             COALESCE(mv.net_usd, 0)::float                    AS net_usd,
-            COALESCE(vol.open_volume_usd, 0)::float           AS open_volume_usd
+            COALESCE(vol.open_volume_usd, 0)::float           AS open_volume_usd,
+            COALESCE(u.status, '')                             AS status
         FROM crm_users u
         LEFT JOIN (
             SELECT agent_id::bigint, SUM(net)::float AS monthly_target_net
@@ -240,6 +241,7 @@ async def agent_bonuses_retention_api(request: Request, date_from: str, date_to:
             target_net      = round(float(r[4]), 2)
             net_usd         = round(float(r[5]), 2)
             open_volume_usd = round(float(r[6]), 2)
+            status          = r[7] or ''
 
             target_vol = target_net * 1650
 
@@ -273,6 +275,7 @@ async def agent_bonuses_retention_api(request: Request, date_from: str, date_to:
                 "pct_on_target_vol": pct_on_target_vol,
                 "total_bonus_pct":   total_bonus_pct,
                 "basic_bonus_usd":   basic_bonus_usd,
+                "status":            status,
             })
 
         _result = {
@@ -295,7 +298,7 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"bon_sales_v5:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"bon_sales_v6:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -322,7 +325,8 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
             COALESCE(bon.ftd100_half_count, 0)::int               AS ftd100_half_count,
             COALESCE(ftc_net.net_usd, 0)::float                   AS ftc_net_usd,
             COALESCE(bon.total_sales_net, 0)::float               AS total_sales_net,
-            COALESCE(bon.ftd_amount_bonus, 0)::float              AS ftd_amount_bonus_sql
+            COALESCE(bon.ftd_amount_bonus, 0)::float              AS ftd_amount_bonus_sql,
+            COALESCE(u.status, '')                                 AS status
         FROM crm_users u
         LEFT JOIN (
             SELECT agent_id::bigint, SUM(ftc)::int AS target_ftc
@@ -396,6 +400,7 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
             ftc_net_usd          = round(float(r[7]), 2)
             total_sales_net      = round(float(r[8]), 2)
             ftd_amount_bonus_raw = round(float(r[9]), 2)
+            status               = r[10] or ''
 
             target_pct = ftc_count / target_ftc if target_ftc > 0 else None
 
@@ -423,6 +428,7 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
                 "total_sales_bonus":  round(total_sales_bonus, 2),
                 "target_pct":         round(target_pct, 6) if target_pct is not None else None,
                 "multiplier":         multiplier,
+                "status":             status,
             })
 
         _result = {"rows": data}
