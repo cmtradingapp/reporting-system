@@ -574,7 +574,7 @@
           <table class="scoreboard-table" id="scoreboard-table">
             <thead>
               <tr>
-                <th>Office / Agent</th>
+                <th data-sort="name" style="cursor:pointer;user-select:none;">Office / Agent <i class="bi sort-icon bi-arrow-down-up" id="sort-icon-name" style="margin-left:4px;font-size:0.7rem;opacity:0.4;"></i></th>
                 <th class="text-center" style="min-width:100px;" data-sort="targetTotal">Target FTC <i class="bi sort-icon" id="sort-icon-targetTotal"></i></th>
                 <th class="text-center" style="min-width:70px;" data-sort="ftdCountTotal">FTD <i class="bi sort-icon" id="sort-icon-ftdCountTotal"></i></th>
                 <th class="text-center" style="min-width:90px;" data-sort="ftd100Total">FTD100 <i class="bi sort-icon" id="sort-icon-ftd100Total"></i></th>
@@ -627,7 +627,7 @@
           <table class="scoreboard-table" id="retention-table">
             <thead>
               <tr>
-                <th>Office / Dept / Agent</th>
+                <th data-sort="ret-name" style="cursor:pointer;user-select:none;">Office / Dept / Agent <i class="bi sort-icon bi-arrow-down-up" id="ret-sort-icon-name" style="margin-left:4px;font-size:0.7rem;opacity:0.4;"></i></th>
                 <th class="text-center" style="min-width:110px;" data-sort="ret-targetNet">Target NET <i class="bi sort-icon" id="ret-sort-icon-targetNet"></i></th>
                 <th class="text-center" style="min-width:90px;"  data-sort="ret-netRrPct">NET RR % <i class="bi sort-icon" id="ret-sort-icon-netRrPct"></i></th>
                 <th class="text-center" style="min-width:130px;" data-sort="ret-miss100Rr">Missing to 100% RR <i class="bi sort-icon" id="ret-sort-icon-miss100Rr"></i></th>
@@ -1027,6 +1027,12 @@
     });
 
     const tbody = document.getElementById('table-body');
+    // Capture which offices are currently expanded before clearing
+    const expandedOfficeNames = new Set();
+    tbody.querySelectorAll('tr.office-row').forEach(tr => {
+      if (tr.querySelector('.chevron')?.classList.contains('open'))
+        expandedOfficeNames.add(tr.dataset.officeName);
+    });
     tbody.innerHTML = '';
 
     // Group by office
@@ -1057,6 +1063,8 @@
       missingTo100RrFtd100Total:agents.reduce((s, a) => s + a.missing_to_100rr_ftd100,  0),
       perWdTotal:               agents.reduce((s, a) => s + a.per_wd,                   0),
     })).sort((a, b) => {
+      if (sortState.col === 'name')
+        return sortState.dir === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
       const av = a[sortState.col] ?? 0;
       const bv = b[sortState.col] ?? 0;
       return sortState.dir === 'desc' ? bv - av : av - bv;
@@ -1095,6 +1103,7 @@
       const offTr = document.createElement('tr');
       offTr.className = 'office-row';
       offTr.dataset.officeId = officeId;
+      offTr.dataset.officeName = office.name;
       offTr.innerHTML = `
         <td>
           <span class="chevron">&#9654;</span>
@@ -1120,23 +1129,9 @@
       `;
       tbody.appendChild(offTr);
 
-      // Agent sub-rows (hidden by default, sorted by active column)
-      const agentSortKey = {
-        total: 'ftc', targetTotal: 'target_ftc',
-        ftcTgtPctTotal: 'ftc_tgt_pct', ftcRrTotal: 'ftc_rr', ftcRrPctTotal: 'ftc_rr_pct',
-        ftd100Total: 'ftd100', ftd100TgtPctTotal: 'ftd100_tgt_pct',
-        ftd100RrTotal: 'ftd100_rr', ftd100RrPctTotal: 'ftd100_rr_pct',
-        netDepositsTotal: 'net_deposits',
-        ftdCountTotal: 'ftd_count',
-        needOnTargetTotal: 'need_on_target', missingTo100Total: 'missing_to_100',
-        missingTo100RrTotal: 'missing_to_100rr', missingTo100RrFtd100Total: 'missing_to_100rr_ftd100',
-        perWdTotal: 'per_wd',
-      }[sortState.col] || 'ftc';
-      const sortedAgents = [...office.agents].sort((a, b) => {
-        const av = a[agentSortKey] ?? 0;
-        const bv = b[agentSortKey] ?? 0;
-        return sortState.dir === 'desc' ? bv - av : av - bv;
-      });
+      // Agent sub-rows (hidden by default, sorted alphabetically)
+      const sortedAgents = [...office.agents].sort((a, b) =>
+        (a.agent_name || '').localeCompare(b.agent_name || ''));
       sortedAgents.forEach(r => {
         agentCount++;
         const ftcHtml  = r.ftc > 0
@@ -1191,6 +1186,12 @@
         `;
         tbody.appendChild(tr);
       });
+
+      // Restore expansion state if this office was expanded before refresh
+      if (expandedOfficeNames.has(office.name)) {
+        offTr.querySelector('.chevron').classList.add('open');
+        tbody.querySelectorAll(`tr[data-parent-office="${officeId}"]`).forEach(r => r.style.display = '');
+      }
 
       // Click to expand/collapse
       offTr.addEventListener('click', () => {
@@ -1372,7 +1373,7 @@
         sortState.dir = sortState.dir === 'desc' ? 'asc' : 'desc';
       } else {
         sortState.col = col;
-        sortState.dir = 'desc';
+        sortState.dir = col === 'name' ? 'asc' : 'desc';
       }
       updateSortIcons();
       if (allRows.length) renderTable();
@@ -1387,7 +1388,7 @@
         retSortState.dir = retSortState.dir === 'desc' ? 'asc' : 'desc';
       } else {
         retSortState.col = col;
-        retSortState.dir = 'desc';
+        retSortState.dir = col === 'ret-name' ? 'asc' : 'desc';
       }
       updateRetSortIcons();
       if (retAllRows.length) renderRetentionTable(retWd, retWdPassed, retWdLeft);
@@ -1555,6 +1556,18 @@
 
     const tbody = document.getElementById('retention-tbody');
     const tfoot = document.getElementById('retention-tfoot');
+    // Capture which offices/depts are currently expanded before clearing
+    const retExpandState = new Map(); // officeName -> Set of expanded deptNames
+    tbody.querySelectorAll('tr.office-row').forEach(offTr => {
+      if (offTr.querySelector('.chevron')?.classList.contains('open')) {
+        const expandedDepts = new Set();
+        tbody.querySelectorAll(`tr.dept-row[data-parent-office="${offTr.dataset.officeId}"]`).forEach(deptTr => {
+          if (deptTr.querySelector('.chevron')?.classList.contains('open'))
+            expandedDepts.add(deptTr.dataset.deptName);
+        });
+        retExpandState.set(offTr.dataset.officeName, expandedDepts);
+      }
+    });
     tbody.innerHTML = '';
     tfoot.innerHTML = '';
 
@@ -1596,6 +1609,8 @@
 
     // Sort offices
     officeArr.sort((a, b) => {
+      if (retSortState.col === 'ret-name')
+        return retSortState.dir === 'asc' ? a.officeName.localeCompare(b.officeName) : b.officeName.localeCompare(a.officeName);
       const av = retSortVal(a), bv = retSortVal(b);
       return retSortState.dir === 'desc' ? bv - av : av - bv;
     });
@@ -1621,6 +1636,7 @@
       const offTr = document.createElement('tr');
       offTr.className = 'office-row';
       offTr.dataset.officeId = officeId;
+      offTr.dataset.officeName = office.officeName;
       offTr.innerHTML = `
         <td>
           <span class="chevron">&#9654;</span>
@@ -1684,6 +1700,7 @@
         deptTr.className = 'dept-row';
         deptTr.dataset.parentOffice = officeId;
         deptTr.dataset.deptId = deptId;
+        deptTr.dataset.deptName = dept.deptName;
         deptTr.style.display = 'none';
         deptTr.innerHTML = `
           <td>
@@ -1708,22 +1725,9 @@
         `;
         tbody.appendChild(deptTr);
 
-        // Sort agents within dept
-        const sortedAgents = [...dept.agents].sort((a, b) => {
-          const av = retSortVal({
-            tgtNet: a.target_net, netUsd: a.net_usd, depUsd: a.deposit_usd, openVol: a.open_volume_usd,
-            netRr: a.net_rr ?? 0, needOnTgt: a.need_on_target, miss100: a.missing_100, miss100Rr: a.missing_100_rr,
-            volRr: a.vol_rr ?? 0, netRrPct: a.net_rr_pct, netTgtPct: a.target_net_pct,
-            volRrPct: a.target_vol_rr_pct, perWd: a.per_wd,
-          });
-          const bv = retSortVal({
-            tgtNet: b.target_net, netUsd: b.net_usd, depUsd: b.deposit_usd, openVol: b.open_volume_usd,
-            netRr: b.net_rr ?? 0, needOnTgt: b.need_on_target, miss100: b.missing_100, miss100Rr: b.missing_100_rr,
-            volRr: b.vol_rr ?? 0, netRrPct: b.net_rr_pct, netTgtPct: b.target_net_pct,
-            volRrPct: b.target_vol_rr_pct, perWd: b.per_wd,
-          });
-          return retSortState.dir === 'desc' ? bv - av : av - bv;
-        });
+        // Sort agents within dept alphabetically
+        const sortedAgents = [...dept.agents].sort((a, b) =>
+          (a.agent_name || '').localeCompare(b.agent_name || ''));
 
         // Agent rows (hidden by default)
         sortedAgents.forEach(r => {
@@ -1762,6 +1766,19 @@
           agRows.forEach(r => r.style.display = isOpen ? 'none' : '');
         });
       });
+
+      // Restore expansion state for this office
+      if (retExpandState.has(office.officeName)) {
+        offTr.querySelector('.chevron').classList.add('open');
+        const expandedDepts = retExpandState.get(office.officeName);
+        tbody.querySelectorAll(`tr.dept-row[data-parent-office="${officeId}"]`).forEach(deptTr => {
+          deptTr.style.display = '';
+          if (expandedDepts.has(deptTr.dataset.deptName)) {
+            deptTr.querySelector('.chevron').classList.add('open');
+            tbody.querySelectorAll(`tr[data-parent-dept="${deptTr.dataset.deptId}"]`).forEach(r => r.style.display = '');
+          }
+        });
+      }
 
       // Office click: toggle dept rows (and hide agent rows when closing)
       offTr.addEventListener('click', () => {
