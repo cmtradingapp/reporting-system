@@ -34,7 +34,8 @@ jobs:
             # Preserve existing .env file (already created manually on server)
             # Build and restart
             cd $APP_DIR
-            docker compose down || true
+            docker compose down --remove-orphans || true
+            docker rm -f reporting-system-app-1 || true
             docker compose up --build -d
 
             echo "Deployment complete."
