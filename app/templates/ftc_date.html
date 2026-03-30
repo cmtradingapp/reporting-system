@@ -474,8 +474,6 @@
   }
 
   function onGroup1Change() {
-    const g1 = document.getElementById('group1').value;
-    document.getElementById('ftc-groups-wrap').style.display = (g1 === 'days_from_ftc') ? '' : 'none';
     loadData();
   }
 
@@ -490,7 +488,9 @@
     const team    = document.getElementById('filterTeam').value;
     const classification = document.getElementById('filterClassification').value;
 
+    const checkedGroups = [...document.querySelectorAll('.group-cb:checked')].map(e => e.value);
     let url = `/api/ftc-date?end_date=${endDate}&group1=${group1}&group2=${group2}`;
+    if (checkedGroups.length) url += `&ftc_groups=${encodeURIComponent(checkedGroups.join(','))}`;
     if (agentId)        url += `&agent_id=${agentId}`;
     if (office)         url += `&office=${encodeURIComponent(office)}`;
     if (team)           url += `&team=${encodeURIComponent(team)}`;

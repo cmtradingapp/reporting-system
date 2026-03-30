@@ -175,6 +175,19 @@ async def ftc_date_options(request: Request):
         conn.close()
 
 
+_ALL_FTC_GROUPS = {"0 - 7 days", "8 - 14 days", "15 - 30 days", "31 - 60 days", "61 - 90 days", "91 - 120 days", "120+ days"}
+
+_GROUP_DAY_SQL = {
+    "0 - 7 days":    "(%(end_date)s::date - a.client_qualification_date::date) BETWEEN 0 AND 7",
+    "8 - 14 days":   "(%(end_date)s::date - a.client_qualification_date::date) BETWEEN 8 AND 14",
+    "15 - 30 days":  "(%(end_date)s::date - a.client_qualification_date::date) BETWEEN 15 AND 30",
+    "31 - 60 days":  "(%(end_date)s::date - a.client_qualification_date::date) BETWEEN 31 AND 60",
+    "61 - 90 days":  "(%(end_date)s::date - a.client_qualification_date::date) BETWEEN 61 AND 90",
+    "91 - 120 days": "(%(end_date)s::date - a.client_qualification_date::date) BETWEEN 91 AND 120",
+    "120+ days":     "(%(end_date)s::date - a.client_qualification_date::date) > 120",
+}
+
+
 @router.get("/api/ftc-date")
 async def ftc_date_api(
     request: Request,
@@ -185,6 +198,7 @@ async def ftc_date_api(
     office: str = None,
     team: str = None,
     classification: str = None,
+    ftc_groups: str = None,   # comma-separated checked group names
 ):
     user = await get_current_user(request)
     if isinstance(user, RedirectResponse):
@@ -199,7 +213,12 @@ async def ftc_date_api(
         group2 = "none"
     has_g2 = group2 != "none"
 
-    _ck = f"ftc_v6:{end_date}:{group1}:{group2}:{agent_id}:{office}:{team}:{classification}"
+    # Parse checked FTC groups — empty / all-7 = no filter
+    ftc_groups_list = [g.strip() for g in ftc_groups.split(",")] if ftc_groups else []
+    ftc_groups_set  = set(ftc_groups_list)
+    apply_group_filter = bool(ftc_groups_set) and ftc_groups_set != _ALL_FTC_GROUPS
+
+    _ck = f"ftc_v7:{end_date}:{group1}:{group2}:{agent_id}:{office}:{team}:{classification}:{ftc_groups}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -231,6 +250,10 @@ async def ftc_date_api(
         filter_parts.append("AND a.classification_int BETWEEN 6 AND 10")
     elif classification == "No segmentation":
         filter_parts.append("AND (a.classification_int IS NULL OR a.classification_int NOT BETWEEN 1 AND 10)")
+    if apply_group_filter:
+        or_clauses = [_GROUP_DAY_SQL[g] for g in ftc_groups_list if g in _GROUP_DAY_SQL]
+        if or_clauses:
+            filter_parts.append("AND (" + " OR ".join(or_clauses) + ")")
     filter_sql = "\n      ".join(filter_parts)
 
     g2_sel    = (", (" + d2["val"] + ") AS g2, (" + d2["sort"] + ") AS g2_sort") if has_g2 else ""
