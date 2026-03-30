@@ -368,6 +368,27 @@ async def ftc_date_api(
                     row['g1'] = rmap.get(row['g1'].strip().upper(), row['g1'])
                 if group2 == 'region' and row.get('g2') and row['g2'] != '(Unassigned)':
                     row['g2'] = rmap.get(row['g2'].strip().upper(), row['g2'])
+            # Re-aggregate: many country_iso → same region name
+            merged = {}
+            for row in data:
+                key = (row['g1'], row.get('g2'))
+                if key not in merged:
+                    merged[key] = dict(row)
+                else:
+                    m = merged[key]
+                    m['ftc']      += row['ftc'];   m['rdp']      += row['rdp']
+                    m['deposit']  += row['deposit']; m['withdrawal'] += row['withdrawal']
+                    m['wd_count'] += row['wd_count']; m['traders']  += row['traders']
+            for row in merged.values():
+                ftc = row['ftc']; dep = row['deposit']; wd = row['withdrawal']
+                net = dep - wd
+                row['net_deposit']    = round(net)
+                row['ltv']            = round(net / ftc, 2) if ftc > 0 else 0
+                row['pct_std']        = round(row['rdp'] / ftc * 100) if ftc > 0 else 0
+                row['pct_wd_clients'] = round(row['wd_count'] / ftc * 100) if ftc > 0 else 0
+                row['pct_wd_usd']     = round(wd / dep * 100) if dep > 0 else 0
+                row['traders_pct']    = round(row['traders'] / ftc * 100) if ftc > 0 else 0
+            data = list(merged.values())
 
         if group1 == 'retention_status' or group2 == 'retention_status':
             rsmap = _get_ret_status_map()
