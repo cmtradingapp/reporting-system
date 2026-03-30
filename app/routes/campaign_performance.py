@@ -637,14 +637,17 @@ def _camp_table_calc(
     if period == "day":
         acct_period_sql = "a.createdtime::date"
         txn_period_sql  = "t.confirmation_time::date"
+        ftc_period_sql  = "a.client_qualification_date::date"
     elif period == "month":
         acct_period_sql = "date_trunc('month', a.createdtime)::date"
         txn_period_sql  = "date_trunc('month', t.confirmation_time)::date"
+        ftc_period_sql  = "date_trunc('month', a.client_qualification_date)::date"
     elif period == "year":
         acct_period_sql = "date_trunc('year', a.createdtime)::date"
         txn_period_sql  = "date_trunc('year', t.confirmation_time)::date"
+        ftc_period_sql  = "date_trunc('year', a.client_qualification_date)::date"
     else:
-        acct_period_sql = txn_period_sql = ""
+        acct_period_sql = txn_period_sql = ftc_period_sql = ""
 
     # Build filter clauses
     ftc_from    = q_date_from    if q_date_from    else date_from
@@ -684,9 +687,7 @@ def _camp_table_calc(
                 " AND a.createdtime::date >= %(date_from)s"
                 " AND a.createdtime::date < %(date_to_excl)s"
                 " AND a.birth_date IS NOT NULL) AS live_accounts",
-                "COUNT(*) FILTER (WHERE a.client_qualification_date IS NOT NULL"
-                " AND a.client_qualification_date::date >= %(ftc_from)s"
-                " AND a.client_qualification_date::date < %(ftc_to_excl)s) AS ftc",
+                # FTC handled in separate query (grouped by qualification date, not creation date)
             ]
             acct_date_filter = (
                 " AND a.createdtime::date >= %(date_from)s AND a.createdtime::date < %(date_to_excl)s"
@@ -758,13 +759,51 @@ def _camp_table_calc(
             cur.execute(txn_sql, txn_params)
             txn_rows = cur.fetchall()
 
+            # ── FTC query (grouped by qualification date, not creation date) ─
+            ftc_params = {"ftc_from": ftc_from, "ftc_to_excl": ftc_to_excl}
+            ftc_filter_where, _, _ = _build_filter_clauses(
+                f_mkt_group, f_legacy_id, f_campaign_name, f_channel, f_sub_channel,
+                f_affiliate, f_classification, ftc_groups_list, date_to, ftc_params,
+                q_date_from=q_date_from, q_date_to_excl=q_date_to_excl,
+                f_country=f_country, f_office=f_office, f_agent=f_agent, f_team=f_team,
+                f_segmentation=f_segmentation
+            )
+            ftc_sel, ftc_grp = [], []
+            p = 1
+            if has_period: ftc_sel.append(f"{ftc_period_sql} AS period"); ftc_grp.append(str(p)); p += 1
+            if has_g1: ftc_sel.append(f"{g1_sql} AS g1"); ftc_grp.append(str(p)); p += 1
+            if has_g2: ftc_sel.append(f"{g2_sql} AS g2"); ftc_grp.append(str(p)); p += 1
+            ftc_sel.append("COUNT(*) AS ftc")
+            ftc_sql = (
+                f"SELECT {', '.join(ftc_sel)}"
+                " FROM accounts a LEFT JOIN campaigns c ON SPLIT_PART(a.campaign, '.', 1) = c.crmid"
+                f"{extra_joins}"
+                " WHERE a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)"
+                " AND a.client_qualification_date IS NOT NULL"
+                " AND a.client_qualification_date::date >= %(ftc_from)s"
+                " AND a.client_qualification_date::date < %(ftc_to_excl)s"
+                + _ACCT_FILTERS +
+                f"\n{ftc_filter_where}"
+            )
+            if ftc_grp:
+                ftc_sql += f" GROUP BY {', '.join(ftc_grp)}"
+            cur.execute(ftc_sql, ftc_params)
+            ftc_rows = cur.fetchall()
+
         # ── Merge rows ────────────────────────────────────────────────────
         def _parse_acct(r):
             off = 0
             per = str(r[off]) if has_period else None; off += int(has_period)
             g1  = r[off] if has_g1 else None;          off += int(has_g1)
             g2  = r[off] if has_g2 else None;          off += int(has_g2)
-            return per, g1, g2, int(r[off] or 0), int(r[off + 1] or 0), int(r[off + 2] or 0)
+            return per, g1, g2, int(r[off] or 0), int(r[off + 1] or 0)
+
+        def _parse_ftc(r):
+            off = 0
+            per = str(r[off]) if has_period else None; off += int(has_period)
+            g1  = r[off] if has_g1 else None;          off += int(has_g1)
+            g2  = r[off] if has_g2 else None;          off += int(has_g2)
+            return per, g1, g2, int(r[off] or 0)
 
         def _parse_txn(r):
             off = 0
@@ -775,10 +814,18 @@ def _camp_table_calc(
 
         merged: dict = {}
         for r in acct_rows:
-            per, g1, g2, leads, live, ftc = _parse_acct(r)
+            per, g1, g2, leads, live = _parse_acct(r)
             k = (per, g1, g2)
-            merged[k] = {"period": per, "g1": g1, "g2": g2, "leads": leads, "live_accounts": live, "ftc": ftc,
+            merged[k] = {"period": per, "g1": g1, "g2": g2, "leads": leads, "live_accounts": live, "ftc": 0,
                          "ftd": 0, "deposits": 0.0, "withdrawals": 0.0, "net_deposits": 0.0, "traders": 0}
+
+        for r in ftc_rows:
+            per, g1, g2, ftc = _parse_ftc(r)
+            k = (per, g1, g2)
+            if k not in merged:
+                merged[k] = {"period": per, "g1": g1, "g2": g2, "leads": 0, "live_accounts": 0, "ftc": 0,
+                              "ftd": 0, "deposits": 0.0, "withdrawals": 0.0, "net_deposits": 0.0, "traders": 0}
+            merged[k]["ftc"] = ftc
 
         for r in txn_rows:
             per, g1, g2, ftd, deps, wds, traders = _parse_txn(r)
@@ -884,7 +931,7 @@ async def campaign_performance_table_api(
         return JSONResponse(status_code=400, content={"detail": "Invalid period"})
 
     def _ck_part(v): return ','.join(sorted(v)) if v else ''
-    _ck = (f"camp_tbl_v9:{date_from}:{date_to}:{group1}:{group2}:{period}"
+    _ck = (f"camp_tbl_v10:{date_from}:{date_to}:{group1}:{group2}:{period}"
            f":{_ck_part(f_mkt_group)}:{_ck_part(f_legacy_id)}:{_ck_part(f_campaign_name)}:{_ck_part(f_channel)}"
            f":{_ck_part(f_sub_channel)}:{_ck_part(f_affiliate)}:{f_classification}:{ftc_groups}"
            f":{q_date_from}:{q_date_to}:{_ck_part(f_country)}:{_ck_part(f_office)}:{_ck_part(f_agent)}:{_ck_part(f_team)}"
