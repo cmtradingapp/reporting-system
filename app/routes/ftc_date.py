@@ -11,6 +11,21 @@ _TZ = ZoneInfo("Europe/Nicosia")
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
+_country_map_cache = None
+
+def _get_country_map() -> dict:
+    global _country_map_cache
+    if _country_map_cache:
+        return _country_map_cache
+    try:
+        from app.db.mssql_conn import get_country_map
+        result = get_country_map()
+        if result:
+            _country_map_cache = result
+        return result or {}
+    except Exception:
+        return {}
+
 # ── Group dimension SQL fragments ─────────────────────────────────────────────
 
 _DAYS_FTC_VAL = (
@@ -68,7 +83,7 @@ _DIMS = {
     "team":                   {"val": "COALESCE(u.department,             '(Unassigned)')",       "sort": "NULL::int",     "cu": True,  "camp": False},
     "agent":                  {"val": "COALESCE(u.agent_name,             '(Unassigned)')",       "sort": "NULL::int",     "cu": True,  "camp": False},
     "age_group":              {"val": _AGE_GROUP_VAL,                                             "sort": _AGE_GROUP_SORT, "cu": False, "camp": False},
-    "sales_client_potential": {"val": "COALESCE(a.sales_client_potential, '(Unassigned)')",       "sort": "NULL::int",     "cu": False, "camp": False},
+    "sales_client_potential": {"val": "COALESCE(ROUND(a.sales_client_potential::numeric)::int::text, '(Unassigned)')", "sort": "ROUND(a.sales_client_potential::numeric)::int", "cu": False, "camp": False},
     "country_name":           {"val": "COALESCE(a.country_iso,            '(Unassigned)')",       "sort": "NULL::int",     "cu": False, "camp": False},
 }
 
@@ -148,6 +163,7 @@ async def ftc_date_api(
 
     needs_cu   = d1["cu"] or (d2 and d2["cu"]) or bool(agent_id or office or team)
     needs_camp = d1["camp"] or (d2 and d2["camp"])
+    age_filter = "AND a.birth_date IS NOT NULL\n" if (group1 == 'age_group' or group2 == 'age_group') else ""
 
     cu_join   = "LEFT JOIN crm_users u ON u.id = a.assigned_to" if needs_cu   else ""
     camp_join = "LEFT JOIN campaigns c ON SPLIT_PART(a.campaign, '.', 1) = c.crmid" if needs_camp else ""
@@ -190,6 +206,7 @@ async def ftc_date_api(
         "      AND a.client_qualification_date::date >= '2024-01-01'\n"
         "      AND a.client_qualification_date::date <= %(end_date)s::date\n"
         "      AND a.is_test_account = 0\n"
+        + ("      " + age_filter if age_filter else "")
         + (("      " + filter_sql + "\n") if filter_sql else "")
         + "),\n"
         "tx_per_account AS (\n"
@@ -289,6 +306,14 @@ async def ftc_date_api(
                 g1, g1_sort, ftc, rdp, dep, wd, wdc, traders = r
                 g2_val = None
             data.append(_build(g1, g2_val, ftc, rdp, dep, wd, wdc, traders))
+
+        if group1 == 'country_name' or group2 == 'country_name':
+            cmap = _get_country_map()
+            for row in data:
+                if group1 == 'country_name' and row.get('g1') and row['g1'] != '(Unassigned)':
+                    row['g1'] = cmap.get(row['g1'].strip().upper(), row['g1'])
+                if group2 == 'country_name' and row.get('g2') and row['g2'] != '(Unassigned)':
+                    row['g2'] = cmap.get(row['g2'].strip().upper(), row['g2'])
 
         total_ftc = total_rdp = total_dep = total_wd = total_wdc = total_traders = 0
         for r in data:

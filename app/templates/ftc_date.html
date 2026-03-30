@@ -20,7 +20,10 @@
     .card { --bs-card-bg: #161b22; background-color: #161b22 !important; border: 1px solid #30363d; border-radius: 12px; }
     .table { --bs-table-bg: transparent; --bs-table-color: #e0e0e0; --bs-table-hover-bg: rgba(255,255,255,0.04); color: #e0e0e0; }
     .table > :not(caption) > * > * { background-color: transparent !important; color: #e0e0e0 !important; }
-    .table thead th { background-color: #21262d; color: #8b949e; border-color: #30363d; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.8px; white-space: nowrap; }
+    .table thead th { background-color: #21262d; color: #8b949e; border-color: #30363d; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.8px; white-space: nowrap; cursor: pointer; user-select: none; }
+    .table thead th:hover { color: #c9d1d9; }
+    .table thead th.sort-asc::after  { content: ' ▲'; font-size: 0.65rem; color: #3fb950; }
+    .table thead th.sort-desc::after { content: ' ▼'; font-size: 0.65rem; color: #3fb950; }
     .table tbody tr { border-color: #21262d; transition: background 0.15s; }
     .table tbody tr:hover { background-color: #21262d; }
     .table td { border-color: #21262d; vertical-align: middle; white-space: nowrap; font-size: 0.88rem; }
@@ -239,18 +242,18 @@
             <table class="table table-hover mb-0" id="ftcTable">
               <thead>
                 <tr>
-                  <th id="col-group1-header" style="min-width:150px;">Days from FTC</th>
-                  <th class="text-num"># FTC</th>
-                  <th class="text-num"># Traders</th>
-                  <th class="text-num">Traders %</th>
-                  <th class="text-num"># Redepositors</th>
-                  <th class="text-num">% STD</th>
-                  <th class="text-num">$ Deposit</th>
-                  <th class="text-num">$ Withdrawal</th>
-                  <th class="text-num">$ Net Deposit</th>
-                  <th class="text-num">$ LTV</th>
-                  <th class="text-num">% WD</th>
-                  <th class="text-num">% WD $</th>
+                  <th id="col-group1-header" data-col="g1" style="min-width:150px;">Days from FTC</th>
+                  <th class="text-num" data-col="ftc"># FTC</th>
+                  <th class="text-num" data-col="traders"># Traders</th>
+                  <th class="text-num" data-col="traders_pct">Traders %</th>
+                  <th class="text-num" data-col="rdp"># Redepositors</th>
+                  <th class="text-num" data-col="pct_std">% STD</th>
+                  <th class="text-num" data-col="deposit">$ Deposit</th>
+                  <th class="text-num" data-col="withdrawal">$ Withdrawal</th>
+                  <th class="text-num" data-col="net_deposit">$ Net Deposit</th>
+                  <th class="text-num" data-col="ltv">$ LTV</th>
+                  <th class="text-num" data-col="pct_wd_clients">% WD</th>
+                  <th class="text-num" data-col="pct_wd_usd">% WD $</th>
                 </tr>
               </thead>
               <tbody id="ftcBody">
@@ -298,6 +301,7 @@
 
   let lastData    = null;
   let expandState = {};
+  let sortState   = { col: null, dir: 1 }; // dir: 1=asc, -1=desc
 
   const GROUP_LABELS = {
     'days_from_ftc':          'Days from FTC',
@@ -364,6 +368,24 @@
     return rows;
   }
 
+  function sortedRows(rows) {
+    if (!sortState.col) return rows;
+    const col = sortState.col, dir = sortState.dir;
+    return [...rows].sort((a, b) => {
+      const av = a[col] ?? '', bv = b[col] ?? '';
+      if (col === 'g1' || col === 'g2') return dir * String(av).localeCompare(String(bv));
+      return dir * (Number(av) - Number(bv));
+    });
+  }
+
+  function updateSortHeaders() {
+    document.querySelectorAll('#ftcTable thead th').forEach(th => {
+      th.classList.remove('sort-asc', 'sort-desc');
+      if (th.dataset.col === sortState.col)
+        th.classList.add(sortState.dir === 1 ? 'sort-asc' : 'sort-desc');
+    });
+  }
+
   function renderTable() {
     if (!lastData) return;
     const isMatrix = lastData.group2 !== 'none';
@@ -375,8 +397,10 @@
     // Show/hide matrix controls
     document.getElementById('matrix-controls').style.display = isMatrix ? 'flex' : 'none';
 
-    const rows = getFilteredRows();
-    const grand = aggRows(rows);
+    updateSortHeaders();
+
+    const rows = sortedRows(getFilteredRows());
+    const grand = aggRows(getFilteredRows());
     let html = `<tr class="row-grand"><td>Grand Total</td>${dataCells(grand)}</tr>`;
 
     if (!isMatrix) {
@@ -475,6 +499,7 @@
         }
         lastData    = data;
         expandState = {};
+        sortState   = { col: null, dir: 1 };
         renderTable();
         if (!silent) document.getElementById('appliedDate').textContent = `End date: ${data.end_date}`;
       })
@@ -562,6 +587,20 @@
 
   loadOptions();
   loadData();
+
+  // Column sort
+  document.querySelectorAll('#ftcTable thead th[data-col]').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.col;
+      if (sortState.col === col) {
+        sortState.dir *= -1;
+      } else {
+        sortState.col = col;
+        sortState.dir = col === 'g1' ? 1 : -1; // default: text asc, numbers desc
+      }
+      renderTable();
+    });
+  });
 
   // Filter collapse
   (function(){
