@@ -11,7 +11,10 @@ _TZ = ZoneInfo("Europe/Nicosia")
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
-_country_map_cache = None
+_country_map_cache    = None
+_region_map_cache     = None
+_ret_status_cache     = None
+_sales_status_cache   = None
 
 def _get_country_map() -> dict:
     global _country_map_cache
@@ -22,6 +25,45 @@ def _get_country_map() -> dict:
         result = get_country_map()
         if result:
             _country_map_cache = result
+        return result or {}
+    except Exception:
+        return {}
+
+def _get_region_map() -> dict:
+    global _region_map_cache
+    if _region_map_cache:
+        return _region_map_cache
+    try:
+        from app.db.mssql_conn import get_country_region_map
+        result = get_country_region_map()
+        if result:
+            _region_map_cache = result
+        return result or {}
+    except Exception:
+        return {}
+
+def _get_ret_status_map() -> dict:
+    global _ret_status_cache
+    if _ret_status_cache:
+        return _ret_status_cache
+    try:
+        from app.db.mssql_conn import get_ret_status_map
+        result = get_ret_status_map()
+        if result:
+            _ret_status_cache = result
+        return result or {}
+    except Exception:
+        return {}
+
+def _get_sales_status_map() -> dict:
+    global _sales_status_cache
+    if _sales_status_cache:
+        return _sales_status_cache
+    try:
+        from app.db.mssql_conn import get_sales_status_map
+        result = get_sales_status_map()
+        if result:
+            _sales_status_cache = result
         return result or {}
     except Exception:
         return {}
@@ -85,6 +127,10 @@ _DIMS = {
     "age_group":              {"val": _AGE_GROUP_VAL,                                             "sort": _AGE_GROUP_SORT, "cu": False, "camp": False},
     "sales_client_potential": {"val": "COALESCE(ROUND(a.sales_client_potential::numeric)::int::text, '(Unassigned)')", "sort": "ROUND(a.sales_client_potential::numeric)::int", "cu": False, "camp": False},
     "country_name":           {"val": "COALESCE(a.country_iso,            '(Unassigned)')",       "sort": "NULL::int",     "cu": False, "camp": False},
+    "region":                 {"val": "COALESCE(a.country_iso,            '(Unassigned)')",       "sort": "NULL::int",     "cu": False, "camp": False},
+    "segmentation":           {"val": "COALESCE(CASE a.segmentation WHEN '1' THEN '-A' WHEN '2' THEN 'B' WHEN '3' THEN 'C' WHEN '4' THEN '+A' END, '(Unassigned)')", "sort": "COALESCE(a.segmentation::int, 99)", "cu": False, "camp": False},
+    "retention_status":       {"val": "COALESCE(a.retention_status::text, '(Unassigned)')",       "sort": "COALESCE(a.retention_status::int, 999)", "cu": False, "camp": False},
+    "sales_status":           {"val": "COALESCE(a.sales_status::text,     '(Unassigned)')",       "sort": "COALESCE(a.sales_status::int, 999)",     "cu": False, "camp": False},
 }
 
 
@@ -153,7 +199,7 @@ async def ftc_date_api(
         group2 = "none"
     has_g2 = group2 != "none"
 
-    _ck = f"ftc_v5:{end_date}:{group1}:{group2}:{agent_id}:{office}:{team}:{classification}"
+    _ck = f"ftc_v6:{end_date}:{group1}:{group2}:{agent_id}:{office}:{team}:{classification}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -314,6 +360,30 @@ async def ftc_date_api(
                     row['g1'] = cmap.get(row['g1'].strip().upper(), row['g1'])
                 if group2 == 'country_name' and row.get('g2') and row['g2'] != '(Unassigned)':
                     row['g2'] = cmap.get(row['g2'].strip().upper(), row['g2'])
+
+        if group1 == 'region' or group2 == 'region':
+            rmap = _get_region_map()
+            for row in data:
+                if group1 == 'region' and row.get('g1') and row['g1'] != '(Unassigned)':
+                    row['g1'] = rmap.get(row['g1'].strip().upper(), row['g1'])
+                if group2 == 'region' and row.get('g2') and row['g2'] != '(Unassigned)':
+                    row['g2'] = rmap.get(row['g2'].strip().upper(), row['g2'])
+
+        if group1 == 'retention_status' or group2 == 'retention_status':
+            rsmap = _get_ret_status_map()
+            for row in data:
+                if group1 == 'retention_status' and row.get('g1') and row['g1'] != '(Unassigned)':
+                    row['g1'] = rsmap.get(row['g1'], row['g1'])
+                if group2 == 'retention_status' and row.get('g2') and row['g2'] != '(Unassigned)':
+                    row['g2'] = rsmap.get(row['g2'], row['g2'])
+
+        if group1 == 'sales_status' or group2 == 'sales_status':
+            ssmap = _get_sales_status_map()
+            for row in data:
+                if group1 == 'sales_status' and row.get('g1') and row['g1'] != '(Unassigned)':
+                    row['g1'] = ssmap.get(row['g1'], row['g1'])
+                if group2 == 'sales_status' and row.get('g2') and row['g2'] != '(Unassigned)':
+                    row['g2'] = ssmap.get(row['g2'], row['g2'])
 
         total_ftc = total_rdp = total_dep = total_wd = total_wdc = total_traders = 0
         for r in data:

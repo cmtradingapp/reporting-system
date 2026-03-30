@@ -209,6 +209,43 @@ def get_country_map() -> dict:
         conn.close()
 
 
+def get_country_region_map() -> dict:
+    """Returns dict of iso2code (uppercase) → region from report.countries."""
+    conn = _get_mssql_connection()
+    try:
+        query = "SELECT iso2code, region FROM report.countries WHERE iso2code IS NOT NULL AND iso2code <> '' AND region IS NOT NULL AND region <> ''"
+        df = pd.read_sql(query, conn)
+        return {str(r['iso2code']).strip().upper(): str(r['region']).strip() for _, r in df.iterrows()}
+    except Exception:
+        return {}
+    finally:
+        conn.close()
+
+
+def get_ret_status_map() -> dict:
+    """Returns dict of status_key (str) → value from report.ant_ret_status."""
+    conn = _get_mssql_connection()
+    try:
+        df = pd.read_sql("SELECT status_key, value FROM report.ant_ret_status", conn)
+        return {str(int(r['status_key'])): str(r['value']).strip() for _, r in df.iterrows()}
+    except Exception:
+        return {}
+    finally:
+        conn.close()
+
+
+def get_sales_status_map() -> dict:
+    """Returns dict of status_key (str) → value from report.ant_sales_status."""
+    conn = _get_mssql_connection()
+    try:
+        df = pd.read_sql("SELECT status_key, value FROM report.ant_sales_status", conn)
+        return {str(int(r['status_key'])): str(r['value']).strip() for _, r in df.iterrows()}
+    except Exception:
+        return {}
+    finally:
+        conn.close()
+
+
 def get_dealio_mt4trades_full():
     """
     Generator using keyset pagination on ticket (clustered PK).
