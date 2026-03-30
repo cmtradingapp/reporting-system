@@ -19,12 +19,12 @@ async def debug_login(login: int, request: Request):
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT date::date, convertedbalance, convertedfloatingpnl, convertedequity
-                FROM dealio_daily_profit WHERE login = %s ORDER BY date DESC LIMIT 5
+                FROM dealio_daily_profitss WHERE login = %s ORDER BY date DESC LIMIT 5
             """, (login,))
             old = [{"date": str(r[0]), "bal": float(r[1] or 0), "flt": float(r[2] or 0), "eq": float(r[3] or 0)} for r in cur.fetchall()]
             cur.execute("""
                 SELECT date::date, convertedbalance, convertedfloatingpnl, convertedequity
-                FROM dealio_daily_profits WHERE login = %s ORDER BY date DESC LIMIT 5
+                FROM dealio_daily_profitss WHERE login = %s ORDER BY date DESC LIMIT 5
             """, (login,))
             new = [{"date": str(r[0]), "bal": float(r[1] or 0), "flt": float(r[2] or 0), "eq": float(r[3] or 0)} for r in cur.fetchall()]
             cur.execute("""
@@ -110,16 +110,16 @@ async def eez_old_api(request: Request):
                 ds.login,
                 GREATEST(0, COALESCE(ds.convertedequity, 0))                                          AS daily_start_equity,
                 GREATEST(0, COALESCE(ds.convertedbalance, 0) + COALESCE(ds.convertedfloatingpnl, 0)) AS daily_start_net_equity
-            FROM dealio_daily_profit ds
+            FROM dealio_daily_profits ds
             WHERE ds.date::date = (
-                SELECT MAX(date::date) FROM dealio_daily_profit
+                SELECT MAX(date::date) FROM dealio_daily_profits
                 WHERE date::date < DATE_TRUNC('month', CURRENT_DATE)
             )
         ),
         latest_equity AS (
             SELECT DISTINCT ON (login)
                 login, convertedbalance, convertedfloatingpnl, convertedequity
-            FROM dealio_daily_profit
+            FROM dealio_daily_profits
             WHERE EXTRACT(YEAR  FROM date) = EXTRACT(YEAR  FROM CURRENT_DATE)
               AND EXTRACT(MONTH FROM date) = EXTRACT(MONTH FROM CURRENT_DATE)
             ORDER BY login, date DESC

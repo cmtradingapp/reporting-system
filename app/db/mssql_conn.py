@@ -95,93 +95,6 @@ def get_targets() -> pd.DataFrame:
         conn.close()
 
 
-_DEALIO_EXCLUDED_SYMBOLS = (
-    "'ZeroingZAR','ZeroingUSD','ZeroingNGN','ZeroingKES',"
-    "'ZeroingJPY','ZeroingGBP','ZeroingEUR'"
-)
-
-
-def get_dealio_mt4trades(hours: int = 24) -> pd.DataFrame:
-    conn = _get_mssql_connection()
-    try:
-        query = f"""
-            SELECT * FROM report.dealio_mt4trades
-            WHERE symbol NOT IN ({_DEALIO_EXCLUDED_SYMBOLS})
-              AND (last_modified >= DATEADD(hour, -{hours}, GETUTCDATE())
-               OR  updated_at    >= DATEADD(hour, -{hours}, GETUTCDATE()))
-        """
-        df = pd.read_sql(query, conn)
-        return _normalize_dealio_cols(df)
-    finally:
-        conn.close()
-
-
-def get_dealio_daily_profit(hours: int = 48) -> pd.DataFrame:
-    conn = _get_mssql_connection()
-    try:
-        query = f"""
-            SELECT date, sourceid, sourcename, sourcetype, book,
-                   closedpnl, convertedclosedpnl, calculationcurrency,
-                   floatingpnl, convertedfloatingpnl, netdeposit, convertednetdeposit,
-                   equity, convertedequity, login, balance, convertedbalance,
-                   groupcurrency, conversionratio, equityprevday, groupname,
-                   deltafloatingpnl, converteddeltafloatingpnl, assigned_to
-            FROM report.dealio_daily_profit
-            WHERE date >= DATEADD(hour, -{hours}, GETUTCDATE())
-        """
-        return pd.read_sql(query, conn)
-    finally:
-        conn.close()
-
-
-def get_dealio_daily_profit_full():
-    """Generator using keyset pagination on (date, login)."""
-    last_date = "1970-01-01"
-    last_login = 0
-    while True:
-        conn = _get_mssql_connection()
-        try:
-            query = f"""
-                SELECT TOP {CHUNK_SIZE}
-                       date, sourceid, sourcename, sourcetype, book,
-                       closedpnl, convertedclosedpnl, calculationcurrency,
-                       floatingpnl, convertedfloatingpnl, netdeposit, convertednetdeposit,
-                       equity, convertedequity, login, balance, convertedbalance,
-                       groupcurrency, conversionratio, equityprevday, groupname,
-                       deltafloatingpnl, converteddeltafloatingpnl, assigned_to
-                FROM report.dealio_daily_profit
-                WHERE date > '{last_date}'
-                   OR (date = '{last_date}' AND login > {last_login})
-                ORDER BY date, login
-            """
-            df = pd.read_sql(query, conn)
-        finally:
-            conn.close()
-
-        if df.empty:
-            break
-
-        last_date = str(df["date"].max())[:10]
-        last_login = int(df["login"].max())
-        yield df
-
-
-def get_pnl_cash_monthly(month_start: str, month_end_exclusive: str) -> float:
-    """Sum convertedclosedpnl + converteddeltafloatingpnl from MSSQL for the given date range."""
-    conn = _get_mssql_connection()
-    try:
-        query = f"""
-            SELECT COALESCE(SUM(COALESCE(convertedclosedpnl, 0) + COALESCE(converteddeltafloatingpnl, 0)), 0)
-            FROM report.dealio_daily_profit
-            WHERE CAST(date AS DATE) >= '{month_start}'
-              AND CAST(date AS DATE) < '{month_end_exclusive}'
-        """
-        df = pd.read_sql(query, conn)
-        return float(df.iloc[0, 0] or 0)
-    finally:
-        conn.close()
-
-
 def get_client_classification() -> pd.DataFrame:
     conn = _get_mssql_connection()
     try:
@@ -244,35 +157,6 @@ def get_sales_status_map() -> dict:
         return {}
     finally:
         conn.close()
-
-
-def get_dealio_mt4trades_full():
-    """
-    Generator using keyset pagination on ticket (clustered PK).
-    Opens a fresh connection per chunk — safe for 10M+ rows regardless
-    of pymssql client-side buffering behaviour.
-    """
-    last_ticket = 0
-    while True:
-        conn = _get_mssql_connection()
-        try:
-            query = f"""
-                SELECT TOP {CHUNK_SIZE} *
-                FROM report.dealio_mt4trades
-                WHERE ticket > {last_ticket}
-                  AND symbol NOT IN ({_DEALIO_EXCLUDED_SYMBOLS})
-                ORDER BY ticket
-            """
-            df = pd.read_sql(query, conn)
-        finally:
-            conn.close()
-
-        if df.empty:
-            break
-
-        df = _normalize_dealio_cols(df)
-        last_ticket = int(df["ticket"].max())
-        yield df
 
 
 def get_bonus_transactions(hours: int = 24) -> pd.DataFrame:
