@@ -15,6 +15,21 @@ templates = Jinja2Templates(directory="app/templates")
 VALID_PERIODS = {"day", "month", "year"}
 PERIOD_LABELS = {"day": "Day", "month": "Month", "year": "Year", "none": ""}
 
+# Base filters applied to all accounts-level queries
+_ACCT_FILTERS = (
+    " AND a.accountid IS NOT NULL AND TRIM(a.accountid::text) != ''"
+    " AND a.createdtime::date >= '2024-01-01'"
+    " AND (a.assigned_to IS NULL OR a.assigned_to NOT IN ("
+    "  SELECT id FROM crm_users"
+    "  WHERE TRIM(COALESCE(agent_name, full_name, '')) ILIKE 'test%%'"
+    "     OR TRIM(COALESCE(agent_name, full_name, '')) ILIKE 'duplicated%%'))"
+)
+# Same but without the assigned_to check (for transaction queries where agent is already filtered via u)
+_TXN_ACCT_FILTERS = (
+    " AND a.accountid IS NOT NULL AND TRIM(a.accountid::text) != ''"
+    " AND a.createdtime::date >= '2024-01-01'"
+)
+
 VALID_GROUPS = {
     "marketing_group":      "COALESCE(c.marketing_group, '(Unassigned)')",
     "campaign_legacy_id":   "COALESCE(c.campaign_legacy_id, '(Unassigned)')",
@@ -298,6 +313,7 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
                     {camp_join}
                     {kpi_cu_join}
                     WHERE a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)
+                    {_ACCT_FILTERS}
                     {extra_where}
                     {camp_filter_where}
                 """, base_p)
@@ -340,7 +356,7 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
                     WHERE a.client_qualification_date IS NOT NULL
                       AND a.is_test_account = 0
                       AND (a.is_demo = 0 OR a.is_demo IS NULL)
-                """, {"date_from": date_from, "date_to_excl": date_to_exclusive, "date_to": date_to})
+                """ + _ACCT_FILTERS, {"date_from": date_from, "date_to_excl": date_to_exclusive, "date_to": date_to})
                 row = cur.fetchone()
                 ftc_mtd   = int(row[0] or 0) if row else 0
                 ftc_daily = int(row[1] or 0) if row else 0
@@ -393,6 +409,7 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
                     WHERE a.client_qualification_date IS NOT NULL
                       AND a.is_test_account = 0
                       AND (a.is_demo = 0 OR a.is_demo IS NULL)
+                    {_ACCT_FILTERS}
                     {class_where}
                     {camp_filter_where}
                 """, base_p)
@@ -413,6 +430,7 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
                   AND t.transactiontype IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
                   AND t.vtigeraccountid IS NOT NULL
                   AND a.is_test_account = 0
+                  {_TXN_ACCT_FILTERS}
                   AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
                   AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
                   AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'
@@ -462,7 +480,7 @@ async def campaign_performance_api(
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
     def _ck_part(v): return ','.join(sorted(v)) if v else ''
-    _ck = (f"camp_perf_v6:{date_from}:{date_to}:{f_classification}:{q_date_from}:{q_date_to}"
+    _ck = (f"camp_perf_v7:{date_from}:{date_to}:{f_classification}:{q_date_from}:{q_date_to}"
            f":{_ck_part(f_mkt_group)}:{_ck_part(f_legacy_id)}:{_ck_part(f_campaign_name)}"
            f":{_ck_part(f_channel)}:{_ck_part(f_sub_channel)}:{_ck_part(f_affiliate)}"
            f":{_ck_part(f_country)}:{_ck_part(f_office)}:{_ck_part(f_agent)}:{_ck_part(f_team)}"
@@ -679,6 +697,7 @@ def _camp_table_calc(
                 " FROM accounts a LEFT JOIN campaigns c ON SPLIT_PART(a.campaign, '.', 1) = c.crmid"
                 f"{extra_joins}"
                 " WHERE a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)"
+                + _ACCT_FILTERS +
                 f"{acct_date_filter}"
                 f"\n{filter_where}"
             )
@@ -724,6 +743,7 @@ def _camp_table_calc(
                 "   AND t.transactiontype IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')"
                 "   AND t.vtigeraccountid IS NOT NULL"
                 "   AND a.is_test_account = 0"
+                + _TXN_ACCT_FILTERS +
                 "   AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'"
                 "   AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'"
                 "   AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'"
@@ -864,7 +884,7 @@ async def campaign_performance_table_api(
         return JSONResponse(status_code=400, content={"detail": "Invalid period"})
 
     def _ck_part(v): return ','.join(sorted(v)) if v else ''
-    _ck = (f"camp_tbl_v8:{date_from}:{date_to}:{group1}:{group2}:{period}"
+    _ck = (f"camp_tbl_v9:{date_from}:{date_to}:{group1}:{group2}:{period}"
            f":{_ck_part(f_mkt_group)}:{_ck_part(f_legacy_id)}:{_ck_part(f_campaign_name)}:{_ck_part(f_channel)}"
            f":{_ck_part(f_sub_channel)}:{_ck_part(f_affiliate)}:{f_classification}:{ftc_groups}"
            f":{q_date_from}:{q_date_to}:{_ck_part(f_country)}:{_ck_part(f_office)}:{_ck_part(f_agent)}:{_ck_part(f_team)}"
