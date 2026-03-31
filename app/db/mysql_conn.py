@@ -1,25 +1,34 @@
 import pymysql
 import pymysql.cursors
 import pandas as pd
+import time
 from app.config import MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DB
 
 CHUNK_SIZE = 50_000
 
 
-def _get_connection(streaming: bool = False):
+def _get_connection(streaming: bool = False, retries: int = 5, retry_delay: float = 5.0):
     kwargs = dict(
         host=MYSQL_HOST,
         port=MYSQL_PORT,
         user=MYSQL_USER,
         password=MYSQL_PASSWORD,
         database=MYSQL_DB if MYSQL_DB else None,
-        connect_timeout=10,
+        connect_timeout=15,
         read_timeout=3600,
         ssl={"ssl": True},
     )
     if streaming:
         kwargs["cursorclass"] = pymysql.cursors.SSDictCursor
-    return pymysql.connect(**kwargs)
+    last_exc = None
+    for attempt in range(1, retries + 1):
+        try:
+            return pymysql.connect(**kwargs)
+        except Exception as e:
+            last_exc = e
+            if attempt < retries:
+                time.sleep(retry_delay)
+    raise last_exc
 
 
 def get_operators() -> pd.DataFrame:
