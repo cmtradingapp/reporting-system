@@ -697,13 +697,7 @@ def upsert_accounts(df: pd.DataFrame):
         for _, row in df.iterrows()
     ]
     update_cols = [c for c in cols if c != "accountid"]
-    update_set = ", ".join(
-        # Never move qualification date to a later date — keep the earliest known value
-        "client_qualification_date = COALESCE(LEAST(EXCLUDED.client_qualification_date, accounts.client_qualification_date), EXCLUDED.client_qualification_date, accounts.client_qualification_date)"
-        if c == "client_qualification_date"
-        else f"{c} = EXCLUDED.{c}"
-        for c in update_cols
-    )
+    update_set = ", ".join(f"{c} = EXCLUDED.{c}" for c in update_cols)
     col_list = ", ".join(cols)
     sql = f"""
         INSERT INTO accounts ({col_list})
