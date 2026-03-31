@@ -242,12 +242,17 @@
     <i class="bi bi-bar-chart-fill text-success me-2"></i>Reporting System
   </div>
   <nav class="sidebar-nav">
+    {% set _ap = current_user.allowed_pages_list %}
+    {% if _ap is none or 'performance' in _ap %}
     <a href="/performance" class="sidebar-link"><i class="bi bi-trophy"></i>Performance Report</a>
-    {% if current_user.role in ('admin', 'marketing', 'general') %}
+    {% endif %}
+    {% if (_ap is none and current_user.role in ('admin', 'marketing', 'general')) or (_ap is not none and 'marketing' in _ap) %}
     <a href="/campaign-performance" class="sidebar-link"><i class="bi bi-graph-up-arrow"></i>Marketing Performance</a>
     {% endif %}
+    {% if _ap is none or 'agent_bonuses' in _ap %}
     <a href="/agent-bonuses" class="sidebar-link active"><i class="bi bi-cash-stack"></i>Agent Bonuses</a>
-    {% if current_user.role in ('admin', 'general') %}
+    {% endif %}
+    {% if (_ap is none and current_user.role in ('admin', 'general')) or (_ap is not none and 'dashboard' in _ap) %}
     <a href="/dashboard" class="sidebar-link"><i class="bi bi-speedometer2"></i>Dashboard</a>
     {% endif %}
     {% if current_user.role == 'admin' %}

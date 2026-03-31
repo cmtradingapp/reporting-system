@@ -79,12 +79,17 @@
     <i class="bi bi-bar-chart-fill text-success me-2"></i>Reporting System
   </div>
   <nav class="sidebar-nav">
+    {% set _ap = current_user.allowed_pages_list %}
+    {% if _ap is none or 'performance' in _ap %}
     <a href="/performance" class="sidebar-link"><i class="bi bi-trophy"></i>Performance Report</a>
-    {% if current_user.role in ('admin', 'marketing', 'general') %}
+    {% endif %}
+    {% if (_ap is none and current_user.role in ('admin', 'marketing', 'general')) or (_ap is not none and 'marketing' in _ap) %}
     <a href="/campaign-performance" class="sidebar-link"><i class="bi bi-graph-up-arrow"></i>Marketing Performance</a>
     {% endif %}
+    {% if _ap is none or 'agent_bonuses' in _ap %}
     <a href="/agent-bonuses" class="sidebar-link"><i class="bi bi-cash-stack"></i>Agent Bonuses</a>
-    {% if current_user.role in ('admin', 'general') %}
+    {% endif %}
+    {% if (_ap is none and current_user.role in ('admin', 'general')) or (_ap is not none and 'dashboard' in _ap) %}
     <a href="/dashboard" class="sidebar-link"><i class="bi bi-speedometer2"></i>Dashboard</a>
     {% endif %}
     {% if current_user.role == 'admin' %}
@@ -229,6 +234,15 @@
           <input type="hidden" id="add-crm-user-id" />
           <div id="add-crm-selected" class="text-success mt-1" style="font-size:0.85rem;"></div>
         </div>
+        <div class="mb-3">
+          <label class="form-label">Page Access <span style="font-size:0.75rem;color:#8b949e;">(leave all unchecked for role-based defaults)</span></label>
+          <div style="display:flex;flex-wrap:wrap;gap:8px 20px;padding:8px 12px;background:#0f1117;border:1px solid #30363d;border-radius:8px;">
+            <label style="cursor:pointer;font-size:0.85rem;"><input type="checkbox" id="add-ap-performance" class="me-1">Performance Report</label>
+            <label style="cursor:pointer;font-size:0.85rem;"><input type="checkbox" id="add-ap-marketing" class="me-1">Marketing Performance</label>
+            <label style="cursor:pointer;font-size:0.85rem;"><input type="checkbox" id="add-ap-agent_bonuses" class="me-1">Agent Bonuses</label>
+            <label style="cursor:pointer;font-size:0.85rem;"><input type="checkbox" id="add-ap-dashboard" class="me-1">Dashboard</label>
+          </div>
+        </div>
         <div class="text-secondary" style="font-size:0.8rem;">Default password: <code>Welcome1!</code> (user must change on first login)</div>
       </div>
       <div class="modal-footer">
@@ -293,6 +307,15 @@
           <div id="edit-crm-results" class="mt-1" style="background:#0f1117; border:1px solid #30363d; border-radius:8px; display:none; max-height:160px; overflow-y:auto;"></div>
           <input type="hidden" id="edit-crm-user-id" />
           <div id="edit-crm-selected" class="text-success mt-1" style="font-size:0.85rem;"></div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Page Access <span style="font-size:0.75rem;color:#8b949e;">(leave all unchecked for role-based defaults)</span></label>
+          <div style="display:flex;flex-wrap:wrap;gap:8px 20px;padding:8px 12px;background:#0f1117;border:1px solid #30363d;border-radius:8px;">
+            <label style="cursor:pointer;font-size:0.85rem;"><input type="checkbox" id="edit-ap-performance" class="me-1">Performance Report</label>
+            <label style="cursor:pointer;font-size:0.85rem;"><input type="checkbox" id="edit-ap-marketing" class="me-1">Marketing Performance</label>
+            <label style="cursor:pointer;font-size:0.85rem;"><input type="checkbox" id="edit-ap-agent_bonuses" class="me-1">Agent Bonuses</label>
+            <label style="cursor:pointer;font-size:0.85rem;"><input type="checkbox" id="edit-ap-dashboard" class="me-1">Dashboard</label>
+          </div>
         </div>
       </div>
       <div class="modal-footer">
@@ -378,6 +401,12 @@
   setupCrmSearch('add-crm-search', 'add-crm-results', 'add-crm-user-id', 'add-crm-selected');
   setupCrmSearch('edit-crm-search', 'edit-crm-results', 'edit-crm-user-id', 'edit-crm-selected');
 
+  const _AP_KEYS = ['performance', 'marketing', 'agent_bonuses', 'dashboard'];
+  function getCheckedPages(prefix) {
+    const checked = _AP_KEYS.filter(p => document.getElementById(`${prefix}-ap-${p}`).checked);
+    return checked.length > 0 ? checked : null;
+  }
+
   // Create user
   function createUser() {
     const payload = {
@@ -385,6 +414,7 @@
       email: document.getElementById('add-email').value.trim(),
       role: document.getElementById('add-role').value,
       crm_user_id: document.getElementById('add-crm-user-id').value || null,
+      allowed_pages: getCheckedPages('add'),
     };
     if (!payload.full_name || !payload.email) { toast('Name and email are required', 'danger'); return; }
     fetch('/api/admin/users', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) })
@@ -405,6 +435,9 @@
     document.getElementById('edit-active').value = u.is_active;
     document.getElementById('edit-crm-user-id').value = u.crm_user_id || '';
     document.getElementById('edit-crm-selected').textContent = u.crm_name ? `✓ Linked: ${u.crm_name}` : '';
+    let apList = [];
+    try { apList = JSON.parse(u.allowed_pages || '[]'); } catch(e) { apList = []; }
+    _AP_KEYS.forEach(p => { document.getElementById(`edit-ap-${p}`).checked = apList.includes(p); });
     new bootstrap.Modal(document.getElementById('editUserModal')).show();
   }
 
@@ -416,6 +449,7 @@
       role: document.getElementById('edit-role').value,
       is_active: parseInt(document.getElementById('edit-active').value),
       crm_user_id: document.getElementById('edit-crm-user-id').value || null,
+      allowed_pages: getCheckedPages('edit'),
     };
     fetch(`/api/admin/users/${id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) })
       .then(r => r.json())

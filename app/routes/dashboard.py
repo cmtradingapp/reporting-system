@@ -35,7 +35,10 @@ async def dashboard_page(request: Request):
     user = await get_current_user(request)
     if isinstance(user, RedirectResponse):
         return user
-    if user.get("role") not in ("admin", "general"):
+    ap = user.get("allowed_pages_list")
+    if ap is not None and "dashboard" not in ap:
+        return RedirectResponse(url="/performance")
+    if ap is None and user.get("role") not in ("admin", "general"):
         return RedirectResponse(url="/performance")
     return templates.TemplateResponse("dashboard.html", {"request": request, "current_user": user})
 

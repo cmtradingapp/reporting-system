@@ -854,6 +854,9 @@ def ensure_auth_table():
             created_at            TIMESTAMP DEFAULT NOW(),
             last_login            TIMESTAMP
         );
+        ALTER TABLE auth_users ADD COLUMN IF NOT EXISTS allowed_pages TEXT NULL;
+        UPDATE auth_users SET allowed_pages = '["performance","agent_bonuses"]'
+            WHERE email = 'despina.n@cmtrading.com' AND allowed_pages IS NULL;
         CREATE INDEX IF NOT EXISTS idx_auth_users_email ON auth_users(email);
         CREATE INDEX IF NOT EXISTS idx_auth_users_crm_user_id ON auth_users(crm_user_id);
     """
@@ -900,9 +903,10 @@ def get_auth_user_by_email(email: str) -> dict | None:
 
 
 def get_auth_user_by_id(user_id: int) -> dict | None:
+    import json as _json
     sql = """
         SELECT a.id, a.crm_user_id, a.email, a.full_name, a.password_hash, a.role,
-               a.is_active, a.force_password_change, c.department_
+               a.is_active, a.force_password_change, c.department_, a.allowed_pages
         FROM auth_users a
         LEFT JOIN crm_users c ON c.id = a.crm_user_id
         WHERE a.id = %s
@@ -914,11 +918,18 @@ def get_auth_user_by_id(user_id: int) -> dict | None:
             row = cur.fetchone()
             if row is None:
                 return None
+            ap_raw = row[9]
+            try:
+                ap_list = _json.loads(ap_raw) if ap_raw else None
+            except Exception:
+                ap_list = None
             return {
                 'id': row[0], 'crm_user_id': row[1], 'email': row[2],
                 'full_name': row[3], 'password_hash': row[4], 'role': row[5],
                 'is_active': row[6], 'force_password_change': row[7],
                 'department_': row[8],
+                'allowed_pages': ap_raw,
+                'allowed_pages_list': ap_list,
             }
     finally:
         conn.close()
@@ -939,7 +950,7 @@ def list_auth_users() -> list:
         SELECT
             a.id, a.crm_user_id, a.email, a.full_name, a.role,
             a.is_active, a.force_password_change, a.created_at, a.last_login,
-            COALESCE(c.agent_name, c.full_name) AS crm_name
+            COALESCE(c.agent_name, c.full_name) AS crm_name, a.allowed_pages
         FROM auth_users a
         LEFT JOIN crm_users c ON c.id = a.crm_user_id
         ORDER BY a.id
@@ -956,6 +967,7 @@ def list_auth_users() -> list:
                     'created_at': r[7].strftime('%Y-%m-%d %H:%M') if r[7] else '',
                     'last_login': r[8].strftime('%Y-%m-%d %H:%M') if r[8] else '',
                     'crm_name': r[9] or '',
+                    'allowed_pages': r[10] or '',
                 }
                 for r in rows
             ]
@@ -963,16 +975,16 @@ def list_auth_users() -> list:
         conn.close()
 
 
-def create_auth_user(email: str, full_name: str, password_hash: str, role: str, crm_user_id) -> int:
+def create_auth_user(email: str, full_name: str, password_hash: str, role: str, crm_user_id, allowed_pages: str | None = None) -> int:
     sql = """
-        INSERT INTO auth_users (email, full_name, password_hash, role, crm_user_id, force_password_change)
-        VALUES (%s, %s, %s, %s, %s, 1)
+        INSERT INTO auth_users (email, full_name, password_hash, role, crm_user_id, force_password_change, allowed_pages)
+        VALUES (%s, %s, %s, %s, %s, 1, %s)
         RETURNING id
     """
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute(sql, (email, full_name, password_hash, role, crm_user_id or None))
+            cur.execute(sql, (email, full_name, password_hash, role, crm_user_id or None, allowed_pages or None))
             new_id = cur.fetchone()[0]
         conn.commit()
         return new_id
@@ -980,16 +992,16 @@ def create_auth_user(email: str, full_name: str, password_hash: str, role: str, 
         conn.close()
 
 
-def update_auth_user(user_id: int, full_name: str, email: str, role: str, is_active: int, crm_user_id):
+def update_auth_user(user_id: int, full_name: str, email: str, role: str, is_active: int, crm_user_id, allowed_pages: str | None = None):
     sql = """
         UPDATE auth_users
-        SET full_name = %s, email = %s, role = %s, is_active = %s, crm_user_id = %s
+        SET full_name = %s, email = %s, role = %s, is_active = %s, crm_user_id = %s, allowed_pages = %s
         WHERE id = %s
     """
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute(sql, (full_name, email, role, is_active, crm_user_id or None, user_id))
+            cur.execute(sql, (full_name, email, role, is_active, crm_user_id or None, allowed_pages or None, user_id))
         conn.commit()
     finally:
         conn.close()

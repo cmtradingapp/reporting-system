@@ -6,7 +6,7 @@ Uses ON CONFLICT DO NOTHING — existing Antelope/MySQL rows are never overwritt
 
 Run:
   docker cp scripts/backfill_missing_transactions.py reporting-system-app-1:/tmp/backfill.py
-  docker exec reporting-system-app-1 python3 /tmp/backfill.py
+  docker exec reporting-system-app-1 python3 -u /tmp/backfill.py
 """
 import pymssql
 import psycopg2
@@ -20,7 +20,9 @@ MSSQL = dict(server='cmtmainserver.database.windows.net', port='1433',
 PG    = dict(host='127.0.0.1', port=5432, user='postgres',
              password='8PpVuUasBVR85T7WuAec', dbname='datawarehouse')
 
-CHUNK_SIZE  = 5000
+CHUNK_SIZE    = 5000
+START_FROM_ID = 3163192  # Set to last printed id to resume after failure; 0 = start from beginning
+
 INSERT_COLS = [
     "mttransactionsid", "tradingaccountsid", "transaction_no", "vtigeraccountid",
     "manualorauto", "paymenttype", "transactionapproval", "amount", "creditcardlast",
@@ -46,25 +48,53 @@ INSERT_SQL = f"""
     ON CONFLICT (mttransactionsid) DO NOTHING
 """
 
-# ── 1. Get existing IDs from PostgreSQL ───────────────────────────────────────
-print("Loading existing transaction IDs from PostgreSQL...")
-pg = psycopg2.connect(**PG)
-cur = pg.cursor()
-cur.execute("SELECT mttransactionsid FROM transactions")
-existing_ids = set(int(r[0]) for r in cur.fetchall() if r[0] is not None)
-pg.close()
-print(f"  Existing rows: {len(existing_ids):,}")
+SMALLINT_COLS = {'ftd', 'is_frd', 'deleted', 'server_id', 'manualorauto',
+                 'original_owner_department', 'need_revise', 'fee_included'}
+VARCHAR_LIMITS = {
+    'transaction_no': 100, 'paymenttype': 100, 'transactionapproval': 100,
+    'transactiontype': 100, 'login': 100, 'platform': 100, 'cardtype': 100,
+    'cvv2pin': 100, 'expmon': 20, 'expyear': 20, 'server': 100,
+    'expiration': 100, 'actionok': 100, 'cleared_by': 100,
+    'transaction_source': 100, 'currency_id': 20, 'bank_country_id': 20,
+    'bank_state': 100, 'bank_city': 100, 'swift': 100,
+    'chb_type': 100, 'chb_status': 100, 'cellexpert': 100,
+    'client_source': 100, 'iban': 100, 'deposifromip': 50,
+    'creditcardlast': 50, 'ticket': 100, 'payment_method_id': 100,
+    'expiration_card': 20, 'granted_by': 100, 'compliance_status': 100,
+    'ftd_owner': 100, 'finance_status': 100, 'session_id': 100,
+    'gateway_name': 100, 'payment_subtype': 100, 'legacy_mtt': 100,
+    'fee_type': 100, 'transaction_promo': 100, 'assisted_by': 100,
+    'deposit_ip': 50,
+}
 
-# ── 2. Stream missing rows from MSSQL in chunks ───────────────────────────────
-print("Streaming missing transactions from MSSQL...")
-total_inserted = 0
-last_id = 0
-start = time.time()
 
-while True:
-    mc = pymssql.connect(**MSSQL)
-    cur_m = mc.cursor(as_dict=True)
-    cur_m.execute(f"""
+def _val(r, c):
+    v = r.get(c)
+    if v is None:
+        return None
+    if isinstance(v, str) and v.strip() == '':
+        return None
+    if isinstance(v, bytes) and v.strip() == b'':
+        return None
+    if isinstance(v, bool):
+        return int(v)
+    if c in SMALLINT_COLS:
+        try:
+            return int(v)
+        except (TypeError, ValueError):
+            return None
+    if c in VARCHAR_LIMITS and isinstance(v, str):
+        return v[:VARCHAR_LIMITS[c]]
+    return v
+
+
+def fetch_chunk_with_retry(last_id):
+    """Fetch one chunk from MSSQL with up to 5 retries on network errors."""
+    for attempt in range(1, 6):
+        try:
+            mc = pymssql.connect(**MSSQL)
+            cur_m = mc.cursor(as_dict=True)
+            cur_m.execute(f"""
         SELECT TOP {CHUNK_SIZE}
             mttransactionsid, tradingaccountsid, transaction_no, vtigeraccountid,
             NULL AS manualorauto, NULL AS paymenttype,
@@ -93,8 +123,41 @@ while True:
           AND usdamount < 10000000
         ORDER BY mttransactionsid
     """)
-    chunk = cur_m.fetchall()
-    mc.close()
+            chunk = cur_m.fetchall()
+            mc.close()
+            return chunk
+        except Exception as e:
+            print(f"  MSSQL error on attempt {attempt}/5: {e}", flush=True)
+            try:
+                mc.close()
+            except Exception:
+                pass
+            if attempt < 5:
+                print(f"  Retrying in 15s...", flush=True)
+                time.sleep(15)
+            else:
+                print(f"\nFATAL: All 5 attempts failed at id={last_id:,}.", flush=True)
+                print(f"  To resume, set START_FROM_ID = {last_id} and re-run.", flush=True)
+                sys.exit(1)
+
+
+# ── 1. Get existing IDs from PostgreSQL ───────────────────────────────────────
+print("Loading existing transaction IDs from PostgreSQL...", flush=True)
+pg = psycopg2.connect(**PG)
+cur = pg.cursor()
+cur.execute("SELECT mttransactionsid FROM transactions")
+existing_ids = set(int(r[0]) for r in cur.fetchall() if r[0] is not None)
+pg.close()
+print(f"  Existing rows: {len(existing_ids):,}", flush=True)
+
+# ── 2. Stream missing rows from MSSQL in chunks ───────────────────────────────
+print(f"Streaming missing transactions from MSSQL (starting from id={START_FROM_ID:,})...", flush=True)
+total_inserted = 0
+last_id = START_FROM_ID
+start = time.time()
+
+while True:
+    chunk = fetch_chunk_with_retry(last_id)
 
     if not chunk:
         break
@@ -105,43 +168,6 @@ while True:
     missing = [r for r in chunk if int(r['mttransactionsid']) not in existing_ids]
 
     if missing:
-        SMALLINT_COLS = {'ftd', 'is_frd', 'deleted', 'server_id', 'manualorauto',
-                         'original_owner_department', 'need_revise', 'fee_included'}
-        VARCHAR_LIMITS = {
-            'transaction_no': 100, 'paymenttype': 100, 'transactionapproval': 100,
-            'transactiontype': 100, 'login': 100, 'platform': 100, 'cardtype': 100,
-            'cvv2pin': 100, 'expmon': 20, 'expyear': 20, 'server': 100,
-            'expiration': 100, 'actionok': 100, 'cleared_by': 100,
-            'transaction_source': 100, 'currency_id': 20, 'bank_country_id': 20,
-            'bank_state': 100, 'bank_city': 100, 'swift': 100,
-            'chb_type': 100, 'chb_status': 100, 'cellexpert': 100,
-            'client_source': 100, 'iban': 100, 'deposifromip': 50,
-            'creditcardlast': 50, 'ticket': 100, 'payment_method_id': 100,
-            'expiration_card': 20, 'granted_by': 100, 'compliance_status': 100,
-            'ftd_owner': 100, 'finance_status': 100, 'session_id': 100,
-            'gateway_name': 100, 'payment_subtype': 100, 'legacy_mtt': 100,
-            'fee_type': 100, 'transaction_promo': 100, 'assisted_by': 100,
-            'deposit_ip': 50,
-        }
-
-        def _val(r, c):
-            v = r.get(c)
-            if v is None:
-                return None
-            if isinstance(v, str) and v.strip() == '':
-                return None
-            if isinstance(v, bytes) and v.strip() == b'':
-                return None
-            if isinstance(v, bool):
-                return int(v)
-            if c in SMALLINT_COLS:
-                try:
-                    return int(v)
-                except (TypeError, ValueError):
-                    return None
-            if c in VARCHAR_LIMITS and isinstance(v, str):
-                return v[:VARCHAR_LIMITS[c]]
-            return v
         rows = [tuple(_val(r, c) for c in INSERT_COLS) for r in missing]
         pg = psycopg2.connect(**PG)
         with pg.cursor() as cur_pg:
@@ -153,4 +179,4 @@ while True:
     elapsed = int(time.time() - start)
     print(f"  Processed up to id={last_id:,} | inserted={total_inserted:,} | {elapsed}s elapsed", flush=True)
 
-print(f"\nDone. Total inserted: {total_inserted:,}")
+print(f"\nDone. Total inserted: {total_inserted:,}", flush=True)

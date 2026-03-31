@@ -91,7 +91,10 @@ async def campaign_performance_page(request: Request):
     user = await get_current_user(request)
     if isinstance(user, RedirectResponse):
         return user
-    if user.get("role") not in ("admin", "marketing", "general"):
+    ap = user.get("allowed_pages_list")
+    if ap is not None and "marketing" not in ap:
+        return RedirectResponse(url="/performance", status_code=302)
+    if ap is None and user.get("role") not in ("admin", "marketing", "general"):
         return RedirectResponse(url="/performance", status_code=302)
     return templates.TemplateResponse("campaign_performance.html", {
         "request": request,
