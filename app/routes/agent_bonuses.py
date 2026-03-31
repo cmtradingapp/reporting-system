@@ -446,7 +446,7 @@ async def agent_bonuses_sales_accounts_api(request: Request, date_from: str, dat
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"bon_sales_acct_v2:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"bon_sales_acct_v3:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -503,7 +503,8 @@ async def agent_bonuses_sales_accounts_api(request: Request, date_from: str, dat
             FULL OUTER JOIN ftc_accs t ON t.accountid = f.accountid
         ),
         ftc_net AS (
-            SELECT t.vtigeraccountid AS accountid,
+            SELECT t.vtigeraccountid        AS accountid,
+                   t.original_deposit_owner AS agent_id,
                    SUM(CASE WHEN t.transactiontype IN ('Deposit','Withdrawal Cancelled') THEN  t.usdamount
                             WHEN t.transactiontype IN ('Withdrawal','Deposit Cancelled')  THEN -t.usdamount
                        END)::float AS net_usd
@@ -518,7 +519,7 @@ async def agent_bonuses_sales_accounts_api(request: Request, date_from: str, dat
               AND (a.client_qualification_date >= t.confirmation_time::date OR t.ftd = 1)
               AND a.is_test_account = 0
               AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
-            GROUP BY t.vtigeraccountid
+            GROUP BY t.vtigeraccountid, t.original_deposit_owner
         ),
         agent_totals AS (
             SELECT bon.agent_id,
@@ -552,7 +553,7 @@ async def agent_bonuses_sales_accounts_api(request: Request, date_from: str, dat
             COALESCE(u.status, '')                      AS status
         FROM combined c
         JOIN crm_users u ON u.id = c.agent_id
-        LEFT JOIN ftc_net fn ON fn.accountid = c.accountid
+        LEFT JOIN ftc_net fn ON fn.accountid = c.accountid AND fn.agent_id = c.agent_id
         LEFT JOIN agent_totals at ON at.agent_id = c.agent_id
         WHERE u.department_ = 'Sales'
           AND u.team = 'Conversion'
