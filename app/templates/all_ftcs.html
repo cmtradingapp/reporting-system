@@ -30,6 +30,9 @@
     .date-input { background-color: #21262d; border: 1px solid #30363d; color: #e0e0e0; border-radius: 6px; padding: 5px 10px; font-size: 0.82rem; width: 140px; }
     .date-input:focus { outline: none; border-color: #238636; }
     .date-input::-webkit-calendar-picker-indicator { filter: invert(0.7); cursor: pointer; }
+    .period-btn { background-color: #21262d; border: 1px solid #30363d; color: #8b949e; font-size: 0.82rem; padding: 5px 12px; border-radius: 6px; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+    .period-btn:hover { background-color: #2d333a; color: #c9d1d9; border-color: #484f58; }
+    .period-btn.active { background-color: rgba(35,134,54,0.25); border-color: #238636; color: #3fb950; font-weight: 600; }
     .quick-btn { background-color: #21262d; border: 1px solid #30363d; color: #8b949e; font-size: 0.78rem; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-weight: 600; transition: all 0.15s; }
     .quick-btn:hover { background-color: #2d333a; color: #c9d1d9; border-color: #484f58; }
     .quick-btn.active-quick { border-color: #388bfd; color: #388bfd; background-color: rgba(56,139,253,0.1); }
@@ -109,16 +112,41 @@
 
   <!-- Filters -->
   <div class="card p-3 mb-4">
-    <div class="d-flex flex-wrap gap-2 align-items-center">
+    <!-- Row 1: Year + Month -->
+    <div class="d-flex flex-wrap align-items-center gap-1 mb-3">
+      <span class="text-muted small me-1" style="min-width:40px">Year</span>
+      <button class="period-btn year-btn" data-year="2024">2024</button>
+      <button class="period-btn year-btn" data-year="2025">2025</button>
+      <button class="period-btn year-btn" data-year="2026">2026</button>
+      <div class="filter-sep"></div>
+      <span class="text-muted small me-1">Month</span>
+      <button class="period-btn month-btn" data-month="1">Jan</button>
+      <button class="period-btn month-btn" data-month="2">Feb</button>
+      <button class="period-btn month-btn" data-month="3">Mar</button>
+      <button class="period-btn month-btn" data-month="4">Apr</button>
+      <button class="period-btn month-btn" data-month="5">May</button>
+      <button class="period-btn month-btn" data-month="6">Jun</button>
+      <button class="period-btn month-btn" data-month="7">Jul</button>
+      <button class="period-btn month-btn" data-month="8">Aug</button>
+      <button class="period-btn month-btn" data-month="9">Sep</button>
+      <button class="period-btn month-btn" data-month="10">Oct</button>
+      <button class="period-btn month-btn" data-month="11">Nov</button>
+      <button class="period-btn month-btn" data-month="12">Dec</button>
+    </div>
+    <!-- Row 2: Date range + quick buttons + Apply + Search + Export -->
+    <div class="d-flex flex-wrap align-items-center gap-2">
+      <span class="text-muted small">From</span>
       <input type="date" id="date-from" class="date-input" />
-      <span class="text-muted small">to</span>
+      <span class="text-muted small">To</span>
       <input type="date" id="date-to" class="date-input" />
-      <button class="quick-btn" onclick="setMonth(0)">This Month</button>
-      <button class="quick-btn" onclick="setMonth(-1)">Last Month</button>
-      <button class="btn btn-sm text-white px-3 ms-1" style="background:linear-gradient(135deg,#238636,#2ea043);border:none;border-radius:6px;" onclick="loadData()">
-        <i class="bi bi-arrow-clockwise me-1"></i>Load
+      <div class="filter-sep"></div>
+      <button class="quick-btn" id="btn-today">TODAY</button>
+      <button class="quick-btn" id="btn-ystrd">YSTRD</button>
+      <div class="filter-sep"></div>
+      <button class="btn btn-sm text-white px-3" style="background:linear-gradient(135deg,#238636,#2ea043);border:none;border-radius:6px;" id="btn-apply">
+        <i class="bi bi-arrow-clockwise me-1"></i>Apply
       </button>
-      <div class="filter-sep ms-1" style="width:1px;height:28px;background-color:#30363d;margin:0 6px;"></div>
+      <div class="filter-sep"></div>
       <input type="text" id="search-input" class="form-control form-control-sm"
              style="width:180px;background:#21262d;border-color:#30363d;color:#e0e0e0;font-size:0.8rem;"
              placeholder="Search account / agent…" oninput="applyFilters()" />
@@ -160,7 +188,7 @@
   <!-- Table -->
   <div class="card p-0" style="overflow:hidden;">
     <div style="overflow-x:auto;">
-      <div style="max-height:520px;overflow-y:auto;">
+      <div style="max-height:calc(100vh - 330px);overflow-y:auto;">
         <table class="ftc-table" id="ftcs-table">
           <thead>
             <tr>
@@ -208,17 +236,17 @@
     setTimeout(() => { const el = document.getElementById(id); if (el) el.remove(); }, 4000);
   }
 
-  function setMonth(offset) {
-    const d = new Date();
-    d.setDate(1);
-    d.setMonth(d.getMonth() + offset);
-    const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0');
-    const lastDay = new Date(y, d.getMonth() + 1, 0).getDate();
-    document.getElementById('date-from').value = `${y}-${m}-01`;
-    document.getElementById('date-to').value   = `${y}-${m}-${String(lastDay).padStart(2,'0')}`;
-    document.querySelectorAll('.quick-btn').forEach(b => b.classList.remove('active-quick'));
-    event.target.classList.add('active-quick');
-  }
+  const _now = new Date();
+  let state = { year: _now.getFullYear(), month: _now.getMonth() + 1 };
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function todayStr() { return `${_now.getFullYear()}-${pad(_now.getMonth()+1)}-${pad(_now.getDate())}`; }
+  function yesterdayStr() { const d = new Date(_now); d.setDate(d.getDate()-1); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+  function firstOfMonth(y, m) { return `${y}-${pad(m)}-01`; }
+  function lastOfMonth(y, m) { const d = new Date(y, m, 0); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+  function dateToForMonth(y, m) { return (y === _now.getFullYear() && m === _now.getMonth()+1) ? todayStr() : lastOfMonth(y, m); }
+  function activateYear(year) { document.querySelectorAll('.year-btn').forEach(b => b.classList.toggle('active', parseInt(b.dataset.year) === year)); }
+  function activateMonth(month) { document.querySelectorAll('.month-btn').forEach(b => b.classList.toggle('active', parseInt(b.dataset.month) === month)); }
+  function setQuickActive(id) { ['btn-today','btn-ystrd'].forEach(i => { const el = document.getElementById(i); if(el) el.classList.toggle('active-quick', i === id); }); }
 
   async function loadData() {
     const from = document.getElementById('date-from').value;
@@ -280,17 +308,17 @@
 
     tbody.innerHTML = filtered.map((r, i) => `
       <tr>
-        <td class="text-muted">${i + 1}</td>
-        <td>${r.agent_name || '<span class="text-muted">Unassigned</span>'}</td>
-        <td class="text-muted">${r.desk || '—'}</td>
-        <td class="text-muted">${r.office_name || '—'}</td>
-        <td class="text-muted">${r.position || '—'}</td>
+        <td style="color:#8b949e;">${i + 1}</td>
+        <td>${r.agent_name || 'Unassigned'}</td>
+        <td>${r.desk || '—'}</td>
+        <td>${r.office_name || '—'}</td>
+        <td>${r.position || '—'}</td>
         <td><code style="color:#c9d1d9;">${r.accountid ?? '—'}</code></td>
         <td style="color:#3fb950;font-weight:600;">1</td>
         <td style="color:#3fb950;">${fmtUSD(r.ftc_deposit)}</td>
-        <td style="color:#f85149;">${r.ftc_wd > 0 ? fmtUSD(r.ftc_wd) : '<span class="text-muted">—</span>'}</td>
-        <td style="color:#e3b341;">${r.basic_bonus > 0 ? fmtUSD(r.basic_bonus) : '<span class="text-muted">—</span>'}</td>
-        <td style="color:#e3b341;">${r.ftd_amount_bonus > 0 ? fmtUSD(r.ftd_amount_bonus) : '<span class="text-muted">—</span>'}</td>
+        <td style="color:#f85149;">${r.ftc_wd > 0 ? fmtUSD(r.ftc_wd) : '—'}</td>
+        <td style="color:#e3b341;">${r.basic_bonus > 0 ? fmtUSD(r.basic_bonus) : '—'}</td>
+        <td style="color:#e3b341;">${r.ftd_amount_bonus > 0 ? fmtUSD(r.ftd_amount_bonus) : '—'}</td>
       </tr>`).join('');
 
     tbody.insertAdjacentHTML('beforeend', `
@@ -350,6 +378,40 @@
     XLSX.writeFile(wb, `all_ftcs_${from}_${to}.xlsx`);
   }
 
+  // Year / month button events
+  document.querySelectorAll('.year-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.year = parseInt(btn.dataset.year);
+      activateYear(state.year);
+      document.getElementById('date-from').value = firstOfMonth(state.year, state.month);
+      document.getElementById('date-to').value   = dateToForMonth(state.year, state.month);
+      loadData();
+    });
+  });
+  document.querySelectorAll('.month-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.month = parseInt(btn.dataset.month);
+      activateMonth(state.month);
+      document.getElementById('date-from').value = firstOfMonth(state.year, state.month);
+      document.getElementById('date-to').value   = dateToForMonth(state.year, state.month);
+      loadData();
+    });
+  });
+  document.getElementById('btn-today').addEventListener('click', () => {
+    document.getElementById('date-to').value = todayStr();
+    setQuickActive('btn-today');
+    loadData();
+  });
+  document.getElementById('btn-ystrd').addEventListener('click', () => {
+    document.getElementById('date-to').value = yesterdayStr();
+    setQuickActive('btn-ystrd');
+    loadData();
+  });
+  document.getElementById('btn-apply').addEventListener('click', () => {
+    setQuickActive(null);
+    loadData();
+  });
+
   // Mobile sidebar toggle
   (function(){
     var toggle = document.getElementById('sidebar-toggle');
@@ -360,15 +422,13 @@
     overlay.addEventListener('click', function(){ sb.classList.remove('open'); overlay.classList.remove('show'); });
   })();
 
-  // Default to current month on load
-  (function(){
-    const d = new Date();
-    const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0');
-    const lastDay = new Date(y, d.getMonth() + 1, 0).getDate();
-    document.getElementById('date-from').value = `${y}-${m}-01`;
-    document.getElementById('date-to').value   = `${y}-${m}-${String(lastDay).padStart(2,'0')}`;
-    loadData();
-  })();
+  // Init
+  document.getElementById('date-from').value = firstOfMonth(state.year, state.month);
+  document.getElementById('date-to').value   = todayStr();
+  activateYear(state.year);
+  activateMonth(state.month);
+  setQuickActive('btn-today');
+  loadData();
 </script>
 <script src="https://instant.page/5.2.0/instantpage.min.js" type="module"></script>
 </body>
