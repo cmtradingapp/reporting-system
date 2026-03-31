@@ -27,7 +27,6 @@ _ACCT_FILTERS = (
 # Same but without the assigned_to check (for transaction queries where agent is already filtered via u)
 _TXN_ACCT_FILTERS = (
     " AND a.accountid IS NOT NULL AND TRIM(a.accountid::text) != ''"
-    " AND a.createdtime::date >= '2024-01-01'"
 )
 
 VALID_GROUPS = {
@@ -480,7 +479,7 @@ async def campaign_performance_api(
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
     def _ck_part(v): return ','.join(sorted(v)) if v else ''
-    _ck = (f"camp_perf_v8:{date_from}:{date_to}:{f_classification}:{q_date_from}:{q_date_to}"
+    _ck = (f"camp_perf_v9:{date_from}:{date_to}:{f_classification}:{q_date_from}:{q_date_to}"
            f":{_ck_part(f_mkt_group)}:{_ck_part(f_legacy_id)}:{_ck_part(f_campaign_name)}"
            f":{_ck_part(f_channel)}:{_ck_part(f_sub_channel)}:{_ck_part(f_affiliate)}"
            f":{_ck_part(f_country)}:{_ck_part(f_office)}:{_ck_part(f_agent)}:{_ck_part(f_team)}"
