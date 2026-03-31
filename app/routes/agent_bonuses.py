@@ -446,7 +446,7 @@ async def agent_bonuses_sales_accounts_api(request: Request, date_from: str, dat
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"bon_sales_acct_v1:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"bon_sales_acct_v2:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -460,8 +460,19 @@ async def agent_bonuses_sales_accounts_api(request: Request, date_from: str, dat
     sql = """
         WITH
         ftc_accs AS (
-            SELECT a.accountid, a.assigned_to AS agent_id, 1 AS is_ftc
+            SELECT a.accountid,
+                   COALESCE(td.original_deposit_owner, a.assigned_to) AS agent_id,
+                   1 AS is_ftc
             FROM accounts a
+            LEFT JOIN (
+                SELECT DISTINCT ON (vtigeraccountid)
+                       vtigeraccountid, original_deposit_owner
+                FROM transactions
+                WHERE ftd = 1
+                  AND transactionapproval = 'Approved'
+                  AND (deleted = 0 OR deleted IS NULL)
+                ORDER BY vtigeraccountid, confirmation_time ASC
+            ) td ON td.vtigeraccountid = a.accountid
             WHERE a.client_qualification_date >= %(date_from)s
               AND a.client_qualification_date <  %(date_to_excl)s
               AND a.is_test_account = 0
