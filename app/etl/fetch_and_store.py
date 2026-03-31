@@ -1,7 +1,7 @@
 import time
 import pandas as pd
 from datetime import datetime, timedelta, timezone
-from app.db.mysql_conn import get_operators, get_users, get_accounts, get_accounts_full, get_crm_users, get_crm_users_full, get_transactions, get_transactions_full, get_trading_accounts, get_trading_accounts_full, get_campaigns
+from app.db.mysql_conn import get_operators, get_users, get_accounts, get_accounts_full, get_accounts_by_qual_date, get_crm_users, get_crm_users_full, get_transactions, get_transactions_full, get_trading_accounts, get_trading_accounts_full, get_campaigns
 from app.db.mssql_conn import get_targets, get_vtiger_users, get_client_classification, get_bonus_transactions, get_bonus_transactions_full
 from app.db.dealio_conn import get_dealio_users, get_dealio_users_full, get_dealio_trades_mt4, get_dealio_trades_mt4_full, get_dealio_trades_mt4_missing, get_dealio_daily_profits, get_dealio_daily_profits_full, get_dealio_daily_profits_daterange
 from app.db.postgres_conn import (
@@ -96,6 +96,26 @@ def run_accounts_full_etl() -> dict:
         duration_ms = int((time.time() - start) * 1000)
         log_sync("crm_accounts", cutoff, rows, duration_ms, status, error_msg)
     return {"status": status, "accounts_synced": rows, "type": "full"}
+
+
+def run_accounts_by_qual_date_etl(from_date: str) -> dict:
+    start = time.time()
+    cutoff = datetime.strptime(from_date, "%Y-%m-%d")
+    status = "success"
+    error_msg = None
+    rows = 0
+    try:
+        df = get_accounts_by_qual_date(from_date)
+        rows = len(df)
+        upsert_accounts(df)
+    except Exception as e:
+        status = "error"
+        error_msg = str(e)
+        raise
+    finally:
+        duration_ms = int((time.time() - start) * 1000)
+        log_sync("crm_accounts", cutoff, rows, duration_ms, status, error_msg)
+    return {"status": status, "accounts_synced": rows, "from_date": from_date}
 
 
 def run_users_etl(hours: int = 24) -> dict:
