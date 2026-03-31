@@ -18,8 +18,9 @@ def sync_transactions_full(background_tasks: BackgroundTasks):
 
 
 @router.post("/sync/transactions/by-confirmation-date")
-def sync_transactions_by_confirmation_date(from_date: str = "2026-01-01"):
-    return run_transactions_by_confirmation_date_etl(from_date=from_date)
+def sync_transactions_by_confirmation_date(background_tasks: BackgroundTasks, from_date: str = "2026-01-01"):
+    background_tasks.add_task(run_transactions_by_confirmation_date_etl, from_date)
+    return {"status": "started", "from_date": from_date}
 
 
 @router.post("/sync/bonus-transactions")

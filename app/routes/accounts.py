@@ -21,5 +21,6 @@ def sync_accounts_by_qual_date(from_date: str = "2026-01-01"):
 
 
 @router.post("/sync/accounts/by-created-date")
-def sync_accounts_by_created_date(from_date: str = "2026-01-01"):
-    return run_accounts_by_created_date_etl(from_date=from_date)
+def sync_accounts_by_created_date(background_tasks: BackgroundTasks, from_date: str = "2026-01-01"):
+    background_tasks.add_task(run_accounts_by_created_date_etl, from_date)
+    return {"status": "started", "from_date": from_date}
