@@ -1154,18 +1154,18 @@
 
     const totalTr = document.createElement('tr');
     totalTr.className = 'total-row';
-    totalTr.style.cssText = 'position:sticky;bottom:0;z-index:1;';
+    const stickyCell = 'position:sticky;bottom:0;background:#1c2128;';
     totalTr.innerHTML = `
-      <td style="background:#1c2128;">Total</td>
-      <td style="background:#1c2128;"></td>
-      <td style="background:#1c2128;"></td>
-      <td class="text-center" style="background:#1c2128;"><span style="color:#388bfd;font-weight:700;">${gFtd100.toLocaleString('en-US')}</span></td>
-      <td class="text-center" style="background:#1c2128;"><span style="color:#388bfd;font-weight:700;">${gFtc.toLocaleString('en-US')}</span></td>
-      <td class="text-center" style="background:#1c2128;">${netHtml(gFtcNet, true)}</td>
-      <td class="text-center" style="background:#1c2128;">${bonusDollarHtml(gBasicBonus, true)}</td>
-      <td class="text-center" style="background:#1c2128;">${bonusDollarHtml(gAmtBonus, true)}</td>
+      <td style="${stickyCell}">Total</td>
+      <td style="${stickyCell}"></td>
+      <td style="${stickyCell}"></td>
+      <td class="text-center" style="${stickyCell}"><span style="color:#388bfd;font-weight:700;">${gFtd100.toLocaleString('en-US')}</span></td>
+      <td class="text-center" style="${stickyCell}"><span style="color:#388bfd;font-weight:700;">${gFtc.toLocaleString('en-US')}</span></td>
+      <td class="text-center" style="${stickyCell}">${netHtml(gFtcNet, true)}</td>
+      <td class="text-center" style="${stickyCell}">${bonusDollarHtml(gBasicBonus, true)}</td>
+      <td class="text-center" style="${stickyCell}">${bonusDollarHtml(gAmtBonus, true)}</td>
     `;
-    tfoot.appendChild(totalTr);
+    tbody.appendChild(totalTr);
   }
 
   // ── Retention API fetch ────────────────────────────────────────────────
