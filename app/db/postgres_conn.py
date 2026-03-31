@@ -544,24 +544,29 @@ def ensure_table():
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute(sql)
-            # Seed recurring holidays for 2024 through current year + 5
-            from datetime import date
-            current_year = date.today().year
-            holiday_rows = []
-            for y in range(2024, current_year + 11):
-                holiday_rows += [
-                    (f"{y}-01-01", "New Year's Day"),
-                    (f"{y}-12-24", "Christmas Eve"),
-                    (f"{y}-12-25", "Christmas Day"),
-                    (f"{y}-12-26", "Boxing Day"),
-                    (f"{y}-12-31", "New Year's Eve"),
-                ]
-            execute_values(
-                cur,
-                "INSERT INTO public_holidays (holiday_date, description) VALUES %s ON CONFLICT (holiday_date) DO NOTHING",
-                holiday_rows,
-            )
+            # Advisory lock so only one worker runs schema migrations at startup
+            cur.execute("SELECT pg_advisory_lock(123456789)")
+            try:
+                cur.execute(sql)
+                # Seed recurring holidays for 2024 through current year + 5
+                from datetime import date
+                current_year = date.today().year
+                holiday_rows = []
+                for y in range(2024, current_year + 11):
+                    holiday_rows += [
+                        (f"{y}-01-01", "New Year's Day"),
+                        (f"{y}-12-24", "Christmas Eve"),
+                        (f"{y}-12-25", "Christmas Day"),
+                        (f"{y}-12-26", "Boxing Day"),
+                        (f"{y}-12-31", "New Year's Eve"),
+                    ]
+                execute_values(
+                    cur,
+                    "INSERT INTO public_holidays (holiday_date, description) VALUES %s ON CONFLICT (holiday_date) DO NOTHING",
+                    holiday_rows,
+                )
+            finally:
+                cur.execute("SELECT pg_advisory_unlock(123456789)")
         conn.commit()
     finally:
         conn.close()
