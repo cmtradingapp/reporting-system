@@ -21,13 +21,12 @@
     .kpi-card { background-color: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 16px 20px; }
     .kpi-value { font-size: 1.5rem; font-weight: 700; }
     .kpi-label { font-size: 0.75rem; color: #8b949e; text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
-    .table { color: #e0e0e0; }
-    .table thead th { background-color: #21262d; color: #8b949e; border-color: #30363d; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; user-select: none; white-space: nowrap; }
-    .table thead th:hover { color: #c9d1d9; }
-    .table tbody tr { border-color: #21262d; background-color: #0f1117; }
-    .table tbody tr:hover { background-color: #21262d; }
-    .table td { border-color: #21262d; vertical-align: middle; font-size: 0.83rem; }
-    .total-row td { background-color: #1c2128 !important; border-top: 2px solid #30363d; padding: 10px 14px; font-weight: 700; color: #c9d1d9; font-size: 0.88rem; position: sticky; bottom: 0; }
+    .ftc-table { width: 100%; border-collapse: collapse; }
+    .ftc-table th { background-color: #21262d; color: #8b949e; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; padding: 9px 14px; border-bottom: 1px solid #30363d; cursor: pointer; user-select: none; white-space: nowrap; text-align: left; }
+    .ftc-table th:hover { color: #c9d1d9; }
+    .ftc-table td { padding: 8px 14px; border-bottom: 1px solid #21262d; font-size: 0.85rem; vertical-align: middle; color: #e0e0e0; background-color: #0f1117; }
+    .ftc-table tbody tr:hover td { background-color: #21262d !important; }
+    .total-row td { background-color: #1c2128 !important; border-top: 2px solid #30363d !important; border-bottom: none !important; padding: 10px 14px; font-weight: 700; color: #c9d1d9; font-size: 0.88rem; position: sticky; bottom: 0; z-index: 2; }
     .date-input { background-color: #21262d; border: 1px solid #30363d; color: #e0e0e0; border-radius: 6px; padding: 5px 10px; font-size: 0.82rem; width: 140px; }
     .date-input:focus { outline: none; border-color: #238636; }
     .date-input::-webkit-calendar-picker-indicator { filter: invert(0.7); cursor: pointer; }
@@ -160,27 +159,29 @@
 
   <!-- Table -->
   <div class="card p-0" style="overflow:hidden;">
-    <div class="table-scroll">
-      <table class="table table-sm mb-0">
-        <thead>
-          <tr>
-            <th onclick="sortBy('agent_name')">#</th>
-            <th onclick="sortBy('agent_name')">Agent Name <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
-            <th onclick="sortBy('desk')">Desk <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
-            <th onclick="sortBy('office_name')">Office <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
-            <th onclick="sortBy('position')">Position <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
-            <th onclick="sortBy('accountid')">Account ID <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
-            <th onclick="sortBy('ftc')">FTC</th>
-            <th onclick="sortBy('ftc_deposit')">FTC Deposit <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
-            <th onclick="sortBy('ftc_wd')">FTC WD <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
-            <th onclick="sortBy('basic_bonus')">Basic Bonus <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
-            <th onclick="sortBy('ftd_amount_bonus')">FTD Amt Bonus <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
-          </tr>
-        </thead>
-        <tbody id="ftcs-tbody">
-          <tr><td colspan="11" class="text-center text-muted py-5">Select a date range and click Load.</td></tr>
-        </tbody>
-      </table>
+    <div style="overflow-x:auto;">
+      <div style="max-height:520px;overflow-y:auto;">
+        <table class="ftc-table" id="ftcs-table">
+          <thead>
+            <tr>
+              <th style="position:sticky;top:0;z-index:2;background:#21262d;" onclick="sortBy('agent_name')">#</th>
+              <th style="position:sticky;top:0;z-index:2;background:#21262d;min-width:140px;" onclick="sortBy('agent_name')">Agent Name <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+              <th style="position:sticky;top:0;z-index:2;background:#21262d;min-width:80px;" onclick="sortBy('desk')">Desk <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+              <th style="position:sticky;top:0;z-index:2;background:#21262d;min-width:110px;" onclick="sortBy('office_name')">Office <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+              <th style="position:sticky;top:0;z-index:2;background:#21262d;min-width:110px;" onclick="sortBy('position')">Position <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+              <th style="position:sticky;top:0;z-index:2;background:#21262d;min-width:110px;" onclick="sortBy('accountid')">Account ID <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+              <th style="position:sticky;top:0;z-index:2;background:#21262d;min-width:55px;" onclick="sortBy('ftc')">FTC</th>
+              <th style="position:sticky;top:0;z-index:2;background:#21262d;min-width:120px;" onclick="sortBy('ftc_deposit')">FTC Deposit <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+              <th style="position:sticky;top:0;z-index:2;background:#21262d;min-width:100px;" onclick="sortBy('ftc_wd')">FTC WD <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+              <th style="position:sticky;top:0;z-index:2;background:#21262d;min-width:120px;" onclick="sortBy('basic_bonus')">Basic Bonus <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+              <th style="position:sticky;top:0;z-index:2;background:#21262d;min-width:130px;" onclick="sortBy('ftd_amount_bonus')">FTD Amt Bonus <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+            </tr>
+          </thead>
+          <tbody id="ftcs-tbody">
+            <tr><td colspan="11" style="text-align:center;color:#8b949e;padding:40px;">Select a date range and click Load.</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 
