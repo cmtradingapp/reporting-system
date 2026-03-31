@@ -24,9 +24,10 @@
     .table { color: #e0e0e0; }
     .table thead th { background-color: #21262d; color: #8b949e; border-color: #30363d; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; user-select: none; white-space: nowrap; }
     .table thead th:hover { color: #c9d1d9; }
-    .table tbody tr { border-color: #21262d; }
+    .table tbody tr { border-color: #21262d; background-color: #0f1117; }
     .table tbody tr:hover { background-color: #21262d; }
     .table td { border-color: #21262d; vertical-align: middle; font-size: 0.83rem; }
+    .total-row td { background-color: #1c2128 !important; border-top: 2px solid #30363d; padding: 10px 14px; font-weight: 700; color: #c9d1d9; font-size: 0.88rem; position: sticky; bottom: 0; }
     .date-input { background-color: #21262d; border: 1px solid #30363d; color: #e0e0e0; border-radius: 6px; padding: 5px 10px; font-size: 0.82rem; width: 140px; }
     .date-input:focus { outline: none; border-color: #238636; }
     .date-input::-webkit-calendar-picker-indicator { filter: invert(0.7); cursor: pointer; }
@@ -271,6 +272,11 @@
       return;
     }
 
+    const totalDep   = filtered.reduce((s,r) => s + r.ftc_deposit, 0);
+    const totalWd    = filtered.reduce((s,r) => s + r.ftc_wd, 0);
+    const totalBonus = filtered.reduce((s,r) => s + r.basic_bonus, 0);
+    const totalAmt   = filtered.reduce((s,r) => s + r.ftd_amount_bonus, 0);
+
     tbody.innerHTML = filtered.map((r, i) => `
       <tr>
         <td class="text-muted">${i + 1}</td>
@@ -279,12 +285,24 @@
         <td class="text-muted">${r.office_name || '—'}</td>
         <td class="text-muted">${r.position || '—'}</td>
         <td><code style="color:#c9d1d9;">${r.accountid ?? '—'}</code></td>
-        <td><span class="badge" style="background:rgba(63,185,80,0.15);color:#3fb950;font-size:0.75rem;">Yes</span></td>
+        <td style="color:#3fb950;font-weight:600;">1</td>
         <td style="color:#3fb950;">${fmtUSD(r.ftc_deposit)}</td>
         <td style="color:#f85149;">${r.ftc_wd > 0 ? fmtUSD(r.ftc_wd) : '<span class="text-muted">—</span>'}</td>
         <td style="color:#e3b341;">${r.basic_bonus > 0 ? fmtUSD(r.basic_bonus) : '<span class="text-muted">—</span>'}</td>
         <td style="color:#e3b341;">${r.ftd_amount_bonus > 0 ? fmtUSD(r.ftd_amount_bonus) : '<span class="text-muted">—</span>'}</td>
       </tr>`).join('');
+
+    tbody.insertAdjacentHTML('beforeend', `
+      <tr class="total-row">
+        <td></td>
+        <td>Total</td>
+        <td></td><td></td><td></td><td></td>
+        <td style="color:#3fb950;font-weight:700;">${filtered.length.toLocaleString()}</td>
+        <td style="color:#3fb950;">${fmtUSD(totalDep)}</td>
+        <td style="color:#f85149;">${fmtUSD(totalWd)}</td>
+        <td style="color:#e3b341;">${fmtUSD(totalBonus)}</td>
+        <td style="color:#e3b341;">${fmtUSD(totalAmt)}</td>
+      </tr>`);
   }
 
   function sortBy(key) {
