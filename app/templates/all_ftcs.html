@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>All FTCs</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    body { background-color: #0f1117; color: #e0e0e0; font-family: 'Segoe UI', sans-serif; display: flex; min-height: 100vh; }
+    .sidebar { width: 220px; min-height: 100vh; background-color: #161b22; border-right: 1px solid #30363d; display: flex; flex-direction: column; position: fixed; top: 0; left: 0; bottom: 0; z-index: 100; }
+    .sidebar-brand { padding: 20px 20px 16px; border-bottom: 1px solid #30363d; font-weight: 700; font-size: 1rem; color: #e0e0e0; }
+    .sidebar-nav { padding: 12px 0; flex: 1; }
+    .sidebar-link { display: flex; align-items: center; gap: 10px; padding: 10px 20px; color: #8b949e; text-decoration: none; font-size: 0.9rem; transition: background 0.15s, color 0.15s; border-left: 3px solid transparent; }
+    .sidebar-link:hover { background-color: #21262d; color: #e0e0e0; }
+    .sidebar-link.active { color: #3fb950; border-left-color: #3fb950; background-color: rgba(63,185,80,0.08); }
+    .main-content { margin-left: 220px; flex: 1; min-width: 0; }
+    .card { background-color: #161b22; border: 1px solid #30363d; border-radius: 12px; }
+    .kpi-card { background-color: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 16px 20px; }
+    .kpi-value { font-size: 1.5rem; font-weight: 700; }
+    .kpi-label { font-size: 0.75rem; color: #8b949e; text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
+    .table { color: #e0e0e0; }
+    .table thead th { background-color: #21262d; color: #8b949e; border-color: #30363d; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; user-select: none; white-space: nowrap; }
+    .table thead th:hover { color: #c9d1d9; }
+    .table tbody tr { border-color: #21262d; }
+    .table tbody tr:hover { background-color: #21262d; }
+    .table td { border-color: #21262d; vertical-align: middle; font-size: 0.83rem; }
+    .date-input { background-color: #21262d; border: 1px solid #30363d; color: #e0e0e0; border-radius: 6px; padding: 5px 10px; font-size: 0.82rem; width: 140px; }
+    .date-input:focus { outline: none; border-color: #238636; }
+    .date-input::-webkit-calendar-picker-indicator { filter: invert(0.7); cursor: pointer; }
+    .quick-btn { background-color: #21262d; border: 1px solid #30363d; color: #8b949e; font-size: 0.78rem; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-weight: 600; transition: all 0.15s; }
+    .quick-btn:hover { background-color: #2d333a; color: #c9d1d9; border-color: #484f58; }
+    .quick-btn.active-quick { border-color: #388bfd; color: #388bfd; background-color: rgba(56,139,253,0.1); }
+    #toast-container { position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 9999; }
+    .sidebar-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:99; }
+    .sidebar-overlay.show { display:block; }
+    .sidebar-toggle { display:none; position:fixed; top:12px; left:12px; z-index:300; background:#161b22; border:1px solid #30363d; color:#e0e0e0; border-radius:8px; padding:7px 10px; cursor:pointer; font-size:1.1rem; line-height:1; }
+    .mob-topbar { display:none; }
+    @media (max-width: 767px) {
+      body { display:block; }
+      .sidebar-toggle { display:block; }
+      .sidebar { transform:translateX(-240px); transition:transform 0.25s ease; }
+      .sidebar.open { transform:translateX(0); box-shadow:4px 0 20px rgba(0,0,0,0.6); }
+      .mob-topbar { display:flex; align-items:center; justify-content:center; position:fixed; top:0; left:0; right:0; height:48px; background:#161b22; border-bottom:1px solid #30363d; z-index:150; }
+      .mob-topbar-title { font-size:0.92rem; font-weight:700; color:#e0e0e0; padding:0 44px; }
+      .main-content { margin-left:0 !important; padding-top:48px; }
+      .table-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    }
+    @media (min-width: 768px) and (max-width: 1024px) {
+      body { display:block; }
+      .sidebar-toggle { display:block; }
+      .sidebar { transform:translateX(-240px); transition:transform 0.25s ease; }
+      .sidebar.open { transform:translateX(0); box-shadow:4px 0 20px rgba(0,0,0,0.6); }
+      .mob-topbar { display:flex; align-items:center; justify-content:center; position:fixed; top:0; left:0; right:0; height:48px; background:#161b22; border-bottom:1px solid #30363d; z-index:150; }
+      .mob-topbar-title { font-size:0.95rem; font-weight:700; color:#e0e0e0; padding:0 44px; }
+      .main-content { margin-left:0 !important; padding-top:48px; }
+      .table-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="mob-topbar"><span class="mob-topbar-title">All FTCs</span></div>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+<button class="sidebar-toggle" id="sidebar-toggle"><i class="bi bi-list"></i></button>
+
+<div class="sidebar">
+  <div class="sidebar-brand"><i class="bi bi-bar-chart-fill text-success me-2"></i>Reporting System</div>
+  <nav class="sidebar-nav">
+    {% set _ap = current_user.allowed_pages_list %}
+    {% if _ap is none or 'performance' in _ap %}
+    <a href="/performance" class="sidebar-link"><i class="bi bi-trophy"></i>Performance Report</a>
+    {% endif %}
+    {% if (_ap is none and current_user.role in ('admin', 'marketing', 'general')) or (_ap is not none and 'marketing' in _ap) %}
+    <a href="/campaign-performance" class="sidebar-link"><i class="bi bi-graph-up-arrow"></i>Marketing Performance</a>
+    {% endif %}
+    {% if _ap is none or 'agent_bonuses' in _ap %}
+    <a href="/agent-bonuses" class="sidebar-link"><i class="bi bi-cash-stack"></i>Agent Bonuses</a>
+    {% endif %}
+    {% if (_ap is none and current_user.role in ('admin', 'general')) or (_ap is not none and 'dashboard' in _ap) %}
+    <a href="/dashboard" class="sidebar-link"><i class="bi bi-speedometer2"></i>Dashboard</a>
+    {% endif %}
+    {% if current_user.role == 'admin' or (_ap is not none and 'ftc_date' in _ap) %}
+    <a href="/ftc-date" class="sidebar-link"><i class="bi bi-calendar2-check"></i>FTC Date</a>
+    {% endif %}
+    {% if current_user.role == 'admin' %}
+    <a href="/data-sync" class="sidebar-link"><i class="bi bi-database"></i>Data Sync</a>
+    <a href="/holidays" class="sidebar-link"><i class="bi bi-calendar-x"></i>Holidays</a>
+    <a href="/all-ftcs" class="sidebar-link active"><i class="bi bi-people"></i>All FTCs</a>
+    {% endif %}
+  </nav>
+  <div style="padding:14px 20px;border-top:1px solid #30363d;">
+    <div style="font-size:0.68rem;color:#8b949e;margin-bottom:2px;">Signed in as</div>
+    <div style="font-weight:600;font-size:0.82rem;color:#e0e0e0;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ current_user.full_name }}</div>
+    <div style="font-size:0.7rem;color:#3fb950;margin-bottom:8px;">{{ current_user.role | replace('_', ' ') | title }}</div>
+    <div style="display:flex;gap:12px;align-items:center;">
+      <a href="/admin/users" style="color:#8b949e;text-decoration:none;font-size:1.05rem;" title="Admin Users"><i class="bi bi-people-fill"></i></a>
+      <a href="/logout" style="color:#f85149;text-decoration:none;font-size:1.05rem;" title="Logout"><i class="bi bi-box-arrow-right"></i></a>
+    </div>
+  </div>
+</div>
+
+<div class="main-content">
+<div class="container-fluid px-4 py-4">
+
+  <div id="toast-container"></div>
+
+  <!-- Filters -->
+  <div class="card p-3 mb-4">
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+      <input type="date" id="date-from" class="date-input" />
+      <span class="text-muted small">to</span>
+      <input type="date" id="date-to" class="date-input" />
+      <button class="quick-btn" onclick="setMonth(0)">This Month</button>
+      <button class="quick-btn" onclick="setMonth(-1)">Last Month</button>
+      <button class="btn btn-sm text-white px-3 ms-1" style="background:linear-gradient(135deg,#238636,#2ea043);border:none;border-radius:6px;" onclick="loadData()">
+        <i class="bi bi-arrow-clockwise me-1"></i>Load
+      </button>
+      <div class="filter-sep ms-1" style="width:1px;height:28px;background-color:#30363d;margin:0 6px;"></div>
+      <input type="text" id="search-input" class="form-control form-control-sm"
+             style="width:180px;background:#21262d;border-color:#30363d;color:#e0e0e0;font-size:0.8rem;"
+             placeholder="Search account / agent…" oninput="applyFilters()" />
+      <button class="btn btn-sm ms-auto" style="background:#238636;border:none;color:#fff;padding:4px 14px;" onclick="exportExcel()">
+        <i class="bi bi-file-earmark-excel me-1"></i>Export Excel
+      </button>
+      <span class="text-muted small" id="row-count-label"></span>
+    </div>
+  </div>
+
+  <!-- KPI Cards -->
+  <div class="row g-3 mb-4" id="kpi-row">
+    <div class="col-6 col-md-3">
+      <div class="kpi-card">
+        <div class="kpi-value text-white" id="kpi-ftc">—</div>
+        <div class="kpi-label">Total FTCs</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="kpi-card">
+        <div class="kpi-value" style="color:#3fb950;" id="kpi-dep">—</div>
+        <div class="kpi-label">FTC Deposits</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="kpi-card">
+        <div class="kpi-value" style="color:#f85149;" id="kpi-wd">—</div>
+        <div class="kpi-label">FTC Withdrawals</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="kpi-card">
+        <div class="kpi-value" style="color:#e3b341;" id="kpi-bonus">—</div>
+        <div class="kpi-label">Total Basic Bonus</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="card p-0" style="overflow:hidden;">
+    <div class="table-scroll">
+      <table class="table table-sm mb-0">
+        <thead>
+          <tr>
+            <th onclick="sortBy('agent_name')">#</th>
+            <th onclick="sortBy('agent_name')">Agent Name <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+            <th onclick="sortBy('desk')">Desk <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+            <th onclick="sortBy('office_name')">Office <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+            <th onclick="sortBy('position')">Position <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+            <th onclick="sortBy('accountid')">Account ID <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+            <th onclick="sortBy('ftc')">FTC</th>
+            <th onclick="sortBy('ftc_deposit')">FTC Deposit <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+            <th onclick="sortBy('ftc_wd')">FTC WD <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+            <th onclick="sortBy('basic_bonus')">Basic Bonus <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+            <th onclick="sortBy('ftd_amount_bonus')">FTD Amt Bonus <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+          </tr>
+        </thead>
+        <tbody id="ftcs-tbody">
+          <tr><td colspan="11" class="text-center text-muted py-5">Select a date range and click Load.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<script>
+  let allRows = [];
+  let sortKey = 'agent_name';
+  let sortDir = 1;
+
+  const fmtUSD = v => v == null ? '—' : '$' + Number(v).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+
+  function showToast(msg, type = 'success') {
+    const id = 'toast-' + Date.now();
+    const color = type === 'success' ? 'bg-success' : 'bg-danger';
+    document.getElementById('toast-container').insertAdjacentHTML('beforeend', `
+      <div id="${id}" class="toast align-items-center text-white ${color} border-0 show mb-2" role="alert">
+        <div class="d-flex">
+          <div class="toast-body">${msg}</div>
+          <button type="button" class="btn-close btn-close-white me-2 m-auto" onclick="document.getElementById('${id}').remove()"></button>
+        </div>
+      </div>`);
+    setTimeout(() => { const el = document.getElementById(id); if (el) el.remove(); }, 4000);
+  }
+
+  function setMonth(offset) {
+    const d = new Date();
+    d.setDate(1);
+    d.setMonth(d.getMonth() + offset);
+    const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0');
+    const lastDay = new Date(y, d.getMonth() + 1, 0).getDate();
+    document.getElementById('date-from').value = `${y}-${m}-01`;
+    document.getElementById('date-to').value   = `${y}-${m}-${String(lastDay).padStart(2,'0')}`;
+    document.querySelectorAll('.quick-btn').forEach(b => b.classList.remove('active-quick'));
+    event.target.classList.add('active-quick');
+  }
+
+  async function loadData() {
+    const from = document.getElementById('date-from').value;
+    const to   = document.getElementById('date-to').value;
+    if (!from || !to) { showToast('Select a date range first.', 'error'); return; }
+
+    const tbody = document.getElementById('ftcs-tbody');
+    tbody.innerHTML = '<tr><td colspan="11" class="text-center text-muted py-5"><div class="spinner-border spinner-border-sm text-secondary me-2"></div>Loading…</td></tr>';
+    document.getElementById('kpi-ftc').textContent = '—';
+    document.getElementById('kpi-dep').textContent = '—';
+    document.getElementById('kpi-wd').textContent  = '—';
+    document.getElementById('kpi-bonus').textContent = '—';
+
+    try {
+      const res = await fetch(`/api/all-ftcs?date_from=${from}&date_to=${to}`);
+      if (!res.ok) { const d = await res.json(); showToast('Error: ' + (d.detail || res.status), 'error'); return; }
+      const d = await res.json();
+      allRows = d.rows || [];
+      applyFilters();
+    } catch(e) {
+      tbody.innerHTML = `<tr><td colspan="11" class="text-center text-danger py-5">Error: ${e.message}</td></tr>`;
+    }
+  }
+
+  function applyFilters() {
+    const q = (document.getElementById('search-input').value || '').toLowerCase().trim();
+    let filtered = allRows.filter(r => {
+      if (!q) return true;
+      return String(r.accountid).includes(q) ||
+             (r.agent_name || '').toLowerCase().includes(q) ||
+             (r.desk || '').toLowerCase().includes(q) ||
+             (r.office_name || '').toLowerCase().includes(q);
+    });
+
+    filtered.sort((a, b) => {
+      let av = a[sortKey] ?? '', bv = b[sortKey] ?? '';
+      if (typeof av === 'string') av = av.toLowerCase();
+      if (typeof bv === 'string') bv = bv.toLowerCase();
+      return sortDir * (av > bv ? 1 : av < bv ? -1 : 0);
+    });
+
+    // KPIs
+    document.getElementById('kpi-ftc').textContent   = filtered.length.toLocaleString();
+    document.getElementById('kpi-dep').textContent   = fmtUSD(filtered.reduce((s,r) => s + r.ftc_deposit, 0));
+    document.getElementById('kpi-wd').textContent    = fmtUSD(filtered.reduce((s,r) => s + r.ftc_wd, 0));
+    document.getElementById('kpi-bonus').textContent = fmtUSD(filtered.reduce((s,r) => s + r.basic_bonus, 0));
+    document.getElementById('row-count-label').textContent = filtered.length.toLocaleString() + ' rows';
+
+    const tbody = document.getElementById('ftcs-tbody');
+    if (!filtered.length) {
+      tbody.innerHTML = '<tr><td colspan="11" class="text-center text-muted py-5">No records found.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = filtered.map((r, i) => `
+      <tr>
+        <td class="text-muted">${i + 1}</td>
+        <td>${r.agent_name || '<span class="text-muted">Unassigned</span>'}</td>
+        <td class="text-muted">${r.desk || '—'}</td>
+        <td class="text-muted">${r.office_name || '—'}</td>
+        <td class="text-muted">${r.position || '—'}</td>
+        <td><code style="color:#c9d1d9;">${r.accountid ?? '—'}</code></td>
+        <td><span class="badge" style="background:rgba(63,185,80,0.15);color:#3fb950;font-size:0.75rem;">Yes</span></td>
+        <td style="color:#3fb950;">${fmtUSD(r.ftc_deposit)}</td>
+        <td style="color:#f85149;">${r.ftc_wd > 0 ? fmtUSD(r.ftc_wd) : '<span class="text-muted">—</span>'}</td>
+        <td style="color:#e3b341;">${r.basic_bonus > 0 ? fmtUSD(r.basic_bonus) : '<span class="text-muted">—</span>'}</td>
+        <td style="color:#e3b341;">${r.ftd_amount_bonus > 0 ? fmtUSD(r.ftd_amount_bonus) : '<span class="text-muted">—</span>'}</td>
+      </tr>`).join('');
+  }
+
+  function sortBy(key) {
+    if (sortKey === key) sortDir *= -1;
+    else { sortKey = key; sortDir = 1; }
+    applyFilters();
+  }
+
+  function exportExcel() {
+    const q = (document.getElementById('search-input').value || '').toLowerCase().trim();
+    let filtered = allRows.filter(r => {
+      if (!q) return true;
+      return String(r.accountid).includes(q) ||
+             (r.agent_name || '').toLowerCase().includes(q) ||
+             (r.desk || '').toLowerCase().includes(q) ||
+             (r.office_name || '').toLowerCase().includes(q);
+    });
+    filtered.sort((a, b) => {
+      let av = a[sortKey] ?? '', bv = b[sortKey] ?? '';
+      if (typeof av === 'string') av = av.toLowerCase();
+      if (typeof bv === 'string') bv = bv.toLowerCase();
+      return sortDir * (av > bv ? 1 : av < bv ? -1 : 0);
+    });
+
+    const wsData = [['Agent Name','Desk','Office','Position','Account ID','FTC','FTC Deposit','FTC WD','Basic Bonus','FTD Amount Bonus']];
+    filtered.forEach(r => wsData.push([
+      r.agent_name || 'Unassigned',
+      r.desk || '',
+      r.office_name || '',
+      r.position || '',
+      r.accountid,
+      1,
+      r.ftc_deposit,
+      r.ftc_wd,
+      r.basic_bonus,
+      r.ftd_amount_bonus,
+    ]));
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    XLSX.utils.book_append_sheet(wb, ws, 'All FTCs');
+    const from = document.getElementById('date-from').value;
+    const to   = document.getElementById('date-to').value;
+    XLSX.writeFile(wb, `all_ftcs_${from}_${to}.xlsx`);
+  }
+
+  // Mobile sidebar toggle
+  (function(){
+    var toggle = document.getElementById('sidebar-toggle');
+    var sb = document.querySelector('.sidebar');
+    var overlay = document.getElementById('sidebar-overlay');
+    if (!toggle) return;
+    toggle.addEventListener('click', function(){ sb.classList.toggle('open'); overlay.classList.toggle('show'); });
+    overlay.addEventListener('click', function(){ sb.classList.remove('open'); overlay.classList.remove('show'); });
+  })();
+
+  // Default to current month on load
+  (function(){
+    const d = new Date();
+    const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0');
+    const lastDay = new Date(y, d.getMonth() + 1, 0).getDate();
+    document.getElementById('date-from').value = `${y}-${m}-01`;
+    document.getElementById('date-to').value   = `${y}-${m}-${String(lastDay).padStart(2,'0')}`;
+    loadData();
+  })();
+</script>
+<script src="https://instant.page/5.2.0/instantpage.min.js" type="module"></script>
+</body>
+</html>

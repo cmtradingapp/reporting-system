@@ -26,6 +26,7 @@ from app.routes.eez_comparison import router as eez_comparison_router
 from app.routes.eez_old import router as eez_old_router
 from app.routes.campaigns_sync import router as campaigns_sync_router
 from app.routes.campaign_performance import router as campaign_performance_router, _camp_kpi_calc, _camp_table_calc
+from app.routes.all_ftcs import router as all_ftcs_router
 from app.db.postgres_conn import ensure_table, ensure_auth_table, seed_admin_user, ensure_client_classification_table, ensure_bonus_transactions_table, ensure_daily_equity_zeroed_table, ensure_materialized_views, refresh_materialized_views, backfill_classification_int
 import threading
 import fcntl
@@ -291,3 +292,4 @@ app.include_router(eez_comparison_router)
 app.include_router(eez_old_router)
 app.include_router(campaigns_sync_router)
 app.include_router(campaign_performance_router)
+app.include_router(all_ftcs_router)
