@@ -65,8 +65,8 @@ SELECT
     COUNT(DISTINCT CASE WHEN t.transactiontype = 'Deposit' AND t.ftd = 1
                         THEN t.vtigeraccountid END)::int                 AS ftc_count
 FROM transactions t
-JOIN accounts  a ON a.accountid           = t.vtigeraccountid
-JOIN crm_users u ON u.id                  = t.original_deposit_owner
+JOIN accounts  a  ON a.accountid           = t.vtigeraccountid
+LEFT JOIN crm_users u ON u.id             = t.original_deposit_owner
 WHERE t.transactionapproval = 'Approved'
   AND (t.deleted = 0 OR t.deleted IS NULL)
   AND t.transactiontype IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
@@ -80,8 +80,9 @@ GROUP BY
     a.client_qualification_date::date;
 
 -- Unique index required for REFRESH CONCURRENTLY
+-- COALESCE(agent_id, -1) handles NULL agent_id (unassigned transactions)
 CREATE UNIQUE INDEX idx_mv_daily_kpis_u
-    ON mv_daily_kpis (agent_id, tx_date, COALESCE(qual_date, '1900-01-01'::date));
+    ON mv_daily_kpis (COALESCE(agent_id, -1), tx_date, COALESCE(qual_date, '1900-01-01'::date));
 CREATE INDEX idx_mv_daily_kpis_tx_date   ON mv_daily_kpis (tx_date);
 CREATE INDEX idx_mv_daily_kpis_qual_date ON mv_daily_kpis (qual_date) WHERE qual_date IS NOT NULL;
 CREATE INDEX idx_mv_daily_kpis_agent     ON mv_daily_kpis (agent_id);
