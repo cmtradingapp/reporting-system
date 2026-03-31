@@ -435,6 +435,49 @@
   </div>
   {% endif %}
 
+  {% if show_sales %}
+  <!-- Sales Per-Account Table -->
+  <div class="mb-4">
+    <div class="card p-0" style="overflow:hidden;">
+      <div class="d-flex justify-content-between align-items-center px-4 py-3" style="border-bottom:1px solid #30363d;">
+        <div class="section-title" style="border-left-color:#388bfd;">Sales — Per Account</div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <span class="small" style="color:#e0e0e0;" id="acct-row-count"></span>
+          <button class="btn btn-sm px-3" style="background:#21262d;border:1px solid #30363d;color:#8b949e;font-size:0.78rem;border-radius:6px;" onclick="exportAcctSales()">
+            <i class="bi bi-file-earmark-excel me-1" style="color:#3fb950;"></i>Export Excel
+          </button>
+        </div>
+      </div>
+
+      <div id="acct-loading" style="display:none;text-align:center;padding:60px;color:#8b949e;">
+        <div class="spinner-border text-primary mb-3" style="width:2rem;height:2rem;"></div>
+        <div class="small">Loading...</div>
+      </div>
+
+      <div id="acct-error-msg" style="display:none;" class="text-danger text-center p-4 small"></div>
+
+      <div id="acct-table-wrapper" style="overflow-x:auto;">
+        <table class="scoreboard-table" id="acct-sales-table">
+          <thead>
+            <tr>
+              <th class="text-start" style="min-width:100px;">Office</th>
+              <th class="text-start" style="min-width:160px;">Agent Name</th>
+              <th class="text-center" style="min-width:110px;">User ID</th>
+              <th class="text-center" style="min-width:75px;">FTD100</th>
+              <th class="text-center" style="min-width:55px;">FTC</th>
+              <th class="text-center" style="min-width:130px;">FTC Net USD</th>
+              <th class="text-center" style="min-width:140px;">Sales Basic Bonus</th>
+              <th class="text-center" style="min-width:150px;">FTD Amount Bonus</th>
+            </tr>
+          </thead>
+          <tbody id="acct-sales-tbody"></tbody>
+          <tfoot id="acct-sales-tfoot"></tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
   {% if show_retention %}
   <!-- Retention Agent Bonuses Table -->
   <div>
@@ -751,6 +794,7 @@
   let bonWd = 0, bonWdPassed = 0, bonWdLeft = 0;
   let salAllRows = [];
   let salSortState = { col: 'sal-totalBonus', dir: 'desc' };
+  let acctAllRows = [];
 
   // ── Custom searchable select (multi) ────────────────────────────────────
   function makeCustomSelect(triggerId, dropId, searchId, optsId, allLabel, onChange) {
@@ -843,8 +887,9 @@
   }
 
   function onFilterChange() {
-    if (salAllRows.length) renderSalesTable();
-    if (bonAllRows.length) renderBonusTable();
+    if (salAllRows.length)  renderSalesTable();
+    if (acctAllRows.length) renderAcctSalesTable();
+    if (bonAllRows.length)  renderBonusTable();
     updateBonusStatsFromFiltered();
   }
   const csOffice = makeCustomSelect('cs-office-trigger','cs-office-drop','cs-office-search','cs-office-opts','All Offices', onFilterChange);
@@ -1027,6 +1072,97 @@
     }
   }
 
+  // ── Sales Accounts API fetch ───────────────────────────────────────────
+  async function loadAcctSalesData(silent = false) {
+    const df = document.getElementById('date-from').value;
+    const dt = document.getElementById('date-to').value;
+    if (!df || !dt) return;
+    if (!silent) {
+      document.getElementById('acct-loading').style.display = 'block';
+      document.getElementById('acct-table-wrapper').style.display = 'none';
+      document.getElementById('acct-error-msg').style.display = 'none';
+    }
+    try {
+      const res  = await fetch(`/api/agent-bonuses/sales-accounts?date_from=${df}&date_to=${dt}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Server error');
+      acctAllRows = data.rows;
+      renderAcctSalesTable();
+    } catch(e) {
+      if (!silent) {
+        document.getElementById('acct-error-msg').textContent = 'Error: ' + e.message;
+        document.getElementById('acct-error-msg').style.display = 'block';
+      }
+    } finally {
+      if (!silent) {
+        document.getElementById('acct-loading').style.display = 'none';
+        document.getElementById('acct-table-wrapper').style.display = '';
+      }
+    }
+  }
+
+  // ── Render Sales Accounts table ────────────────────────────────────────
+  function renderAcctSalesTable() {
+    const fOffice = csOffice.getValue();
+    const fAgent  = csAgent.getValue();
+    const fStatus = csStatus.getValue();
+    const filtered = acctAllRows.filter(r => {
+      if (fOffice && !fOffice.has(r.office_name)) return false;
+      if (fAgent  && !fAgent.has(r.agent_name))   return false;
+      if (fStatus && !fStatus.has(r.status))       return false;
+      return true;
+    });
+
+    const tbody = document.getElementById('acct-sales-tbody');
+    const tfoot = document.getElementById('acct-sales-tfoot');
+    tbody.innerHTML = '';
+    tfoot.innerHTML = '';
+
+    let gFtd100 = 0, gFtc = 0, gFtcNet = 0, gBasicBonus = 0, gAmtBonus = 0;
+
+    filtered.forEach(r => {
+      gFtd100      += r.is_ftd100;
+      gFtc         += r.is_ftc;
+      gFtcNet      += r.ftc_net_usd;
+      gBasicBonus  += r.basic_bonus;
+      gAmtBonus    += r.ftd_amount_bonus;
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="text-start">${escHtml(r.office_name)}</td>
+        <td class="text-start">${escHtml(r.agent_name)}</td>
+        <td class="text-center" style="color:#8b949e;">${escHtml(String(r.accountid))}</td>
+        <td class="text-center">${r.is_ftd100 ? '<span style="color:#388bfd;font-weight:600;">1</span>' : '<span style="color:#484f58;">0</span>'}</td>
+        <td class="text-center">${r.is_ftc ? '<span style="color:#388bfd;font-weight:600;">1</span>' : '<span style="color:#484f58;">0</span>'}</td>
+        <td class="text-center">${netHtml(r.ftc_net_usd)}</td>
+        <td class="text-center">${bonusDollarHtml(r.basic_bonus)}</td>
+        <td class="text-center">${bonusDollarHtml(r.ftd_amount_bonus)}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    document.getElementById('acct-row-count').textContent = `${filtered.length} accounts`;
+
+    if (filtered.length === 0) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td colspan="8" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No data for this period</td>`;
+      tbody.appendChild(tr);
+      return;
+    }
+
+    const totalTr = document.createElement('tr');
+    totalTr.className = 'total-row';
+    totalTr.innerHTML = `
+      <td colspan="3">Total</td>
+      <td class="text-center"><span style="color:#388bfd;font-weight:700;">${gFtd100.toLocaleString('en-US')}</span></td>
+      <td class="text-center"><span style="color:#388bfd;font-weight:700;">${gFtc.toLocaleString('en-US')}</span></td>
+      <td class="text-center">${netHtml(gFtcNet, true)}</td>
+      <td class="text-center">${bonusDollarHtml(gBasicBonus, true)}</td>
+      <td class="text-center">${bonusDollarHtml(gAmtBonus, true)}</td>
+    `;
+    tfoot.appendChild(totalTr);
+  }
+
   // ── Retention API fetch ────────────────────────────────────────────────
   async function loadBonusData(silent = false) {
     const df = document.getElementById('date-from').value;
@@ -1077,6 +1213,7 @@
   async function loadAllData(silent = false) {
     const tasks = [];
     if (SHOW_SALES)     tasks.push(loadSalesData(silent));
+    if (SHOW_SALES)     tasks.push(loadAcctSalesData(silent));
     if (SHOW_RETENTION) tasks.push(loadBonusData(silent));
     await Promise.all(tasks);
   }
@@ -1715,6 +1852,36 @@
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Sales Bonuses');
     XLSX.writeFile(wb, `sales_bonuses_${df}_${dt}.xlsx`);
+  }
+
+  function exportAcctSales() {
+    if (!acctAllRows.length) { alert('No data to export.'); return; }
+    const df = document.getElementById('date-from').value;
+    const dt = document.getElementById('date-to').value;
+    const fOffice = csOffice.getValue();
+    const fAgent  = csAgent.getValue();
+    const fStatus = csStatus.getValue();
+    const filtered = acctAllRows.filter(r => {
+      if (fOffice && !fOffice.has(r.office_name)) return false;
+      if (fAgent  && !fAgent.has(r.agent_name))   return false;
+      if (fStatus && !fStatus.has(r.status))       return false;
+      return true;
+    });
+    const headers = ['Office', 'Agent Name', 'User ID', 'FTD100', 'FTC', 'FTC Net USD', 'Sales Basic Bonus', 'FTD Amount Bonus'];
+    const rows = filtered.map(r => [
+      r.office_name,
+      r.agent_name,
+      r.accountid,
+      r.is_ftd100,
+      r.is_ftc,
+      r.ftc_net_usd,
+      r.basic_bonus,
+      r.ftd_amount_bonus,
+    ]);
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Sales Per Account');
+    XLSX.writeFile(wb, `sales_per_account_${df}_${dt}.xlsx`);
   }
 
   function exportRetention() {

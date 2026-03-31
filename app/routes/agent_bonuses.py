@@ -438,3 +438,168 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
         return JSONResponse(status_code=500, content={"detail": str(e)})
     finally:
         conn.close()
+
+
+@router.get("/api/agent-bonuses/sales-accounts")
+async def agent_bonuses_sales_accounts_api(request: Request, date_from: str, date_to: str):
+    user = await get_current_user(request)
+    if isinstance(user, RedirectResponse):
+        return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+    role_filter = get_role_filter(user)
+    _ck = f"bon_sales_acct_v1:{user.get('role','')}:{date_from}:{date_to}"
+    _hit = cache.get(_ck)
+    if _hit is not None:
+        return JSONResponse(content=_hit)
+    try:
+        dt_to             = datetime.strptime(date_to, "%Y-%m-%d").date()
+        date_to_exclusive = (dt_to + timedelta(days=1)).strftime("%Y-%m-%d")
+        datetime.strptime(date_from, "%Y-%m-%d")
+    except ValueError:
+        return JSONResponse(status_code=400, content={"detail": "Invalid date format"})
+
+    sql = """
+        WITH
+        ftc_accs AS (
+            SELECT a.accountid, a.assigned_to AS agent_id, 1 AS is_ftc
+            FROM accounts a
+            WHERE a.client_qualification_date >= %(date_from)s
+              AND a.client_qualification_date <  %(date_to_excl)s
+              AND a.is_test_account = 0
+              AND a.accountid IS NOT NULL
+        ),
+        ftd100_accs AS (
+            SELECT f.accountid,
+                   f.original_deposit_owner                                    AS agent_id,
+                   1                                                            AS is_ftd100,
+                   CASE WHEN f.ftd_100_amount >= 240 THEN 'full' ELSE 'half' END AS ftd100_type,
+                   CASE WHEN f.ftd_100_amount < 500  THEN 0
+                        WHEN f.ftd_100_amount < 1000 THEN 10
+                        WHEN f.ftd_100_amount < 5000 THEN 20
+                        ELSE 50 END::float                                     AS ftd_amount_bonus_raw
+            FROM ftd100_clients f
+            WHERE f.ftd_100_date >= %(date_from)s
+              AND f.ftd_100_date <  %(date_to_excl)s
+              AND f.original_deposit_owner IS NOT NULL
+        ),
+        combined AS (
+            SELECT COALESCE(f.accountid, t.accountid)       AS accountid,
+                   COALESCE(f.agent_id,  t.agent_id)        AS agent_id,
+                   COALESCE(t.is_ftc,    0)                 AS is_ftc,
+                   COALESCE(f.is_ftd100, 0)                 AS is_ftd100,
+                   f.ftd100_type,
+                   COALESCE(f.ftd_amount_bonus_raw, 0)      AS ftd_amount_bonus_raw
+            FROM ftd100_accs f
+            FULL OUTER JOIN ftc_accs t ON t.accountid = f.accountid
+        ),
+        ftc_net AS (
+            SELECT t.vtigeraccountid AS accountid,
+                   SUM(CASE WHEN t.transactiontype IN ('Deposit','Withdrawal Cancelled') THEN  t.usdamount
+                            WHEN t.transactiontype IN ('Withdrawal','Deposit Cancelled')  THEN -t.usdamount
+                       END)::float AS net_usd
+            FROM transactions t
+            JOIN accounts a ON a.accountid = t.vtigeraccountid
+            WHERE t.transactionapproval = 'Approved'
+              AND (t.deleted = 0 OR t.deleted IS NULL)
+              AND t.transactiontype IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
+              AND a.client_qualification_date IS NOT NULL
+              AND a.client_qualification_date >= %(date_from)s
+              AND a.client_qualification_date <  %(date_to_excl)s
+              AND (a.client_qualification_date >= t.confirmation_time::date OR t.ftd = 1)
+              AND a.is_test_account = 0
+              AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
+            GROUP BY t.vtigeraccountid
+        ),
+        agent_totals AS (
+            SELECT bon.agent_id,
+                   SUM(bon.ftd100_count)::int        AS ftd100_total,
+                   COALESCE(tgt.target_ftc, 0)::int  AS target_ftc
+            FROM (
+                SELECT agent_id, SUM(ftd100_count) AS ftd100_count
+                FROM mv_sales_bonuses
+                WHERE ftd_100_date >= %(date_from)s AND ftd_100_date < %(date_to_excl)s
+                GROUP BY agent_id
+            ) bon
+            LEFT JOIN (
+                SELECT agent_id::bigint, SUM(ftc)::int AS target_ftc
+                FROM targets
+                WHERE date >= %(date_from)s AND date < %(date_to_excl)s
+                GROUP BY agent_id
+            ) tgt ON tgt.agent_id = bon.agent_id
+            GROUP BY bon.agent_id, tgt.target_ftc
+        )
+        SELECT
+            COALESCE(u.office_name, 'N/A')              AS office_name,
+            COALESCE(u.agent_name, u.full_name, 'N/A')  AS agent_name,
+            c.accountid,
+            c.is_ftc,
+            c.is_ftd100,
+            c.ftd100_type,
+            COALESCE(fn.net_usd, 0)::float              AS ftc_net_usd,
+            c.ftd_amount_bonus_raw,
+            COALESCE(at.ftd100_total, 0)::int           AS ftd100_total,
+            COALESCE(at.target_ftc,  0)::int            AS target_ftc,
+            COALESCE(u.status, '')                      AS status
+        FROM combined c
+        JOIN crm_users u ON u.id = c.agent_id
+        LEFT JOIN ftc_net fn ON fn.accountid = c.accountid
+        LEFT JOIN agent_totals at ON at.agent_id = c.agent_id
+        WHERE u.department_ = 'Sales'
+          AND u.team = 'Conversion'
+          AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
+          AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
+          AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'
+          {role_filter}
+        ORDER BY u.office_name NULLS LAST, u.agent_name, c.accountid
+    """
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            base_params = {"date_from": date_from, "date_to_excl": date_to_exclusive}
+            final_sql, final_params = _apply_role_filter(sql, base_params, role_filter)
+            cur.execute(final_sql, final_params)
+            rows = cur.fetchall()
+
+        data = []
+        for r in rows:
+            office_name          = r[0]
+            agent_name           = r[1]
+            accountid            = r[2]
+            is_ftc               = int(r[3])
+            is_ftd100            = int(r[4])
+            ftd100_type          = r[5]
+            ftc_net_usd          = round(float(r[6]), 2)
+            ftd_amount_bonus_raw = round(float(r[7]), 2)
+            ftd100_total         = int(r[8])
+            target_ftc           = int(r[9])
+            status               = r[10] or ''
+
+            qualify    = target_ftc > 0 and ftd100_total >= 0.50 * target_ftc
+            multiplier = get_sales_multiplier(ftd100_total)
+
+            if is_ftd100 and qualify:
+                basic_bonus      = multiplier if ftd100_type == 'full' else round(multiplier / 2, 2)
+                ftd_amount_bonus = ftd_amount_bonus_raw
+            else:
+                basic_bonus      = 0
+                ftd_amount_bonus = 0
+
+            data.append({
+                "office_name":      office_name,
+                "agent_name":       agent_name,
+                "accountid":        accountid,
+                "is_ftc":           is_ftc,
+                "is_ftd100":        is_ftd100,
+                "ftc_net_usd":      ftc_net_usd,
+                "basic_bonus":      basic_bonus,
+                "ftd_amount_bonus": ftd_amount_bonus,
+                "status":           status,
+            })
+
+        _result = {"rows": data}
+        cache.set(_ck, _result)
+        return JSONResponse(content=_result)
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+    finally:
+        conn.close()
