@@ -1,6 +1,6 @@
 from fastapi import APIRouter, BackgroundTasks
 from fastapi.responses import JSONResponse
-from app.etl.fetch_and_store import run_transactions_etl, run_transactions_full_etl, run_bonus_transactions_etl, run_bonus_transactions_full_etl
+from app.etl.fetch_and_store import run_transactions_etl, run_transactions_full_etl, run_transactions_by_confirmation_date_etl, run_bonus_transactions_etl, run_bonus_transactions_full_etl
 from app.db.mssql_conn import _get_mssql_connection
 
 router = APIRouter()
@@ -15,6 +15,11 @@ def sync_transactions(hours: int = 24):
 def sync_transactions_full(background_tasks: BackgroundTasks):
     background_tasks.add_task(run_transactions_full_etl)
     return {"status": "started"}
+
+
+@router.post("/sync/transactions/by-confirmation-date")
+def sync_transactions_by_confirmation_date(from_date: str = "2026-01-01"):
+    return run_transactions_by_confirmation_date_etl(from_date=from_date)
 
 
 @router.post("/sync/bonus-transactions")
