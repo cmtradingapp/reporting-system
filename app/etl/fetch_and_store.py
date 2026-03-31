@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime, timedelta, timezone
 from app.db.mysql_conn import get_operators, get_users, get_accounts, get_accounts_full, get_accounts_by_qual_date, get_accounts_by_created_date, get_crm_users, get_crm_users_full, get_transactions, get_transactions_full, get_transactions_by_confirmation_date, get_trading_accounts, get_trading_accounts_full, get_campaigns
 from app.db.mssql_conn import get_targets, get_vtiger_users, get_client_classification, get_bonus_transactions, get_bonus_transactions_full
-from app.db.dealio_conn import get_dealio_users, get_dealio_users_full, get_dealio_trades_mt4, get_dealio_trades_mt4_full, get_dealio_trades_mt4_missing, get_dealio_daily_profits, get_dealio_daily_profits_full, get_dealio_daily_profits_daterange
+from app.db.dealio_conn import get_dealio_users, get_dealio_users_full, get_dealio_trades_mt4, get_dealio_trades_mt4_full, get_dealio_trades_mt4_missing, get_dealio_trades_mt4_by_open_time, get_dealio_daily_profits, get_dealio_daily_profits_full, get_dealio_daily_profits_daterange
 from app.db.postgres_conn import (
     ensure_table, delete_all_performance, insert_records,
     upsert_users, upsert_accounts, cleanup_accounts, upsert_crm_users, truncate_crm_users, upsert_transactions,
@@ -503,6 +503,33 @@ def run_dealio_trades_mt4_refresh_notional_etl(hours: int = 2160) -> dict:
         duration_ms = int((time.time() - start) * 1000)
         log_sync("dealio_trades_mt4", cutoff, rows, duration_ms, status, error_msg)
     return {"status": status, "rows_synced": rows, "type": "notional_refresh", "lookback_hours": hours}
+
+
+def run_dealio_trades_mt4_by_open_time_etl(from_date: str = "2026-01-01") -> None:
+    """Re-sync dealio_trades_mt4 for trades with open_time >= from_date (UTC+2 after conversion).
+    Used after the timezone fix to correct stored open_time/close_time values."""
+    global _dealio_trades_mt4_rebuilding
+    start = time.time()
+    cutoff = datetime.strptime(from_date, "%Y-%m-%d")
+    status = "success"
+    error_msg = None
+    rows = 0
+    chunk_num = 0
+    try:
+        for chunk in get_dealio_trades_mt4_by_open_time(from_date):
+            upsert_dealio_trades_mt4(chunk)
+            rows += len(chunk)
+            chunk_num += 1
+            if chunk_num % 10 == 0:
+                elapsed = int((time.time() - start) * 1000)
+                log_sync("dealio_trades_mt4", cutoff, rows, elapsed, "running", f"by_open_time: chunk {chunk_num}, {rows} rows so far")
+    except Exception as e:
+        status = "error"
+        error_msg = str(e)
+        raise
+    finally:
+        duration_ms = int((time.time() - start) * 1000)
+        log_sync("dealio_trades_mt4", cutoff, rows, duration_ms, status, error_msg)
 
 
 def run_client_classification_etl() -> dict:
