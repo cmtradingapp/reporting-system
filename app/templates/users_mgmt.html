@@ -92,8 +92,10 @@
     {% if (_ap is none and current_user.role in ('admin', 'general')) or (_ap is not none and 'dashboard' in _ap) %}
     <a href="/dashboard" class="sidebar-link"><i class="bi bi-speedometer2"></i>Dashboard</a>
     {% endif %}
-    {% if current_user.role == 'admin' %}
+    {% if current_user.role == 'admin' or (_ap is not none and 'ftc_date' in _ap) %}
     <a href="/ftc-date" class="sidebar-link"><i class="bi bi-calendar2-check"></i>FTC Date</a>
+    {% endif %}
+    {% if current_user.role == 'admin' %}
     <a href="/data-sync" class="sidebar-link"><i class="bi bi-database"></i>Data Sync</a>
     <a href="/holidays" class="sidebar-link"><i class="bi bi-calendar-x"></i>Holidays</a>
     {% endif %}
@@ -241,6 +243,7 @@
             <label style="cursor:pointer;font-size:0.85rem;"><input type="checkbox" id="add-ap-marketing" class="me-1">Marketing Performance</label>
             <label style="cursor:pointer;font-size:0.85rem;"><input type="checkbox" id="add-ap-agent_bonuses" class="me-1">Agent Bonuses</label>
             <label style="cursor:pointer;font-size:0.85rem;"><input type="checkbox" id="add-ap-dashboard" class="me-1">Dashboard</label>
+            <label style="cursor:pointer;font-size:0.85rem;"><input type="checkbox" id="add-ap-ftc_date" class="me-1">FTC Date</label>
           </div>
         </div>
         <div class="text-secondary" style="font-size:0.8rem;">Default password: <code>Welcome1!</code> (user must change on first login)</div>
@@ -315,6 +318,7 @@
             <label style="cursor:pointer;font-size:0.85rem;"><input type="checkbox" id="edit-ap-marketing" class="me-1">Marketing Performance</label>
             <label style="cursor:pointer;font-size:0.85rem;"><input type="checkbox" id="edit-ap-agent_bonuses" class="me-1">Agent Bonuses</label>
             <label style="cursor:pointer;font-size:0.85rem;"><input type="checkbox" id="edit-ap-dashboard" class="me-1">Dashboard</label>
+            <label style="cursor:pointer;font-size:0.85rem;"><input type="checkbox" id="edit-ap-ftc_date" class="me-1">FTC Date</label>
           </div>
         </div>
       </div>
@@ -401,7 +405,7 @@
   setupCrmSearch('add-crm-search', 'add-crm-results', 'add-crm-user-id', 'add-crm-selected');
   setupCrmSearch('edit-crm-search', 'edit-crm-results', 'edit-crm-user-id', 'edit-crm-selected');
 
-  const _AP_KEYS = ['performance', 'marketing', 'agent_bonuses', 'dashboard'];
+  const _AP_KEYS = ['performance', 'marketing', 'agent_bonuses', 'dashboard', 'ftc_date'];
   function getCheckedPages(prefix) {
     const checked = _AP_KEYS.filter(p => document.getElementById(`${prefix}-ap-${p}`).checked);
     return checked.length > 0 ? checked : null;
