@@ -32,7 +32,7 @@ async def all_ftcs_api(request: Request, date_from: str, date_to: str):
     if user.get("role") != "admin":
         return JSONResponse(status_code=403, content={"detail": "Forbidden"})
 
-    _ck = f"all_ftcs_v1:{date_from}:{date_to}"
+    _ck = f"all_ftcs_v2:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -46,9 +46,10 @@ async def all_ftcs_api(request: Request, date_from: str, date_to: str):
 
     sql = """
         WITH
+        -- FTC accounts + who owns the FTD (gets FTC=1)
         ftc_accs AS (
             SELECT a.accountid,
-                   COALESCE(td.original_deposit_owner, a.assigned_to) AS agent_id
+                   COALESCE(td.original_deposit_owner, a.assigned_to) AS ftd_agent_id
             FROM accounts a
             LEFT JOIN (
                 SELECT DISTINCT ON (vtigeraccountid)
@@ -64,20 +65,10 @@ async def all_ftcs_api(request: Request, date_from: str, date_to: str):
               AND a.is_test_account = 0
               AND a.accountid IS NOT NULL
         ),
-        ftd100_accs AS (
-            SELECT f.accountid,
-                   f.original_deposit_owner AS agent_id,
-                   CASE WHEN f.ftd_100_amount >= 240 THEN 'full' ELSE 'half' END AS ftd100_type,
-                   CASE WHEN f.ftd_100_amount < 500  THEN 0
-                        WHEN f.ftd_100_amount < 1000 THEN 10
-                        WHEN f.ftd_100_amount < 5000 THEN 20
-                        ELSE 50 END::float AS ftd_amount_bonus_raw
-            FROM ftd100_clients f
-            WHERE f.ftd_100_date >= %(date_from)s
-              AND f.ftd_100_date <  %(date_to_excl)s
-        ),
+        -- Transactions split per agent (each transaction attributed to its own owner)
         ftc_txns AS (
             SELECT t.vtigeraccountid AS accountid,
+                   COALESCE(t.original_deposit_owner, a.assigned_to) AS agent_id,
                    SUM(CASE WHEN t.transactiontype IN ('Deposit','Withdrawal Cancelled')
                             THEN t.usdamount ELSE 0 END)::float AS ftc_deposit,
                    SUM(CASE WHEN t.transactiontype IN ('Withdrawal','Deposit Cancelled')
@@ -90,10 +81,29 @@ async def all_ftcs_api(request: Request, date_from: str, date_to: str):
               AND a.client_qualification_date IS NOT NULL
               AND a.client_qualification_date >= %(date_from)s
               AND a.client_qualification_date <  %(date_to_excl)s
-              AND (a.client_qualification_date >= t.confirmation_time::date OR t.ftd = 1)
+              AND (t.confirmation_time::date >= a.client_qualification_date OR t.ftd = 1)
               AND a.is_test_account = 0
               AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
-            GROUP BY t.vtigeraccountid
+            GROUP BY t.vtigeraccountid, COALESCE(t.original_deposit_owner, a.assigned_to)
+        ),
+        -- All (accountid, agent_id) pairs to show:
+        --   agents who made transactions + FTD owner (even if $0)
+        account_agents AS (
+            SELECT accountid, agent_id FROM ftc_txns
+            UNION
+            SELECT accountid, ftd_agent_id FROM ftc_accs
+        ),
+        ftd100_accs AS (
+            SELECT f.accountid,
+                   f.original_deposit_owner AS agent_id,
+                   CASE WHEN f.ftd_100_amount >= 240 THEN 'full' ELSE 'half' END AS ftd100_type,
+                   CASE WHEN f.ftd_100_amount < 500  THEN 0
+                        WHEN f.ftd_100_amount < 1000 THEN 10
+                        WHEN f.ftd_100_amount < 5000 THEN 20
+                        ELSE 50 END::float AS ftd_amount_bonus_raw
+            FROM ftd100_clients f
+            WHERE f.ftd_100_date >= %(date_from)s
+              AND f.ftd_100_date <  %(date_to_excl)s
         ),
         agent_totals AS (
             SELECT bon.agent_id,
@@ -114,27 +124,29 @@ async def all_ftcs_api(request: Request, date_from: str, date_to: str):
             GROUP BY bon.agent_id, tgt.target_ftc
         )
         SELECT
-            COALESCE(u.agent_name, u.full_name, 'N/A')  AS agent_name,
-            COALESCE(u.desk, '')                          AS desk,
-            COALESCE(u.office_name, '')                   AS office_name,
-            COALESCE(u.position, '')                      AS position,
-            fa.accountid,
-            COALESCE(ft.ftc_deposit, 0)::float            AS ftc_deposit,
-            COALESCE(ft.ftc_wd, 0)::float                 AS ftc_wd,
-            COALESCE(fd.ftd100_type, '')                  AS ftd100_type,
-            COALESCE(fd.ftd_amount_bonus_raw, 0)::float   AS ftd_amount_bonus_raw,
-            COALESCE(at.ftd100_total, 0)::int             AS ftd100_total,
-            COALESCE(at.target_ftc, 0)::int               AS target_ftc
-        FROM ftc_accs fa
-        LEFT JOIN crm_users u ON u.id = fa.agent_id
-        LEFT JOIN ftc_txns ft ON ft.accountid = fa.accountid
-        LEFT JOIN ftd100_accs fd ON fd.accountid = fa.accountid
-        LEFT JOIN agent_totals at ON at.agent_id = fa.agent_id
+            COALESCE(u.agent_name, u.full_name, 'N/A')               AS agent_name,
+            COALESCE(u.desk, '')                                       AS desk,
+            COALESCE(u.office_name, '')                                AS office_name,
+            COALESCE(u.position, '')                                   AS position,
+            aa.accountid,
+            CASE WHEN aa.agent_id = fa.ftd_agent_id THEN 1 ELSE 0 END AS ftc,
+            COALESCE(ft.ftc_deposit, 0)::float                        AS ftc_deposit,
+            COALESCE(ft.ftc_wd, 0)::float                             AS ftc_wd,
+            COALESCE(fd.ftd100_type, '')                               AS ftd100_type,
+            COALESCE(fd.ftd_amount_bonus_raw, 0)::float                AS ftd_amount_bonus_raw,
+            COALESCE(at.ftd100_total, 0)::int                         AS ftd100_total,
+            COALESCE(at.target_ftc, 0)::int                           AS target_ftc
+        FROM account_agents aa
+        JOIN ftc_accs fa ON fa.accountid = aa.accountid
+        LEFT JOIN crm_users u ON u.id = aa.agent_id
+        LEFT JOIN ftc_txns ft ON ft.accountid = aa.accountid AND ft.agent_id = aa.agent_id
+        LEFT JOIN ftd100_accs fd ON fd.accountid = aa.accountid AND fd.agent_id = aa.agent_id
+        LEFT JOIN agent_totals at ON at.agent_id = aa.agent_id
         WHERE (u.id IS NULL
                OR (TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
                    AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
                    AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'))
-        ORDER BY COALESCE(u.agent_name, u.full_name, 'N/A'), fa.accountid
+        ORDER BY COALESCE(u.agent_name, u.full_name, 'N/A'), aa.accountid
     """
 
     conn = get_connection()
@@ -150,17 +162,18 @@ async def all_ftcs_api(request: Request, date_from: str, date_to: str):
             office_name          = r[2]
             position             = r[3]
             accountid            = r[4]
-            ftc_deposit          = round(float(r[5]), 2)
-            ftc_wd               = round(float(r[6]), 2)
-            ftd100_type          = r[7]
-            ftd_amount_bonus_raw = round(float(r[8]), 2)
-            ftd100_total         = int(r[9])
-            target_ftc           = int(r[10])
+            ftc                  = int(r[5])
+            ftc_deposit          = round(float(r[6]), 2)
+            ftc_wd               = round(float(r[7]), 2)
+            ftd100_type          = r[8]
+            ftd_amount_bonus_raw = round(float(r[9]), 2)
+            ftd100_total         = int(r[10])
+            target_ftc           = int(r[11])
 
             qualify    = target_ftc > 0 and ftd100_total >= 0.50 * target_ftc
             multiplier = get_sales_multiplier(ftd100_total)
 
-            if ftd100_type and qualify:
+            if ftc == 1 and ftd100_type and qualify:
                 basic_bonus      = multiplier if ftd100_type == 'full' else round(multiplier / 2, 2)
                 ftd_amount_bonus = ftd_amount_bonus_raw
             else:
@@ -173,7 +186,7 @@ async def all_ftcs_api(request: Request, date_from: str, date_to: str):
                 "office_name":      office_name,
                 "position":         position,
                 "accountid":        accountid,
-                "ftc":              1,
+                "ftc":              ftc,
                 "ftc_deposit":      ftc_deposit,
                 "ftc_wd":           ftc_wd,
                 "basic_bonus":      basic_bonus,
