@@ -28,6 +28,7 @@ from app.routes.campaigns_sync import router as campaigns_sync_router
 from app.routes.campaign_performance import router as campaign_performance_router, _camp_kpi_calc, _camp_table_calc
 from app.db.postgres_conn import ensure_table, ensure_auth_table, seed_admin_user, ensure_client_classification_table, ensure_bonus_transactions_table, ensure_daily_equity_zeroed_table, ensure_materialized_views, refresh_materialized_views, backfill_classification_int
 import threading
+import fcntl
 from app.auth.auth import hash_password
 from app.etl.fetch_and_store import run_accounts_etl, run_users_etl, run_transactions_etl, run_targets_etl, run_trading_accounts_etl, run_ftd100_etl, run_client_classification_etl, run_dealio_users_etl, run_dealio_trades_mt4_etl, run_dealio_daily_profits_etl, run_bonus_transactions_etl, run_daily_equity_zeroed_snapshot, run_campaigns_etl
 from app import cache
@@ -35,12 +36,31 @@ import os
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
+# File lock so only one worker process runs the APScheduler background jobs.
+# The other worker(s) only serve HTTP requests, keeping their connection pool free.
+_SCHED_LOCK_FILE = "/tmp/reporting_sched.lock"
+_sched_lock_fd = None
+
+def _acquire_scheduler_lock() -> bool:
+    global _sched_lock_fd
+    try:
+        _sched_lock_fd = open(_SCHED_LOCK_FILE, 'w')
+        fcntl.flock(_sched_lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return True
+    except (IOError, OSError):
+        if _sched_lock_fd:
+            _sched_lock_fd.close()
+        _sched_lock_fd = None
+        return False
+
 _TZ = ZoneInfo("Europe/Nicosia")
 
 
 def warm_cache():
-    """Refresh cache for dashboard and live EEZ every minute so users always get fresh numbers."""
+    """Refresh cache for dashboard, live EEZ and campaign performance every minute."""
     today = datetime.now(_TZ).date()
+    month_start = today.replace(day=1).isoformat()
+    today_iso   = today.isoformat()
 
     _ck = f"dashboard_v9:{today.isoformat()}"
     try:
@@ -54,18 +74,19 @@ def warm_cache():
     except Exception as e:
         print(f"[warm_cache] live_eez: {e}")
 
-    month_start = today.replace(day=1).isoformat()
-    today_iso   = today.isoformat()
-
-    _ck = f"camp_perf_v1:{month_start}:{today_iso}:None"
+    # KPI cards — no filters, current month
+    # Key must match camp_performance.py route: camp_perf_v9:{from}:{to}:{class}:{qfrom}:{qto}:{mkt}:{leg}:{name}:{ch}:{sub}:{aff}:{country}:{office}:{agent}:{team}:{seg}
+    _ck = f"camp_perf_v9:{month_start}:{today_iso}:None:None:None:::::::::::None"
     try:
         cache.set(_ck, _camp_kpi_calc(month_start, today_iso))
     except Exception as e:
         print(f"[warm_cache] camp_perf: {e}")
 
-    _ck = f"camp_tbl_v3:{month_start}:{today_iso}:none:none:none:None:None:None:None:None:None:None:None"
+    # Table — no groups, period=day, no filters (most common default view)
+    # Key must match camp_performance.py route: camp_tbl_v10:{from}:{to}:{g1}:{g2}:{period}:{mkt}:{leg}:{name}:{ch}:{sub}:{aff}:{class}:{ftc}:{qfrom}:{qto}:{country}:{office}:{agent}:{team}:{seg}
+    _ck = f"camp_tbl_v10:{month_start}:{today_iso}:none:none:day:::::::None:None:None:None::::None"
     try:
-        cache.set(_ck, _camp_table_calc(month_start, today_iso))
+        cache.set(_ck, _camp_table_calc(month_start, today_iso, period="day"))
     except Exception as e:
         print(f"[warm_cache] camp_tbl: {e}")
 
@@ -100,6 +121,11 @@ async def lifespan(app: FastAPI):
     ensure_materialized_views()
     seed_admin_user(hash_password('Admin123!'))
     threading.Thread(target=backfill_classification_int, daemon=True).start()
+    _run_scheduler = _acquire_scheduler_lock()
+    if not _run_scheduler:
+        # Another worker already holds the scheduler lock — this worker only serves requests.
+        yield
+        return
     _base = datetime.utcnow()
     scheduler.add_job(
         run_accounts_etl,
