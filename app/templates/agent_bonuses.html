@@ -457,22 +457,24 @@
       <div id="acct-error-msg" style="display:none;" class="text-danger text-center p-4 small"></div>
 
       <div id="acct-table-wrapper" style="overflow-x:auto;">
-        <table class="scoreboard-table" id="acct-sales-table">
-          <thead>
-            <tr>
-              <th class="text-start" style="min-width:100px;">Office</th>
-              <th class="text-start" style="min-width:160px;">Agent Name</th>
-              <th class="text-center" style="min-width:110px;">User ID</th>
-              <th class="text-center" style="min-width:75px;">FTD100</th>
-              <th class="text-center" style="min-width:55px;">FTC</th>
-              <th class="text-center" style="min-width:130px;">FTC Net USD</th>
-              <th class="text-center" style="min-width:140px;">Sales Basic Bonus</th>
-              <th class="text-center" style="min-width:150px;">FTD Amount Bonus</th>
-            </tr>
-          </thead>
-          <tbody id="acct-sales-tbody"></tbody>
-          <tfoot id="acct-sales-tfoot"></tfoot>
-        </table>
+        <div style="max-height:440px;overflow-y:auto;">
+          <table class="scoreboard-table" id="acct-sales-table">
+            <thead>
+              <tr>
+                <th class="text-start" style="min-width:100px;position:sticky;top:0;z-index:2;background:#161b22;">Office</th>
+                <th class="text-start" style="min-width:160px;position:sticky;top:0;z-index:2;background:#161b22;">Agent Name</th>
+                <th class="text-center" style="min-width:110px;position:sticky;top:0;z-index:2;background:#161b22;">User ID</th>
+                <th class="text-center" style="min-width:75px;position:sticky;top:0;z-index:2;background:#161b22;">FTD100</th>
+                <th class="text-center" style="min-width:55px;position:sticky;top:0;z-index:2;background:#161b22;">FTC</th>
+                <th class="text-center" style="min-width:130px;position:sticky;top:0;z-index:2;background:#161b22;">FTC Net USD</th>
+                <th class="text-center" style="min-width:140px;position:sticky;top:0;z-index:2;background:#161b22;">Sales Basic Bonus</th>
+                <th class="text-center" style="min-width:150px;position:sticky;top:0;z-index:2;background:#161b22;">FTD Amount Bonus</th>
+              </tr>
+            </thead>
+            <tbody id="acct-sales-tbody"></tbody>
+            <tfoot id="acct-sales-tfoot"></tfoot>
+          </table>
+        </div>
       </div>
     </div>
   </div>
@@ -1152,13 +1154,14 @@
 
     const totalTr = document.createElement('tr');
     totalTr.className = 'total-row';
+    totalTr.style.cssText = 'position:sticky;bottom:0;z-index:1;';
     totalTr.innerHTML = `
-      <td colspan="3">Total</td>
-      <td class="text-center"><span style="color:#388bfd;font-weight:700;">${gFtd100.toLocaleString('en-US')}</span></td>
-      <td class="text-center"><span style="color:#388bfd;font-weight:700;">${gFtc.toLocaleString('en-US')}</span></td>
-      <td class="text-center">${netHtml(gFtcNet, true)}</td>
-      <td class="text-center">${bonusDollarHtml(gBasicBonus, true)}</td>
-      <td class="text-center">${bonusDollarHtml(gAmtBonus, true)}</td>
+      <td colspan="3" style="background:#1c2128;">Total</td>
+      <td class="text-center" style="background:#1c2128;"><span style="color:#388bfd;font-weight:700;">${gFtd100.toLocaleString('en-US')}</span></td>
+      <td class="text-center" style="background:#1c2128;"><span style="color:#388bfd;font-weight:700;">${gFtc.toLocaleString('en-US')}</span></td>
+      <td class="text-center" style="background:#1c2128;">${netHtml(gFtcNet, true)}</td>
+      <td class="text-center" style="background:#1c2128;">${bonusDollarHtml(gBasicBonus, true)}</td>
+      <td class="text-center" style="background:#1c2128;">${bonusDollarHtml(gAmtBonus, true)}</td>
     `;
     tfoot.appendChild(totalTr);
   }
