@@ -32,7 +32,7 @@ async def all_ftcs_api(request: Request, date_from: str, date_to: str):
     if user.get("role") != "admin":
         return JSONResponse(status_code=403, content={"detail": "Forbidden"})
 
-    _ck = f"all_ftcs_v9:{date_from}:{date_to}"
+    _ck = f"all_ftcs_v10:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -58,14 +58,16 @@ async def all_ftcs_api(request: Request, date_from: str, date_to: str):
               AND a.accountid IS NOT NULL
         ),
         ftd_info AS (
-            -- The agent who gets FTC=1 credit (original_deposit_owner of the FTD transaction)
+            -- The agent who gets FTC=1 credit + the FTD date (used as deposit lower bound)
             SELECT fa.accountid,
-                   COALESCE(td.ftd_agent_id, fa.assigned_to) AS ftd_agent_id
+                   COALESCE(td.ftd_agent_id, fa.assigned_to) AS ftd_agent_id,
+                   td.ftd_date
             FROM ftc_accounts fa
             LEFT JOIN (
                 SELECT DISTINCT ON (t.vtigeraccountid)
                        t.vtigeraccountid                                         AS accountid,
-                       COALESCE(t.original_deposit_owner, a2.assigned_to)        AS ftd_agent_id
+                       COALESCE(t.original_deposit_owner, a2.assigned_to)        AS ftd_agent_id,
+                       t.confirmation_time::date                                  AS ftd_date
                 FROM transactions t
                 JOIN accounts a2 ON a2.accountid = t.vtigeraccountid
                 WHERE t.ftd = 1
@@ -99,10 +101,12 @@ async def all_ftcs_api(request: Request, date_from: str, date_to: str):
                             THEN t.usdamount ELSE 0 END)::float                  AS ftc_wd
             FROM transactions t
             JOIN ftc_accounts fa ON fa.accountid = t.vtigeraccountid
+            JOIN ftd_info fi     ON fi.accountid = t.vtigeraccountid
             WHERE t.transactionapproval = 'Approved'
               AND (t.deleted = 0 OR t.deleted IS NULL)
               AND t.transactiontype IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
               AND t.original_deposit_owner IS NOT NULL
+              AND (fi.ftd_date IS NULL OR t.confirmation_time::date >= fi.ftd_date OR t.ftd = 1)
               AND (t.confirmation_time::date <= fa.client_qualification_date OR t.ftd = 1)
               AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
             GROUP BY t.vtigeraccountid, t.original_deposit_owner
