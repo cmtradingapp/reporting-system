@@ -32,14 +32,14 @@ async def all_ftcs_api(request: Request, date_from: str, date_to: str):
     if user.get("role") != "admin":
         return JSONResponse(status_code=403, content={"detail": "Forbidden"})
 
-    _ck = f"all_ftcs_v6:{date_from}:{date_to}"
+    _ck = f"all_ftcs_v7:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
 
     try:
         dt_from = datetime.strptime(date_from, "%Y-%m-%d").date()
-        dt_to = datetime.strptime(date_to, "%Y-%m-%d").date()
+        dt_to   = datetime.strptime(date_to,   "%Y-%m-%d").date()
         date_to_exclusive = (dt_to + timedelta(days=1)).strftime("%Y-%m-%d")
     except ValueError:
         return JSONResponse(status_code=400, content={"detail": "Invalid date format"})
@@ -48,28 +48,34 @@ async def all_ftcs_api(request: Request, date_from: str, date_to: str):
 
     sql = """
         WITH
-        ftc_accs AS (
-            SELECT a.accountid,
-                   COALESCE(td.original_deposit_owner, a.assigned_to) AS agent_id,
-                   1 AS is_ftc
+        ftc_accounts AS (
+            -- All accounts that qualified as FTCs in the date range
+            SELECT a.accountid, a.assigned_to
             FROM accounts a
-            LEFT JOIN (
-                SELECT DISTINCT ON (vtigeraccountid)
-                       vtigeraccountid, original_deposit_owner
-                FROM transactions
-                WHERE ftd = 1
-                  AND transactionapproval = 'Approved'
-                  AND (deleted = 0 OR deleted IS NULL)
-                ORDER BY vtigeraccountid, confirmation_time ASC
-            ) td ON td.vtigeraccountid = a.accountid
             WHERE a.client_qualification_date >= %(date_from)s
               AND a.client_qualification_date <  %(date_to_excl)s
               AND a.is_test_account = 0
               AND a.accountid IS NOT NULL
         ),
+        ftd_info AS (
+            -- The agent who gets FTC=1 credit (original_deposit_owner of the FTD transaction)
+            SELECT fa.accountid,
+                   COALESCE(td.ftd_agent_id, fa.assigned_to) AS ftd_agent_id
+            FROM ftc_accounts fa
+            LEFT JOIN (
+                SELECT DISTINCT ON (t.vtigeraccountid)
+                       t.vtigeraccountid                                         AS accountid,
+                       COALESCE(t.original_deposit_owner, a2.assigned_to)        AS ftd_agent_id
+                FROM transactions t
+                JOIN accounts a2 ON a2.accountid = t.vtigeraccountid
+                WHERE t.ftd = 1
+                  AND t.transactionapproval = 'Approved'
+                  AND (t.deleted = 0 OR t.deleted IS NULL)
+                ORDER BY t.vtigeraccountid, t.confirmation_time ASC
+            ) td ON td.accountid = fa.accountid
+        ),
         ftd100_accs AS (
             SELECT f.accountid,
-                   f.original_deposit_owner                                     AS agent_id,
                    1                                                             AS is_ftd100,
                    CASE WHEN f.ftd_100_amount >= 240 THEN 'full' ELSE 'half' END AS ftd100_type,
                    CASE WHEN f.ftd_100_amount < 500  THEN 0
@@ -81,34 +87,35 @@ async def all_ftcs_api(request: Request, date_from: str, date_to: str):
               AND f.ftd_100_date <  %(date_to_excl)s
               AND f.original_deposit_owner IS NOT NULL
         ),
-        combined AS (
-            SELECT COALESCE(f.accountid, t.accountid)  AS accountid,
-                   COALESCE(f.agent_id,  t.agent_id)   AS agent_id,
-                   COALESCE(t.is_ftc,    0)             AS is_ftc,
-                   COALESCE(f.is_ftd100, 0)             AS is_ftd100,
-                   f.ftd100_type,
-                   COALESCE(f.ftd_amount_bonus_raw, 0)  AS ftd_amount_bonus_raw
-            FROM ftd100_accs f
-            FULL OUTER JOIN ftc_accs t ON t.accountid = f.accountid
-        ),
-        ftc_txns AS (
-            SELECT t.vtigeraccountid AS accountid,
+        per_agent_deps AS (
+            -- Sum deposits/WDs per (account, agent) using original_deposit_owner on each transaction
+            SELECT t.vtigeraccountid                                              AS accountid,
+                   COALESCE(t.original_deposit_owner, fa.assigned_to)            AS agent_id,
                    SUM(CASE WHEN t.transactiontype IN ('Deposit','Withdrawal Cancelled')
-                            THEN t.usdamount ELSE 0 END)::float AS ftc_deposit,
+                            THEN t.usdamount ELSE 0 END)::float                  AS ftc_deposit,
                    SUM(CASE WHEN t.transactiontype IN ('Withdrawal','Deposit Cancelled')
-                            THEN t.usdamount ELSE 0 END)::float AS ftc_wd
+                            THEN t.usdamount ELSE 0 END)::float                  AS ftc_wd
             FROM transactions t
-            JOIN accounts a ON a.accountid = t.vtigeraccountid
+            JOIN ftc_accounts fa ON fa.accountid = t.vtigeraccountid
             WHERE t.transactionapproval = 'Approved'
               AND (t.deleted = 0 OR t.deleted IS NULL)
               AND t.transactiontype IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
-              AND a.client_qualification_date IS NOT NULL
-              AND a.client_qualification_date >= %(date_from)s
-              AND a.client_qualification_date <  %(date_to_excl)s
-              AND (a.client_qualification_date >= t.confirmation_time::date OR t.ftd = 1)
-              AND a.is_test_account = 0
               AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
-            GROUP BY t.vtigeraccountid
+            GROUP BY t.vtigeraccountid, COALESCE(t.original_deposit_owner, fa.assigned_to)
+        ),
+        all_account_agents AS (
+            -- One row per (account, agent): from transactions + current assigned_to with $0 if missing
+            SELECT accountid, agent_id, ftc_deposit, ftc_wd
+            FROM per_agent_deps
+
+            UNION
+
+            SELECT fa.accountid, fa.assigned_to AS agent_id, 0::float, 0::float
+            FROM ftc_accounts fa
+            LEFT JOIN per_agent_deps pad
+                   ON pad.accountid = fa.accountid AND pad.agent_id = fa.assigned_to
+            WHERE fa.assigned_to IS NOT NULL
+              AND pad.agent_id IS NULL
         ),
         agent_totals AS (
             SELECT bon.agent_id,
@@ -124,69 +131,33 @@ async def all_ftcs_api(request: Request, date_from: str, date_to: str):
             GROUP BY bon.agent_id, tgt.target_ftc
         )
         SELECT
-            COALESCE(u.agent_name, u.full_name, 'N/A')  AS agent_name,
-            COALESCE(u.desk, '')                          AS desk,
-            COALESCE(u.office_name, '')                   AS office_name,
-            COALESCE(u.position, '')                      AS position,
-            c.accountid,
-            COALESCE(ft.ftc_deposit, 0)::float            AS ftc_deposit,
-            COALESCE(ft.ftc_wd, 0)::float                 AS ftc_wd,
-            COALESCE(c.ftd100_type, '')                   AS ftd100_type,
-            c.ftd_amount_bonus_raw::float                 AS ftd_amount_bonus_raw,
-            COALESCE(c.is_ftd100, 0)::int                 AS is_ftd100,
-            COALESCE(at.ftd100_total, 0)::int             AS ftd100_total,
-            COALESCE(at.target_ftc, 0)::int               AS target_ftc,
-            1::int                                        AS is_ftc
-        FROM combined c
-        LEFT JOIN crm_users u ON u.id = c.agent_id
-        LEFT JOIN ftc_txns ft ON ft.accountid = c.accountid
-        LEFT JOIN agent_totals at ON at.agent_id = c.agent_id
-        WHERE c.is_ftc = 1
-          AND (u.id IS NULL
+            COALESCE(u.agent_name, u.full_name, 'N/A')                           AS agent_name,
+            COALESCE(u.desk, '')                                                  AS desk,
+            COALESCE(u.office_name, '')                                           AS office_name,
+            COALESCE(u.position, '')                                              AS position,
+            aaa.accountid,
+            aaa.ftc_deposit::float                                                AS ftc_deposit,
+            aaa.ftc_wd::float                                                     AS ftc_wd,
+            CASE WHEN aaa.agent_id = fi.ftd_agent_id
+                 THEN COALESCE(f.ftd100_type, '') ELSE '' END                     AS ftd100_type,
+            CASE WHEN aaa.agent_id = fi.ftd_agent_id
+                 THEN COALESCE(f.ftd_amount_bonus_raw, 0) ELSE 0
+                 END::float                                                       AS ftd_amount_bonus_raw,
+            CASE WHEN aaa.agent_id = fi.ftd_agent_id
+                 THEN COALESCE(f.is_ftd100, 0) ELSE 0 END::int                   AS is_ftd100,
+            COALESCE(at.ftd100_total, 0)::int                                    AS ftd100_total,
+            COALESCE(at.target_ftc, 0)::int                                      AS target_ftc,
+            CASE WHEN aaa.agent_id = fi.ftd_agent_id THEN 1 ELSE 0 END::int      AS is_ftc
+        FROM all_account_agents aaa
+        JOIN ftd_info fi ON fi.accountid = aaa.accountid
+        LEFT JOIN ftd100_accs f ON f.accountid = aaa.accountid
+        LEFT JOIN crm_users u ON u.id = aaa.agent_id
+        LEFT JOIN agent_totals at ON at.agent_id = aaa.agent_id
+        WHERE (u.id IS NULL
                OR (TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
                    AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
                    AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'))
-
-        UNION ALL
-
-        SELECT
-            COALESCE(ua.agent_name, ua.full_name, 'N/A')  AS agent_name,
-            COALESCE(ua.desk, '')                          AS desk,
-            COALESCE(ua.office_name, '')                   AS office_name,
-            COALESCE(ua.position, '')                      AS position,
-            a.accountid,
-            0::float                                       AS ftc_deposit,
-            0::float                                       AS ftc_wd,
-            ''                                             AS ftd100_type,
-            0::float                                       AS ftd_amount_bonus_raw,
-            0::int                                         AS is_ftd100,
-            0::int                                         AS ftd100_total,
-            0::int                                         AS target_ftc,
-            0::int                                         AS is_ftc
-        FROM accounts a
-        JOIN (
-            SELECT DISTINCT ON (vtigeraccountid)
-                   vtigeraccountid, original_deposit_owner
-            FROM transactions
-            WHERE ftd = 1
-              AND transactionapproval = 'Approved'
-              AND (deleted = 0 OR deleted IS NULL)
-            ORDER BY vtigeraccountid, confirmation_time ASC
-        ) ftd ON ftd.vtigeraccountid = a.accountid
-        LEFT JOIN crm_users ua ON ua.id = a.assigned_to
-        WHERE a.client_qualification_date >= %(date_from)s
-          AND a.client_qualification_date <  %(date_to_excl)s
-          AND a.is_test_account = 0
-          AND a.accountid IS NOT NULL
-          AND a.assigned_to IS NOT NULL
-          AND ftd.original_deposit_owner IS NOT NULL
-          AND ftd.original_deposit_owner != a.assigned_to
-          AND (ua.id IS NULL
-               OR (TRIM(COALESCE(ua.agent_name, ua.full_name, '')) NOT ILIKE 'test%%'
-                   AND TRIM(COALESCE(ua.full_name, '')) NOT ILIKE 'test%%'
-                   AND TRIM(COALESCE(ua.agent_name, ua.full_name, '')) NOT ILIKE 'duplicated%%'))
-
-        ORDER BY agent_name, accountid
+        ORDER BY COALESCE(u.agent_name, u.full_name, 'N/A'), aaa.accountid
     """
 
     if dt_from >= _TARGETS_CUTOFF:
