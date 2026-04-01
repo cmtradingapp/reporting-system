@@ -245,6 +245,7 @@
             <label style="cursor:pointer;font-size:0.85rem;"><input type="checkbox" id="add-ap-agent_bonuses" class="me-1">Agent Bonuses</label>
             <label style="cursor:pointer;font-size:0.85rem;"><input type="checkbox" id="add-ap-dashboard" class="me-1">Dashboard</label>
             <label style="cursor:pointer;font-size:0.85rem;"><input type="checkbox" id="add-ap-ftc_date" class="me-1">FTC Date</label>
+            <label style="cursor:pointer;font-size:0.85rem;"><input type="checkbox" id="add-ap-all_ftcs" class="me-1">All FTCs</label>
           </div>
         </div>
         <div class="text-secondary" style="font-size:0.8rem;">Default password: <code>Welcome1!</code> (user must change on first login)</div>
@@ -320,6 +321,7 @@
             <label style="cursor:pointer;font-size:0.85rem;"><input type="checkbox" id="edit-ap-agent_bonuses" class="me-1">Agent Bonuses</label>
             <label style="cursor:pointer;font-size:0.85rem;"><input type="checkbox" id="edit-ap-dashboard" class="me-1">Dashboard</label>
             <label style="cursor:pointer;font-size:0.85rem;"><input type="checkbox" id="edit-ap-ftc_date" class="me-1">FTC Date</label>
+            <label style="cursor:pointer;font-size:0.85rem;"><input type="checkbox" id="edit-ap-all_ftcs" class="me-1">All FTCs</label>
           </div>
         </div>
       </div>
@@ -406,7 +408,7 @@
   setupCrmSearch('add-crm-search', 'add-crm-results', 'add-crm-user-id', 'add-crm-selected');
   setupCrmSearch('edit-crm-search', 'edit-crm-results', 'edit-crm-user-id', 'edit-crm-selected');
 
-  const _AP_KEYS = ['performance', 'marketing', 'agent_bonuses', 'dashboard', 'ftc_date'];
+  const _AP_KEYS = ['performance', 'marketing', 'agent_bonuses', 'dashboard', 'ftc_date', 'all_ftcs'];
   function getCheckedPages(prefix) {
     const checked = _AP_KEYS.filter(p => document.getElementById(`${prefix}-ap-${p}`).checked);
     return checked.length > 0 ? checked : null;

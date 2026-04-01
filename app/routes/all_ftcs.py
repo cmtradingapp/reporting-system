@@ -16,7 +16,10 @@ async def all_ftcs_page(request: Request):
     user = await get_current_user(request)
     if isinstance(user, RedirectResponse):
         return user
-    if user.get("role") != "admin":
+    ap = user.get("allowed_pages_list")
+    if ap is not None and "all_ftcs" not in ap:
+        return RedirectResponse(url="/performance", status_code=302)
+    if ap is None and user.get("role") != "admin":
         return RedirectResponse(url="/performance", status_code=302)
     return templates.TemplateResponse("all_ftcs.html", {
         "request": request,
@@ -29,7 +32,10 @@ async def all_ftcs_api(request: Request, date_from: str, date_to: str):
     user = await get_current_user(request)
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
-    if user.get("role") != "admin":
+    ap = user.get("allowed_pages_list")
+    if ap is not None and "all_ftcs" not in ap:
+        return JSONResponse(status_code=403, content={"detail": "Forbidden"})
+    if ap is None and user.get("role") != "admin":
         return JSONResponse(status_code=403, content={"detail": "Forbidden"})
 
     _ck = f"all_ftcs_v10:{date_from}:{date_to}"
