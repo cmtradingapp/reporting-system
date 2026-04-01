@@ -77,7 +77,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"perf_v14:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"perf_v15:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -134,11 +134,10 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
             GROUP BY k.agent_id
         ) dk ON dk.agent_id = u.id
         LEFT JOIN (
-            SELECT agent_id::bigint, SUM(ftc)::int AS target_ftc
-            FROM targets
-            WHERE date >= %(date_from)s
-              AND date <  %(date_to_excl)s
-            GROUP BY agent_id
+            SELECT crm_user_id AS agent_id, monthly_ftd100_target AS target_ftc
+            FROM agent_targets_history
+            WHERE report_month = DATE_TRUNC('month', %(date_from)s::date)
+              AND crm_user_id IS NOT NULL
         ) tgt ON tgt.agent_id = u.id
         LEFT JOIN (
             SELECT f.original_deposit_owner AS agent_id,
@@ -349,7 +348,7 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"perf_ret_v10:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"perf_ret_v11:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -377,10 +376,10 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
             COALESCE(std.std_count, 0)::int                   AS std_count
         FROM crm_users u
         LEFT JOIN (
-            SELECT agent_id::bigint, SUM(net)::float AS monthly_target_net
-            FROM targets
-            WHERE date >= %(date_from)s AND date <= %(last_day)s AND agent_id IS NOT NULL
-            GROUP BY agent_id
+            SELECT crm_user_id AS agent_id, monthly_net_target::float AS monthly_target_net
+            FROM agent_targets_history
+            WHERE report_month = DATE_TRUNC('month', %(date_from)s::date)
+              AND crm_user_id IS NOT NULL
         ) tgt ON tgt.agent_id = u.id
         LEFT JOIN (
             -- NET + DEPOSIT in one mv_daily_kpis scan

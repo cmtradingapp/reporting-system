@@ -32,7 +32,7 @@ async def all_ftcs_api(request: Request, date_from: str, date_to: str):
     if user.get("role") != "admin":
         return JSONResponse(status_code=403, content={"detail": "Forbidden"})
 
-    _ck = f"all_ftcs_v3:{date_from}:{date_to}"
+    _ck = f"all_ftcs_v4:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -119,10 +119,10 @@ async def all_ftcs_api(request: Request, date_from: str, date_to: str):
                 GROUP BY agent_id
             ) bon
             LEFT JOIN (
-                SELECT agent_id::bigint, SUM(ftc)::int AS target_ftc
-                FROM targets
-                WHERE date >= %(date_from)s AND date < %(date_to_excl)s
-                GROUP BY agent_id
+                SELECT crm_user_id AS agent_id, monthly_ftd100_target AS target_ftc
+                FROM agent_targets_history
+                WHERE report_month = DATE_TRUNC('month', %(date_from)s::date)
+                  AND crm_user_id IS NOT NULL
             ) tgt ON tgt.agent_id = bon.agent_id
             GROUP BY bon.agent_id, tgt.target_ftc
         )

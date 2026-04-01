@@ -154,7 +154,7 @@ async def agent_bonuses_retention_api(request: Request, date_from: str, date_to:
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"bon_ret_v6:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"bon_ret_v7:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -180,10 +180,10 @@ async def agent_bonuses_retention_api(request: Request, date_from: str, date_to:
             COALESCE(u.status, '')                             AS status
         FROM crm_users u
         LEFT JOIN (
-            SELECT agent_id::bigint, SUM(net)::float AS monthly_target_net
-            FROM targets
-            WHERE date >= %(date_from)s AND date <= %(last_day)s AND agent_id IS NOT NULL
-            GROUP BY agent_id
+            SELECT crm_user_id AS agent_id, monthly_net_target::float AS monthly_target_net
+            FROM agent_targets_history
+            WHERE report_month = DATE_TRUNC('month', %(date_from)s::date)
+              AND crm_user_id IS NOT NULL
         ) tgt ON tgt.agent_id = u.id
         LEFT JOIN (
             SELECT k.agent_id, SUM(k.net_usd) AS net_usd
@@ -301,7 +301,7 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"bon_sales_v6:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"bon_sales_v7:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -332,10 +332,10 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
             COALESCE(u.status, '')                                 AS status
         FROM crm_users u
         LEFT JOIN (
-            SELECT agent_id::bigint, SUM(ftc)::int AS target_ftc
-            FROM targets
-            WHERE date >= %(date_from)s AND date < %(date_to_excl)s
-            GROUP BY agent_id
+            SELECT crm_user_id AS agent_id, monthly_ftd100_target AS target_ftc
+            FROM agent_targets_history
+            WHERE report_month = DATE_TRUNC('month', %(date_from)s::date)
+              AND crm_user_id IS NOT NULL
         ) tgt ON tgt.agent_id = u.id
         LEFT JOIN (
             -- FTC from mv_daily_kpis (qual_date axis)
@@ -449,7 +449,7 @@ async def agent_bonuses_sales_accounts_api(request: Request, date_from: str, dat
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"bon_sales_acct_v3:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"bon_sales_acct_v4:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -535,10 +535,10 @@ async def agent_bonuses_sales_accounts_api(request: Request, date_from: str, dat
                 GROUP BY agent_id
             ) bon
             LEFT JOIN (
-                SELECT agent_id::bigint, SUM(ftc)::int AS target_ftc
-                FROM targets
-                WHERE date >= %(date_from)s AND date < %(date_to_excl)s
-                GROUP BY agent_id
+                SELECT crm_user_id AS agent_id, monthly_ftd100_target AS target_ftc
+                FROM agent_targets_history
+                WHERE report_month = DATE_TRUNC('month', %(date_from)s::date)
+                  AND crm_user_id IS NOT NULL
             ) tgt ON tgt.agent_id = bon.agent_id
             GROUP BY bon.agent_id, tgt.target_ftc
         )
