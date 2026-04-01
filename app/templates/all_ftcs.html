@@ -289,7 +289,8 @@
     });
 
     // KPIs
-    document.getElementById('kpi-ftc').textContent   = filtered.length.toLocaleString();
+    const ftc1Count = filtered.filter(r => r.ftc === 1).length;
+    document.getElementById('kpi-ftc').textContent   = ftc1Count.toLocaleString();
     document.getElementById('kpi-dep').textContent   = fmtUSD(filtered.reduce((s,r) => s + r.ftc_deposit, 0));
     document.getElementById('kpi-wd').textContent    = fmtUSD(filtered.reduce((s,r) => s + r.ftc_wd, 0));
     document.getElementById('kpi-bonus').textContent = fmtUSD(filtered.reduce((s,r) => s + r.basic_bonus, 0));
@@ -306,27 +307,32 @@
     const totalBonus = filtered.reduce((s,r) => s + r.basic_bonus, 0);
     const totalAmt   = filtered.reduce((s,r) => s + r.ftd_amount_bonus, 0);
 
-    tbody.innerHTML = filtered.map((r, i) => `
-      <tr>
+    tbody.innerHTML = filtered.map((r, i) => {
+      const dim = r.ftc === 0;
+      const dimStyle = dim ? 'opacity:0.45;' : '';
+      const ftcColor = dim ? '#8b949e' : '#3fb950';
+      return `
+      <tr style="${dimStyle}">
         <td style="color:#8b949e;">${i + 1}</td>
         <td>${r.agent_name || 'Unassigned'}</td>
         <td>${r.desk || '—'}</td>
         <td>${r.office_name || '—'}</td>
         <td>${r.position || '—'}</td>
         <td><code style="color:#c9d1d9;">${r.accountid ?? '—'}</code></td>
-        <td style="color:#3fb950;font-weight:600;">1</td>
-        <td style="color:#3fb950;">${fmtUSD(r.ftc_deposit)}</td>
+        <td style="color:${ftcColor};font-weight:600;">${r.ftc}</td>
+        <td style="color:#3fb950;">${r.ftc_deposit > 0 ? fmtUSD(r.ftc_deposit) : '—'}</td>
         <td style="color:#f85149;">${r.ftc_wd > 0 ? fmtUSD(r.ftc_wd) : '—'}</td>
         <td style="color:#e3b341;">${r.basic_bonus > 0 ? fmtUSD(r.basic_bonus) : '—'}</td>
         <td style="color:#e3b341;">${r.ftd_amount_bonus > 0 ? fmtUSD(r.ftd_amount_bonus) : '—'}</td>
-      </tr>`).join('');
+      </tr>`;
+    }).join('');
 
     tbody.insertAdjacentHTML('beforeend', `
       <tr class="total-row">
         <td></td>
         <td>Total</td>
         <td></td><td></td><td></td><td></td>
-        <td style="color:#3fb950;font-weight:700;">${filtered.length.toLocaleString()}</td>
+        <td style="color:#3fb950;font-weight:700;">${ftc1Count.toLocaleString()}</td>
         <td style="color:#3fb950;">${fmtUSD(totalDep)}</td>
         <td style="color:#f85149;">${fmtUSD(totalWd)}</td>
         <td style="color:#e3b341;">${fmtUSD(totalBonus)}</td>
@@ -363,7 +369,7 @@
       r.office_name || '',
       r.position || '',
       r.accountid,
-      1,
+      r.ftc,
       r.ftc_deposit,
       r.ftc_wd,
       r.basic_bonus,
