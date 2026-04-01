@@ -39,10 +39,11 @@ CREATE INDEX IF NOT EXISTS idx_ath_report_month ON agent_targets_history (report
 CREATE INDEX IF NOT EXISTS idx_ath_crm_user     ON agent_targets_history (crm_user_id);
 
 -- STEP 2: Agent data
--- Duplicate emails (second entry skipped - FIX IN EXCEL):
---   jane.j@cmtrading.com      : Makama Jochabed (2026-01-14) vs Jane Jochabed (2026-03-25)
---   victoria.j@cmtrading.com  : Joseph Agusiobo (2026-03-25) vs Victoria Jatau (2026-03-25)
--- No email (skipped): Matthew (LAG Nigeria, 2026-04-01)
+-- Resolved duplicates:
+--   jane.j@cmtrading.com     -> Jane Jochabed (Makama Jochabed removed)
+--   joseph.a@cmtrading.com   -> Joseph Agusiobo (corrected email)
+--   victoria.j@cmtrading.com -> Victoria Jatau
+-- No email (removed): Matthew (LAG Nigeria, 2026-04-01)
 
 INSERT INTO agents_master (agent_name,office_name,email,start_date,target_group) VALUES ('Titilayo.O','LAG Nigeria','titilayo.o@cmtrading.com','2025-05-14','FTD100') ON CONFLICT (email) DO NOTHING;
 INSERT INTO agents_master (agent_name,office_name,email,start_date,target_group) VALUES ('Osazuwa.O','LAG Nigeria','osazuwa.o@cmtrading.com','2025-05-14','FTD100') ON CONFLICT (email) DO NOTHING;
@@ -165,7 +166,7 @@ INSERT INTO agents_master (agent_name,office_name,email,start_date,target_group)
 INSERT INTO agents_master (agent_name,office_name,email,start_date,target_group) VALUES ('Princess Adaugo Chidi','ABU','princess.c@cmtrading.com','2025-09-10','NET') ON CONFLICT (email) DO NOTHING;
 INSERT INTO agents_master (agent_name,office_name,email,start_date,target_group) VALUES ('Chilaka Juliet Amarachi','ABU','juliet.c@cmtrading.com','2025-06-11','NET') ON CONFLICT (email) DO NOTHING;
 INSERT INTO agents_master (agent_name,office_name,email,start_date,target_group) VALUES ('Faith Stephen','ABU','faith.s@cmtrading.com','2025-06-11','NET') ON CONFLICT (email) DO NOTHING;
-INSERT INTO agents_master (agent_name,office_name,email,start_date,target_group) VALUES ('Makama Jochabed','ABU','jane.j@cmtrading.com','2026-01-14','NET') ON CONFLICT (email) DO NOTHING;
+INSERT INTO agents_master (agent_name,office_name,email,start_date,target_group) VALUES ('Jane Jochabed','ABU','jane.j@cmtrading.com','2026-03-25','NET') ON CONFLICT (email) DO NOTHING;
 INSERT INTO agents_master (agent_name,office_name,email,start_date,target_group) VALUES ('Dede Lolia','ABU','dede.l@cmtrading.com','2026-01-14','NET') ON CONFLICT (email) DO NOTHING;
 INSERT INTO agents_master (agent_name,office_name,email,start_date,target_group) VALUES ('David Nwamara','ABU','david.n@cmtrading.com','2026-01-14','NET') ON CONFLICT (email) DO NOTHING;
 INSERT INTO agents_master (agent_name,office_name,email,start_date,target_group) VALUES ('Alao Jessica','ABU','jessica.a@cmtrading.com','2026-01-14','NET') ON CONFLICT (email) DO NOTHING;
@@ -174,7 +175,8 @@ INSERT INTO agents_master (agent_name,office_name,email,start_date,target_group)
 INSERT INTO agents_master (agent_name,office_name,email,start_date,target_group) VALUES ('Jane Okezi-dovie','ABU','jane.o@cmtrading.com','2025-11-06','NET') ON CONFLICT (email) DO NOTHING;
 INSERT INTO agents_master (agent_name,office_name,email,start_date,target_group) VALUES ('Success Elijah','ABU','success.el@cmtrading.com','2026-03-25','NET') ON CONFLICT (email) DO NOTHING;
 INSERT INTO agents_master (agent_name,office_name,email,start_date,target_group) VALUES ('Christian Nnadozie','ABU','christian.n@cmtrading.com','2026-03-25','NET') ON CONFLICT (email) DO NOTHING;
-INSERT INTO agents_master (agent_name,office_name,email,start_date,target_group) VALUES ('Joseph Agusiobo','ABU','victoria.j@cmtrading.com','2026-03-25','NET') ON CONFLICT (email) DO NOTHING;
+INSERT INTO agents_master (agent_name,office_name,email,start_date,target_group) VALUES ('Joseph Agusiobo','ABU','joseph.a@cmtrading.com','2026-03-25','NET') ON CONFLICT (email) DO NOTHING;
+INSERT INTO agents_master (agent_name,office_name,email,start_date,target_group) VALUES ('Victoria Jatau','ABU','victoria.j@cmtrading.com','2026-03-25','NET') ON CONFLICT (email) DO NOTHING;
 INSERT INTO agents_master (agent_name,office_name,email,start_date,target_group) VALUES ('Esther Jacob','ABU','esther.j@cmtrading.com','2026-03-25','NET') ON CONFLICT (email) DO NOTHING;
 INSERT INTO agents_master (agent_name,office_name,email,start_date,target_group) VALUES ('Divine Uzoama','ABU','divine.u@cmtrading.com','2026-03-25','NET') ON CONFLICT (email) DO NOTHING;
 INSERT INTO agents_master (agent_name,office_name,email,start_date,target_group) VALUES ('Divine Chukwuendu','ABU','divine.c@cmtrading.com','2026-03-26','NET') ON CONFLICT (email) DO NOTHING;
