@@ -32,7 +32,7 @@ async def all_ftcs_api(request: Request, date_from: str, date_to: str):
     if user.get("role") != "admin":
         return JSONResponse(status_code=403, content={"detail": "Forbidden"})
 
-    _ck = f"all_ftcs_v7:{date_from}:{date_to}"
+    _ck = f"all_ftcs_v8:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -50,7 +50,7 @@ async def all_ftcs_api(request: Request, date_from: str, date_to: str):
         WITH
         ftc_accounts AS (
             -- All accounts that qualified as FTCs in the date range
-            SELECT a.accountid, a.assigned_to
+            SELECT a.accountid, a.assigned_to, a.client_qualification_date
             FROM accounts a
             WHERE a.client_qualification_date >= %(date_from)s
               AND a.client_qualification_date <  %(date_to_excl)s
@@ -100,6 +100,7 @@ async def all_ftcs_api(request: Request, date_from: str, date_to: str):
             WHERE t.transactionapproval = 'Approved'
               AND (t.deleted = 0 OR t.deleted IS NULL)
               AND t.transactiontype IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
+              AND (t.confirmation_time::date <= fa.client_qualification_date OR t.ftd = 1)
               AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
             GROUP BY t.vtigeraccountid, COALESCE(t.original_deposit_owner, fa.assigned_to)
         ),
