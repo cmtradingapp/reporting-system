@@ -32,7 +32,7 @@ async def all_ftcs_api(request: Request, date_from: str, date_to: str):
     if user.get("role") != "admin":
         return JSONResponse(status_code=403, content={"detail": "Forbidden"})
 
-    _ck = f"all_ftcs_v8:{date_from}:{date_to}"
+    _ck = f"all_ftcs_v9:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -88,9 +88,11 @@ async def all_ftcs_api(request: Request, date_from: str, date_to: str):
               AND f.original_deposit_owner IS NOT NULL
         ),
         per_agent_deps AS (
-            -- Sum deposits/WDs per (account, agent) using original_deposit_owner on each transaction
+            -- Sum deposits/WDs per (account, agent) using original_deposit_owner on each transaction.
+            -- NULL original_deposit_owner rows are excluded here; the current assigned_to gets
+            -- a $0 row via the UNION in all_account_agents if they have no transactions.
             SELECT t.vtigeraccountid                                              AS accountid,
-                   COALESCE(t.original_deposit_owner, fa.assigned_to)            AS agent_id,
+                   t.original_deposit_owner                                       AS agent_id,
                    SUM(CASE WHEN t.transactiontype IN ('Deposit','Withdrawal Cancelled')
                             THEN t.usdamount ELSE 0 END)::float                  AS ftc_deposit,
                    SUM(CASE WHEN t.transactiontype IN ('Withdrawal','Deposit Cancelled')
@@ -100,9 +102,10 @@ async def all_ftcs_api(request: Request, date_from: str, date_to: str):
             WHERE t.transactionapproval = 'Approved'
               AND (t.deleted = 0 OR t.deleted IS NULL)
               AND t.transactiontype IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
+              AND t.original_deposit_owner IS NOT NULL
               AND (t.confirmation_time::date <= fa.client_qualification_date OR t.ftd = 1)
               AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
-            GROUP BY t.vtigeraccountid, COALESCE(t.original_deposit_owner, fa.assigned_to)
+            GROUP BY t.vtigeraccountid, t.original_deposit_owner
         ),
         all_account_agents AS (
             -- One row per (account, agent): from transactions + current assigned_to with $0 if missing
