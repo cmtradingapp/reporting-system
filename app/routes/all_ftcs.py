@@ -32,17 +32,19 @@ async def all_ftcs_api(request: Request, date_from: str, date_to: str):
     if user.get("role") != "admin":
         return JSONResponse(status_code=403, content={"detail": "Forbidden"})
 
-    _ck = f"all_ftcs_v4:{date_from}:{date_to}"
+    _ck = f"all_ftcs_v6:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
 
     try:
+        dt_from = datetime.strptime(date_from, "%Y-%m-%d").date()
         dt_to = datetime.strptime(date_to, "%Y-%m-%d").date()
         date_to_exclusive = (dt_to + timedelta(days=1)).strftime("%Y-%m-%d")
-        datetime.strptime(date_from, "%Y-%m-%d")
     except ValueError:
         return JSONResponse(status_code=400, content={"detail": "Invalid date format"})
+
+    _TARGETS_CUTOFF = datetime.strptime("2026-04-01", "%Y-%m-%d").date()
 
     sql = """
         WITH
@@ -118,12 +120,7 @@ async def all_ftcs_api(request: Request, date_from: str, date_to: str):
                 WHERE ftd_100_date >= %(date_from)s AND ftd_100_date < %(date_to_excl)s
                 GROUP BY agent_id
             ) bon
-            LEFT JOIN (
-                SELECT crm_user_id AS agent_id, monthly_ftd100_target AS target_ftc
-                FROM agent_targets_history
-                WHERE report_month = DATE_TRUNC('month', %(date_from)s::date)
-                  AND crm_user_id IS NOT NULL
-            ) tgt ON tgt.agent_id = bon.agent_id
+            LEFT JOIN ({tgt_subq}) tgt ON tgt.agent_id = bon.agent_id
             GROUP BY bon.agent_id, tgt.target_ftc
         )
         SELECT
@@ -138,7 +135,8 @@ async def all_ftcs_api(request: Request, date_from: str, date_to: str):
             c.ftd_amount_bonus_raw::float                 AS ftd_amount_bonus_raw,
             COALESCE(c.is_ftd100, 0)::int                 AS is_ftd100,
             COALESCE(at.ftd100_total, 0)::int             AS ftd100_total,
-            COALESCE(at.target_ftc, 0)::int               AS target_ftc
+            COALESCE(at.target_ftc, 0)::int               AS target_ftc,
+            1::int                                        AS is_ftc
         FROM combined c
         LEFT JOIN crm_users u ON u.id = c.agent_id
         LEFT JOIN ftc_txns ft ON ft.accountid = c.accountid
@@ -148,8 +146,59 @@ async def all_ftcs_api(request: Request, date_from: str, date_to: str):
                OR (TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
                    AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
                    AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'))
-        ORDER BY COALESCE(u.agent_name, u.full_name, 'N/A'), c.accountid
+
+        UNION ALL
+
+        SELECT
+            COALESCE(ua.agent_name, ua.full_name, 'N/A')  AS agent_name,
+            COALESCE(ua.desk, '')                          AS desk,
+            COALESCE(ua.office_name, '')                   AS office_name,
+            COALESCE(ua.position, '')                      AS position,
+            a.accountid,
+            0::float                                       AS ftc_deposit,
+            0::float                                       AS ftc_wd,
+            ''                                             AS ftd100_type,
+            0::float                                       AS ftd_amount_bonus_raw,
+            0::int                                         AS is_ftd100,
+            0::int                                         AS ftd100_total,
+            0::int                                         AS target_ftc,
+            0::int                                         AS is_ftc
+        FROM accounts a
+        JOIN (
+            SELECT DISTINCT ON (vtigeraccountid)
+                   vtigeraccountid, original_deposit_owner
+            FROM transactions
+            WHERE ftd = 1
+              AND transactionapproval = 'Approved'
+              AND (deleted = 0 OR deleted IS NULL)
+            ORDER BY vtigeraccountid, confirmation_time ASC
+        ) ftd ON ftd.vtigeraccountid = a.accountid
+        LEFT JOIN crm_users ua ON ua.id = a.assigned_to
+        WHERE a.client_qualification_date >= %(date_from)s
+          AND a.client_qualification_date <  %(date_to_excl)s
+          AND a.is_test_account = 0
+          AND a.accountid IS NOT NULL
+          AND a.assigned_to IS NOT NULL
+          AND ftd.original_deposit_owner IS NOT NULL
+          AND ftd.original_deposit_owner != a.assigned_to
+          AND (ua.id IS NULL
+               OR (TRIM(COALESCE(ua.agent_name, ua.full_name, '')) NOT ILIKE 'test%%'
+                   AND TRIM(COALESCE(ua.full_name, '')) NOT ILIKE 'test%%'
+                   AND TRIM(COALESCE(ua.agent_name, ua.full_name, '')) NOT ILIKE 'duplicated%%'))
+
+        ORDER BY agent_name, accountid
     """
+
+    if dt_from >= _TARGETS_CUTOFF:
+        _tgt_subq = """SELECT crm_user_id AS agent_id, monthly_ftd100_target AS target_ftc
+            FROM agent_targets_history
+            WHERE report_month = DATE_TRUNC('month', %(date_from)s::date)
+              AND crm_user_id IS NOT NULL"""
+    else:
+        _tgt_subq = """SELECT agent_id::int AS agent_id, ftc::int AS target_ftc
+            FROM targets
+            WHERE date = DATE_TRUNC('month', %(date_from)s::date)"""
+    sql = sql.replace('{tgt_subq}', _tgt_subq)
 
     conn = get_connection()
     try:
@@ -171,11 +220,12 @@ async def all_ftcs_api(request: Request, date_from: str, date_to: str):
             is_ftd100            = int(r[9])
             ftd100_total         = int(r[10])
             target_ftc           = int(r[11])
+            is_ftc               = int(r[12])
 
             qualify    = target_ftc > 0 and ftd100_total >= 0.50 * target_ftc
             multiplier = get_sales_multiplier(ftd100_total)
 
-            if is_ftd100 and qualify:
+            if is_ftd100 and qualify and is_ftc == 1:
                 basic_bonus      = multiplier if ftd100_type == 'full' else round(multiplier / 2, 2)
                 ftd_amount_bonus = ftd_amount_bonus_raw
             else:
@@ -188,7 +238,7 @@ async def all_ftcs_api(request: Request, date_from: str, date_to: str):
                 "office_name":      office_name,
                 "position":         position,
                 "accountid":        accountid,
-                "ftc":              1,
+                "ftc":              is_ftc,
                 "ftc_deposit":      ftc_deposit,
                 "ftc_wd":           ftc_wd,
                 "basic_bonus":      basic_bonus,
