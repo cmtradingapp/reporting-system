@@ -449,7 +449,9 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
             })
 
         _result = {"rows": data}
-        cache.set(_ck, _result)
+        # Don't cache if mv_sales_bonuses is empty/stale (all agents showing 0 FTD100s)
+        if any(r["ftd100_count"] > 0 for r in data):
+            cache.set(_ck, _result)
         return JSONResponse(content=_result)
     except Exception as e:
         return JSONResponse(status_code=500, content={"detail": str(e)})
