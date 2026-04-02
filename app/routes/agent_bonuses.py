@@ -309,7 +309,7 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"bon_sales_v15:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"bon_sales_v16:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -382,6 +382,7 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
             (u.department_ = 'Sales' AND u.team = 'Conversion' {role_filter})
             OR u.id IN (3750, 3614, 6119, 6479, 6492, 6355, 6666, 6694)
           )
+          AND u.office_name IN ('GMT', 'LAG Nigeria', 'ABJ Nigeria', 'South Africa', 'Cyprus')
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'
@@ -490,7 +491,7 @@ async def agent_bonuses_sales_accounts_api(request: Request, date_from: str, dat
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"bon_sales_acct_v11:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"bon_sales_acct_v12:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -599,6 +600,7 @@ async def agent_bonuses_sales_accounts_api(request: Request, date_from: str, dat
             (u.department_ = 'Sales' AND u.team = 'Conversion' {role_filter})
             OR u.id IN (3750, 3614, 6119, 6479, 6492, 6355, 6666, 6694)
           )
+          AND u.office_name IN ('GMT', 'LAG Nigeria', 'ABJ Nigeria', 'South Africa', 'Cyprus')
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'
