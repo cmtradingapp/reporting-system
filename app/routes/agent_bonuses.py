@@ -155,7 +155,7 @@ async def agent_bonuses_retention_api(request: Request, date_from: str, date_to:
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"bon_ret_v8:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"bon_ret_v9:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -231,7 +231,7 @@ async def agent_bonuses_retention_api(request: Request, date_from: str, date_to:
                 "date_to_excl": date_to_exclusive,
                 "date_to":      date_to,
                 "last_day":     last_day,
-                "is_admin":     user.get("role") == "admin",
+                "is_admin":     user.get("role") in ("admin", "general"),
             }
             final_sql, final_params = _apply_role_filter(sql.replace('{tgt_subq}', _tgt_subq), base_params, role_filter)
             cur.execute(final_sql, final_params)
@@ -309,7 +309,7 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"bon_sales_v12:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"bon_sales_v13:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -411,7 +411,7 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
             base_params = {
                 "date_from":    date_from,
                 "date_to_excl": date_to_exclusive,
-                "is_admin":     user.get("role") == "admin",
+                "is_admin":     user.get("role") in ("admin", "general"),
             }
             final_sql, final_params = _apply_role_filter(sql.replace('{tgt_subq}', _tgt_subq), base_params, role_filter)
             cur.execute(final_sql, final_params)
@@ -492,7 +492,7 @@ async def agent_bonuses_sales_accounts_api(request: Request, date_from: str, dat
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"bon_sales_acct_v8:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"bon_sales_acct_v9:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -623,7 +623,7 @@ async def agent_bonuses_sales_accounts_api(request: Request, date_from: str, dat
             base_params = {
                 "date_from":    date_from,
                 "date_to_excl": date_to_exclusive,
-                "is_admin":     user.get("role") == "admin",
+                "is_admin":     user.get("role") in ("admin", "general"),
             }
             final_sql, final_params = _apply_role_filter(sql.replace('{tgt_subq}', _tgt_subq), base_params, role_filter)
             cur.execute(final_sql, final_params)
