@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 import calendar
 
 _TZ = ZoneInfo("Europe/Nicosia")
+_TARGETS_CUTOFF = date_type(2026, 4, 1)
 
 
 def _apply_role_filter(sql: str, params: dict, role_filter: dict) -> tuple[str, dict]:
@@ -77,7 +78,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"perf_v15:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"perf_v16:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -133,12 +134,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
             WHERE k.tx_date = %(date_to)s OR k.qual_date = %(date_to)s
             GROUP BY k.agent_id
         ) dk ON dk.agent_id = u.id
-        LEFT JOIN (
-            SELECT crm_user_id AS agent_id, monthly_ftd100_target AS target_ftc
-            FROM agent_targets_history
-            WHERE report_month = DATE_TRUNC('month', %(date_from)s::date)
-              AND crm_user_id IS NOT NULL
-        ) tgt ON tgt.agent_id = u.id
+        LEFT JOIN ({tgt_subq}) tgt ON tgt.agent_id = u.id
         LEFT JOIN (
             SELECT f.original_deposit_owner AS agent_id,
                    COUNT(DISTINCT f.accountid) AS ftd100_cnt
@@ -166,8 +162,17 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
                 conn.rollback()
                 holidays = set()
 
+            if dt_from >= _TARGETS_CUTOFF:
+                _tgt_subq = """SELECT crm_user_id AS agent_id, monthly_ftd100_target AS target_ftc
+                    FROM agent_targets_history
+                    WHERE report_month = DATE_TRUNC('month', %(date_from)s::date)
+                      AND crm_user_id IS NOT NULL"""
+            else:
+                _tgt_subq = """SELECT agent_id::int AS agent_id, ftc::int AS target_ftc
+                    FROM targets
+                    WHERE date = DATE_TRUNC('month', %(date_from)s::date)"""
             base_params = {"date_from": date_from, "date_to_excl": date_to_exclusive, "date_to": date_to}
-            final_sql, final_params = _apply_role_filter(sql, base_params, role_filter)
+            final_sql, final_params = _apply_role_filter(sql.replace('{tgt_subq}', _tgt_subq), base_params, role_filter)
             cur.execute(final_sql, final_params)
             rows = cur.fetchall()
 
@@ -348,7 +353,7 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"perf_ret_v11:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"perf_ret_v12:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -375,12 +380,7 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
             COALESCE(u.status, '')                             AS status,
             COALESCE(std.std_count, 0)::int                   AS std_count
         FROM crm_users u
-        LEFT JOIN (
-            SELECT crm_user_id AS agent_id, monthly_net_target::float AS monthly_target_net
-            FROM agent_targets_history
-            WHERE report_month = DATE_TRUNC('month', %(date_from)s::date)
-              AND crm_user_id IS NOT NULL
-        ) tgt ON tgt.agent_id = u.id
+        LEFT JOIN ({tgt_subq}) tgt ON tgt.agent_id = u.id
         LEFT JOIN (
             -- NET + DEPOSIT in one mv_daily_kpis scan
             SELECT k.agent_id,
@@ -432,13 +432,22 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
                 conn.rollback()
                 holidays = set()
 
+            if dt_from >= _TARGETS_CUTOFF:
+                _tgt_subq = """SELECT crm_user_id AS agent_id, monthly_net_target::float AS monthly_target_net
+                    FROM agent_targets_history
+                    WHERE report_month = DATE_TRUNC('month', %(date_from)s::date)
+                      AND crm_user_id IS NOT NULL"""
+            else:
+                _tgt_subq = """SELECT agent_id::int AS agent_id, net::float AS monthly_target_net
+                    FROM targets
+                    WHERE date = DATE_TRUNC('month', %(date_from)s::date)"""
             base_params = {
                 "date_from":    date_from,
                 "date_to_excl": date_to_exclusive,
                 "date_to":      date_to,
                 "last_day":     last_day,
             }
-            final_sql, final_params = _apply_role_filter(sql, base_params, role_filter)
+            final_sql, final_params = _apply_role_filter(sql.replace('{tgt_subq}', _tgt_subq), base_params, role_filter)
             cur.execute(final_sql, final_params)
             rows = cur.fetchall()
 

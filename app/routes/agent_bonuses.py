@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 import calendar
 
 _TZ = ZoneInfo("Europe/Nicosia")
+_TARGETS_CUTOFF = date_type(2026, 4, 1)
 
 
 def _apply_role_filter(sql: str, params: dict, role_filter: dict) -> tuple[str, dict]:
@@ -154,7 +155,7 @@ async def agent_bonuses_retention_api(request: Request, date_from: str, date_to:
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"bon_ret_v7:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"bon_ret_v8:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -179,12 +180,7 @@ async def agent_bonuses_retention_api(request: Request, date_from: str, date_to:
             COALESCE(vol.open_volume_usd, 0)::float           AS open_volume_usd,
             COALESCE(u.status, '')                             AS status
         FROM crm_users u
-        LEFT JOIN (
-            SELECT crm_user_id AS agent_id, monthly_net_target::float AS monthly_target_net
-            FROM agent_targets_history
-            WHERE report_month = DATE_TRUNC('month', %(date_from)s::date)
-              AND crm_user_id IS NOT NULL
-        ) tgt ON tgt.agent_id = u.id
+        LEFT JOIN ({tgt_subq}) tgt ON tgt.agent_id = u.id
         LEFT JOIN (
             SELECT k.agent_id, SUM(k.net_usd) AS net_usd
             FROM mv_daily_kpis k
@@ -219,13 +215,22 @@ async def agent_bonuses_retention_api(request: Request, date_from: str, date_to:
                 conn.rollback()
                 holidays = set()
 
+            if dt_from >= _TARGETS_CUTOFF:
+                _tgt_subq = """SELECT crm_user_id AS agent_id, monthly_net_target::float AS monthly_target_net
+                    FROM agent_targets_history
+                    WHERE report_month = DATE_TRUNC('month', %(date_from)s::date)
+                      AND crm_user_id IS NOT NULL"""
+            else:
+                _tgt_subq = """SELECT agent_id::int AS agent_id, net::float AS monthly_target_net
+                    FROM targets
+                    WHERE date = DATE_TRUNC('month', %(date_from)s::date)"""
             base_params = {
                 "date_from":    date_from,
                 "date_to_excl": date_to_exclusive,
                 "date_to":      date_to,
                 "last_day":     last_day,
             }
-            final_sql, final_params = _apply_role_filter(sql, base_params, role_filter)
+            final_sql, final_params = _apply_role_filter(sql.replace('{tgt_subq}', _tgt_subq), base_params, role_filter)
             cur.execute(final_sql, final_params)
             rows = cur.fetchall()
 
@@ -301,14 +306,14 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"bon_sales_v7:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"bon_sales_v8:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
     try:
+        dt_from           = datetime.strptime(date_from, "%Y-%m-%d").date()
         dt_to             = datetime.strptime(date_to, "%Y-%m-%d").date()
         date_to_exclusive = (dt_to + timedelta(days=1)).strftime("%Y-%m-%d")
-        datetime.strptime(date_from, "%Y-%m-%d")
     except ValueError:
         return JSONResponse(status_code=400, content={"detail": "Invalid date format"})
 
@@ -331,12 +336,7 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
             COALESCE(bon.ftd_amount_bonus, 0)::float              AS ftd_amount_bonus_sql,
             COALESCE(u.status, '')                                 AS status
         FROM crm_users u
-        LEFT JOIN (
-            SELECT crm_user_id AS agent_id, monthly_ftd100_target AS target_ftc
-            FROM agent_targets_history
-            WHERE report_month = DATE_TRUNC('month', %(date_from)s::date)
-              AND crm_user_id IS NOT NULL
-        ) tgt ON tgt.agent_id = u.id
+        LEFT JOIN ({tgt_subq}) tgt ON tgt.agent_id = u.id
         LEFT JOIN (
             -- FTC from mv_daily_kpis (qual_date axis)
             SELECT k.agent_id, SUM(k.ftc_count)::int AS ftc_count
@@ -386,8 +386,17 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
     conn = get_connection()
     try:
         with conn.cursor() as cur:
+            if dt_from >= _TARGETS_CUTOFF:
+                _tgt_subq = """SELECT crm_user_id AS agent_id, monthly_ftd100_target AS target_ftc
+                    FROM agent_targets_history
+                    WHERE report_month = DATE_TRUNC('month', %(date_from)s::date)
+                      AND crm_user_id IS NOT NULL"""
+            else:
+                _tgt_subq = """SELECT agent_id::int AS agent_id, ftc::int AS target_ftc
+                    FROM targets
+                    WHERE date = DATE_TRUNC('month', %(date_from)s::date)"""
             base_params = {"date_from": date_from, "date_to_excl": date_to_exclusive}
-            final_sql, final_params = _apply_role_filter(sql, base_params, role_filter)
+            final_sql, final_params = _apply_role_filter(sql.replace('{tgt_subq}', _tgt_subq), base_params, role_filter)
             cur.execute(final_sql, final_params)
             rows = cur.fetchall()
 
@@ -449,14 +458,14 @@ async def agent_bonuses_sales_accounts_api(request: Request, date_from: str, dat
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"bon_sales_acct_v4:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"bon_sales_acct_v5:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
     try:
+        dt_from           = datetime.strptime(date_from, "%Y-%m-%d").date()
         dt_to             = datetime.strptime(date_to, "%Y-%m-%d").date()
         date_to_exclusive = (dt_to + timedelta(days=1)).strftime("%Y-%m-%d")
-        datetime.strptime(date_from, "%Y-%m-%d")
     except ValueError:
         return JSONResponse(status_code=400, content={"detail": "Invalid date format"})
 
@@ -534,12 +543,7 @@ async def agent_bonuses_sales_accounts_api(request: Request, date_from: str, dat
                 WHERE ftd_100_date >= %(date_from)s AND ftd_100_date < %(date_to_excl)s
                 GROUP BY agent_id
             ) bon
-            LEFT JOIN (
-                SELECT crm_user_id AS agent_id, monthly_ftd100_target AS target_ftc
-                FROM agent_targets_history
-                WHERE report_month = DATE_TRUNC('month', %(date_from)s::date)
-                  AND crm_user_id IS NOT NULL
-            ) tgt ON tgt.agent_id = bon.agent_id
+            LEFT JOIN ({tgt_subq}) tgt ON tgt.agent_id = bon.agent_id
             GROUP BY bon.agent_id, tgt.target_ftc
         )
         SELECT
@@ -570,8 +574,17 @@ async def agent_bonuses_sales_accounts_api(request: Request, date_from: str, dat
     conn = get_connection()
     try:
         with conn.cursor() as cur:
+            if dt_from >= _TARGETS_CUTOFF:
+                _tgt_subq = """SELECT crm_user_id AS agent_id, monthly_ftd100_target AS target_ftc
+                    FROM agent_targets_history
+                    WHERE report_month = DATE_TRUNC('month', %(date_from)s::date)
+                      AND crm_user_id IS NOT NULL"""
+            else:
+                _tgt_subq = """SELECT agent_id::int AS agent_id, ftc::int AS target_ftc
+                    FROM targets
+                    WHERE date = DATE_TRUNC('month', %(date_from)s::date)"""
             base_params = {"date_from": date_from, "date_to_excl": date_to_exclusive}
-            final_sql, final_params = _apply_role_filter(sql, base_params, role_filter)
+            final_sql, final_params = _apply_role_filter(sql.replace('{tgt_subq}', _tgt_subq), base_params, role_filter)
             cur.execute(final_sql, final_params)
             rows = cur.fetchall()
 
