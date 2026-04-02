@@ -180,6 +180,7 @@ async def agent_bonuses_retention_api(request: Request, date_from: str, date_to:
             COALESCE(vol.open_volume_usd, 0)::float           AS open_volume_usd,
             COALESCE(u.status, '')                             AS status
         FROM crm_users u
+        LEFT JOIN auth_users au ON au.crm_user_id = u.id
         LEFT JOIN ({tgt_subq}) tgt ON tgt.agent_id = u.id
         LEFT JOIN (
             SELECT k.agent_id, SUM(k.net_usd) AS net_usd
@@ -201,6 +202,7 @@ async def agent_bonuses_retention_api(request: Request, date_from: str, date_to:
           AND TRIM(COALESCE(u.department, '')) NOT ILIKE '%%Conversion%%'
           AND TRIM(COALESCE(u.department, '')) NOT ILIKE '%%Support%%'
           AND TRIM(COALESCE(u.department, '')) NOT ILIKE '%%General%%'
+          AND (%(is_admin)s OR au.role IS NULL OR au.role NOT IN ('admin', 'general'))
           {role_filter}
         ORDER BY u.office_name NULLS LAST, dept_name, u.agent_name
     """
@@ -229,6 +231,7 @@ async def agent_bonuses_retention_api(request: Request, date_from: str, date_to:
                 "date_to_excl": date_to_exclusive,
                 "date_to":      date_to,
                 "last_day":     last_day,
+                "is_admin":     user.get("role") == "admin",
             }
             final_sql, final_params = _apply_role_filter(sql.replace('{tgt_subq}', _tgt_subq), base_params, role_filter)
             cur.execute(final_sql, final_params)

@@ -285,8 +285,29 @@ def run_targets_etl() -> dict:
     return {"status": status, "rows_synced": rows}
 
 
+def _refresh_sales_bonuses_mv() -> None:
+    """Refresh only mv_sales_bonuses after ftd100_clients rebuild."""
+    conn = _pg_conn()
+    try:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("REFRESH MATERIALIZED VIEW CONCURRENTLY mv_sales_bonuses")
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            with conn.cursor() as cur:
+                cur.execute("REFRESH MATERIALIZED VIEW mv_sales_bonuses")
+            conn.commit()
+    except Exception as e:
+        print(f"[ftd100_etl] mv_sales_bonuses refresh error: {e}")
+        conn.rollback()
+    finally:
+        conn.close()
+
+
 def run_ftd100_etl() -> dict:
     """Full refresh — TRUNCATE + INSERT computed from transactions + accounts CTEs."""
+    from app import cache
     start = time.time()
     cutoff = datetime(1970, 1, 1)  # full refresh marker
     status = "success"
@@ -294,6 +315,10 @@ def run_ftd100_etl() -> dict:
     rows = 0
     try:
         rows = truncate_and_insert_ftd100()
+        # Immediately refresh mv_sales_bonuses so it's never stale after rebuild
+        _refresh_sales_bonuses_mv()
+        # Clear sales bonus cache so next request gets fresh data
+        cache.invalidate_all()
     except Exception as e:
         status = "error"
         error_msg = str(e)
