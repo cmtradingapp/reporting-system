@@ -309,7 +309,7 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"bon_sales_v14:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"bon_sales_v15:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -437,17 +437,15 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
             ftd_amount_bonus_raw = round(float(r[9]), 2)
             status               = r[10] or ''
 
-            target_pct = ftc_count / target_ftc if target_ftc > 0 else None
+            target_ftc = max(target_ftc, 1)  # no target → treat as 1
 
-            if target_ftc == 0:
-                qualify = ftd100_count >= 5
-            else:
-                qualify = ftd100_count >= 0.50 * target_ftc
+            target_pct = ftd100_count / target_ftc
+
+            qualify = ftd100_count >= 0.50 * target_ftc
 
             multiplier         = get_sales_multiplier(ftd100_count)
             basic_bonus        = (ftd100_full_count * multiplier + ftd100_half_count * multiplier / 2) if qualify else 0
-            _eff_target        = target_ftc if target_ftc > 0 else 1
-            sales_target_bonus = get_sales_target_bonus(ftd100_count, _eff_target) if qualify else 0
+            sales_target_bonus = get_sales_target_bonus(ftd100_count, target_ftc) if qualify else 0
             ftd_amount_bonus   = ftd_amount_bonus_raw if qualify else 0
             total_sales_bonus  = basic_bonus + sales_target_bonus + ftd_amount_bonus
 
@@ -465,7 +463,7 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
                 "sales_target_bonus": sales_target_bonus,
                 "ftd_amount_bonus":   ftd_amount_bonus,
                 "total_sales_bonus":  round(total_sales_bonus, 2),
-                "target_pct":         round(target_pct, 6) if target_pct is not None else None,
+                "target_pct":         round(target_pct, 6),
                 "multiplier":         multiplier,
                 "status":             status,
             })
@@ -492,7 +490,7 @@ async def agent_bonuses_sales_accounts_api(request: Request, date_from: str, dat
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"bon_sales_acct_v10:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"bon_sales_acct_v11:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -643,10 +641,8 @@ async def agent_bonuses_sales_accounts_api(request: Request, date_from: str, dat
             target_ftc           = int(r[9])
             status               = r[10] or ''
 
-            if target_ftc == 0:
-                qualify = ftd100_total >= 5
-            else:
-                qualify = ftd100_total >= 0.50 * target_ftc
+            target_ftc = max(target_ftc, 1)  # no target → treat as 1
+            qualify = ftd100_total >= 0.50 * target_ftc
             multiplier = get_sales_multiplier(ftd100_total)
 
             if is_ftd100 and qualify:
