@@ -416,11 +416,15 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
 
             target_pct = ftc_count / target_ftc if target_ftc > 0 else None
 
-            qualify = target_ftc > 0 and ftd100_count >= 0.50 * target_ftc
+            if target_ftc == 0:
+                qualify = ftd100_count > 0
+            else:
+                qualify = ftd100_count >= 0.50 * target_ftc
 
             multiplier         = get_sales_multiplier(ftd100_count)
             basic_bonus        = (ftd100_full_count * multiplier + ftd100_half_count * multiplier / 2) if qualify else 0
-            sales_target_bonus = get_sales_target_bonus(ftd100_count, target_ftc) if qualify else 0
+            _eff_target        = target_ftc if target_ftc > 0 else 1
+            sales_target_bonus = get_sales_target_bonus(ftd100_count, _eff_target) if qualify else 0
             ftd_amount_bonus   = ftd_amount_bonus_raw if qualify else 0
             total_sales_bonus  = basic_bonus + sales_target_bonus + ftd_amount_bonus
 
@@ -602,7 +606,10 @@ async def agent_bonuses_sales_accounts_api(request: Request, date_from: str, dat
             target_ftc           = int(r[9])
             status               = r[10] or ''
 
-            qualify    = target_ftc > 0 and ftd100_total >= 0.50 * target_ftc
+            if target_ftc == 0:
+                qualify = ftd100_total > 0
+            else:
+                qualify = ftd100_total >= 0.50 * target_ftc
             multiplier = get_sales_multiplier(ftd100_total)
 
             if is_ftd100 and qualify:
