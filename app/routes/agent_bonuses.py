@@ -309,7 +309,7 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"bon_sales_v11:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"bon_sales_v12:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -339,6 +339,7 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
             COALESCE(bon.ftd_amount_bonus, 0)::float              AS ftd_amount_bonus_sql,
             COALESCE(u.status, '')                                 AS status
         FROM crm_users u
+        LEFT JOIN auth_users au ON au.crm_user_id = u.id
         LEFT JOIN ({tgt_subq}) tgt ON tgt.agent_id = u.id
         LEFT JOIN (
             -- FTC from mv_daily_kpis (qual_date axis)
@@ -384,6 +385,7 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'
+          AND (%(is_admin)s OR au.role IS NULL OR au.role NOT IN ('admin', 'general'))
         ORDER BY u.office_name NULLS LAST, COALESCE(bon.ftd100_count, 0) DESC, u.agent_name
     """
 
@@ -406,7 +408,11 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
                 _tgt_subq = """SELECT agent_id::int AS agent_id, ftc::int AS target_ftc
                     FROM targets
                     WHERE date = DATE_TRUNC('month', %(date_from)s::date)"""
-            base_params = {"date_from": date_from, "date_to_excl": date_to_exclusive}
+            base_params = {
+                "date_from":    date_from,
+                "date_to_excl": date_to_exclusive,
+                "is_admin":     user.get("role") == "admin",
+            }
             final_sql, final_params = _apply_role_filter(sql.replace('{tgt_subq}', _tgt_subq), base_params, role_filter)
             cur.execute(final_sql, final_params)
             rows = cur.fetchall()
@@ -486,7 +492,7 @@ async def agent_bonuses_sales_accounts_api(request: Request, date_from: str, dat
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"bon_sales_acct_v7:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"bon_sales_acct_v8:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -588,6 +594,7 @@ async def agent_bonuses_sales_accounts_api(request: Request, date_from: str, dat
             COALESCE(u.status, '')                      AS status
         FROM combined c
         JOIN crm_users u ON u.id = c.agent_id
+        LEFT JOIN auth_users au ON au.crm_user_id = u.id
         LEFT JOIN ftc_net fn ON fn.accountid = c.accountid AND fn.agent_id = c.agent_id
         LEFT JOIN agent_totals at ON at.agent_id = c.agent_id
         WHERE (
@@ -597,6 +604,7 @@ async def agent_bonuses_sales_accounts_api(request: Request, date_from: str, dat
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'
+          AND (%(is_admin)s OR au.role IS NULL OR au.role NOT IN ('admin', 'general'))
         ORDER BY u.office_name NULLS LAST, u.agent_name, c.accountid
     """
 
@@ -612,7 +620,11 @@ async def agent_bonuses_sales_accounts_api(request: Request, date_from: str, dat
                 _tgt_subq = """SELECT agent_id::int AS agent_id, ftc::int AS target_ftc
                     FROM targets
                     WHERE date = DATE_TRUNC('month', %(date_from)s::date)"""
-            base_params = {"date_from": date_from, "date_to_excl": date_to_exclusive}
+            base_params = {
+                "date_from":    date_from,
+                "date_to_excl": date_to_exclusive,
+                "is_admin":     user.get("role") == "admin",
+            }
             final_sql, final_params = _apply_role_filter(sql.replace('{tgt_subq}', _tgt_subq), base_params, role_filter)
             cur.execute(final_sql, final_params)
             rows = cur.fetchall()
