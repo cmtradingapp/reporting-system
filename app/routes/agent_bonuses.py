@@ -309,7 +309,7 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"bon_sales_v13:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"bon_sales_v14:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -380,7 +380,7 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
         ) ftc_net ON ftc_net.agent_id = u.id
         WHERE (
             (u.department_ = 'Sales' AND u.team = 'Conversion' {role_filter})
-            OR u.id IN (3750, 3614, 6119, 6479, 6492)
+            OR u.id IN (3750, 3614, 6119, 6479, 6492, 6355, 6666, 6694)
           )
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
@@ -492,7 +492,7 @@ async def agent_bonuses_sales_accounts_api(request: Request, date_from: str, dat
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"bon_sales_acct_v9:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"bon_sales_acct_v10:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -599,7 +599,7 @@ async def agent_bonuses_sales_accounts_api(request: Request, date_from: str, dat
         LEFT JOIN agent_totals at ON at.agent_id = c.agent_id
         WHERE (
             (u.department_ = 'Sales' AND u.team = 'Conversion' {role_filter})
-            OR u.id IN (3750, 3614, 6119, 6479, 6492)
+            OR u.id IN (3750, 3614, 6119, 6479, 6492, 6355, 6666, 6694)
           )
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
