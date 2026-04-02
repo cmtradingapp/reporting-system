@@ -1850,7 +1850,7 @@
       'FTC Net USD', 'Total Sales Net', 'Basic Bonus',
       'Sales Target Bonus', 'FTD Amount Bonus', 'Total Sales Bonus',
     ];
-    const rows = salAllRows.map(r => [
+    const rows = salAllRows.filter(r => r.target_ftc > 0 || r.ftd100_count > 0 || r.ftc_count > 0).map(r => [
       r.office_name,
       r.agent_name,
       r.target_ftc,
@@ -1909,7 +1909,7 @@
       '% on Net', '% on Target Net', '% on Target Vol',
       'Total Bonus %', 'Total Retention Bonus $',
     ];
-    const rows = bonAllRows.map(r => [
+    const rows = bonAllRows.filter(r => r.target_net > 0 || r.net_usd !== 0 || r.open_volume_usd > 0).map(r => [
       r.office_name,
       r.dept_name,
       r.agent_name,
