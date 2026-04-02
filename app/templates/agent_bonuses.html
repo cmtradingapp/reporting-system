@@ -425,7 +425,7 @@
         <table class="scoreboard-table" id="sales-table">
           <thead>
             <tr>
-              <th>Office / Agent</th>
+              <th data-sort="sal-name" style="cursor:pointer;user-select:none;">Office / Agent <i class="bi sort-icon bi-sort-alpha-down" id="sal-sort-icon-name" style="opacity:0.4;"></i></th>
               <th class="text-center" style="min-width:80px;" data-sort="sal-target">Target <i class="bi sort-icon" id="sal-sort-icon-target"></i></th>
               <th class="text-center" style="min-width:100px;" data-sort="sal-targetPct">Target % <i class="bi sort-icon" id="sal-sort-icon-targetPct"></i></th>
               <th class="text-center" style="min-width:90px;" data-sort="sal-ftd100">FTD100 <i class="bi sort-icon" id="sal-sort-icon-ftd100"></i></th>
@@ -1280,6 +1280,10 @@
     });
 
     officeArr.sort((a, b) => {
+      if (salSortState.col === 'sal-name')
+        return salSortState.dir === 'asc'
+          ? a.officeName.localeCompare(b.officeName)
+          : b.officeName.localeCompare(a.officeName);
       const av = salSortVal(a), bv = salSortVal(b);
       return salSortState.dir === 'desc' ? bv - av : av - bv;
     });
@@ -1324,6 +1328,10 @@
 
       // Sort agents
       const sortedAgents = [...office.agents].sort((a, b) => {
+        if (salSortState.col === 'sal-name')
+          return salSortState.dir === 'asc'
+            ? a.agent_name.localeCompare(b.agent_name)
+            : b.agent_name.localeCompare(a.agent_name);
         const av = salSortVal({
           targetFtc: a.target_ftc, targetPct: a.target_pct,
           ftd100: a.ftd100_count, ftcNet: a.ftc_net_usd, salesNet: a.total_sales_net,
@@ -1687,9 +1695,15 @@
       const icon = document.getElementById('sal-sort-icon-' + key);
       th.classList.toggle('sort-active', col === salSortState.col);
       if (icon) {
-        icon.className = 'bi sort-icon ' + (col !== salSortState.col
-          ? 'bi-arrow-down-up'
-          : salSortState.dir === 'desc' ? 'bi-sort-down' : 'bi-sort-up');
+        if (col !== salSortState.col) {
+          icon.className = 'bi sort-icon ' + (col === 'sal-name' ? 'bi-sort-alpha-down' : 'bi-arrow-down-up');
+          icon.style.opacity = '0.4';
+        } else {
+          icon.className = 'bi sort-icon ' + (col === 'sal-name'
+            ? (salSortState.dir === 'asc' ? 'bi-sort-alpha-down' : 'bi-sort-alpha-up')
+            : (salSortState.dir === 'desc' ? 'bi-sort-down' : 'bi-sort-up'));
+          icon.style.opacity = '1';
+        }
       }
     });
   }
@@ -1769,7 +1783,7 @@
         salSortState.dir = salSortState.dir === 'desc' ? 'asc' : 'desc';
       } else {
         salSortState.col = col;
-        salSortState.dir = 'desc';
+        salSortState.dir = col === 'sal-name' ? 'asc' : 'desc';
       }
       updateSalSortIcons();
       if (salAllRows.length) renderSalesTable();
