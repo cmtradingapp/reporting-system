@@ -1064,6 +1064,15 @@
       salAllRows = data.rows;
       populateFilterDropdowns();
 
+      if (!SHOW_RETENTION) {
+        bonWd       = data.working_days;
+        bonWdPassed = data.working_days_passed;
+        bonWdLeft   = data.working_days_left;
+        document.getElementById('stat-wd').textContent        = bonWd;
+        document.getElementById('stat-wd-passed').textContent = bonWdPassed;
+        document.getElementById('stat-wd-left').textContent   = bonWdLeft;
+      }
+
       const totalSalesBonus = salAllRows.reduce((s, r) => s + (r.total_sales_bonus ?? 0), 0);
       const sfmt = totalSalesBonus >= 1000
         ? '$' + Math.round(totalSalesBonus).toLocaleString('en-US')

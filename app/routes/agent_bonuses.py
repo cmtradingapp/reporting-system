@@ -387,6 +387,13 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
     conn = get_connection()
     try:
         with conn.cursor() as cur:
+            try:
+                cur.execute("SELECT holiday_date FROM public_holidays")
+                holidays = {row[0] for row in cur.fetchall()}
+            except Exception:
+                conn.rollback()
+                holidays = set()
+
             if dt_from >= _TARGETS_CUTOFF:
                 _tgt_subq = """SELECT crm_user_id AS agent_id, monthly_ftd100_target AS target_ftc
                     FROM agent_targets_history
@@ -400,6 +407,12 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
             final_sql, final_params = _apply_role_filter(sql.replace('{tgt_subq}', _tgt_subq), base_params, role_filter)
             cur.execute(final_sql, final_params)
             rows = cur.fetchall()
+
+        today               = datetime.now(_TZ).date()
+        month_end           = last_day_of_month(dt_from)
+        working_days        = count_working_days(dt_from, month_end, holidays)
+        working_days_passed = count_working_days(dt_from, min(dt_to, today), holidays)
+        working_days_left   = working_days - working_days_passed
 
         data = []
         for r in rows:
@@ -448,7 +461,12 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
                 "status":             status,
             })
 
-        _result = {"rows": data}
+        _result = {
+            "rows":                data,
+            "working_days":        working_days,
+            "working_days_passed": working_days_passed,
+            "working_days_left":   working_days_left,
+        }
         # Don't cache if mv_sales_bonuses is empty/stale (all agents showing 0 FTD100s)
         if any(r["ftd100_count"] > 0 for r in data):
             cache.set(_ck, _result)
