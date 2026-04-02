@@ -325,10 +325,10 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
     sql = """
         SELECT
             CASE
-                WHEN u.id IN (3750, 3614) THEN 'LAG-NG'
+                WHEN u.id IN (3750, 3614) THEN 'LAG Nigeria'
                 WHEN u.id = 6119          THEN 'GMT'
-                WHEN u.id = 6479          THEN 'ABJ-NG'
-                WHEN u.id = 6492          THEN 'SA'
+                WHEN u.id = 6479          THEN 'ABJ Nigeria'
+                WHEN u.id = 6492          THEN 'South Africa'
                 ELSE COALESCE(u.office_name, 'N/A')
             END                                                    AS office_name,
             COALESCE(u.agent_name, u.full_name, 'N/A')            AS agent_name,
@@ -560,10 +560,10 @@ async def agent_bonuses_sales_accounts_api(request: Request, date_from: str, dat
         )
         SELECT
             CASE
-                WHEN u.id IN (3750, 3614) THEN 'LAG-NG'
+                WHEN u.id IN (3750, 3614) THEN 'LAG Nigeria'
                 WHEN u.id = 6119          THEN 'GMT'
-                WHEN u.id = 6479          THEN 'ABJ-NG'
-                WHEN u.id = 6492          THEN 'SA'
+                WHEN u.id = 6479          THEN 'ABJ Nigeria'
+                WHEN u.id = 6492          THEN 'South Africa'
                 ELSE COALESCE(u.office_name, 'N/A')
             END                                         AS office_name,
             COALESCE(u.agent_name, u.full_name, 'N/A')  AS agent_name,
