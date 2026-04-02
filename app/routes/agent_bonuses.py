@@ -324,13 +324,7 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
     #   (qual_date >= tx_date OR ftd=1) cannot be pre-aggregated cleanly.
     sql = """
         SELECT
-            CASE
-                WHEN u.id IN (3750, 3614) THEN 'LAG Nigeria'
-                WHEN u.id = 6119          THEN 'GMT'
-                WHEN u.id = 6479          THEN 'ABJ Nigeria'
-                WHEN u.id = 6492          THEN 'South Africa'
-                ELSE COALESCE(u.office_name, 'N/A')
-            END                                                    AS office_name,
+            COALESCE(u.office_name, 'N/A')                       AS office_name,
             COALESCE(u.agent_name, u.full_name, 'N/A')            AS agent_name,
             COALESCE(tgt.target_ftc, 0)::int                      AS target_ftc,
             COALESCE(ftc.ftc_count, 0)::int                       AS ftc_count,
@@ -558,13 +552,7 @@ async def agent_bonuses_sales_accounts_api(request: Request, date_from: str, dat
             GROUP BY bon.agent_id, tgt.target_ftc
         )
         SELECT
-            CASE
-                WHEN u.id IN (3750, 3614) THEN 'LAG Nigeria'
-                WHEN u.id = 6119          THEN 'GMT'
-                WHEN u.id = 6479          THEN 'ABJ Nigeria'
-                WHEN u.id = 6492          THEN 'South Africa'
-                ELSE COALESCE(u.office_name, 'N/A')
-            END                                         AS office_name,
+            COALESCE(u.office_name, 'N/A')              AS office_name,
             COALESCE(u.agent_name, u.full_name, 'N/A')  AS agent_name,
             c.accountid,
             c.is_ftc,

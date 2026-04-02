@@ -1225,6 +1225,18 @@ def upsert_crm_users(df: pd.DataFrame):
     try:
         with conn.cursor() as cur:
             execute_values(cur, sql, rows)
+            # Preserve manual overrides for team leader agents whose CRM
+            # classification differs from their actual Sales role.
+            cur.execute("""
+                UPDATE crm_users SET department_='Sales', team='Conversion', office='LAG-NG', office_name='LAG Nigeria'
+                WHERE id IN (3750, 3614);
+                UPDATE crm_users SET department_='Sales', team='Conversion', office='GMT', office_name='GMT'
+                WHERE id = 6119;
+                UPDATE crm_users SET department_='Sales', team='Conversion', office='ABJ-NG', office_name='ABJ Nigeria'
+                WHERE id = 6479;
+                UPDATE crm_users SET department_='Sales', team='Conversion', office='SA', office_name='South Africa'
+                WHERE id = 6492;
+            """)
         conn.commit()
     finally:
         conn.close()
