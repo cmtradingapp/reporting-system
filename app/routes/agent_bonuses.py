@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 import calendar
 
 _TZ = ZoneInfo("Europe/Nicosia")
-_TARGETS_CUTOFF = date_type(2026, 4, 1)
+_TARGETS_CUTOFF = date_type(2026, 5, 1)
 
 
 def _apply_role_filter(sql: str, params: dict, role_filter: dict) -> tuple[str, dict]:
@@ -155,7 +155,7 @@ async def agent_bonuses_retention_api(request: Request, date_from: str, date_to:
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"bon_ret_v9:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"bon_ret_v10:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -309,7 +309,7 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"bon_sales_v16:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"bon_sales_v17:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)

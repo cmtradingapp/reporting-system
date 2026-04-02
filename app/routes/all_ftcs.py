@@ -50,7 +50,7 @@ async def all_ftcs_api(request: Request, date_from: str, date_to: str):
     except ValueError:
         return JSONResponse(status_code=400, content={"detail": "Invalid date format"})
 
-    _TARGETS_CUTOFF = datetime.strptime("2026-04-01", "%Y-%m-%d").date()
+    _TARGETS_CUTOFF = datetime.strptime("2026-05-01", "%Y-%m-%d").date()
 
     sql = """
         WITH
