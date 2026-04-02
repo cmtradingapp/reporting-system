@@ -324,7 +324,13 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
     #   (qual_date >= tx_date OR ftd=1) cannot be pre-aggregated cleanly.
     sql = """
         SELECT
-            COALESCE(u.office_name, 'N/A')                       AS office_name,
+            CASE
+                WHEN u.id IN (3750, 3614) THEN 'LAG-NG'
+                WHEN u.id = 6119          THEN 'GMT'
+                WHEN u.id = 6479          THEN 'ABJ-NG'
+                WHEN u.id = 6492          THEN 'SA'
+                ELSE COALESCE(u.office_name, 'N/A')
+            END                                                    AS office_name,
             COALESCE(u.agent_name, u.full_name, 'N/A')            AS agent_name,
             COALESCE(tgt.target_ftc, 0)::int                      AS target_ftc,
             COALESCE(ftc.ftc_count, 0)::int                       AS ftc_count,
@@ -374,8 +380,10 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
               AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
             GROUP BY t.original_deposit_owner
         ) ftc_net ON ftc_net.agent_id = u.id
-        WHERE u.department_ = 'Sales'
-          AND u.team = 'Conversion'
+        WHERE (
+            (u.department_ = 'Sales' AND u.team = 'Conversion')
+            OR u.id IN (3750, 3614, 6119, 6479, 6492)
+          )
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'
@@ -551,7 +559,13 @@ async def agent_bonuses_sales_accounts_api(request: Request, date_from: str, dat
             GROUP BY bon.agent_id, tgt.target_ftc
         )
         SELECT
-            COALESCE(u.office_name, 'N/A')              AS office_name,
+            CASE
+                WHEN u.id IN (3750, 3614) THEN 'LAG-NG'
+                WHEN u.id = 6119          THEN 'GMT'
+                WHEN u.id = 6479          THEN 'ABJ-NG'
+                WHEN u.id = 6492          THEN 'SA'
+                ELSE COALESCE(u.office_name, 'N/A')
+            END                                         AS office_name,
             COALESCE(u.agent_name, u.full_name, 'N/A')  AS agent_name,
             c.accountid,
             c.is_ftc,
@@ -566,8 +580,10 @@ async def agent_bonuses_sales_accounts_api(request: Request, date_from: str, dat
         JOIN crm_users u ON u.id = c.agent_id
         LEFT JOIN ftc_net fn ON fn.accountid = c.accountid AND fn.agent_id = c.agent_id
         LEFT JOIN agent_totals at ON at.agent_id = c.agent_id
-        WHERE u.department_ = 'Sales'
-          AND u.team = 'Conversion'
+        WHERE (
+            (u.department_ = 'Sales' AND u.team = 'Conversion')
+            OR u.id IN (3750, 3614, 6119, 6479, 6492)
+          )
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'
