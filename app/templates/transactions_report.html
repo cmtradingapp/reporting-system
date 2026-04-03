@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Transactions Report — March 2026</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    body { background-color: #0f1117; color: #e0e0e0; font-family: 'Segoe UI', sans-serif; display: flex; min-height: 100vh; }
+    .sidebar { width: 220px; min-height: 100vh; background-color: #161b22; border-right: 1px solid #30363d; display: flex; flex-direction: column; position: fixed; top: 0; left: 0; bottom: 0; z-index: 100; }
+    .sidebar-brand { padding: 20px 20px 16px; border-bottom: 1px solid #30363d; font-weight: 700; font-size: 1rem; color: #e0e0e0; }
+    .sidebar-nav { padding: 12px 0; flex: 1; }
+    .sidebar-link { display: flex; align-items: center; gap: 10px; padding: 10px 20px; color: #8b949e; text-decoration: none; font-size: 0.9rem; transition: background 0.15s, color 0.15s; border-left: 3px solid transparent; }
+    .sidebar-link:hover { background-color: #21262d; color: #e0e0e0; }
+    .sidebar-link.active { color: #3fb950; border-left-color: #3fb950; background-color: rgba(63,185,80,0.08); }
+    .main-content { margin-left: 220px; flex: 1; min-width: 0; }
+    .card { background-color: #161b22; border: 1px solid #30363d; border-radius: 12px; }
+    .tx-table { width: 100%; border-collapse: collapse; }
+    .tx-table th { background-color: #21262d; color: #8b949e; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; padding: 9px 14px; border-bottom: 1px solid #30363d; cursor: pointer; user-select: none; white-space: nowrap; text-align: left; }
+    .tx-table th:hover { color: #c9d1d9; }
+    .tx-table td { padding: 8px 14px; border-bottom: 1px solid #21262d; font-size: 0.85rem; vertical-align: middle; color: #e0e0e0; background-color: #0f1117; white-space: nowrap; }
+    .tx-table tbody tr:hover td { background-color: #21262d !important; }
+    .sort-icon { font-size: 0.65rem; margin-left: 4px; opacity: 0.5; }
+    .sort-icon.active { opacity: 1; color: #3fb950; }
+    #toast-container { position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 9999; }
+    .sidebar-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:99; }
+    .sidebar-overlay.show { display:block; }
+    .sidebar-toggle { display:none; position:fixed; top:12px; left:12px; z-index:300; background:#161b22; border:1px solid #30363d; color:#e0e0e0; border-radius:8px; padding:7px 10px; cursor:pointer; font-size:1.1rem; line-height:1; }
+    .mob-topbar { display:none; }
+    @media (max-width: 767px) {
+      body { display:block; }
+      .sidebar-toggle { display:block; }
+      .sidebar { transform:translateX(-240px); transition:transform 0.25s ease; }
+      .sidebar.open { transform:translateX(0); box-shadow:4px 0 20px rgba(0,0,0,0.6); }
+      .mob-topbar { display:flex; align-items:center; justify-content:center; position:fixed; top:0; left:0; right:0; height:48px; background:#161b22; border-bottom:1px solid #30363d; z-index:150; }
+      .mob-topbar-title { font-size:0.92rem; font-weight:700; color:#e0e0e0; padding:0 44px; }
+      .main-content { margin-left:0 !important; padding-top:48px; }
+      .table-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    }
+    @media (min-width: 768px) and (max-width: 1024px) {
+      body { display:block; }
+      .sidebar-toggle { display:block; }
+      .sidebar { transform:translateX(-240px); transition:transform 0.25s ease; }
+      .sidebar.open { transform:translateX(0); box-shadow:4px 0 20px rgba(0,0,0,0.6); }
+      .mob-topbar { display:flex; align-items:center; justify-content:center; position:fixed; top:0; left:0; right:0; height:48px; background:#161b22; border-bottom:1px solid #30363d; z-index:150; }
+      .mob-topbar-title { font-size:0.95rem; font-weight:700; color:#e0e0e0; padding:0 44px; }
+      .main-content { margin-left:0 !important; padding-top:48px; }
+      .table-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="mob-topbar"><span class="mob-topbar-title">Transactions Report</span></div>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+<button class="sidebar-toggle" id="sidebar-toggle"><i class="bi bi-list"></i></button>
+
+<div class="sidebar">
+  <div class="sidebar-brand"><i class="bi bi-bar-chart-fill text-success me-2"></i>Reporting System</div>
+  <nav class="sidebar-nav">
+    {% set _ap = current_user.allowed_pages_list %}
+    {% if _ap is none or 'performance' in _ap %}
+    <a href="/performance" class="sidebar-link"><i class="bi bi-trophy"></i>Performance Report</a>
+    {% endif %}
+    {% if (_ap is none and current_user.role in ('admin', 'marketing', 'general')) or (_ap is not none and 'marketing' in _ap) %}
+    <a href="/campaign-performance" class="sidebar-link"><i class="bi bi-graph-up-arrow"></i>Marketing Performance</a>
+    {% endif %}
+    {% if _ap is none or 'agent_bonuses' in _ap %}
+    <a href="/agent-bonuses" class="sidebar-link"><i class="bi bi-cash-stack"></i>Agent Bonuses</a>
+    {% endif %}
+    {% if (_ap is none and current_user.role in ('admin', 'general')) or (_ap is not none and 'dashboard' in _ap) %}
+    <a href="/dashboard" class="sidebar-link"><i class="bi bi-speedometer2"></i>Dashboard</a>
+    {% endif %}
+    {% if current_user.role == 'admin' or (_ap is not none and 'ftc_date' in _ap) %}
+    <a href="/ftc-date" class="sidebar-link"><i class="bi bi-calendar2-check"></i>FTC Date</a>
+    {% endif %}
+    {% if current_user.role == 'admin' %}
+    <a href="/data-sync" class="sidebar-link"><i class="bi bi-database"></i>Data Sync</a>
+    <a href="/holidays" class="sidebar-link"><i class="bi bi-calendar-x"></i>Holidays</a>
+    <a href="/all-ftcs" class="sidebar-link"><i class="bi bi-people"></i>All FTCs</a>
+    <a href="/transactions-report" class="sidebar-link active"><i class="bi bi-receipt"></i>Transactions Report</a>
+    {% endif %}
+  </nav>
+  <div style="padding:14px 20px;border-top:1px solid #30363d;">
+    <div style="font-size:0.68rem;color:#8b949e;margin-bottom:2px;">Signed in as</div>
+    <div style="font-weight:600;font-size:0.82rem;color:#e0e0e0;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ current_user.full_name }}</div>
+    <div style="font-size:0.7rem;color:#3fb950;margin-bottom:8px;">{{ current_user.role | replace('_', ' ') | title }}</div>
+    <div style="display:flex;gap:12px;align-items:center;">
+      <a href="/admin/users" style="color:#8b949e;text-decoration:none;font-size:1.05rem;" title="Admin Users"><i class="bi bi-people-fill"></i></a>
+      <a href="/logout" style="color:#f85149;text-decoration:none;font-size:1.05rem;" title="Logout"><i class="bi bi-box-arrow-right"></i></a>
+    </div>
+  </div>
+</div>
+
+<div class="main-content">
+<div class="container-fluid px-4 py-4">
+
+  <div id="toast-container"></div>
+
+  <!-- Header -->
+  <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+    <div>
+      <h5 class="mb-0 fw-bold">Transactions Report</h5>
+      <div class="text-muted" style="font-size:0.8rem;">March 2026 &mdash; non-test accounts only</div>
+    </div>
+    <button class="btn btn-sm btn-outline-success" onclick="exportExcel()">
+      <i class="bi bi-download me-1"></i>Export Excel
+    </button>
+  </div>
+
+  <!-- Search + count -->
+  <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
+    <input type="text" id="search-input" class="form-control form-control-sm"
+           placeholder="Search any column..." style="max-width:300px;background:#21262d;border-color:#30363d;color:#e0e0e0;">
+    <span id="row-count" class="text-muted small"></span>
+  </div>
+
+  <!-- Table -->
+  <div class="card">
+    <div class="table-scroll" style="max-height:75vh;overflow-y:auto;overflow-x:auto;">
+      <table class="tx-table" id="tx-table">
+        <thead>
+          <tr>
+            <th onclick="sortBy(0)" data-col="0">Transaction ID <span class="sort-icon bi bi-chevron-expand" id="sort-0"></span></th>
+            <th onclick="sortBy(1)" data-col="1">Login <span class="sort-icon bi bi-chevron-expand" id="sort-1"></span></th>
+            <th onclick="sortBy(2)" data-col="2" style="text-align:right;">USD Amount <span class="sort-icon bi bi-chevron-expand" id="sort-2"></span></th>
+            <th onclick="sortBy(3)" data-col="3">Type <span class="sort-icon bi bi-chevron-expand" id="sort-3"></span></th>
+            <th onclick="sortBy(4)" data-col="4">Owner ID <span class="sort-icon bi bi-chevron-expand" id="sort-4"></span></th>
+            <th onclick="sortBy(5)" data-col="5">Confirmation Time <span class="sort-icon bi bi-chevron-expand" id="sort-5"></span></th>
+          </tr>
+        </thead>
+        <tbody id="tx-tbody">
+          <tr><td colspan="6" class="text-center text-muted py-4">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<script>
+let allRows = [];
+let sortCol = 5;
+let sortAsc = false;
+
+function toast(msg, ok = true) {
+  const el = document.createElement('div');
+  el.className = `alert alert-${ok ? 'success' : 'danger'} py-2 px-3 mb-2`;
+  el.style.cssText = 'font-size:0.82rem;border-radius:8px;min-width:200px;';
+  el.textContent = msg;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+async function loadData() {
+  try {
+    const res = await fetch('/api/transactions-report');
+    if (!res.ok) { toast('Failed to load data', false); return; }
+    const json = await res.json();
+    allRows = json.rows;
+    renderTable(allRows);
+  } catch (e) {
+    toast('Error: ' + e.message, false);
+  }
+}
+
+function fmtAmount(v) {
+  if (v === null || v === undefined) return '—';
+  return '$' + Number(v).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+}
+
+function fmtTime(v) {
+  if (!v) return '—';
+  return v.replace('T', ' ').substring(0, 19);
+}
+
+function renderTable(rows) {
+  const tbody = document.getElementById('tx-tbody');
+  document.getElementById('row-count').textContent = rows.length.toLocaleString() + ' rows';
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No data found</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td>${r.mttransactionsid ?? '—'}</td>
+      <td>${r.login ?? '—'}</td>
+      <td style="text-align:right;">${fmtAmount(r.usdamount)}</td>
+      <td>${r.transaction_type_name ?? '—'}</td>
+      <td>${r.original_deposit_owner ?? '—'}</td>
+      <td>${fmtTime(r.confirmation_time)}</td>
+    </tr>`).join('');
+}
+
+function sortBy(col) {
+  if (sortCol === col) sortAsc = !sortAsc;
+  else { sortCol = col; sortAsc = true; }
+
+  document.querySelectorAll('.sort-icon').forEach((el, i) => {
+    el.className = 'sort-icon bi ' + (i === col
+      ? (sortAsc ? 'bi-chevron-up active' : 'bi-chevron-down active')
+      : 'bi-chevron-expand');
+  });
+
+  const keys = ['mttransactionsid','login','usdamount','transaction_type_name','original_deposit_owner','confirmation_time'];
+  const key = keys[col];
+  const filtered = getFiltered();
+  filtered.sort((a, b) => {
+    let av = a[key], bv = b[key];
+    if (av === null || av === undefined) av = '';
+    if (bv === null || bv === undefined) bv = '';
+    if (typeof av === 'number' && typeof bv === 'number') return sortAsc ? av - bv : bv - av;
+    return sortAsc ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
+  });
+  renderTable(filtered);
+}
+
+function getFiltered() {
+  const q = document.getElementById('search-input').value.trim().toLowerCase();
+  if (!q) return [...allRows];
+  return allRows.filter(r =>
+    Object.values(r).some(v => v !== null && String(v).toLowerCase().includes(q))
+  );
+}
+
+document.getElementById('search-input').addEventListener('input', () => {
+  renderTable(getFiltered());
+});
+
+function exportExcel() {
+  const rows = getFiltered();
+  if (!rows.length) { toast('No data to export', false); return; }
+  const headers = ['Transaction ID','Login','USD Amount','Type','Owner ID','Confirmation Time'];
+  const data = [headers, ...rows.map(r => [
+    r.mttransactionsid,
+    r.login,
+    r.usdamount,
+    r.transaction_type_name,
+    r.original_deposit_owner,
+    r.confirmation_time ? r.confirmation_time.replace('T',' ').substring(0,19) : '',
+  ])];
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Transactions Mar 2026');
+  XLSX.writeFile(wb, 'transactions_march_2026.xlsx');
+  toast('Exported successfully');
+}
+
+// Sidebar toggle
+document.getElementById('sidebar-toggle').addEventListener('click', () => {
+  document.querySelector('.sidebar').classList.toggle('open');
+  document.getElementById('sidebar-overlay').classList.toggle('show');
+});
+document.getElementById('sidebar-overlay').addEventListener('click', () => {
+  document.querySelector('.sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('show');
+});
+
+loadData();
+</script>
+</body>
+</html>

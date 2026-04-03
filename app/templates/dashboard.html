@@ -96,6 +96,9 @@
     {% if current_user.role == 'admin' or (_ap is not none and 'all_ftcs' in _ap) %}
     <a href="/all-ftcs" class="sidebar-link"><i class="bi bi-people"></i>All FTCs</a>
     {% endif %}
+    {% if current_user.role == 'admin' %}
+    <a href="/transactions-report" class="sidebar-link"><i class="bi bi-receipt"></i>Transactions Report</a>
+    {% endif %}
   </nav>
   <div style="padding:14px 20px;border-top:1px solid #30363d;">
     <div style="font-size:0.68rem;color:#8b949e;margin-bottom:2px;">Signed in as</div>
