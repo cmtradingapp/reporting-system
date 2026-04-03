@@ -607,7 +607,6 @@
                 <th class="text-center" style="min-width:160px;" data-sort="needOnTargetTotal">Need to be on target (100% RR) <i class="bi sort-icon" id="sort-icon-needOnTargetTotal"></i></th>
                 <th class="text-center" style="min-width:140px;" data-sort="missingTo100Total">Missing to reach 100% <i class="bi sort-icon" id="sort-icon-missingTo100Total"></i></th>
                 <th class="text-center" style="min-width:110px;" data-sort="perWdTotal">Per Working Day <i class="bi sort-icon" id="sort-icon-perWdTotal"></i></th>
-                <th class="text-center" style="min-width:110px;" data-sort="rdpNetTotal">RDP Net $ <i class="bi sort-icon" id="sort-icon-rdpNetTotal"></i></th>
               </tr>
             </thead>
             <tbody id="table-body"></tbody>
@@ -677,11 +676,11 @@
 <script>
   const SHOW_SALES      = {{ 'true' if show_sales else 'false' }};
   const SHOW_RETENTION  = {{ 'true' if show_retention else 'false' }};
-  let _rdpNetSales = 0, _rdpNetRet = 0;
+  let _rdpNetRet = 0;
   function _updateRdpNetCard() {
     const el = document.getElementById('stat-rdp-net');
     if (!el) return;
-    const v = _rdpNetSales + _rdpNetRet;
+    const v = _rdpNetRet;
     const color = v >= 0 ? '#3fb950' : '#f85149';
     el.style.color = color;
     el.textContent = (v < 0 ? '-$' : '$') + Math.round(Math.abs(v)).toLocaleString();
@@ -1089,7 +1088,6 @@
       missingTo100RrTotal:      agents.reduce((s, a) => s + a.missing_to_100rr,         0),
       missingTo100RrFtd100Total:agents.reduce((s, a) => s + a.missing_to_100rr_ftd100,  0),
       perWdTotal:               agents.reduce((s, a) => s + a.per_wd,                   0),
-      rdpNetTotal:              agents.reduce((s, a) => s + (a.rdp_net ?? 0),           0),
     })).sort((a, b) => {
       if (sortState.col === 'name')
         return sortState.dir === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
@@ -1106,7 +1104,6 @@
     let grandFtd100Rr    = 0;
     let grandNetDeposits   = 0;
     let grandFtdCount      = 0;
-    let grandRdpNet        = 0;
     let grandNeedOnTarget  = 0;
     let grandMissing100    = 0;
     let grandMissing100Rr       = 0;
@@ -1127,7 +1124,6 @@
       grandMissing100Rr       += office.missingTo100RrTotal;
       grandMissing100RrFtd100 += office.missingTo100RrFtd100Total;
       grandPerWd              += office.perWdTotal;
-      grandRdpNet             += office.rdpNetTotal;
       const officeId = 'office-' + oi;
       // Office row (collapsed by default)
       const offTr = document.createElement('tr');
@@ -1156,7 +1152,6 @@
         <td class="text-center">${wCountHtml(office.needOnTargetTotal, true)}</td>
         <td class="text-center">${wCountHtml(office.missingTo100Total, true)}</td>
         <td class="text-center">${wCountHtml(office.perWdTotal, true)}</td>
-        <td class="text-center">${netHtml(office.rdpNetTotal, true)}</td>
       `;
       tbody.appendChild(offTr);
 
@@ -1214,7 +1209,6 @@
           <td class="text-center">${needOnTgtHtml}</td>
           <td class="text-center">${missing100Html}</td>
           <td class="text-center">${perWdAgentHtml}</td>
-          <td class="text-center">${netHtml(r.rdp_net)}</td>
         `;
         tbody.appendChild(tr);
       });
@@ -1260,13 +1254,10 @@
         <td class="text-center">${wCountHtml(grandNeedOnTarget, true)}</td>
         <td class="text-center">${wCountHtml(grandMissing100, true)}</td>
         <td class="text-center">${wCountHtml(grandPerWd, true)}</td>
-        <td class="text-center">${netHtml(grandRdpNet, true)}</td>
       `;
       tbody.appendChild(totalTr);
     }
 
-    _rdpNetSales = grandRdpNet;
-    _updateRdpNetCard();
     document.getElementById('row-count').textContent = `${offices.length} offices · ${agentCount} agents`;
     applyMobileColOrder();
   }
@@ -1952,7 +1943,7 @@
       'Office', 'Agent', 'Target FTC', 'FTD', 'FTD100', 'FTC', 'FTD100 RR', 'FTC RR',
       'Missing to 100% RR', 'Missing to 100% RR FTC',
       'FTD100 RR %', 'FTC RR %', 'Target FTD100 %', 'Target FTC %', 'NET $',
-      'Need to be on Target (100% RR)', 'Missing to Reach 100%', 'Per Working Day', 'RDP Net $'
+      'Need to be on Target (100% RR)', 'Missing to Reach 100%', 'Per Working Day'
     ];
     const rows = filtered.map(r => [
       r.office_name,
@@ -1973,7 +1964,6 @@
       Math.round(r.need_on_target),
       Math.round(r.missing_to_100),
       Math.round(r.per_wd),
-      Math.round((r.rdp_net ?? 0) * 100) / 100,
     ]);
     const df = document.getElementById('date-from').value;
     const dt = document.getElementById('date-to').value;

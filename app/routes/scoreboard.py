@@ -78,7 +78,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"perf_v19:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"perf_v20:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -106,8 +106,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
             COALESCE(dk.daily_ftd, 0)::int               AS daily_ftd,
             COALESCE(dk.daily_ftc, 0)::int               AS daily_ftc,
             COALESCE(dk.daily_net, 0)::float             AS daily_net,
-            COALESCE(u.status, '')                        AS status,
-            COALESCE(rdp.rdp_net, 0)::float               AS rdp_net
+            COALESCE(u.status, '')                        AS status
         FROM crm_users u
         LEFT JOIN (
             -- Combined FTC + NET + FTD from mv_daily_kpis in a single scan
@@ -144,23 +143,6 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
               AND f.ftd_100_date <  %(date_to_excl)s
             GROUP BY f.original_deposit_owner
         ) f100 ON f100.agent_id = u.id
-        LEFT JOIN (
-            SELECT a.assigned_to AS agent_id,
-                   SUM(CASE WHEN t.transaction_type_name IN ('Deposit', 'Withdrawal Cancelled')
-                            THEN t.usdamount ELSE 0 END)
-                   - SUM(CASE WHEN t.transaction_type_name IN ('Withdrawal', 'Deposit Cancelled')
-                              THEN t.usdamount ELSE 0 END) AS rdp_net
-            FROM transactions t
-            JOIN accounts a ON a.accountid = t.vtigeraccountid
-            WHERE t.transactionapproval = 'Approved'
-              AND (t.deleted = 0 OR t.deleted IS NULL)
-              AND a.client_qualification_date IS NOT NULL
-              AND t.transaction_type_name IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
-              AND t.confirmation_time::date >= %(date_from)s
-              AND t.confirmation_time::date < %(date_to_excl)s
-              AND t.confirmation_time::date > a.client_qualification_date
-            GROUP BY a.assigned_to
-        ) rdp ON rdp.agent_id = u.id
         WHERE u.department_ = 'Sales'
           AND u.team = 'Conversion'
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
@@ -327,7 +309,6 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
                 "daily_ftc":    int(r[9] or 0),
                 "daily_net":    round(float(r[10] or 0), 2),
                 "status":       r[11] or '',
-                "rdp_net":      round(float(r[12] or 0), 2),
             }
             for r in rows
         ]
