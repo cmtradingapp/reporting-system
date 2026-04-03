@@ -601,6 +601,7 @@
                 <th class="text-center" style="min-width:160px;" data-sort="needOnTargetTotal">Need to be on target (100% RR) <i class="bi sort-icon" id="sort-icon-needOnTargetTotal"></i></th>
                 <th class="text-center" style="min-width:140px;" data-sort="missingTo100Total">Missing to reach 100% <i class="bi sort-icon" id="sort-icon-missingTo100Total"></i></th>
                 <th class="text-center" style="min-width:110px;" data-sort="perWdTotal">Per Working Day <i class="bi sort-icon" id="sort-icon-perWdTotal"></i></th>
+                <th class="text-center" style="min-width:110px;" data-sort="rdpNetTotal">RDP Net $ <i class="bi sort-icon" id="sort-icon-rdpNetTotal"></i></th>
               </tr>
             </thead>
             <tbody id="table-body"></tbody>
@@ -652,6 +653,7 @@
                 <th class="text-center" style="min-width:110px;" data-sort="ret-openVol">Open Volume <i class="bi sort-icon" id="ret-sort-icon-openVol"></i></th>
                 <th class="text-center" style="min-width:100px;" data-sort="ret-volRr">Volume RR <i class="bi sort-icon" id="ret-sort-icon-volRr"></i></th>
                 <th class="text-center" style="min-width:115px;" data-sort="ret-volRrPct">Target Vol RR % <i class="bi sort-icon" id="ret-sort-icon-volRrPct"></i></th>
+                <th class="text-center" style="min-width:110px;" data-sort="ret-rdpNet">RDP Net $ <i class="bi sort-icon" id="ret-sort-icon-rdpNet"></i></th>
               </tr>
             </thead>
             <tbody id="retention-tbody"></tbody>
@@ -1072,6 +1074,7 @@
       missingTo100RrTotal:      agents.reduce((s, a) => s + a.missing_to_100rr,         0),
       missingTo100RrFtd100Total:agents.reduce((s, a) => s + a.missing_to_100rr_ftd100,  0),
       perWdTotal:               agents.reduce((s, a) => s + a.per_wd,                   0),
+      rdpNetTotal:              agents.reduce((s, a) => s + (a.rdp_net ?? 0),           0),
     })).sort((a, b) => {
       if (sortState.col === 'name')
         return sortState.dir === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
@@ -1088,6 +1091,7 @@
     let grandFtd100Rr    = 0;
     let grandNetDeposits   = 0;
     let grandFtdCount      = 0;
+    let grandRdpNet        = 0;
     let grandNeedOnTarget  = 0;
     let grandMissing100    = 0;
     let grandMissing100Rr       = 0;
@@ -1108,6 +1112,7 @@
       grandMissing100Rr       += office.missingTo100RrTotal;
       grandMissing100RrFtd100 += office.missingTo100RrFtd100Total;
       grandPerWd              += office.perWdTotal;
+      grandRdpNet             += office.rdpNetTotal;
       const officeId = 'office-' + oi;
       // Office row (collapsed by default)
       const offTr = document.createElement('tr');
@@ -1136,6 +1141,7 @@
         <td class="text-center">${wCountHtml(office.needOnTargetTotal, true)}</td>
         <td class="text-center">${wCountHtml(office.missingTo100Total, true)}</td>
         <td class="text-center">${wCountHtml(office.perWdTotal, true)}</td>
+        <td class="text-center">${netHtml(office.rdpNetTotal, true)}</td>
       `;
       tbody.appendChild(offTr);
 
@@ -1193,6 +1199,7 @@
           <td class="text-center">${needOnTgtHtml}</td>
           <td class="text-center">${missing100Html}</td>
           <td class="text-center">${perWdAgentHtml}</td>
+          <td class="text-center">${netHtml(r.rdp_net)}</td>
         `;
         tbody.appendChild(tr);
       });
@@ -1215,7 +1222,7 @@
 
     if (offices.length === 0) {
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td colspan="18" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No data for this period</td>`;
+      tr.innerHTML = `<td colspan="19" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No data for this period</td>`;
       tbody.appendChild(tr);
     } else {
       const totalTr = document.createElement('tr');
@@ -1238,6 +1245,7 @@
         <td class="text-center">${wCountHtml(grandNeedOnTarget, true)}</td>
         <td class="text-center">${wCountHtml(grandMissing100, true)}</td>
         <td class="text-center">${wCountHtml(grandPerWd, true)}</td>
+        <td class="text-center">${netHtml(grandRdpNet, true)}</td>
       `;
       tbody.appendChild(totalTr);
     }
@@ -1544,6 +1552,7 @@
       'ret-needOnTgt': o.needOnTgt ?? 0,
       'ret-miss100':   o.miss100   ?? 0,
       'ret-perWd':     o.perWd     ?? 1e9,
+      'ret-rdpNet':    o.rdpNet    ?? 0,
     };
     return m[retSortState.col] ?? 0;
   }
@@ -1605,11 +1614,12 @@
       const miss100   = officeAgents.reduce((s, a) => s + a.missing_100, 0);
       const miss100Rr = officeAgents.reduce((s, a) => s + a.missing_100_rr, 0);
       const volRr     = officeAgents.reduce((s, a) => s + (a.vol_rr ?? 0), 0);
+      const rdpNet    = officeAgents.reduce((s, a) => s + (a.rdp_net ?? 0), 0);
       const tgtVol    = tgtNet * 1650;
       officeArr.push({
         officeName, deptMap,
         agentCount: officeAgents.length,
-        tgtNet, netUsd, depUsd, stdCount, openVol, netRr, needOnTgt, miss100, miss100Rr, volRr,
+        tgtNet, netUsd, depUsd, stdCount, openVol, netRr, needOnTgt, miss100, miss100Rr, volRr, rdpNet,
         netRrPct:  tgtNet > 0 ? netRr  / tgtNet : null,
         netTgtPct: tgtNet > 0 ? netUsd / tgtNet : null,
         volRrPct:  tgtVol > 0 ? volRr  / tgtVol : null,
@@ -1627,7 +1637,7 @@
 
     // Grand totals
     let gTargetNet = 0, gNetUsd = 0, gDepositUsd = 0, gStdCount = 0, gOpenVol = 0;
-    let gNetRr = 0, gNeedOnTarget = 0, gMissing100 = 0;
+    let gNetRr = 0, gNeedOnTarget = 0, gMissing100 = 0, gRdpNet = 0;
     let totalOffices = 0, totalAgents = 0;
 
     officeArr.forEach((office, officeIndex) => {
@@ -1641,6 +1651,7 @@
       gNetRr        += office.netRr;
       gNeedOnTarget += office.needOnTgt;
       gMissing100   += office.miss100;
+      gRdpNet       += office.rdpNet;
 
       // Office row
       const offTr = document.createElement('tr');
@@ -1667,6 +1678,7 @@
         <td class="text-center"><span class="office-total">${wDollarHtml(office.openVol, true)}</span></td>
         <td class="text-center"><span class="office-total">${wDollarHtml(office.volRr, true)}</span></td>
         <td class="text-center">${retPctHtml(office.volRrPct, true)}</td>
+        <td class="text-center">${netHtml(office.rdpNet, true)}</td>
       `;
       tbody.appendChild(offTr);
 
@@ -1683,11 +1695,12 @@
         const dMiss100   = agents.reduce((s, a) => s + a.missing_100, 0);
         const dMiss100Rr = agents.reduce((s, a) => s + a.missing_100_rr, 0);
         const dVolRr     = agents.reduce((s, a) => s + (a.vol_rr ?? 0), 0);
+        const dRdpNet    = agents.reduce((s, a) => s + (a.rdp_net ?? 0), 0);
         const dTgtVol    = dTgtNet * 1650;
         deptArr.push({
           deptName, agents,
           tgtNet: dTgtNet, netUsd: dNetUsd, depUsd: dDepUsd, stdCount: dStdCount, openVol: dOpenVol,
-          netRr: dNetRr, needOnTgt: dNeedOnTgt, miss100: dMiss100, miss100Rr: dMiss100Rr, volRr: dVolRr,
+          netRr: dNetRr, needOnTgt: dNeedOnTgt, miss100: dMiss100, miss100Rr: dMiss100Rr, volRr: dVolRr, rdpNet: dRdpNet,
           netRrPct:  dTgtNet > 0 ? dNetRr  / dTgtNet : null,
           netTgtPct: dTgtNet > 0 ? dNetUsd / dTgtNet : null,
           volRrPct:  dTgtVol > 0 ? dVolRr  / dTgtVol : null,
@@ -1732,6 +1745,7 @@
           <td class="text-center">${wDollarHtml(dept.openVol)}</td>
           <td class="text-center">${wDollarHtml(dept.volRr)}</td>
           <td class="text-center">${retPctHtml(dept.volRrPct)}</td>
+          <td class="text-center">${netHtml(dept.rdpNet)}</td>
         `;
         tbody.appendChild(deptTr);
 
@@ -1762,6 +1776,7 @@
             <td class="text-center">${wDollarHtml(r.open_volume_usd)}</td>
             <td class="text-center">${wDollarHtml(r.vol_rr)}</td>
             <td class="text-center">${retPctHtml(r.target_vol_rr_pct)}</td>
+            <td class="text-center">${netHtml(r.rdp_net)}</td>
           `;
           tbody.appendChild(agTr);
         });
@@ -1844,6 +1859,7 @@
         <td class="text-center">${wDollarHtml(gOpenVol, true)}</td>
         <td class="text-center">${wDollarHtml(gVolRr, true)}</td>
         <td class="text-center">${retPctHtml(gVolRrPct, true)}</td>
+        <td class="text-center">${netHtml(gRdpNet, true)}</td>
       `;
       tfoot.appendChild(totalTr);
     }
@@ -1917,7 +1933,7 @@
       'Office', 'Agent', 'Target FTC', 'FTD', 'FTD100', 'FTC', 'FTD100 RR', 'FTC RR',
       'Missing to 100% RR', 'Missing to 100% RR FTC',
       'FTD100 RR %', 'FTC RR %', 'Target FTD100 %', 'Target FTC %', 'NET $',
-      'Need to be on Target (100% RR)', 'Missing to Reach 100%', 'Per Working Day'
+      'Need to be on Target (100% RR)', 'Missing to Reach 100%', 'Per Working Day', 'RDP Net $'
     ];
     const rows = filtered.map(r => [
       r.office_name,
@@ -1938,6 +1954,7 @@
       Math.round(r.need_on_target),
       Math.round(r.missing_to_100),
       Math.round(r.per_wd),
+      Math.round((r.rdp_net ?? 0) * 100) / 100,
     ]);
     const df = document.getElementById('date-from').value;
     const dt = document.getElementById('date-to').value;
@@ -1958,7 +1975,7 @@
     const headers = [
       'Office', 'Department', 'Agent', 'Target NET', 'NET RR %', 'Missing to 100% RR',
       'Deposit $', 'STD', 'NET $', 'NET RR', 'Target NET %', 'Need to be on Target',
-      'Missing to Reach 100%', 'Per Working Day', 'Open Volume', 'Volume RR', 'Target Vol RR %'
+      'Missing to Reach 100%', 'Per Working Day', 'Open Volume', 'Volume RR', 'Target Vol RR %', 'RDP Net $'
     ];
     const rows = filtered.map(r => [
       r.office_name,
@@ -1978,6 +1995,7 @@
       r2(r.open_volume_usd),
       r2(r.vol_rr),
       pct(r.target_vol_rr_pct),
+      r2(r.rdp_net ?? 0),
     ]);
     const df = document.getElementById('date-from').value;
     const dt = document.getElementById('date-to').value;
