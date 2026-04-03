@@ -38,7 +38,7 @@ async def all_ftcs_api(request: Request, date_from: str, date_to: str):
     if ap is None and user.get("role") != "admin":
         return JSONResponse(status_code=403, content={"detail": "Forbidden"})
 
-    _ck = f"all_ftcs_v10:{date_from}:{date_to}"
+    _ck = f"all_ftcs_v11:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -101,16 +101,16 @@ async def all_ftcs_api(request: Request, date_from: str, date_to: str):
             -- a $0 row via the UNION in all_account_agents if they have no transactions.
             SELECT t.vtigeraccountid                                              AS accountid,
                    t.original_deposit_owner                                       AS agent_id,
-                   SUM(CASE WHEN t.transactiontype IN ('Deposit','Withdrawal Cancelled')
+                   SUM(CASE WHEN t.transaction_type_name IN ('Deposit','Withdrawal Cancelled')
                             THEN t.usdamount ELSE 0 END)::float                  AS ftc_deposit,
-                   SUM(CASE WHEN t.transactiontype IN ('Withdrawal','Deposit Cancelled')
+                   SUM(CASE WHEN t.transaction_type_name IN ('Withdrawal','Deposit Cancelled')
                             THEN t.usdamount ELSE 0 END)::float                  AS ftc_wd
             FROM transactions t
             JOIN ftc_accounts fa ON fa.accountid = t.vtigeraccountid
             JOIN ftd_info fi     ON fi.accountid = t.vtigeraccountid
             WHERE t.transactionapproval = 'Approved'
               AND (t.deleted = 0 OR t.deleted IS NULL)
-              AND t.transactiontype IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
+              AND t.transaction_type_name IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
               AND t.original_deposit_owner IS NOT NULL
               AND (fi.ftd_date IS NULL OR t.confirmation_time::date >= fi.ftd_date OR t.ftd = 1)
               AND (t.confirmation_time::date <= fa.client_qualification_date OR t.ftd = 1)

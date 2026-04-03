@@ -256,12 +256,13 @@ CREATE OR REPLACE FUNCTION _get_ftd100_target(p_tenure int)
 RETURNS INTEGER LANGUAGE plpgsql IMMUTABLE AS $$
 BEGIN
     RETURN CASE
-        WHEN p_tenure = 0 THEN 5
-        WHEN p_tenure = 1 THEN 10
-        WHEN p_tenure = 2 THEN 15
-        WHEN p_tenure = 3 THEN 20
-        WHEN p_tenure = 4 THEN 25
-        WHEN p_tenure = 5 THEN 30
+        WHEN p_tenure = 0  THEN 0
+        WHEN p_tenure = 1  THEN 5
+        WHEN p_tenure = 2  THEN 10
+        WHEN p_tenure = 3  THEN 15
+        WHEN p_tenure = 4  THEN 20
+        WHEN p_tenure = 5  THEN 25
+        WHEN p_tenure = 6  THEN 30
         ELSE 35
     END;
 END;
@@ -302,19 +303,12 @@ BEGIN
     r_month := DATE_TRUNC('month', a.start_date)::date;
     WHILE r_month <= DATE_TRUNC('month', CURRENT_DATE)::date LOOP
         t_months := (
-            EXTRACT(YEAR  FROM age(r_month, DATE_TRUNC('month', a.start_date)::date)) * 12 +
-            EXTRACT(MONTH FROM age(r_month, DATE_TRUNC('month', a.start_date)::date))
+            EXTRACT(YEAR  FROM age(r_month, a.start_date)) * 12 +
+            EXTRACT(MONTH FROM age(r_month, a.start_date))
         )::integer;
 
-        IF a.target_group = 'NET' THEN
-            net_tgt := _get_net_target(t_months, a.office_name, a.agent_name);
-            ftd_tgt := NULL;
-        ELSIF a.target_group = 'FTD100' THEN
-            net_tgt := NULL;
-            ftd_tgt := _get_ftd100_target(t_months);
-        ELSE
-            net_tgt := NULL; ftd_tgt := NULL;
-        END IF;
+        net_tgt := _get_net_target(t_months, a.office_name, a.agent_name);
+        ftd_tgt := _get_ftd100_target(t_months);
 
         INSERT INTO agent_targets_history (
             agent_name, office_name, email, start_date, target_group,
@@ -362,19 +356,12 @@ BEGIN
         CONTINUE WHEN a.start_date IS NULL OR a.start_date > CURRENT_DATE;
 
         t_months := (
-            EXTRACT(YEAR  FROM age(r_month, DATE_TRUNC('month', a.start_date)::date)) * 12 +
-            EXTRACT(MONTH FROM age(r_month, DATE_TRUNC('month', a.start_date)::date))
+            EXTRACT(YEAR  FROM age(r_month, a.start_date)) * 12 +
+            EXTRACT(MONTH FROM age(r_month, a.start_date))
         )::integer;
 
-        IF a.target_group = 'NET' THEN
-            net_tgt := _get_net_target(t_months, a.office_name, a.agent_name);
-            ftd_tgt := NULL;
-        ELSIF a.target_group = 'FTD100' THEN
-            net_tgt := NULL;
-            ftd_tgt := _get_ftd100_target(t_months);
-        ELSE
-            net_tgt := NULL; ftd_tgt := NULL;
-        END IF;
+        net_tgt := _get_net_target(t_months, a.office_name, a.agent_name);
+        ftd_tgt := _get_ftd100_target(t_months);
 
         INSERT INTO agent_targets_history (
             agent_name, office_name, email, start_date, target_group,

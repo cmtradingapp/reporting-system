@@ -78,7 +78,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"perf_v18:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"perf_v19:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -146,16 +146,16 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
         ) f100 ON f100.agent_id = u.id
         LEFT JOIN (
             SELECT a.assigned_to AS agent_id,
-                   SUM(CASE WHEN t.transactiontype IN ('Deposit', 'Withdrawal Cancelled')
+                   SUM(CASE WHEN t.transaction_type_name IN ('Deposit', 'Withdrawal Cancelled')
                             THEN t.usdamount ELSE 0 END)
-                   - SUM(CASE WHEN t.transactiontype IN ('Withdrawal', 'Deposit Cancelled')
+                   - SUM(CASE WHEN t.transaction_type_name IN ('Withdrawal', 'Deposit Cancelled')
                               THEN t.usdamount ELSE 0 END) AS rdp_net
             FROM transactions t
             JOIN accounts a ON a.accountid = t.vtigeraccountid
             WHERE t.transactionapproval = 'Approved'
               AND (t.deleted = 0 OR t.deleted IS NULL)
               AND a.client_qualification_date IS NOT NULL
-              AND t.transactiontype IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
+              AND t.transaction_type_name IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
               AND t.confirmation_time::date >= %(date_from)s
               AND t.confirmation_time::date < %(date_to_excl)s
               AND t.confirmation_time::date > a.client_qualification_date
@@ -372,7 +372,7 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"perf_ret_v14:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"perf_ret_v15:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -432,16 +432,16 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
         ) std ON std.agent_id = u.id
         LEFT JOIN (
             SELECT a.assigned_to AS agent_id,
-                   SUM(CASE WHEN t.transactiontype IN ('Deposit', 'Withdrawal Cancelled')
+                   SUM(CASE WHEN t.transaction_type_name IN ('Deposit', 'Withdrawal Cancelled')
                             THEN t.usdamount ELSE 0 END)
-                   - SUM(CASE WHEN t.transactiontype IN ('Withdrawal', 'Deposit Cancelled')
+                   - SUM(CASE WHEN t.transaction_type_name IN ('Withdrawal', 'Deposit Cancelled')
                               THEN t.usdamount ELSE 0 END) AS rdp_net
             FROM transactions t
             JOIN accounts a ON a.accountid = t.vtigeraccountid
             WHERE t.transactionapproval = 'Approved'
               AND (t.deleted = 0 OR t.deleted IS NULL)
               AND a.client_qualification_date IS NOT NULL
-              AND t.transactiontype IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
+              AND t.transaction_type_name IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
               AND t.confirmation_time::date >= %(date_from)s
               AND t.confirmation_time::date < %(date_to_excl)s
               AND t.confirmation_time::date > a.client_qualification_date

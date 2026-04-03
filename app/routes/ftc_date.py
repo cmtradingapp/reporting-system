@@ -219,7 +219,7 @@ async def ftc_date_api(
     ftc_groups_set  = set(ftc_groups_list)
     apply_group_filter = bool(ftc_groups_set) and ftc_groups_set != _ALL_FTC_GROUPS
 
-    _ck = f"ftc_v7:{end_date}:{group1}:{group2}:{agent_id}:{office}:{team}:{classification}:{ftc_groups}"
+    _ck = f"ftc_v8:{end_date}:{group1}:{group2}:{agent_id}:{office}:{team}:{classification}:{ftc_groups}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -281,8 +281,8 @@ async def ftc_date_api(
         + "),\n"
         "tx_per_account AS (\n"
         "    SELECT t.vtigeraccountid AS accountid,\n"
-        "           SUM(CASE WHEN t.transactiontype IN ('Deposit','Withdrawal Cancelled') THEN t.usdamount ELSE 0 END) AS deposit_usd,\n"
-        "           SUM(CASE WHEN t.transactiontype IN ('Withdrawal','Deposit Cancelled') THEN t.usdamount ELSE 0 END) AS withdrawal_usd\n"
+        "           SUM(CASE WHEN t.transaction_type_name IN ('Deposit','Withdrawal Cancelled') THEN t.usdamount ELSE 0 END) AS deposit_usd,\n"
+        "           SUM(CASE WHEN t.transaction_type_name IN ('Withdrawal','Deposit Cancelled') THEN t.usdamount ELSE 0 END) AS withdrawal_usd\n"
         "    FROM transactions t\n"
         "    WHERE t.transactionapproval = 'Approved'\n"
         "      AND (t.deleted = 0 OR t.deleted IS NULL)\n"
@@ -300,7 +300,7 @@ async def ftc_date_api(
         "    SELECT DISTINCT t.vtigeraccountid AS accountid\n"
         "    FROM transactions t\n"
         "    JOIN accounts a ON a.accountid = t.vtigeraccountid\n"
-        "    WHERE t.transactiontype = 'Withdrawal'\n"
+        "    WHERE t.transaction_type_name = 'Withdrawal'\n"
         "      AND t.transactionapproval = 'Approved'\n"
         "      AND (t.deleted = 0 OR t.deleted IS NULL)\n"
         "      AND COALESCE(t.confirmation_time, t.created_time)::date <= %(end_date)s::date\n"

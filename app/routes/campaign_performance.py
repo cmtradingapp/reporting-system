@@ -368,10 +368,10 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
                           **qual_params, **camp_filter_params}
                 cur.execute(f"""
                     SELECT
-                        COALESCE(SUM(CASE WHEN t.transactiontype IN ('Deposit','Withdrawal Cancelled') THEN t.usdamount ELSE 0 END), 0) AS deposits,
-                        COALESCE(SUM(CASE WHEN t.transactiontype IN ('Withdrawal','Deposit Cancelled') THEN t.usdamount ELSE 0 END), 0) AS withdrawals,
-                        COALESCE(SUM(CASE WHEN t.ftd = 1 AND t.transactiontype = 'Deposit' THEN 1 ELSE 0 END), 0)                       AS ftd_mtd,
-                        COALESCE(SUM(CASE WHEN t.ftd = 1 AND t.transactiontype = 'Deposit'
+                        COALESCE(SUM(CASE WHEN t.transaction_type_name IN ('Deposit','Withdrawal Cancelled') THEN t.usdamount ELSE 0 END), 0) AS deposits,
+                        COALESCE(SUM(CASE WHEN t.transaction_type_name IN ('Withdrawal','Deposit Cancelled') THEN t.usdamount ELSE 0 END), 0) AS withdrawals,
+                        COALESCE(SUM(CASE WHEN t.ftd = 1 AND t.transaction_type_name = 'Deposit' THEN 1 ELSE 0 END), 0)                       AS ftd_mtd,
+                        COALESCE(SUM(CASE WHEN t.ftd = 1 AND t.transaction_type_name = 'Deposit'
                                           AND t.confirmation_time::date = %(date_to)s THEN 1 ELSE 0 END), 0)                            AS ftd_daily
                     FROM transactions t
                     JOIN accounts a ON a.accountid = t.vtigeraccountid
@@ -379,7 +379,7 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
                     LEFT JOIN crm_users u ON u.id = t.original_deposit_owner
                     WHERE t.transactionapproval = 'Approved'
                       AND (t.deleted = 0 OR t.deleted IS NULL)
-                      AND t.transactiontype IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
+                      AND t.transaction_type_name IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
                       AND t.vtigeraccountid IS NOT NULL
                       AND a.is_test_account = 0
                       AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
@@ -429,7 +429,7 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
                 LEFT JOIN crm_users u ON u.id = t.original_deposit_owner
                 WHERE t.transactionapproval = 'Approved'
                   AND (t.deleted = 0 OR t.deleted IS NULL)
-                  AND t.transactiontype IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
+                  AND t.transaction_type_name IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
                   AND t.vtigeraccountid IS NOT NULL
                   AND a.is_test_account = 0
                   {_TXN_ACCT_FILTERS}
@@ -482,7 +482,7 @@ async def campaign_performance_api(
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
     def _ck_part(v): return ','.join(sorted(v)) if v else ''
-    _ck = (f"camp_perf_v9:{date_from}:{date_to}:{f_classification}:{q_date_from}:{q_date_to}"
+    _ck = (f"camp_perf_v10:{date_from}:{date_to}:{f_classification}:{q_date_from}:{q_date_to}"
            f":{_ck_part(f_mkt_group)}:{_ck_part(f_legacy_id)}:{_ck_part(f_campaign_name)}"
            f":{_ck_part(f_channel)}:{_ck_part(f_sub_channel)}:{_ck_part(f_affiliate)}"
            f":{_ck_part(f_country)}:{_ck_part(f_office)}:{_ck_part(f_agent)}:{_ck_part(f_team)}"
@@ -726,11 +726,11 @@ def _camp_table_calc(
             if has_g1: txn_sel.append(f"{g1_sql} AS g1"); txn_grp.append(str(p)); p += 1
             if has_g2: txn_sel.append(f"{g2_sql} AS g2"); txn_grp.append(str(p)); p += 1
             txn_sel += [
-                "COALESCE(SUM(CASE WHEN t.ftd = 1 AND t.transactiontype = 'Deposit'"
+                "COALESCE(SUM(CASE WHEN t.ftd = 1 AND t.transaction_type_name = 'Deposit'"
                 " THEN 1 ELSE 0 END), 0) AS ftd",
-                "COALESCE(SUM(CASE WHEN t.transactiontype IN ('Deposit', 'Withdrawal Cancelled')"
+                "COALESCE(SUM(CASE WHEN t.transaction_type_name IN ('Deposit', 'Withdrawal Cancelled')"
                 " THEN t.usdamount ELSE 0 END), 0) AS deposits",
-                "COALESCE(SUM(CASE WHEN t.transactiontype IN ('Withdrawal', 'Deposit Cancelled')"
+                "COALESCE(SUM(CASE WHEN t.transaction_type_name IN ('Withdrawal', 'Deposit Cancelled')"
                 " THEN t.usdamount ELSE 0 END), 0) AS withdrawals",
                 "COUNT(DISTINCT t.vtigeraccountid) AS traders",
             ]
@@ -743,7 +743,7 @@ def _camp_table_calc(
                 f"{extra_joins}"
                 " WHERE t.transactionapproval = 'Approved'"
                 "   AND (t.deleted = 0 OR t.deleted IS NULL)"
-                "   AND t.transactiontype IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')"
+                "   AND t.transaction_type_name IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')"
                 "   AND t.vtigeraccountid IS NOT NULL"
                 "   AND a.is_test_account = 0"
                 + _TXN_ACCT_FILTERS +
@@ -933,7 +933,7 @@ async def campaign_performance_table_api(
         return JSONResponse(status_code=400, content={"detail": "Invalid period"})
 
     def _ck_part(v): return ','.join(sorted(v)) if v else ''
-    _ck = (f"camp_tbl_v10:{date_from}:{date_to}:{group1}:{group2}:{period}"
+    _ck = (f"camp_tbl_v11:{date_from}:{date_to}:{group1}:{group2}:{period}"
            f":{_ck_part(f_mkt_group)}:{_ck_part(f_legacy_id)}:{_ck_part(f_campaign_name)}:{_ck_part(f_channel)}"
            f":{_ck_part(f_sub_channel)}:{_ck_part(f_affiliate)}:{f_classification}:{ftc_groups}"
            f":{q_date_from}:{q_date_to}:{_ck_part(f_country)}:{_ck_part(f_office)}:{_ck_part(f_agent)}:{_ck_part(f_team)}"

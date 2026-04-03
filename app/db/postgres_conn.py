@@ -1569,8 +1569,8 @@ def truncate_and_insert_ftd100() -> int:
                 a.client_qualification_date,
                 SUM(
                     CASE
-                        WHEN t.transactiontype IN ('Deposit', 'Withdrawal Cancelled') THEN t.usdamount
-                        WHEN t.transactiontype IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
+                        WHEN t.transaction_type_name IN ('Deposit', 'Withdrawal Cancelled') THEN t.usdamount
+                        WHEN t.transaction_type_name IN ('Withdrawal', 'Deposit Cancelled') THEN -t.usdamount
                         ELSE 0
                     END
                 ) OVER (
@@ -1585,7 +1585,7 @@ def truncate_and_insert_ftd100() -> int:
             FROM transactions t
             JOIN accounts a ON a.accountid = t.vtigeraccountid
             WHERE t.transactionapproval = 'Approved'
-              AND t.transactiontype IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
+              AND t.transaction_type_name IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
               AND (t.deleted = 0 OR t.deleted IS NULL)
               AND a.is_test_account = 0
               AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%bonus%'
@@ -2144,26 +2144,26 @@ _MV_SETUP_SQL = [
         t.confirmation_time::date                                            AS tx_date,
         a.client_qualification_date::date                                    AS qual_date,
         COALESCE(SUM(CASE
-            WHEN t.transactiontype IN ('Deposit', 'Withdrawal Cancelled')  THEN  t.usdamount
-            WHEN t.transactiontype IN ('Withdrawal', 'Deposit Cancelled')  THEN -t.usdamount
+            WHEN t.transaction_type_name IN ('Deposit', 'Withdrawal Cancelled')  THEN  t.usdamount
+            WHEN t.transaction_type_name IN ('Withdrawal', 'Deposit Cancelled')  THEN -t.usdamount
         END), 0)                                                             AS net_usd,
         COALESCE(SUM(CASE
-            WHEN t.transactiontype IN ('Deposit', 'Withdrawal Cancelled')  THEN t.usdamount
+            WHEN t.transaction_type_name IN ('Deposit', 'Withdrawal Cancelled')  THEN t.usdamount
             ELSE 0
         END), 0)                                                             AS deposit_usd,
         COALESCE(SUM(CASE
-            WHEN t.transactiontype IN ('Withdrawal', 'Deposit Cancelled')  THEN t.usdamount
+            WHEN t.transaction_type_name IN ('Withdrawal', 'Deposit Cancelled')  THEN t.usdamount
             ELSE 0
         END), 0)                                                             AS withdrawal_usd,
-        SUM(CASE WHEN t.transactiontype = 'Deposit' AND t.ftd = 1 THEN 1 ELSE 0 END)::int AS ftd_count,
-        COUNT(DISTINCT CASE WHEN t.transactiontype = 'Deposit' AND t.ftd = 1
+        SUM(CASE WHEN t.transaction_type_name = 'Deposit' AND t.ftd = 1 THEN 1 ELSE 0 END)::int AS ftd_count,
+        COUNT(DISTINCT CASE WHEN t.transaction_type_name = 'Deposit' AND t.ftd = 1
                             THEN t.vtigeraccountid END)::int                 AS ftc_count
     FROM transactions t
     JOIN accounts  a  ON a.accountid = t.vtigeraccountid
     LEFT JOIN crm_users u ON u.id   = t.original_deposit_owner
     WHERE t.transactionapproval = 'Approved'
       AND (t.deleted = 0 OR t.deleted IS NULL)
-      AND t.transactiontype IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
+      AND t.transaction_type_name IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
       AND t.vtigeraccountid IS NOT NULL
       AND a.is_test_account = 0
       AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%'
@@ -2297,7 +2297,7 @@ _MV_SETUP_SQL = [
         FROM transactions t
         JOIN accounts a ON t.vtigeraccountid = a.accountid
         WHERE t.transactionapproval = 'Approved'
-          AND t.transactiontype IN ('Deposit', 'Withdrawal Cancelled')
+          AND t.transaction_type_name IN ('Deposit', 'Withdrawal Cancelled')
           AND (t.deleted = 0 OR t.deleted IS NULL)
           AND a.is_test_account = 0
     ),
@@ -2317,7 +2317,7 @@ _MV_SETUP_SQL = [
         JOIN transactions t ON t.vtigeraccountid = f.accountid
           AND t.confirmation_time > f.ftd_240_date
           AND t.transactionapproval = 'Approved'
-          AND t.transactiontype IN ('Deposit', 'Withdrawal Cancelled')
+          AND t.transaction_type_name IN ('Deposit', 'Withdrawal Cancelled')
           AND (t.deleted = 0 OR t.deleted IS NULL)
         GROUP BY f.accountid
     )

@@ -309,7 +309,7 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"bon_sales_v17:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"bon_sales_v18:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -363,13 +363,13 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
         LEFT JOIN (
             -- FTC net USD: live query — depends on (qual_date >= tx_date OR ftd=1)
             SELECT t.original_deposit_owner AS agent_id,
-                   SUM(CASE WHEN t.transactiontype IN ('Deposit','Withdrawal Cancelled') THEN  t.usdamount
-                            WHEN t.transactiontype IN ('Withdrawal','Deposit Cancelled')  THEN -t.usdamount END)::float AS net_usd
+                   SUM(CASE WHEN t.transaction_type_name IN ('Deposit','Withdrawal Cancelled') THEN  t.usdamount
+                            WHEN t.transaction_type_name IN ('Withdrawal','Deposit Cancelled')  THEN -t.usdamount END)::float AS net_usd
             FROM transactions t
             JOIN accounts a ON a.accountid = t.vtigeraccountid
             WHERE t.transactionapproval = 'Approved'
               AND (t.deleted = 0 OR t.deleted IS NULL)
-              AND t.transactiontype IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
+              AND t.transaction_type_name IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
               AND a.client_qualification_date IS NOT NULL
               AND a.client_qualification_date >= %(date_from)s
               AND a.client_qualification_date <  %(date_to_excl)s
@@ -491,7 +491,7 @@ async def agent_bonuses_sales_accounts_api(request: Request, date_from: str, dat
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"bon_sales_acct_v12:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"bon_sales_acct_v13:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -550,14 +550,14 @@ async def agent_bonuses_sales_accounts_api(request: Request, date_from: str, dat
         ftc_net AS (
             SELECT t.vtigeraccountid        AS accountid,
                    t.original_deposit_owner AS agent_id,
-                   SUM(CASE WHEN t.transactiontype IN ('Deposit','Withdrawal Cancelled') THEN  t.usdamount
-                            WHEN t.transactiontype IN ('Withdrawal','Deposit Cancelled')  THEN -t.usdamount
+                   SUM(CASE WHEN t.transaction_type_name IN ('Deposit','Withdrawal Cancelled') THEN  t.usdamount
+                            WHEN t.transaction_type_name IN ('Withdrawal','Deposit Cancelled')  THEN -t.usdamount
                        END)::float AS net_usd
             FROM transactions t
             JOIN accounts a ON a.accountid = t.vtigeraccountid
             WHERE t.transactionapproval = 'Approved'
               AND (t.deleted = 0 OR t.deleted IS NULL)
-              AND t.transactiontype IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
+              AND t.transaction_type_name IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
               AND a.client_qualification_date IS NOT NULL
               AND a.client_qualification_date >= %(date_from)s
               AND a.client_qualification_date <  %(date_to_excl)s
