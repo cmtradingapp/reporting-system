@@ -483,6 +483,12 @@
         <div class="kpi-label">NET $</div>
       </div>
     </div>
+    <div class="col-6 col-md-2" id="kpi-rdp-net">
+      <div class="kpi-card text-center">
+        <div class="kpi-value" id="stat-rdp-net">—</div>
+        <div class="kpi-label">RDP Net $</div>
+      </div>
+    </div>
     <div class="col-6 col-md-2" id="kpi-net-rr">
       <div class="kpi-card text-center">
         <div class="kpi-value" style="color:#d29922;" id="stat-grand-net-rr">—</div>
@@ -671,6 +677,15 @@
 <script>
   const SHOW_SALES      = {{ 'true' if show_sales else 'false' }};
   const SHOW_RETENTION  = {{ 'true' if show_retention else 'false' }};
+  let _rdpNetSales = 0, _rdpNetRet = 0;
+  function _updateRdpNetCard() {
+    const el = document.getElementById('stat-rdp-net');
+    if (!el) return;
+    const v = _rdpNetSales + _rdpNetRet;
+    const color = v >= 0 ? '#3fb950' : '#f85149';
+    el.style.color = color;
+    el.textContent = (v < 0 ? '-$' : '$') + Math.round(Math.abs(v)).toLocaleString();
+  }
 
   // ── State ──────────────────────────────────────────────────────────────
   const now = new Date();
@@ -1250,6 +1265,8 @@
       tbody.appendChild(totalTr);
     }
 
+    _rdpNetSales = grandRdpNet;
+    _updateRdpNetCard();
     document.getElementById('row-count').textContent = `${offices.length} offices · ${agentCount} agents`;
     applyMobileColOrder();
   }
@@ -1864,6 +1881,8 @@
       tfoot.appendChild(totalTr);
     }
 
+    _rdpNetRet = gRdpNet;
+    _updateRdpNetCard();
     document.getElementById('ret-row-count').textContent = `${totalOffices} offices · ${totalAgents} agents`;
     applyMobileColOrder();
   }
