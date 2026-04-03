@@ -78,7 +78,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"perf_v20:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"perf_v21:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -148,6 +148,13 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'
+          AND NOT EXISTS (
+              SELECT 1 FROM agent_dept_history dh
+              WHERE dh.agent_id = u.id
+                AND dh.report_dept != 'Sales'
+                AND dh.effective_from <= %(date_to_excl)s::date - 1
+                AND (dh.effective_to IS NULL OR dh.effective_to >= %(date_from)s::date)
+          )
           {role_filter}
         ORDER BY u.office_name NULLS LAST, COALESCE(mv.ftc, 0) DESC, u.agent_name
     """
@@ -353,7 +360,7 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"perf_ret_v15:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"perf_ret_v16:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -428,7 +435,15 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
               AND t.confirmation_time::date > a.client_qualification_date
             GROUP BY a.assigned_to
         ) rdp ON rdp.agent_id = u.id
-        WHERE u.department_ = 'Retention'
+        WHERE (
+              u.department_ = 'Retention'
+              OR u.id IN (
+                  SELECT agent_id FROM agent_dept_history
+                  WHERE report_dept = 'Retention'
+                    AND effective_from <= %(date_to_excl)s::date - 1
+                    AND (effective_to IS NULL OR effective_to >= %(date_from)s::date)
+              )
+          )
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'

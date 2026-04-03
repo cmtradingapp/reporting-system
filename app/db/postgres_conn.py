@@ -770,6 +770,44 @@ def backfill_classification_int():
         conn.close()
 
 
+def ensure_agent_dept_history_table():
+    """Create agent_dept_history table to track department overrides for reporting.
+    Agents who move between departments mid-month can be pinned to a report_dept
+    for a specific date range so historical reports stay accurate.
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS agent_dept_history (
+                    id           SERIAL PRIMARY KEY,
+                    agent_id     INTEGER NOT NULL,
+                    report_dept  VARCHAR(50) NOT NULL,
+                    effective_from DATE NOT NULL,
+                    effective_to   DATE,
+                    note         TEXT,
+                    created_at   TIMESTAMPTZ DEFAULT NOW(),
+                    UNIQUE (agent_id, report_dept, effective_from)
+                );
+                CREATE INDEX IF NOT EXISTS idx_adh_agent ON agent_dept_history(agent_id);
+                CREATE INDEX IF NOT EXISTS idx_adh_dept  ON agent_dept_history(report_dept, effective_from, effective_to);
+            """)
+            # Seed the 5 ex-Retention agents for March 2026 (idempotent)
+            cur.execute("""
+                INSERT INTO agent_dept_history (agent_id, report_dept, effective_from, effective_to, note)
+                VALUES
+                    (3750, 'Retention', '2026-03-01', '2026-03-31', 'Tamara R — moved to Sales after March 2026'),
+                    (3614, 'Retention', '2026-03-01', '2026-03-31', 'Temitope D — moved to Sales after March 2026'),
+                    (6119, 'Retention', '2026-03-01', '2026-03-31', 'Ramy N — moved to Sales after March 2026'),
+                    (6479, 'Retention', '2026-03-01', '2026-03-31', 'Princess C — moved to Sales after March 2026'),
+                    (6492, 'Retention', '2026-03-01', '2026-03-31', 'Zinhle K — moved to Sales after March 2026')
+                ON CONFLICT (agent_id, report_dept, effective_from) DO NOTHING;
+            """)
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def ensure_bonus_transactions_table():
     conn = get_connection()
     try:
@@ -1588,7 +1626,6 @@ def truncate_and_insert_ftd100() -> int:
               AND t.transaction_type_name IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
               AND (t.deleted = 0 OR t.deleted IS NULL)
               AND a.is_test_account = 0
-              AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%bonus%'
         ),
         agg AS (
             SELECT
@@ -2137,8 +2174,12 @@ def fetch_dealio_daily_profits_stats() -> dict:
 
 _MV_SETUP_SQL = [
     # ── mv_daily_kpis ────────────────────────────────────────────────────────
+    # Drop first so definition changes (e.g. bonus filter removal) take effect on restart.
+    # CASCADE also drops mv_run_rate which depends on it.
+    "DROP MATERIALIZED VIEW IF EXISTS mv_run_rate CASCADE",
+    "DROP MATERIALIZED VIEW IF EXISTS mv_daily_kpis CASCADE",
     """
-    CREATE MATERIALIZED VIEW IF NOT EXISTS mv_daily_kpis AS
+    CREATE MATERIALIZED VIEW mv_daily_kpis AS
     SELECT
         t.original_deposit_owner                                             AS agent_id,
         t.confirmation_time::date                                            AS tx_date,
@@ -2167,7 +2208,6 @@ _MV_SETUP_SQL = [
       AND t.vtigeraccountid IS NOT NULL
       AND a.is_test_account = 0
       AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%'
-      AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%bonus%'
     GROUP BY t.original_deposit_owner, t.confirmation_time::date, a.client_qualification_date::date
     """,
     "CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_daily_kpis_u    ON mv_daily_kpis (COALESCE(agent_id, -1), tx_date, COALESCE(qual_date, '1900-01-01'::date))",
@@ -2224,7 +2264,7 @@ _MV_SETUP_SQL = [
 
     # ── mv_run_rate  (depends on mv_daily_kpis — must come last) ─────────────
     """
-    CREATE MATERIALIZED VIEW IF NOT EXISTS mv_run_rate AS
+    CREATE MATERIALIZED VIEW mv_run_rate AS
     WITH tagged AS (
         SELECT k.agent_id, k.tx_date, k.qual_date,
                k.net_usd, k.deposit_usd, k.ftd_count, k.ftc_count,

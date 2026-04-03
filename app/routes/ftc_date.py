@@ -286,7 +286,6 @@ async def ftc_date_api(
         "    FROM transactions t\n"
         "    WHERE t.transactionapproval = 'Approved'\n"
         "      AND (t.deleted = 0 OR t.deleted IS NULL)\n"
-        "      AND LOWER(COALESCE(t.comment,'')) NOT LIKE '%%bonus%%'\n"
         "      AND COALESCE(t.confirmation_time, t.created_time)::date >= '2024-01-01'\n"
         "      AND COALESCE(t.confirmation_time, t.created_time)::date <= %(end_date)s::date\n"
         "    GROUP BY t.vtigeraccountid\n"

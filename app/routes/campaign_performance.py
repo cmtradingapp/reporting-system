@@ -384,7 +384,6 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
                       AND a.is_test_account = 0
                       AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
                       AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
-                      AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
                       AND t.confirmation_time::date >= %(date_from)s
                       AND t.confirmation_time::date <  %(date_to_excl)s
                     {extra_where}
@@ -438,7 +437,6 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
                   AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'
                   AND t.confirmation_time::date >= %(date_from)s
                   AND t.confirmation_time::date <  %(date_to_excl)s
-                  AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
                 {extra_where}
                 {camp_filter_where}
             """, base_p)
@@ -752,7 +750,6 @@ def _camp_table_calc(
                 "   AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'"
                 "   AND t.confirmation_time::date >= %(date_from)s"
                 "   AND t.confirmation_time::date < %(date_to_excl)s"
-                "   AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'"
                 f"\n{txn_filter_where}"
             )
             if txn_grp:

@@ -114,7 +114,6 @@ async def all_ftcs_api(request: Request, date_from: str, date_to: str):
               AND t.original_deposit_owner IS NOT NULL
               AND (fi.ftd_date IS NULL OR t.confirmation_time::date >= fi.ftd_date OR t.ftd = 1)
               AND (t.confirmation_time::date <= fa.client_qualification_date OR t.ftd = 1)
-              AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
             GROUP BY t.vtigeraccountid, t.original_deposit_owner
         ),
         all_account_agents AS (

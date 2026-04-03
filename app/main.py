@@ -27,7 +27,7 @@ from app.routes.eez_old import router as eez_old_router
 from app.routes.campaigns_sync import router as campaigns_sync_router
 from app.routes.campaign_performance import router as campaign_performance_router, _camp_kpi_calc, _camp_table_calc
 from app.routes.all_ftcs import router as all_ftcs_router
-from app.db.postgres_conn import ensure_table, ensure_auth_table, seed_admin_user, ensure_client_classification_table, ensure_bonus_transactions_table, ensure_daily_equity_zeroed_table, ensure_materialized_views, refresh_materialized_views, backfill_classification_int
+from app.db.postgres_conn import ensure_table, ensure_auth_table, seed_admin_user, ensure_client_classification_table, ensure_bonus_transactions_table, ensure_daily_equity_zeroed_table, ensure_materialized_views, refresh_materialized_views, backfill_classification_int, ensure_agent_dept_history_table
 import threading
 import fcntl
 from app.auth.auth import hash_password
@@ -119,6 +119,7 @@ async def lifespan(app: FastAPI):
     ensure_client_classification_table()
     ensure_bonus_transactions_table()
     ensure_daily_equity_zeroed_table()
+    ensure_agent_dept_history_table()
     ensure_materialized_views()
     seed_admin_user(hash_password('Admin123!'))
     threading.Thread(target=backfill_classification_int, daemon=True).start()

@@ -375,7 +375,6 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
               AND a.client_qualification_date <  %(date_to_excl)s
               AND (a.client_qualification_date >= t.confirmation_time::date OR t.ftd = 1)
               AND a.is_test_account = 0
-              AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
             GROUP BY t.original_deposit_owner
         ) ftc_net ON ftc_net.agent_id = u.id
         WHERE (
@@ -563,7 +562,6 @@ async def agent_bonuses_sales_accounts_api(request: Request, date_from: str, dat
               AND a.client_qualification_date <  %(date_to_excl)s
               AND (a.client_qualification_date >= t.confirmation_time::date OR t.ftd = 1)
               AND a.is_test_account = 0
-              AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
             GROUP BY t.vtigeraccountid, t.original_deposit_owner
         ),
         agent_totals AS (
