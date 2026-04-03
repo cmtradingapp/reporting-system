@@ -44,6 +44,7 @@ async def transactions_report_api(request: Request):
             JOIN accounts a ON a.accountid = t.vtigeraccountid
             WHERE t.confirmation_time::date >= '2026-03-01'
               AND t.confirmation_time::date <  '2026-04-01'
+              AND t.transactionapproval = 'Approved'
               AND a.is_test_account = 0
             ORDER BY t.confirmation_time DESC
         """)
