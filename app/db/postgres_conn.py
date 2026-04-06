@@ -1464,24 +1464,8 @@ def update_transactiontypename(df) -> int:
         conn.close()
 
 
-def compute_transaction_type_name(ids: list = None) -> int:
-    """Compute and UPDATE transaction_type_name using CASE logic.
-
-    Joins transactions with dealio_trades_mt4 (cmd=6) on mtorder_id=ticket to get
-    the MT4 comment, then applies CASE rules derived from the VTiger SQL script.
-    ids: list of mttransactionsids to update. None = all rows (full backfill).
-    Returns rows updated.
-    """
-    if ids is not None and len(ids) == 0:
-        return 0
-
-    # Build IN clause directly from ints — avoids psycopg2 % escaping conflicts with LIKE patterns
-    if ids is not None:
-        id_list = ",".join(str(int(i)) for i in ids)
-        id_filter = f"WHERE t2.mttransactionsid IN ({id_list})"
-    else:
-        id_filter = ""
-
+def _compute_type_name_batch(id_filter: str) -> int:
+    """Run the transaction_type_name CASE UPDATE for a specific id_filter clause."""
     sql = f"""
         UPDATE transactions t
         SET transaction_type_name = CASE
@@ -1676,14 +1660,52 @@ def compute_transaction_type_name(ids: list = None) -> int:
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            if ids is None:
-                cur.execute("SET LOCAL statement_timeout = 0")
-            cur.execute(sql)  # no params — avoids % conflict with LIKE patterns
+            cur.execute(sql)
             count = cur.rowcount
         conn.commit()
         return count
     finally:
         conn.close()
+
+
+def compute_transaction_type_name(ids: list = None) -> int:
+    """Compute and UPDATE transaction_type_name using CASE logic.
+
+    Incremental (ids provided): single UPDATE for those IDs.
+    Full backfill (ids=None): chunks of 50k rows by mttransactionsid range.
+    Returns total rows updated.
+    """
+    if ids is not None:
+        if len(ids) == 0:
+            return 0
+        id_list = ",".join(str(int(i)) for i in ids)
+        return _compute_type_name_batch(f"WHERE t2.mttransactionsid IN ({id_list})")
+
+    # Full backfill — get ID range then process in chunks
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT MIN(mttransactionsid), MAX(mttransactionsid) FROM transactions WHERE mttransactionsid IS NOT NULL")
+            min_id, max_id = cur.fetchone()
+    finally:
+        conn.close()
+
+    if min_id is None:
+        return 0
+
+    min_id, max_id = int(min_id), int(max_id)
+    chunk_size = 50_000
+    total = 0
+    current = min_id
+    while current <= max_id:
+        chunk_end = min(current + chunk_size - 1, max_id)
+        total += _compute_type_name_batch(
+            f"WHERE t2.mttransactionsid BETWEEN {current} AND {chunk_end}"
+        )
+        print(f"[transaction_type_name backfill] up to {chunk_end}/{max_id}, updated {total} rows")
+        current = chunk_end + 1
+
+    return total
 
 
 def fetch_transactions_stats() -> dict:
