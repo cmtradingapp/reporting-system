@@ -21,6 +21,7 @@ from app.routes.last_sync import router as last_sync_router
 from app.routes.client_classification_sync import router as client_classification_sync_router
 from app.routes.dealio_new_sync import router as dealio_new_sync_router
 from app.routes.dealio_daily_profits_sync import router as dealio_daily_profits_sync_router
+from app.routes.dealio_mt5trades_sync import router as dealio_mt5trades_sync_router
 from app.routes.live_equity import router as live_equity_router, _live_calc
 from app.routes.eez_comparison import router as eez_comparison_router
 from app.routes.eez_old import router as eez_old_router
@@ -32,7 +33,7 @@ from app.db.postgres_conn import ensure_table, ensure_auth_table, seed_admin_use
 import threading
 import fcntl
 from app.auth.auth import hash_password
-from app.etl.fetch_and_store import run_accounts_etl, run_users_etl, run_transactions_etl, run_targets_etl, run_trading_accounts_etl, run_ftd100_etl, run_client_classification_etl, run_dealio_users_etl, run_dealio_trades_mt4_etl, run_dealio_daily_profits_etl, run_bonus_transactions_etl, run_daily_equity_zeroed_snapshot, run_campaigns_etl
+from app.etl.fetch_and_store import run_accounts_etl, run_users_etl, run_transactions_etl, run_targets_etl, run_trading_accounts_etl, run_ftd100_etl, run_client_classification_etl, run_dealio_users_etl, run_dealio_trades_mt4_etl, run_dealio_daily_profits_etl, run_bonus_transactions_etl, run_daily_equity_zeroed_snapshot, run_campaigns_etl, run_dealio_trades_mt5_etl
 from app import cache
 import os
 from datetime import datetime, timedelta
@@ -106,6 +107,7 @@ TRANSACTIONS_SYNC_HOURS        = int(os.getenv("TRANSACTIONS_SYNC_HOURS", "6"))
 DEALIO_SYNC_HOURS              = int(os.getenv("DEALIO_SYNC_HOURS", "6"))
 DEALIO_USERS_SYNC_HOURS        = int(os.getenv("DEALIO_USERS_SYNC_HOURS", "6"))
 DEALIO_TRADES_MT4_SYNC_HOURS   = int(os.getenv("DEALIO_TRADES_MT4_SYNC_HOURS", "6"))
+DEALIO_TRADES_MT5_SYNC_HOURS   = int(os.getenv("DEALIO_TRADES_MT5_SYNC_HOURS", "6"))
 TRADING_ACCOUNTS_SYNC_HOURS    = int(os.getenv("TRADING_ACCOUNTS_SYNC_HOURS", "6"))
 DEALIO_DAILY_PROFIT_SYNC_HOURS = int(os.getenv("DEALIO_DAILY_PROFIT_SYNC_HOURS", "48"))
 DEALIO_DAILY_PROFITS_SYNC_HOURS = int(os.getenv("DEALIO_DAILY_PROFITS_SYNC_HOURS", "48"))
@@ -209,6 +211,15 @@ async def lifespan(app: FastAPI):
         replace_existing=True,
     )
     scheduler.add_job(
+        run_dealio_trades_mt5_etl,
+        "interval",
+        minutes=SYNC_INTERVAL_MINUTES,
+        kwargs={"hours": DEALIO_TRADES_MT5_SYNC_HOURS},
+        id="dealio_trades_mt5_sync",
+        start_date=_base + timedelta(seconds=360),
+        replace_existing=True,
+    )
+    scheduler.add_job(
         run_dealio_daily_profits_etl,
         "interval",
         minutes=SYNC_INTERVAL_MINUTES,
@@ -289,6 +300,7 @@ app.include_router(last_sync_router)
 app.include_router(client_classification_sync_router)
 app.include_router(dealio_new_sync_router)
 app.include_router(dealio_daily_profits_sync_router)
+app.include_router(dealio_mt5trades_sync_router)
 app.include_router(live_equity_router)
 app.include_router(eez_comparison_router)
 app.include_router(eez_old_router)

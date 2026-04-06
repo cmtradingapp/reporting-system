@@ -7,7 +7,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from app.auth.dependencies import get_current_user
-from app.db.postgres_conn import fetch_accounts_stats, fetch_crm_users_stats, fetch_transactions_stats, fetch_targets_stats, fetch_trading_accounts_stats, fetch_ftd100_stats, fetch_sync_log, fetch_dealio_users_stats, fetch_dealio_trades_mt4_stats, fetch_dealio_daily_profits_stats, fetch_bonus_transactions_stats, fetch_campaigns_stats
+from app.db.postgres_conn import fetch_accounts_stats, fetch_crm_users_stats, fetch_transactions_stats, fetch_targets_stats, fetch_trading_accounts_stats, fetch_ftd100_stats, fetch_sync_log, fetch_dealio_users_stats, fetch_dealio_trades_mt4_stats, fetch_dealio_trades_mt5_stats, fetch_dealio_daily_profits_stats, fetch_bonus_transactions_stats, fetch_campaigns_stats
 from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 
@@ -43,6 +43,8 @@ DEALIO_USERS_SYNC_INTERVAL_HOURS = int(os.getenv("DEALIO_USERS_SYNC_INTERVAL_HOU
 DEALIO_USERS_SYNC_HOURS = int(os.getenv("DEALIO_USERS_SYNC_HOURS", "24"))
 DEALIO_TRADES_MT4_SYNC_INTERVAL_HOURS = int(os.getenv("DEALIO_TRADES_MT4_SYNC_INTERVAL_HOURS", "1"))
 DEALIO_TRADES_MT4_SYNC_HOURS = int(os.getenv("DEALIO_TRADES_MT4_SYNC_HOURS", "24"))
+DEALIO_TRADES_MT5_SYNC_INTERVAL_HOURS = int(os.getenv("DEALIO_TRADES_MT5_SYNC_INTERVAL_HOURS", "1"))
+DEALIO_TRADES_MT5_SYNC_HOURS = int(os.getenv("DEALIO_TRADES_MT5_SYNC_HOURS", "24"))
 DEALIO_DAILY_PROFIT_SYNC_INTERVAL_HOURS = int(os.getenv("DEALIO_DAILY_PROFIT_SYNC_INTERVAL_HOURS", "1"))
 DEALIO_DAILY_PROFIT_SYNC_HOURS = int(os.getenv("DEALIO_DAILY_PROFIT_SYNC_HOURS", "48"))
 DEALIO_DAILY_PROFITS_SYNC_INTERVAL_HOURS = int(os.getenv("DEALIO_DAILY_PROFITS_SYNC_INTERVAL_HOURS", "1"))
@@ -70,6 +72,7 @@ def warm_data_sync_cache():
     _cached("ftd100_stats",    fetch_ftd100_stats)
     _cached("du_stats",        fetch_dealio_users_stats)
     _cached("dtm4_stats",      fetch_dealio_trades_mt4_stats)
+    _cached("dtm5_stats",      fetch_dealio_trades_mt5_stats)
     _cached("ddps_stats",      fetch_dealio_daily_profits_stats)
     _cached("bonus_stats",     fetch_bonus_transactions_stats)
     _cached("campaigns_stats", fetch_campaigns_stats)
@@ -81,6 +84,7 @@ def warm_data_sync_cache():
     _cached("ftd100_log",      lambda: fetch_sync_log("ftd100_clients",       limit=20))
     _cached("du_log",          lambda: fetch_sync_log("dealio_users",         limit=20))
     _cached("dtm4_log",        lambda: fetch_sync_log("dealio_trades_mt4",    limit=20))
+    _cached("dtm5_log",        lambda: fetch_sync_log("dealio_trades_mt5",    limit=20))
     _cached("ddps_log",        lambda: fetch_sync_log("dealio_daily_profits", limit=20))
     _cached("bonus_log",       lambda: fetch_sync_log("bonus_transactions",   limit=20))
     _cached("campaigns_log",   lambda: fetch_sync_log("campaigns",            limit=20))
@@ -102,6 +106,7 @@ async def data_sync_page(request: Request):
         "ftd100_stats":    lambda: _cached("ftd100_stats",    fetch_ftd100_stats),
         "du_stats":        lambda: _cached("du_stats",        fetch_dealio_users_stats),
         "dtm4_stats":      lambda: _cached("dtm4_stats",      fetch_dealio_trades_mt4_stats),
+        "dtm5_stats":      lambda: _cached("dtm5_stats",      fetch_dealio_trades_mt5_stats),
         "ddps_stats":      lambda: _cached("ddps_stats",      fetch_dealio_daily_profits_stats),
         "bonus_stats":     lambda: _cached("bonus_stats",     fetch_bonus_transactions_stats),
         "campaigns_stats": lambda: _cached("campaigns_stats", fetch_campaigns_stats),
@@ -113,6 +118,7 @@ async def data_sync_page(request: Request):
         "ftd100_log":      lambda: _cached("ftd100_log",      lambda: fetch_sync_log("ftd100_clients",       limit=20)),
         "du_log":          lambda: _cached("du_log",          lambda: fetch_sync_log("dealio_users",         limit=20)),
         "dtm4_log":        lambda: _cached("dtm4_log",        lambda: fetch_sync_log("dealio_trades_mt4",    limit=20)),
+        "dtm5_log":        lambda: _cached("dtm5_log",        lambda: fetch_sync_log("dealio_trades_mt5",    limit=20)),
         "ddps_log":        lambda: _cached("ddps_log",        lambda: fetch_sync_log("dealio_daily_profits", limit=20)),
         "bonus_log":       lambda: _cached("bonus_log",       lambda: fetch_sync_log("bonus_transactions",   limit=20)),
         "campaigns_log":   lambda: _cached("campaigns_log",   lambda: fetch_sync_log("campaigns",            limit=20)),
@@ -153,6 +159,8 @@ async def data_sync_page(request: Request):
     du_log         = results["du_log"]
     dtm4_stats     = results["dtm4_stats"]
     dtm4_log       = results["dtm4_log"]
+    dtm5_stats     = results["dtm5_stats"]
+    dtm5_log       = results["dtm5_log"]
     ddps_stats     = results["ddps_stats"]
     ddps_log       = results["ddps_log"]
     bonus_stats      = results["bonus_stats"]
@@ -304,6 +312,24 @@ async def data_sync_page(request: Request):
             "primary_key": "ticket",
             "incremental_columns": "last_modified",
             "source": "Dealio PG → dealio.trades_mt4",
+        },
+        {
+            "key": "dealio_trades_mt5",
+            "label": "dealio_trades_mt5",
+            "last_synced_at": dtm5_stats["last_synced_at"],
+            "stat_cards": [
+                {"label": "Total Records",  "value": dtm5_stats["total_records"],  "color": "text-info",    "icon": "bi-database"},
+                {"label": "Unique Logins",  "value": dtm5_stats["unique_logins"],  "color": "text-success", "icon": "bi-person-badge"},
+                {"label": "Total Profit",   "value": dtm5_stats["total_profit"],   "color": "text-warning", "icon": "bi-currency-dollar"},
+                {"label": "Unique Symbols", "value": dtm5_stats["unique_symbols"], "color": "text-primary", "icon": "bi-graph-up"},
+            ],
+            "sync_log": dtm5_log,
+            "healthy": _is_healthy(dtm5_log, DEALIO_TRADES_MT5_SYNC_INTERVAL_HOURS),
+            "sync_interval_hours": DEALIO_TRADES_MT5_SYNC_INTERVAL_HOURS,
+            "lookback_hours": DEALIO_TRADES_MT5_SYNC_HOURS,
+            "primary_key": "ticket",
+            "incremental_columns": "synctime",
+            "source": "Dealio PG → dealio.trades_mt5",
         },
         {
             "key": "bonus_transactions",

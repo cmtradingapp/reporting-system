@@ -299,7 +299,7 @@
   async function runSync(tableKey) {
     document.getElementById('spinner').classList.add('active');
     try {
-      const urlMap = { 'crm_accounts': '/sync/accounts', 'crm_users': '/sync/users', 'transactions': '/sync/transactions', 'targets': '/sync/targets', 'trading_accounts': '/sync/trading-accounts', 'ftd100_clients': '/sync/ftd100', 'dealio_users': '/sync/dealio-users', 'dealio_trades_mt4': '/sync/dealio-trades-mt4', 'bonus_transactions': '/sync/bonus-transactions', 'dealio_daily_profits': '/sync/dealio-daily-profits' };
+      const urlMap = { 'crm_accounts': '/sync/accounts', 'crm_users': '/sync/users', 'transactions': '/sync/transactions', 'targets': '/sync/targets', 'trading_accounts': '/sync/trading-accounts', 'ftd100_clients': '/sync/ftd100', 'dealio_users': '/sync/dealio-users', 'dealio_trades_mt4': '/sync/dealio-trades-mt4', 'dealio_trades_mt5': '/sync/dealio-mt5trades', 'bonus_transactions': '/sync/bonus-transactions', 'dealio_daily_profits': '/sync/dealio-daily-profits' };
       const url = urlMap[tableKey] || '/sync/accounts';
       const res = await fetch(url, { method: 'POST' });
       const data = await res.json();
@@ -322,7 +322,7 @@
     document.getElementById('spinner').classList.add('active');
     document.querySelector('#spinner div div:last-child').textContent = 'Starting full sync...';
     try {
-      const urlMap = { 'crm_accounts': '/sync/accounts/full', 'crm_users': '/sync/users/full', 'transactions': '/sync/transactions/full', 'targets': '/sync/targets/full', 'trading_accounts': '/sync/trading-accounts/full', 'ftd100_clients': '/sync/ftd100/full', 'dealio_users': '/sync/dealio-users/full', 'dealio_trades_mt4': '/sync/dealio-trades-mt4/full', 'bonus_transactions': '/sync/bonus-transactions/full', 'dealio_daily_profits': '/sync/dealio-daily-profits/full' };
+      const urlMap = { 'crm_accounts': '/sync/accounts/full', 'crm_users': '/sync/users/full', 'transactions': '/sync/transactions/full', 'targets': '/sync/targets/full', 'trading_accounts': '/sync/trading-accounts/full', 'ftd100_clients': '/sync/ftd100/full', 'dealio_users': '/sync/dealio-users/full', 'dealio_trades_mt4': '/sync/dealio-trades-mt4/full', 'dealio_trades_mt5': '/sync/dealio-mt5trades/full', 'bonus_transactions': '/sync/bonus-transactions/full', 'dealio_daily_profits': '/sync/dealio-daily-profits/full' };
       const url = urlMap[tableKey] || '/sync/accounts/full';
       const res = await fetch(url, { method: 'POST' });
       const data = await res.json();

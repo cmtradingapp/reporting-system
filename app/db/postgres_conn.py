@@ -468,6 +468,49 @@ def ensure_table():
         CREATE INDEX IF NOT EXISTS idx_dtm4_last_modified ON dealio_trades_mt4 (last_modified);
         CREATE INDEX IF NOT EXISTS idx_dtm4_symbol        ON dealio_trades_mt4 (symbol);
 
+        CREATE TABLE IF NOT EXISTS dealio_trades_mt5 (
+            ticket              BIGINT           NOT NULL,
+            source_id           TEXT             NOT NULL,
+            login               BIGINT,
+            symbol              TEXT,
+            digit               BIGINT,
+            cmd                 SMALLINT,
+            volume              DOUBLE PRECISION,
+            open_time           TIMESTAMP,
+            open_price          DOUBLE PRECISION,
+            close_time          TIMESTAMP,
+            close_price         DOUBLE PRECISION,
+            reason              INTEGER,
+            commission          DOUBLE PRECISION,
+            agent_id            BIGINT,
+            swap                DOUBLE PRECISION,
+            profit              DOUBLE PRECISION,
+            comment             TEXT,
+            computed_profit     DOUBLE PRECISION,
+            computed_swap       DOUBLE PRECISION,
+            computed_commission DOUBLE PRECISION,
+            group_name          TEXT,
+            group_currency      TEXT,
+            book                TEXT,
+            notional_value      DOUBLE PRECISION,
+            source_name         TEXT,
+            source_type         TEXT,
+            position_id         BIGINT,
+            entry               SMALLINT,
+            volume_closed       DOUBLE PRECISION,
+            sync_time           TIMESTAMP,
+            is_finalized        BOOLEAN,
+            spread              TEXT,
+            conversion_rate     DOUBLE PRECISION,
+            synced_at           TIMESTAMPTZ DEFAULT NOW(),
+            PRIMARY KEY (source_id, ticket)
+        );
+        CREATE INDEX IF NOT EXISTS idx_dtm5_login      ON dealio_trades_mt5 (login);
+        CREATE INDEX IF NOT EXISTS idx_dtm5_open_time  ON dealio_trades_mt5 (open_time);
+        CREATE INDEX IF NOT EXISTS idx_dtm5_close_time ON dealio_trades_mt5 (close_time);
+        CREATE INDEX IF NOT EXISTS idx_dtm5_sync_time  ON dealio_trades_mt5 (sync_time);
+        CREATE INDEX IF NOT EXISTS idx_dtm5_symbol     ON dealio_trades_mt5 (symbol);
+
         CREATE TABLE IF NOT EXISTS dealio_daily_profits (
             date                        TIMESTAMP        NOT NULL,
             login                       BIGINT           NOT NULL,
@@ -2031,6 +2074,55 @@ def truncate_dealio_trades_mt4():
         conn.close()
 
 
+def upsert_dealio_trades_mt5(df: pd.DataFrame):
+    import time as _time
+    cols = [
+        "ticket", "source_id", "login", "symbol", "digit", "cmd", "volume",
+        "open_time", "open_price", "close_time", "close_price",
+        "reason", "commission", "agent_id", "swap", "profit", "comment",
+        "computed_profit", "computed_swap", "computed_commission",
+        "group_name", "group_currency", "book", "notional_value",
+        "source_name", "source_type", "position_id", "entry", "volume_closed",
+        "sync_time", "is_finalized", "spread", "conversion_rate",
+    ]
+    rows = [tuple(_clean(row.get(c)) for c in cols) for _, row in df.iterrows()]
+    update_cols = [c for c in cols if c not in ("ticket", "source_id")]
+    update_set = ", ".join(f"{c} = EXCLUDED.{c}" for c in update_cols)
+    col_list = ", ".join(cols)
+    sql = f"""
+        INSERT INTO dealio_trades_mt5 ({col_list})
+        VALUES %s
+        ON CONFLICT (source_id, ticket) DO UPDATE SET
+            {update_set},
+            synced_at = NOW()
+    """
+    for attempt in range(3):
+        conn = get_connection()
+        try:
+            with conn.cursor() as cur:
+                execute_values(cur, sql, rows)
+            conn.commit()
+            return
+        except Exception as e:
+            conn.rollback()
+            if "deadlock" in str(e).lower() and attempt < 2:
+                _time.sleep(5)
+                continue
+            raise
+        finally:
+            conn.close()
+
+
+def truncate_dealio_trades_mt5():
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("TRUNCATE TABLE dealio_trades_mt5")
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def fetch_dealio_trades_mt4_stats() -> dict:
     sql = """
         SELECT
@@ -2040,6 +2132,32 @@ def fetch_dealio_trades_mt4_stats() -> dict:
             COALESCE(SUM(profit), 0)  AS total_profit,
             COUNT(DISTINCT symbol)    AS unique_symbols
         FROM dealio_trades_mt4
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+            row = cur.fetchone()
+            return {
+                "total_records":  row[0] or 0,
+                "last_synced_at": row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else "Never",
+                "unique_logins":  row[2] or 0,
+                "total_profit":   int(row[3] or 0),
+                "unique_symbols": row[4] or 0,
+            }
+    finally:
+        conn.close()
+
+
+def fetch_dealio_trades_mt5_stats() -> dict:
+    sql = """
+        SELECT
+            (SELECT reltuples::bigint FROM pg_class WHERE relname = 'dealio_trades_mt5') AS total_records,
+            MAX(synced_at)            AS last_synced_at,
+            COUNT(DISTINCT login)     AS unique_logins,
+            COALESCE(SUM(profit), 0)  AS total_profit,
+            COUNT(DISTINCT symbol)    AS unique_symbols
+        FROM dealio_trades_mt5
     """
     conn = get_connection()
     try:

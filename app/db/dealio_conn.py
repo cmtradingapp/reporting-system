@@ -384,6 +384,114 @@ def get_dealio_daily_profits_full():
         last_sourceid = str(df.iloc[-1]["sourceid"])
 
 
+# ── dealio.trades_mt5 ────────────────────────────────────────────────────────
+
+_TRADES_MT5_COLS = """
+    ticket,
+    login,
+    symbol,
+    digit,
+    cmd,
+    volume,
+    (opentime  AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Nicosia' AS open_time,
+    openprice  AS open_price,
+    (closetime AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Nicosia' AS close_time,
+    closeprice AS close_price,
+    reason,
+    commission,
+    agentid    AS agent_id,
+    swap,
+    profit,
+    comment,
+    computedprofit      AS computed_profit,
+    computedswap        AS computed_swap,
+    computedcommission  AS computed_commission,
+    groupname           AS group_name,
+    groupcurrency       AS group_currency,
+    book,
+    notionalvalue       AS notional_value,
+    sourcename          AS source_name,
+    sourcetype          AS source_type,
+    sourceid            AS source_id,
+    positionid          AS position_id,
+    entry,
+    volumeclosed        AS volume_closed,
+    synctime            AS sync_time,
+    isfinalized         AS is_finalized,
+    spread::text        AS spread,
+    conversionrate      AS conversion_rate
+"""
+
+
+def get_dealio_trades_mt5(hours: int = 24) -> pd.DataFrame:
+    """Fetch dealio.trades_mt5 updated within the last N hours (cmd 0/1)."""
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    sql = f"""
+        SELECT {_TRADES_MT5_COLS}
+        FROM dealio.trades_mt5
+        WHERE synctime >= %(cutoff)s
+          AND cmd IN (0, 1)
+        ORDER BY synctime
+    """
+    conn = get_dealio_connection()
+    try:
+        df = pd.read_sql(sql, conn, params={"cutoff": cutoff})
+        return df
+    finally:
+        conn.close()
+
+
+def get_dealio_trades_mt5_full():
+    """Full fetch of dealio.trades_mt5 in chunks (cmd 0/1).
+    Reconnects per chunk to avoid SSL timeout on long-running syncs."""
+    last_ticket = 0
+    while True:
+        sql = f"""
+            SELECT {_TRADES_MT5_COLS}
+            FROM dealio.trades_mt5
+            WHERE ticket > %(last_ticket)s
+              AND cmd IN (0, 1)
+            ORDER BY ticket
+            LIMIT {_CHUNK_SIZE}
+        """
+        conn = get_dealio_connection()
+        try:
+            df = pd.read_sql(sql, conn, params={"last_ticket": last_ticket})
+        finally:
+            conn.close()
+        if df.empty:
+            break
+        yield df
+        if len(df) < _CHUNK_SIZE:
+            break
+        last_ticket = int(df["ticket"].max())
+
+
+def get_dealio_trades_mt5_missing(start_ticket: int):
+    """Fetch only rows with ticket > start_ticket."""
+    last_ticket = start_ticket
+    while True:
+        sql = f"""
+            SELECT {_TRADES_MT5_COLS}
+            FROM dealio.trades_mt5
+            WHERE ticket > %(last_ticket)s
+              AND cmd IN (0, 1)
+            ORDER BY ticket
+            LIMIT {_CHUNK_SIZE}
+        """
+        conn = get_dealio_connection()
+        try:
+            df = pd.read_sql(sql, conn, params={"last_ticket": last_ticket})
+        finally:
+            conn.close()
+        if df.empty:
+            break
+        yield df
+        if len(df) < _CHUNK_SIZE:
+            break
+        last_ticket = int(df["ticket"].max())
+
+
 # ── Live equity helpers ───────────────────────────────────────────────────────
 
 def get_dealio_users_comp():
