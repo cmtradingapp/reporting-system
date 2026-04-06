@@ -1643,7 +1643,7 @@ def _compute_type_name_batch(id_filter: str) -> int:
             ELSE 'Not Set'
         END
         FROM (
-            SELECT t2.mttransactionsid, m.comment AS mt4_comment
+            SELECT t2.ctid, m.comment AS mt4_comment
             FROM transactions t2
             LEFT JOIN dealio_trades_mt4 m
                 ON m.cmd = 6
@@ -1655,7 +1655,7 @@ def _compute_type_name_batch(id_filter: str) -> int:
                     END = m.ticket
             {id_filter}
         ) sub
-        WHERE t.mttransactionsid = sub.mttransactionsid
+        WHERE t.ctid = sub.ctid
     """
     conn = get_connection()
     try:
@@ -1671,17 +1671,23 @@ def _compute_type_name_batch(id_filter: str) -> int:
 def compute_transaction_type_name(ids: list = None) -> int:
     """Compute and UPDATE transaction_type_name using CASE logic.
 
-    Incremental (ids provided): single UPDATE for those IDs.
-    Full backfill (ids=None): chunks of 50k rows by mttransactionsid range.
+    Incremental (ids provided): UPDATE for those mttransactionsids + NULL-mttransactionsid rows
+    with no type yet (broker_banking records).
+    Full backfill (ids=None): mttransactionsid-range chunks + one NULL-mttransactionsid batch.
     Returns total rows updated.
     """
     if ids is not None:
         if len(ids) == 0:
             return 0
         id_list = ",".join(str(int(i)) for i in ids)
-        return _compute_type_name_batch(f"WHERE t2.mttransactionsid IN ({id_list})")
+        n = _compute_type_name_batch(f"WHERE t2.mttransactionsid IN ({id_list})")
+        # broker_banking rows have NULL mttransactionsid — process those too
+        n += _compute_type_name_batch(
+            "WHERE t2.mttransactionsid IS NULL AND t2.transaction_type_name IS NULL"
+        )
+        return n
 
-    # Full backfill — get ID range then process in chunks
+    # Full backfill — mttransactionsid-range chunks for non-NULL rows
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -1690,20 +1696,22 @@ def compute_transaction_type_name(ids: list = None) -> int:
     finally:
         conn.close()
 
-    if min_id is None:
-        return 0
-
-    min_id, max_id = int(min_id), int(max_id)
-    chunk_size = 50_000
     total = 0
-    current = min_id
-    while current <= max_id:
-        chunk_end = min(current + chunk_size - 1, max_id)
-        total += _compute_type_name_batch(
-            f"WHERE t2.mttransactionsid BETWEEN {current} AND {chunk_end}"
-        )
-        print(f"[transaction_type_name backfill] up to {chunk_end}/{max_id}, updated {total} rows")
-        current = chunk_end + 1
+    if min_id is not None:
+        min_id, max_id = int(min_id), int(max_id)
+        chunk_size = 50_000
+        current = min_id
+        while current <= max_id:
+            chunk_end = min(current + chunk_size - 1, max_id)
+            total += _compute_type_name_batch(
+                f"WHERE t2.mttransactionsid BETWEEN {current} AND {chunk_end}"
+            )
+            print(f"[transaction_type_name backfill] up to {chunk_end}/{max_id}, updated {total} rows")
+            current = chunk_end + 1
+
+    # One batch for NULL mttransactionsid (broker_banking / Antilope records)
+    total += _compute_type_name_batch("WHERE t2.mttransactionsid IS NULL")
+    print(f"[transaction_type_name backfill] NULL mttransactionsid batch done, total {total}")
 
     return total
 
