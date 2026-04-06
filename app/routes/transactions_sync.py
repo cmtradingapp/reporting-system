@@ -1,6 +1,6 @@
 from fastapi import APIRouter, BackgroundTasks
 from fastapi.responses import JSONResponse
-from app.etl.fetch_and_store import run_transactions_etl, run_transactions_full_etl, run_transactions_by_confirmation_date_etl, run_bonus_transactions_etl, run_bonus_transactions_full_etl
+from app.etl.fetch_and_store import run_transactions_etl, run_transactions_full_etl, run_transactions_by_confirmation_date_etl, run_bonus_transactions_etl, run_bonus_transactions_full_etl, run_transaction_type_names_backfill_etl
 from app.db.mssql_conn import _get_mssql_connection
 
 router = APIRouter()
@@ -32,6 +32,13 @@ def sync_bonus_transactions(hours: int = 24):
 def sync_bonus_transactions_full(background_tasks: BackgroundTasks):
     background_tasks.add_task(run_bonus_transactions_full_etl)
     return {"status": "started"}
+
+
+@router.post("/sync/transactions/backfill-type-names")
+def backfill_transaction_type_names(background_tasks: BackgroundTasks):
+    """Backfill transaction_type_name from MSSQL for all historical records. Runs in background."""
+    background_tasks.add_task(run_transaction_type_names_backfill_etl)
+    return JSONResponse(content={"status": "started", "info": "backfilling transaction_type_name from MSSQL vtiger_mttransactions"})
 
 
 @router.get("/api/debug-bonus-sample")

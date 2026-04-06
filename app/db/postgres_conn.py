@@ -1439,7 +1439,7 @@ def upsert_transactions(df: pd.DataFrame):
 
 
 def update_transactiontypename(df) -> int:
-    """Batch UPDATE transactiontypename for rows matched by mttransactionsid. Returns rows updated."""
+    """Batch UPDATE transaction_type_name for rows matched by mttransactionsid. Returns rows updated."""
     if df is None or len(df) == 0:
         return 0
     rows = [
@@ -1454,7 +1454,7 @@ def update_transactiontypename(df) -> int:
     try:
         with conn.cursor() as cur:
             execute_values(cur, """
-                UPDATE transactions SET transactiontypename = data.ttn
+                UPDATE transactions SET transaction_type_name = data.ttn
                 FROM (VALUES %s) AS data(ttn, id)
                 WHERE transactions.mttransactionsid = data.id::bigint
             """, rows, template="(%s, %s)")
