@@ -33,7 +33,7 @@ from app.db.postgres_conn import ensure_table, ensure_auth_table, seed_admin_use
 import threading
 import fcntl
 from app.auth.auth import hash_password
-from app.etl.fetch_and_store import run_accounts_etl, run_users_etl, run_transactions_etl, run_targets_etl, run_trading_accounts_etl, run_ftd100_etl, run_client_classification_etl, run_dealio_users_etl, run_dealio_trades_mt4_etl, run_dealio_daily_profits_etl, run_bonus_transactions_etl, run_daily_equity_zeroed_snapshot, run_campaigns_etl, run_dealio_trades_mt5_etl
+from app.etl.fetch_and_store import run_accounts_etl, run_users_etl, run_transactions_etl, run_targets_etl, run_trading_accounts_etl, run_ftd100_etl, run_client_classification_etl, run_dealio_users_etl, run_dealio_trades_mt4_etl, run_dealio_daily_profits_etl, run_bonus_transactions_etl, run_daily_equity_zeroed_snapshot, run_campaigns_etl, run_dealio_trades_mt5_etl, run_dealio_trades_mt5_full_etl
 from app import cache
 import os
 from datetime import datetime, timedelta
@@ -113,6 +113,35 @@ DEALIO_DAILY_PROFIT_SYNC_HOURS = int(os.getenv("DEALIO_DAILY_PROFIT_SYNC_HOURS",
 DEALIO_DAILY_PROFITS_SYNC_HOURS = int(os.getenv("DEALIO_DAILY_PROFITS_SYNC_HOURS", "48"))
 
 scheduler = BackgroundScheduler()
+
+
+def _auto_mt5_full_sync():
+    """On startup, trigger MT5 full sync if no successful full sync has ever completed."""
+    import time
+    time.sleep(10)  # let scheduler settle first
+    try:
+        from app.db.postgres_conn import get_connection
+        conn = get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT 1 FROM sync_log
+                    WHERE table_name = 'dealio_trades_mt5'
+                      AND status = 'success'
+                      AND cutoff_used = '1970-01-01 00:00:00'
+                    LIMIT 1
+                """)
+                already_done = cur.fetchone() is not None
+        finally:
+            conn.close()
+        if not already_done:
+            print("[auto_mt5_full_sync] No completed full sync found — starting now.")
+            run_dealio_trades_mt5_full_etl()
+            print("[auto_mt5_full_sync] Full sync completed.")
+        else:
+            print("[auto_mt5_full_sync] Full sync already completed — skipping.")
+    except Exception as e:
+        print(f"[auto_mt5_full_sync] Error: {e}")
 
 
 @asynccontextmanager
@@ -270,6 +299,7 @@ async def lifespan(app: FastAPI):
         replace_existing=True,
     )
     scheduler.start()
+    threading.Thread(target=_auto_mt5_full_sync, daemon=True).start()
     yield
     scheduler.shutdown()
 
