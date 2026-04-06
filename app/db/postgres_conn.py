@@ -1664,8 +1664,11 @@ def compute_transaction_type_name(ids: list = None) -> int:
             LEFT JOIN dealio_trades_mt4 m
                 ON m.cmd = 6
                 AND t2.mtorder_id IS NOT NULL
-                AND t2.mtorder_id ~ '^[0-9]+$'
-                AND t2.mtorder_id::bigint = m.ticket
+                AND t2.mtorder_id ~ '^[0-9]+(\.[0-9]*)?$'
+                AND CASE WHEN t2.mtorder_id ~ '^[0-9]+(\.[0-9]*)?$'
+                         THEN t2.mtorder_id::numeric::bigint
+                         ELSE NULL
+                    END = m.ticket
             {id_filter}
         ) sub
         WHERE t.mttransactionsid = sub.mttransactionsid
