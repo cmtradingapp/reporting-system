@@ -1475,7 +1475,12 @@ def compute_transaction_type_name(ids: list = None) -> int:
     if ids is not None and len(ids) == 0:
         return 0
 
-    id_filter = "WHERE t2.mttransactionsid = ANY(%(ids)s)" if ids is not None else ""
+    # Build IN clause directly from ints — avoids psycopg2 % escaping conflicts with LIKE patterns
+    if ids is not None:
+        id_list = ",".join(str(int(i)) for i in ids)
+        id_filter = f"WHERE t2.mttransactionsid IN ({id_list})"
+    else:
+        id_filter = ""
 
     sql = f"""
         UPDATE transactions t
@@ -1670,7 +1675,7 @@ def compute_transaction_type_name(ids: list = None) -> int:
         with conn.cursor() as cur:
             if ids is None:
                 cur.execute("SET LOCAL statement_timeout = 0")
-            cur.execute(sql, {"ids": ids} if ids is not None else {})
+            cur.execute(sql)  # no params — avoids % conflict with LIKE patterns
             count = cur.rowcount
         conn.commit()
         return count
