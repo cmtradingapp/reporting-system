@@ -2,13 +2,13 @@ import time
 import pandas as pd
 from datetime import datetime, timedelta, timezone
 from app.db.mysql_conn import get_operators, get_users, get_accounts, get_accounts_full, get_accounts_by_qual_date, get_accounts_by_created_date, get_crm_users, get_crm_users_full, get_transactions, get_transactions_full, get_transactions_by_confirmation_date, get_trading_accounts, get_trading_accounts_full, get_campaigns
-from app.db.mssql_conn import get_targets, get_vtiger_users, get_client_classification, get_bonus_transactions, get_bonus_transactions_full, get_transaction_type_names_for_ids, get_transaction_type_names_full
+from app.db.mssql_conn import get_targets, get_vtiger_users, get_client_classification, get_bonus_transactions, get_bonus_transactions_full
 from app.db.dealio_conn import get_dealio_users, get_dealio_users_full, get_dealio_trades_mt4, get_dealio_trades_mt4_full, get_dealio_trades_mt4_missing, get_dealio_trades_mt4_by_open_time, get_dealio_daily_profits, get_dealio_daily_profits_full, get_dealio_daily_profits_daterange, get_dealio_trades_mt5, get_dealio_trades_mt5_full, get_dealio_trades_mt5_missing
 from app.db.postgres_conn import (
     ensure_table, delete_all_performance, insert_records,
     upsert_users, upsert_accounts, cleanup_accounts, upsert_crm_users, truncate_crm_users, upsert_transactions,
     upsert_targets, upsert_trading_accounts, log_sync,
-    truncate_and_insert_ftd100, update_transactiontypename,
+    truncate_and_insert_ftd100, compute_transaction_type_name,
     ensure_client_classification_table, upsert_client_classification,
     upsert_dealio_users, upsert_dealio_trades_mt4, truncate_dealio_trades_mt4,
     upsert_dealio_trades_mt5, truncate_dealio_trades_mt5,
@@ -149,6 +149,9 @@ def run_transactions_by_confirmation_date_etl(from_date: str) -> dict:
         df = get_transactions_by_confirmation_date(from_date)
         rows = len(df)
         upsert_transactions(df)
+        if rows > 0:
+            ids = df["mttransactionsid"].dropna().astype(int).tolist()
+            compute_transaction_type_name(ids)
     except Exception as e:
         status = "error"
         error_msg = str(e)
@@ -214,12 +217,9 @@ def run_transactions_etl(hours: int = 24) -> dict:
         df = get_transactions(hours=hours)
         rows = len(df)
         upsert_transactions(df)
-        # Populate transaction_type_name from MSSQL for newly synced rows
         if rows > 0:
             ids = df["mttransactionsid"].dropna().astype(int).tolist()
-            type_names_df = get_transaction_type_names_for_ids(ids)
-            if not type_names_df.empty:
-                update_transactiontypename(type_names_df)
+            compute_transaction_type_name(ids)
     except Exception as e:
         status = "error"
         error_msg = str(e)
@@ -346,6 +346,7 @@ def run_transactions_full_etl() -> dict:
         for chunk in get_transactions_full():
             upsert_transactions(chunk)
             rows += len(chunk)
+        compute_transaction_type_name()
     except Exception as e:
         status = "error"
         error_msg = str(e)
@@ -357,21 +358,13 @@ def run_transactions_full_etl() -> dict:
 
 
 def run_transaction_type_names_backfill_etl() -> dict:
-    """Full backfill of transaction_type_name from MSSQL vtiger_mttransactions.
-    Iterates all records in chunks and updates our transactions table."""
+    """Recompute transaction_type_name for all transactions using local CASE logic."""
     start = time.time()
     status = "success"
     error_msg = None
     rows = 0
-    chunk_num = 0
     try:
-        for chunk in get_transaction_type_names_full():
-            update_transactiontypename(chunk)
-            rows += len(chunk)
-            chunk_num += 1
-            if chunk_num % 20 == 0:
-                elapsed = int((time.time() - start) * 1000)
-                log_sync("transaction_type_names", datetime(1970, 1, 1), rows, elapsed, "running", f"chunk {chunk_num}, {rows} rows so far")
+        rows = compute_transaction_type_name()
     except Exception as e:
         status = "error"
         error_msg = str(e)

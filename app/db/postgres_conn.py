@@ -1464,6 +1464,220 @@ def update_transactiontypename(df) -> int:
         conn.close()
 
 
+def compute_transaction_type_name(ids: list = None) -> int:
+    """Compute and UPDATE transaction_type_name using CASE logic.
+
+    Joins transactions with dealio_trades_mt4 (cmd=6) on mtorder_id=ticket to get
+    the MT4 comment, then applies CASE rules derived from the VTiger SQL script.
+    ids: list of mttransactionsids to update. None = all rows (full backfill).
+    Returns rows updated.
+    """
+    if ids is not None and len(ids) == 0:
+        return 0
+
+    id_filter = "WHERE t2.mttransactionsid = ANY(%(ids)s)" if ids is not None else ""
+
+    sql = f"""
+        UPDATE transactions t
+        SET transaction_type_name = CASE
+            -- IB Commission
+            WHEN t.transactiontype = 'Deposit' AND t.payment_method = 'Adjustment'
+                 AND t.payment_subtype = 'IB Commission'
+                 AND t.created_time <= '2023-01-01' THEN 'IB Commission'
+            WHEN t.transactiontype = 'Deposit' AND t.payment_method = 'Commission'
+                 AND (t.payment_subtype = 'IB Commission'
+                      OR sub.mt4_comment = 'Affiliate Payment To Trading Pl')
+                 AND t.created_time <= '2023-01-01' THEN 'IB Commission'
+            WHEN t.transactiontype LIKE 'Withdraw%' AND t.payment_method = 'Adjustment'
+                 AND t.payment_subtype = 'IB Commission'
+                 AND t.created_time <= '2023-01-01' THEN 'IB Commission Cancelled'
+            WHEN t.transactiontype LIKE 'Withdraw%' AND t.payment_method = 'Commission'
+                 AND t.payment_subtype = 'IB Commission'
+                 AND t.created_time <= '2023-01-01' THEN 'IB Commission Cancelled'
+            WHEN t.transactiontype = 'Deposit' AND t.payment_method = 'IB commission'
+                 AND sub.mt4_comment IN ('IB Commission PayOut Cancelled', 'IB Commission PayOut Void')
+                THEN 'IB Commission PayOut Cancelled'
+            WHEN t.transactiontype = 'Deposit' AND t.payment_method = 'IB commission'
+                 AND sub.mt4_comment = 'IB Commission'
+                THEN 'IB Commission'
+            WHEN t.transactiontype LIKE 'Withdraw%' AND t.payment_method = 'IB commission'
+                 AND t.created_time <= '2023-01-01'
+                THEN 'IB Commission PayOut'
+            WHEN t.transactiontype LIKE 'Withdraw%' AND t.payment_method = 'IB commission'
+                 AND sub.mt4_comment = 'IB Commission Void'
+                THEN 'IB Commission Cancelled'
+            WHEN t.transactiontype LIKE 'Withdraw%' AND t.payment_method = 'IB commission'
+                 AND sub.mt4_comment = 'IB Commission PayOut'
+                THEN 'IB Commission PayOut'
+            -- FRF Commission
+            WHEN t.transactiontype = 'Deposit' AND t.payment_method = 'Commission'
+                 AND t.payment_subtype = 'FRF Commission'
+                 AND t.created_time <= '2022-12-05' THEN 'FRF Commission'
+            WHEN t.transactiontype = 'Deposit' AND t.payment_method = 'Adjustment'
+                 AND t.payment_subtype = 'FRF Commission'
+                 AND t.created_time <= '2022-12-05' THEN 'FRF Commission'
+            WHEN t.transactiontype LIKE 'Withdraw%' AND t.payment_method = 'Commission'
+                 AND t.payment_subtype = 'FRF Commission'
+                 AND t.created_time <= '2022-12-05' THEN 'FRF Commission Cancelled'
+            WHEN t.transactiontype LIKE 'Withdraw%' AND t.payment_method = 'Adjustment'
+                 AND t.payment_subtype = 'FRF Commission'
+                 AND t.created_time <= '2022-12-05' THEN 'FRF Commission Cancelled'
+            WHEN t.transactiontype = 'Deposit' AND t.payment_method = 'FRF commission'
+                 AND t.created_time >= '2022-12-05'
+                 AND sub.mt4_comment IN ('FRF PayOut Cancelled', 'FRF PayOut Void')
+                THEN 'FRF Commission PayOutCancelled'
+            WHEN t.transactiontype = 'Deposit' AND t.payment_method = 'FRF commission'
+                 AND t.created_time >= '2022-12-05'
+                 AND sub.mt4_comment = 'FRF - Transfer to Balance'
+                THEN 'FRF Commission Transfer to Balance'
+            WHEN t.transactiontype LIKE 'Withdraw%' AND t.payment_method = 'FRF commission'
+                 AND t.created_time >= '2022-12-05'
+                 AND sub.mt4_comment = 'FRF - Transfer to Balance Void'
+                THEN 'FRF Commission Transfer to Balance Cancelled'
+            WHEN t.transactiontype LIKE 'Withdraw%' AND t.payment_method = 'FRF commission'
+                 AND t.created_time >= '2022-12-05'
+                 AND sub.mt4_comment = 'FRF PayOut'
+                THEN 'FRF Commission PayOut'
+            WHEN t.transactiontype LIKE 'Withdraw%' AND t.payment_method = 'FRF commission'
+                 AND t.created_time < '2022-12-05'
+                THEN 'FRF Commission Cancelled'
+            WHEN t.transactiontype = 'Deposit' AND t.payment_method = 'FRF commission'
+                 AND t.created_time < '2022-12-05'
+                THEN 'FRF Commission'
+            WHEN t.transactiontype = 'Credit In'
+                 AND (sub.mt4_comment ILIKE '%FRF Commission%'
+                      OR sub.mt4_comment ILIKE '%Refer a friend%'
+                      OR sub.mt4_comment ILIKE '%FRF Bonus%'
+                      OR sub.mt4_comment = 'FRF')
+                THEN 'FRF Commission'
+            WHEN t.transactiontype = 'Credit Out'
+                 AND (sub.mt4_comment ILIKE '%FRF Commission%'
+                      OR sub.mt4_comment ILIKE '%Refer a friend%'
+                      OR sub.mt4_comment ILIKE '%FRF Bonus%'
+                      OR sub.mt4_comment = 'FRF Void')
+                THEN 'FRF Commission Cancelled'
+            -- Credit Advance
+            WHEN t.transactiontype = 'Credit In' AND sub.mt4_comment ILIKE '%advance%'
+                THEN 'Credit In Advance'
+            WHEN t.transactiontype = 'Credit Out' AND sub.mt4_comment ILIKE '%advance%'
+                THEN 'Credit In Advance Cancelled'
+            -- Bonus
+            WHEN (t.transactiontype = 'Deposit' AND t.payment_method = 'Bonus'
+                  AND t.created_time <= '2022-11-01')
+              OR (t.transactiontype = 'Deposit' AND t.payment_method = 'Bonus'
+                  AND sub.mt4_comment IN ('Deposit,Bonus', 'Bonus', 'CashBack Bonus'))
+                THEN 'Bonus'
+            WHEN t.transactiontype = 'Deposit' AND t.payment_method = 'Bonus'
+                 AND sub.mt4_comment LIKE '%Transfer to Balance%'
+                THEN 'Bonus Transfer to Balance'
+            WHEN t.transactiontype LIKE 'Withdraw%' AND t.payment_method = 'Bonus'
+                 AND sub.mt4_comment LIKE 'Bonus Transfer to Balance Cancel%'
+                THEN 'Bonus Transfer to Balance Cancelled'
+            WHEN t.transactiontype = 'Deposit' AND t.payment_method = 'Bonus'
+                 AND sub.mt4_comment IN ('Bonus PayOut Cancelled', 'Bonus PayOut Void')
+                THEN 'Bonus PayOut Cancelled'
+            WHEN t.transactiontype LIKE 'Withdraw%' AND t.payment_method = 'Bonus'
+                 AND t.created_time <= '2022-11-01'
+                THEN 'BonusCancelled'
+            WHEN t.transactiontype LIKE 'Withdraw%' AND t.payment_method = 'Bonus'
+                 AND sub.mt4_comment = 'Bonus PayOut'
+                THEN 'Bonus PayOut'
+            WHEN t.transactiontype LIKE 'Withdraw%' AND t.payment_method = 'Bonus'
+                THEN 'BonusCancelled'
+            WHEN t.transactiontype = 'Credit In' THEN 'Bonus'
+            WHEN t.transactiontype = 'Credit Out' THEN 'BonusCancelled'
+            -- Deposits and Withdrawals
+            WHEN t.transactiontype LIKE 'Withdraw%' AND t.payment_method = 'Adjustment'
+                 AND t.payment_subtype = 'Deposit Void'
+                 AND t.created_time <= '2023-01-01' THEN 'Deposit Cancelled'
+            WHEN t.transactiontype = 'Deposit' AND t.payment_method = 'Adjustment'
+                 AND t.payment_subtype = 'Withdrawal Void'
+                 AND t.created_time <= '2023-01-01' THEN 'Withdrawal Cancelled'
+            WHEN t.transactiontype LIKE 'Withdraw%'
+                 AND t.payment_method IN ('Credit card', 'Electronic payment',
+                                          'Wire transfer', 'CryptoWallet', 'Cash')
+                 AND sub.mt4_comment IN ('Deposit Cancelled', 'Deposit Void')
+                THEN 'Deposit Cancelled'
+            WHEN t.transactiontype = 'Deposit'
+                 AND t.payment_method IN ('Credit card', 'Electronic payment',
+                                          'Wire transfer', 'CryptoWallet', 'Cash')
+                 AND sub.mt4_comment IN ('Withdrawal Cancelled', 'Withdrawal Void')
+                THEN 'Withdrawal Cancelled'
+            WHEN t.transactiontype = 'Deposit'
+                 AND t.payment_method IN ('None', 'Wire', 'Credit card', 'ElectronicPayment',
+                                          'Electronic payment', 'Wire transfer', 'Crypto',
+                                          'CryptoWallet', 'Cash', 'External', 'CreditCard')
+                THEN 'Deposit'
+            WHEN t.transactiontype LIKE 'Withdraw%'
+                 AND t.payment_method IN ('None', 'Wire', 'Credit card', 'ElectronicPayment',
+                                          'Electronic payment', 'Wire transfer', 'Crypto',
+                                          'CryptoWallet', 'Cash', 'External', 'CreditCard')
+                THEN 'Withdrawal'
+            WHEN t.transactiontype = 'Deposit' AND t.payment_method = 'Chargeback'
+                THEN 'Charge Back Cancelled'
+            WHEN t.transactiontype LIKE 'Withdraw%' AND t.payment_method = 'Chargeback'
+                THEN 'Charge Back'
+            WHEN t.transactiontype = 'Deposit' AND t.payment_method = 'Processing fees'
+                THEN 'Fee Cancelled'
+            WHEN t.transactiontype = 'Fee'
+              OR (t.transactiontype LIKE 'Withdraw%'
+                  AND t.payment_method IN ('Processing fees', 'Fee', 'ProcessingFee'))
+                THEN 'Fee'
+            WHEN (t.transactiontype = 'Deposit' AND t.payment_method = 'Transfer')
+              OR t.transactiontype = 'TransferIn'
+                THEN 'Transfer To Account'
+            WHEN (t.transactiontype LIKE 'Withdraw%' AND t.payment_method = 'Transfer')
+              OR t.transactiontype = 'TransferOut'
+                THEN 'Transfer From Account'
+            WHEN t.transactiontype = 'Deposit' AND t.payment_method = 'Adjustment'
+                 AND t.payment_subtype = 'Gift'
+                 AND t.created_time < '2023-01-01' THEN 'Gift'
+            WHEN t.transactiontype = 'Deposit' AND t.payment_method = 'Commission'
+                 AND t.payment_subtype = 'Gift'
+                 AND t.created_time < '2023-01-01' THEN 'Gift'
+            WHEN t.transactiontype LIKE 'Withdraw%' AND t.payment_method = 'Adjustment'
+                 AND t.payment_subtype = 'Gift'
+                 AND t.created_time < '2023-01-01' THEN 'Gift Cancelled'
+            WHEN t.transactiontype LIKE 'Withdraw%' AND t.payment_method = 'Commission'
+                 AND t.payment_subtype = 'Gift'
+                 AND t.created_time < '2023-01-01' THEN 'Gift Cancelled'
+            WHEN t.transactiontype = 'Deposit' AND t.payment_method = 'Adjustment'
+                 AND sub.mt4_comment ILIKE '%transfer%'
+                THEN 'Transfer To Account'
+            WHEN t.transactiontype LIKE 'Withdraw%' AND t.payment_method = 'Adjustment'
+                 AND sub.mt4_comment ILIKE '%transfer%'
+                THEN 'Transfer From Account'
+            WHEN t.transactiontype = 'Deposit' AND t.payment_method = 'Adjustment'
+                THEN 'Positive Trading Adjustment'
+            WHEN t.transactiontype LIKE 'Withdraw%' AND t.payment_method = 'Adjustment'
+                THEN 'Negative Trading Adjustment'
+            ELSE 'Not Set'
+        END
+        FROM (
+            SELECT t2.mttransactionsid, m.comment AS mt4_comment
+            FROM transactions t2
+            LEFT JOIN dealio_trades_mt4 m
+                ON m.cmd = 6
+                AND t2.mtorder_id IS NOT NULL
+                AND t2.mtorder_id ~ '^[0-9]+$'
+                AND t2.mtorder_id::bigint = m.ticket
+            {id_filter}
+        ) sub
+        WHERE t.mttransactionsid = sub.mttransactionsid
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            if ids is None:
+                cur.execute("SET LOCAL statement_timeout = 0")
+            cur.execute(sql, {"ids": ids} if ids is not None else {})
+            count = cur.rowcount
+        conn.commit()
+        return count
+    finally:
+        conn.close()
+
+
 def fetch_transactions_stats() -> dict:
     sql = """
         SELECT
