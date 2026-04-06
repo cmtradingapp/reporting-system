@@ -444,7 +444,8 @@ def get_dealio_trades_mt5(hours: int = 24) -> pd.DataFrame:
 
 def get_dealio_trades_mt5_full():
     """Full fetch of dealio.trades_mt5 in chunks (cmd 0/1, filtered symbols).
-    Reconnects per chunk to avoid SSL timeout on long-running syncs."""
+    Reconnects per chunk and retries up to 3 times on SSL errors."""
+    import time
     last_ticket = 0
     while True:
         sql = f"""
@@ -456,11 +457,20 @@ def get_dealio_trades_mt5_full():
             ORDER BY ticket
             LIMIT {_CHUNK_SIZE}
         """
-        conn = get_dealio_connection()
-        try:
-            df = pd.read_sql(sql, conn, params={"last_ticket": last_ticket, "excluded": _EXCLUDED_SYMBOLS_TUPLE})
-        finally:
-            conn.close()
+        df = None
+        for attempt in range(3):
+            conn = get_dealio_connection()
+            try:
+                df = pd.read_sql(sql, conn, params={"last_ticket": last_ticket, "excluded": _EXCLUDED_SYMBOLS_TUPLE})
+                break
+            except Exception as e:
+                if attempt < 2:
+                    print(f"[get_dealio_trades_mt5_full] attempt {attempt+1} failed: {e} — retrying in 5s")
+                    time.sleep(5)
+                else:
+                    raise
+            finally:
+                conn.close()
         if df.empty:
             break
         yield df
