@@ -424,25 +424,26 @@ _TRADES_MT5_COLS = """
 
 
 def get_dealio_trades_mt5(hours: int = 24) -> pd.DataFrame:
-    """Fetch dealio.trades_mt5 updated within the last N hours (cmd 0/1)."""
+    """Fetch dealio.trades_mt5 updated within the last N hours (cmd 0/1, filtered symbols)."""
     cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
     sql = f"""
         SELECT {_TRADES_MT5_COLS}
         FROM dealio.trades_mt5
         WHERE synctime >= %(cutoff)s
           AND cmd IN (0, 1)
+          AND symbolplain NOT IN %(excluded)s
         ORDER BY synctime
     """
     conn = get_dealio_connection()
     try:
-        df = pd.read_sql(sql, conn, params={"cutoff": cutoff})
+        df = pd.read_sql(sql, conn, params={"cutoff": cutoff, "excluded": _EXCLUDED_SYMBOLS_TUPLE})
         return df
     finally:
         conn.close()
 
 
 def get_dealio_trades_mt5_full():
-    """Full fetch of dealio.trades_mt5 in chunks (cmd 0/1).
+    """Full fetch of dealio.trades_mt5 in chunks (cmd 0/1, filtered symbols).
     Reconnects per chunk to avoid SSL timeout on long-running syncs."""
     last_ticket = 0
     while True:
@@ -451,12 +452,13 @@ def get_dealio_trades_mt5_full():
             FROM dealio.trades_mt5
             WHERE ticket > %(last_ticket)s
               AND cmd IN (0, 1)
+              AND symbolplain NOT IN %(excluded)s
             ORDER BY ticket
             LIMIT {_CHUNK_SIZE}
         """
         conn = get_dealio_connection()
         try:
-            df = pd.read_sql(sql, conn, params={"last_ticket": last_ticket})
+            df = pd.read_sql(sql, conn, params={"last_ticket": last_ticket, "excluded": _EXCLUDED_SYMBOLS_TUPLE})
         finally:
             conn.close()
         if df.empty:
@@ -476,12 +478,13 @@ def get_dealio_trades_mt5_missing(start_ticket: int):
             FROM dealio.trades_mt5
             WHERE ticket > %(last_ticket)s
               AND cmd IN (0, 1)
+              AND symbolplain NOT IN %(excluded)s
             ORDER BY ticket
             LIMIT {_CHUNK_SIZE}
         """
         conn = get_dealio_connection()
         try:
-            df = pd.read_sql(sql, conn, params={"last_ticket": last_ticket})
+            df = pd.read_sql(sql, conn, params={"last_ticket": last_ticket, "excluded": _EXCLUDED_SYMBOLS_TUPLE})
         finally:
             conn.close()
         if df.empty:
