@@ -44,7 +44,7 @@ async def live_equity_zeroed(request: Request, date: str = None):
             return JSONResponse(status_code=400, content={"detail": "Invalid date"})
 
     is_current_month = (d.year == today.year and d.month == today.month)
-    _ck = f"live_eez_v23:{d}"
+    _ck = f"live_eez_v24:{d}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -261,13 +261,14 @@ def _live_calc(d) -> dict:
 
                 cur.execute("""
                     SELECT login,
-                           SUM(COALESCE(computed_commission,0)
-                             + COALESCE(computed_profit,0)
-                             + COALESCE(computed_swap,0))
-                    FROM dealio.trades_mt4
+                           SUM(COALESCE(computedcommission,0)
+                             + COALESCE(computedprofit,0)
+                             + COALESCE(computedswap,0))
+                    FROM dealio.trades_mt5
                     WHERE login = ANY(%s)
-                      AND close_time >= %s::date
-                      AND close_time <  %s::date + INTERVAL '1 day'
+                      AND entry = 1
+                      AND closetime >= %s::date
+                      AND closetime <  %s::date + INTERVAL '1 day'
                       AND cmd < 2
                       AND symbol NOT IN %s
                     GROUP BY login
