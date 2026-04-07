@@ -2667,24 +2667,57 @@ _MV_SETUP_SQL = [
     "CREATE INDEX IF NOT EXISTS idx_mv_daily_kpis_qual_date   ON mv_daily_kpis (qual_date) WHERE qual_date IS NOT NULL",
     "CREATE INDEX IF NOT EXISTS idx_mv_daily_kpis_agent       ON mv_daily_kpis (agent_id)",
 
-    # ── mv_volume_stats ──────────────────────────────────────────────────────
+    # ── mv_volume_stats (MT5 + open positions) ───────────────────────────────
+    # Rename old MT4-based MV to backup (first deploy only — subsequent runs no-op via IF EXISTS)
+    "ALTER MATERIALIZED VIEW IF EXISTS mv_volume_stats RENAME TO mv_volume_stats_mt4_backup",
     """
     CREATE MATERIALIZED VIEW IF NOT EXISTS mv_volume_stats AS
     SELECT
-        a.assigned_to                                                        AS agent_id,
-        ta.vtigeraccountid                                                   AS accountid,
-        d.open_time::date                                                    AS open_date,
-        SUM(d.notional_value)                                                AS notional_usd,
-        MAX(CASE WHEN d.notional_value > 0 THEN 1 ELSE 0 END)::smallint     AS has_positive_notional
-    FROM dealio_trades_mt4 d
-    JOIN trading_accounts ta ON ta.login::bigint = d.login
-    JOIN accounts         a  ON a.accountid      = ta.vtigeraccountid
-    LEFT JOIN crm_users   u  ON u.id             = a.assigned_to
-    WHERE ta.vtigeraccountid IS NOT NULL
-      AND a.is_test_account = 0
-      AND d.open_time::date >= '2024-01-01'
-      AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%'
-    GROUP BY a.assigned_to, ta.vtigeraccountid, d.open_time::date
+        agent_id,
+        accountid,
+        open_date,
+        SUM(notional_usd)                                               AS notional_usd,
+        MAX(CASE WHEN notional_usd > 0 THEN 1 ELSE 0 END)::smallint    AS has_positive_notional
+    FROM (
+        -- Part 1: Currently open positions (dealio_positions)
+        SELECT
+            a.assigned_to       AS agent_id,
+            ta.vtigeraccountid  AS accountid,
+            p.open_time::date   AS open_date,
+            p.notional_value    AS notional_usd
+        FROM dealio_positions p
+        JOIN trading_accounts ta ON ta.login::bigint = p.login
+        JOIN accounts         a  ON a.accountid      = ta.vtigeraccountid
+        LEFT JOIN crm_users   u  ON u.id             = a.assigned_to
+        WHERE ta.vtigeraccountid IS NOT NULL
+          AND a.is_test_account = 0
+          AND p.open_time::date >= '2024-01-01'
+          AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%'
+
+        UNION ALL
+
+        -- Part 2: Closed MT5 trades (exit deal joined to entry deal for open_time)
+        SELECT
+            a.assigned_to       AS agent_id,
+            ta.vtigeraccountid  AS accountid,
+            en.open_time::date  AS open_date,
+            ex.notional_value   AS notional_usd
+        FROM dealio_trades_mt5 ex
+        JOIN dealio_trades_mt5 en
+            ON en.position_id = ex.position_id
+           AND en.source_id   = ex.source_id
+           AND en.entry       = 0
+        JOIN trading_accounts ta ON ta.login::bigint = ex.login
+        JOIN accounts         a  ON a.accountid      = ta.vtigeraccountid
+        LEFT JOIN crm_users   u  ON u.id             = a.assigned_to
+        WHERE ex.entry = 1
+          AND ex.close_time > '1971-01-01'
+          AND ta.vtigeraccountid IS NOT NULL
+          AND a.is_test_account = 0
+          AND en.open_time::date >= '2024-01-01'
+          AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%'
+    ) combined
+    GROUP BY agent_id, accountid, open_date
     """,
     "CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_volume_stats_u         ON mv_volume_stats (COALESCE(agent_id, -1), accountid, open_date)",
     "CREATE INDEX IF NOT EXISTS idx_mv_volume_stats_open_date        ON mv_volume_stats (open_date)",
