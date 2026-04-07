@@ -78,7 +78,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"perf_v22:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"perf_v23:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -145,6 +145,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
         ) f100 ON f100.agent_id = u.id
         WHERE u.department_ = 'Sales'
           AND u.team = 'Conversion'
+          AND u.status = 'Active'
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'
