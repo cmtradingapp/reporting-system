@@ -8,6 +8,7 @@ Tables fetched into local warehouse:
   - dealio.users          (incremental by lastupdate)
   - dealio.trades_mt4     (incremental by last_modified; cmd IN (0,1); exclude bad symbols)
   - dealio.daily_profits  (incremental by date)
+  - dealio.positions      (full replace every sync — live open positions snapshot)
 
 Live (no local copy):
   - dealio.positions    (open trades — queried directly via get_dealio_connection())
@@ -634,5 +635,56 @@ def get_dealio_floating_pnl_for_logins(logins: list):
                 GROUP BY login
             """, (logins, _EXCLUDED_SYMBOLS_TUPLE))
             return cur.fetchall()
+    finally:
+        conn.close()
+
+
+# ── dealio.positions ──────────────────────────────────────────────────────────
+
+def get_dealio_positions() -> pd.DataFrame:
+    """Fetch all open positions from dealio.positions (live snapshot, full replace)."""
+    sql = """
+        SELECT
+            id,
+            login,
+            cmd,
+            volume,
+            symbol,
+            coresymbol          AS core_symbol,
+            book,
+            openprice           AS open_price,
+            closeprice          AS close_price,
+            profit,
+            computedprofit      AS computed_profit,
+            swap,
+            computedswap        AS computed_swap,
+            commission,
+            computedcommission  AS computed_commission,
+            comment,
+            groupname           AS group_name,
+            groupcurrency       AS group_currency,
+            notionalvalue       AS notional_value,
+            contractsize        AS contract_size,
+            sourcename          AS source_name,
+            sourcetype          AS source_type,
+            sourceid            AS source_id,
+            (opentime AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Nicosia' AS open_time,
+            lastupdate          AS last_update,
+            reason,
+            conversionrate      AS conversion_rate,
+            calculationcurrency AS calculation_currency,
+            currencybase        AS currency_base,
+            currencyprofit      AS currency_profit,
+            exposurebase        AS exposure_base,
+            exposureprofit      AS exposure_profit
+        FROM dealio.positions
+        WHERE cmd IN (0, 1)
+          AND symbol NOT IN %(excluded)s
+        ORDER BY id
+    """
+    conn = get_dealio_connection()
+    try:
+        df = pd.read_sql(sql, conn, params={"excluded": _EXCLUDED_SYMBOLS_TUPLE})
+        return df
     finally:
         conn.close()

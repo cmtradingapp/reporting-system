@@ -2375,6 +2375,88 @@ def truncate_dealio_trades_mt5():
         conn.close()
 
 
+# ── dealio_positions ──────────────────────────────────────────────────────────
+
+def ensure_dealio_positions_table():
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS dealio_positions (
+                    id                   BIGINT PRIMARY KEY,
+                    login                BIGINT,
+                    cmd                  SMALLINT,
+                    volume               DOUBLE PRECISION,
+                    symbol               TEXT,
+                    core_symbol          TEXT,
+                    book                 TEXT,
+                    open_price           DOUBLE PRECISION,
+                    close_price          DOUBLE PRECISION,
+                    profit               DOUBLE PRECISION,
+                    computed_profit      DOUBLE PRECISION,
+                    swap                 DOUBLE PRECISION,
+                    computed_swap        DOUBLE PRECISION,
+                    commission           DOUBLE PRECISION,
+                    computed_commission  DOUBLE PRECISION,
+                    comment              TEXT,
+                    group_name           TEXT,
+                    group_currency       TEXT,
+                    notional_value       DOUBLE PRECISION,
+                    contract_size        DOUBLE PRECISION,
+                    source_name          TEXT,
+                    source_type          TEXT,
+                    source_id            TEXT,
+                    open_time            TIMESTAMP,
+                    last_update          TIMESTAMPTZ,
+                    reason               INTEGER,
+                    conversion_rate      DOUBLE PRECISION,
+                    calculation_currency TEXT,
+                    currency_base        TEXT,
+                    currency_profit      TEXT,
+                    exposure_base        DOUBLE PRECISION,
+                    exposure_profit      DOUBLE PRECISION,
+                    synced_at            TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_dealio_positions_login ON dealio_positions(login)"
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def truncate_and_insert_dealio_positions(df: pd.DataFrame) -> int:
+    cols = [
+        "id", "login", "cmd", "volume", "symbol", "core_symbol", "book",
+        "open_price", "close_price", "profit", "computed_profit",
+        "swap", "computed_swap", "commission", "computed_commission",
+        "comment", "group_name", "group_currency", "notional_value", "contract_size",
+        "source_name", "source_type", "source_id", "open_time", "last_update",
+        "reason", "conversion_rate", "calculation_currency",
+        "currency_base", "currency_profit", "exposure_base", "exposure_profit",
+    ]
+    rows = [tuple(_clean(row.get(c)) for c in cols) for _, row in df.iterrows()]
+    col_list = ", ".join(cols)
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("TRUNCATE TABLE dealio_positions")
+            if rows:
+                execute_values(
+                    cur,
+                    f"INSERT INTO dealio_positions ({col_list}) VALUES %s",
+                    rows,
+                )
+        conn.commit()
+        return len(rows)
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
 def fetch_dealio_trades_mt4_stats() -> dict:
     sql = """
         SELECT
