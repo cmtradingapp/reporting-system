@@ -146,16 +146,27 @@ def _auto_mt5_full_sync():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    ensure_table()
-    ensure_auth_table()
-    ensure_client_classification_table()
-    ensure_bonus_transactions_table()
-    ensure_daily_equity_zeroed_table()
-    ensure_agent_dept_history_table()
-    ensure_dealio_positions_table()
-    ensure_materialized_views()
-    seed_admin_user(hash_password('Admin123!'))
-    threading.Thread(target=backfill_classification_int, daemon=True).start()
+    # Only one worker runs schema migrations — others skip (idempotent DDL already done)
+    from app.db.postgres_conn import get_connection as _pgconn
+    _mc = _pgconn()
+    try:
+        with _mc.cursor() as _c:
+            _c.execute("SELECT pg_try_advisory_lock(987654321)")
+            _run_setup = _c.fetchone()[0]
+        _mc.commit()
+    finally:
+        _mc.close()
+    if _run_setup:
+        ensure_table()
+        ensure_auth_table()
+        ensure_client_classification_table()
+        ensure_bonus_transactions_table()
+        ensure_daily_equity_zeroed_table()
+        ensure_agent_dept_history_table()
+        ensure_dealio_positions_table()
+        ensure_materialized_views()
+        seed_admin_user(hash_password('Admin123!'))
+        threading.Thread(target=backfill_classification_int, daemon=True).start()
     _run_scheduler = _acquire_scheduler_lock()
     if not _run_scheduler:
         # Another worker already holds the scheduler lock — this worker only serves requests.
