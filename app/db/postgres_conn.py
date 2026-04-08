@@ -1082,6 +1082,7 @@ def update_auth_user(user_id: int, full_name: str, email: str, role: str, is_act
     conn = get_connection()
     try:
         with conn.cursor() as cur:
+            cur.execute("SET LOCAL lock_timeout = '5s'")
             cur.execute(sql, (full_name, email, role, is_active, crm_user_id or None, allowed_pages or None, user_id))
         conn.commit()
     finally:

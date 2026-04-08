@@ -464,12 +464,13 @@
       allowed_pages: getCheckedPages('edit'),
     };
     fetch(`/api/admin/users/${id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) })
-      .then(r => r.json())
+      .then(r => { if (!r.ok) throw new Error('Server error ' + r.status); return r.json(); })
       .then(d => {
         if (d.detail) { toast(d.detail, 'danger'); return; }
         toast('User updated');
         setTimeout(() => location.reload(), 800);
-      });
+      })
+      .catch(e => toast('Save failed — please try again. (' + e.message + ')', 'danger'));
   }
 
   // Reset password
