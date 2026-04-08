@@ -169,6 +169,7 @@
       </div>
 
       <!-- FTD RR / FTC RR -->
+      {% if not current_user.role.startswith('sales') %}
       <div class="col-6 col-md-2">
         <div class="kpi-card">
           <div style="display:flex;justify-content:center;align-items:center;gap:12px;">
@@ -184,6 +185,7 @@
           </div>
         </div>
       </div>
+      {% endif %}
 
       <!-- Daily Net / Daily Ret Net -->
       <div class="col-6 col-md-2">
@@ -218,6 +220,7 @@
         </div>
       </div>
 
+      {% if not current_user.role.startswith('sales') %}
       <!-- Open Volume -->
       <div class="col-6 col-md-2">
         <div class="kpi-card">
@@ -233,6 +236,7 @@
           <div class="kpi-label">Open Volume RR</div>
         </div>
       </div>
+      {% endif %}
 
       <!-- Start EEZ -->
       <div class="col-6 col-md-2">
@@ -363,8 +367,10 @@
       document.getElementById('nd-rr').textContent          = fmtMoney(data.net_deposits.rr);
 
       // Open Volume
+      {% if not current_user.role.startswith('sales') %}
       document.getElementById('ov-monthly').textContent = fmtMoney(data.open_volume.monthly);
       document.getElementById('ov-rr').textContent      = fmtMoney(data.open_volume.rr);
+      {% endif %}
 
       // New Leads + Live Accounts
       if (data.new_leads) {
