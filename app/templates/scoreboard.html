@@ -809,7 +809,7 @@
     if (ftdEl) ftdEl.textContent = ftd.toLocaleString();
     document.getElementById('stat-grand-net').textContent    = netFmt(net);
     document.getElementById('stat-grand-net-rr').textContent = netFmt(Math.round(net / safeWdp * workingDays));
-    document.getElementById('stat-open-volume').textContent  = Math.round(ovol).toLocaleString();
+    const ovEl = document.getElementById('stat-open-volume'); if (ovEl) ovEl.textContent = Math.round(ovol).toLocaleString();
     const ovRrEl = document.getElementById('stat-open-volume-rr');
     if (ovRrEl) ovRrEl.textContent = Math.round(ovol / safeWdp * workingDays).toLocaleString();
     const dFtdEl = document.getElementById('stat-daily-ftd'); if (dFtdEl) dFtdEl.textContent = dFtd.toLocaleString();
@@ -1023,7 +1023,7 @@
     if (ftdRrEl) ftdRrEl.textContent = (data.grand_ftd_rr ?? 0).toLocaleString();
     document.getElementById('stat-grand-net').textContent      = netFmt(data.grand_net);
     document.getElementById('stat-grand-net-rr').textContent   = netFmt(data.grand_net_rr);
-    document.getElementById('stat-open-volume').textContent    = volFmt(data.open_volume);
+    const ovEl2 = document.getElementById('stat-open-volume'); if (ovEl2) ovEl2.textContent = volFmt(data.open_volume);
     const ovRrEl = document.getElementById('stat-open-volume-rr'); if (ovRrEl) ovRrEl.textContent = volFmt(data.open_volume_rr);
     // Monthly FTD — company-wide (matches daily_ftd scope)
     const ftdEl = document.getElementById('stat-total-ftd');
