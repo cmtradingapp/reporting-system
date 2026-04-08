@@ -378,10 +378,11 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
             GROUP BY t.original_deposit_owner
         ) ftc_net ON ftc_net.agent_id = u.id
         WHERE (
-            (u.department_ = 'Sales' AND u.team = 'Conversion' {role_filter})
+            u.department_ = 'Sales' AND u.team = 'Conversion'
             OR u.id IN (3750, 3614, 6119, 6479, 6492, 6355, 6666, 6694)
           )
           AND u.office_name IN ('GMT', 'LAG Nigeria', 'ABJ Nigeria', 'South Africa', 'Cyprus')
+          {role_filter}
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'
@@ -595,10 +596,11 @@ async def agent_bonuses_sales_accounts_api(request: Request, date_from: str, dat
         LEFT JOIN ftc_net fn ON fn.accountid = c.accountid AND fn.agent_id = c.agent_id
         LEFT JOIN agent_totals at ON at.agent_id = c.agent_id
         WHERE (
-            (u.department_ = 'Sales' AND u.team = 'Conversion' {role_filter})
+            u.department_ = 'Sales' AND u.team = 'Conversion'
             OR u.id IN (3750, 3614, 6119, 6479, 6492, 6355, 6666, 6694)
           )
           AND u.office_name IN ('GMT', 'LAG Nigeria', 'ABJ Nigeria', 'South Africa', 'Cyprus')
+          {role_filter}
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'
