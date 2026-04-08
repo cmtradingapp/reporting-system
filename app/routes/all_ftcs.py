@@ -2,10 +2,11 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from app.auth.dependencies import get_current_user
+from app.auth.role_filters import get_role_filter
 from app.db.postgres_conn import get_connection
 from app import cache
 from datetime import datetime, timedelta
-from app.routes.agent_bonuses import get_sales_multiplier
+from app.routes.agent_bonuses import get_sales_multiplier, _apply_role_filter
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -38,7 +39,8 @@ async def all_ftcs_api(request: Request, date_from: str, date_to: str):
     if ap is None and user.get("role") != "admin":
         return JSONResponse(status_code=403, content={"detail": "Forbidden"})
 
-    _ck = f"all_ftcs_v11:{date_from}:{date_to}"
+    role_filter = get_role_filter(user)
+    _ck = f"all_ftcs_v12:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -170,6 +172,7 @@ async def all_ftcs_api(request: Request, date_from: str, date_to: str):
                OR (TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
                    AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
                    AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'))
+          {role_filter}
         ORDER BY COALESCE(u.agent_name, u.full_name, 'N/A'), aaa.accountid
     """
 
@@ -183,11 +186,13 @@ async def all_ftcs_api(request: Request, date_from: str, date_to: str):
             FROM targets
             WHERE date = DATE_TRUNC('month', %(date_from)s::date)"""
     sql = sql.replace('{tgt_subq}', _tgt_subq)
+    base_params = {"date_from": date_from, "date_to_excl": date_to_exclusive}
+    sql, base_params = _apply_role_filter(sql, base_params, role_filter)
 
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute(sql, {"date_from": date_from, "date_to_excl": date_to_exclusive})
+            cur.execute(sql, base_params)
             rows = cur.fetchall()
 
         data = []
