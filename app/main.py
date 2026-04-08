@@ -315,6 +315,9 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Agent Performance Report", lifespan=lifespan)
 
+from fastapi.middleware.gzip import GZipMiddleware
+app.add_middleware(GZipMiddleware, minimum_size=500)
+
 
 @app.get("/")
 async def root(request: Request):
