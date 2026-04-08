@@ -587,8 +587,11 @@ def ensure_table():
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            # Advisory lock so only one worker runs schema migrations at startup
-            cur.execute("SELECT pg_advisory_lock(123456789)")
+            # Non-blocking advisory lock — if another worker already holds it, skip migrations
+            cur.execute("SELECT pg_try_advisory_lock(123456789)")
+            got_lock = cur.fetchone()[0]
+            if not got_lock:
+                return  # another worker is running migrations
             try:
                 cur.execute(sql)
                 # Seed recurring holidays for 2024 through current year + 5
