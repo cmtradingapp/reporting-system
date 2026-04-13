@@ -15,7 +15,7 @@ router = APIRouter()
 
 _RETRYABLE_ERRORS = ("conflict with recovery", "ssl syscall error", "eof detected", "timeout expired")
 
-def _with_retry(fn, *args, retries=4, delay=2.0):
+def _with_retry(fn, *args, retries=2, delay=0.5):
     """Retry fn on transient dealio replica errors (replication conflict, SSL drop, timeout)."""
     for attempt in range(retries):
         try:
@@ -71,27 +71,15 @@ async def live_equity_zeroed(request: Request, date: str = None):
 
 def _historical_calc(d) -> dict:
     """Use dealio_daily_profits with same EEZ formula as eez_comparison page."""
+    # Performance: previously did DISTINCT ON over 13.4M dealio_daily_profits rows
+    # (full seq scan + disk sort ~18s). Rewritten as LATERAL index scan driven from
+    # trading_accounts (~50K non-test/non-deleted rows) using idx_ddps_login_date_desc.
     sql = """
         WITH bonus_bal AS (
             SELECT login, SUM(net_amount) AS old_bonus_balance
             FROM bonus_transactions
             WHERE confirmation_time::date <= %(d)s
             GROUP BY login
-        ),
-        test_flags AS (
-            SELECT ta.login::bigint AS login,
-                   MAX(a.is_test_account) AS is_test
-            FROM trading_accounts ta
-            JOIN accounts a ON a.accountid = ta.vtigeraccountid
-            WHERE (ta.deleted = 0 OR ta.deleted IS NULL)
-            GROUP BY ta.login::bigint
-        ),
-        latest_equity AS (
-            SELECT DISTINCT ON (login)
-                login, convertedbalance, convertedfloatingpnl
-            FROM dealio_daily_profits
-            WHERE date::date <= %(d)s
-            ORDER BY login, date DESC
         )
         SELECT COALESCE(SUM(
             CASE
@@ -103,10 +91,19 @@ def _historical_calc(d) -> dict:
                 )
             END
         ), 0) AS total_eez
-        FROM latest_equity d
-        LEFT JOIN bonus_bal b  ON b.login = d.login
-        JOIN test_flags tf ON tf.login = d.login
-        WHERE tf.is_test = 0
+        FROM trading_accounts ta
+        JOIN accounts a ON a.accountid = ta.vtigeraccountid
+                       AND a.is_test_account = 0
+        CROSS JOIN LATERAL (
+            SELECT convertedbalance, convertedfloatingpnl
+            FROM dealio_daily_profits
+            WHERE login = ta.login::bigint
+              AND date::date <= %(d)s
+            ORDER BY date DESC
+            LIMIT 1
+        ) d
+        LEFT JOIN bonus_bal b ON b.login = ta.login::bigint
+        WHERE (ta.deleted = 0 OR ta.deleted IS NULL)
     """
     conn = get_connection()
     try:
