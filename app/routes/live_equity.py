@@ -49,24 +49,42 @@ async def live_equity_zeroed(request: Request, date: str = None):
     if _hit is not None:
         return JSONResponse(content=_hit)
 
-    try:
-        if is_current_month:
-            try:
-                result = _with_retry(_live_calc, d)
-            except Exception as live_err:
-                # Dealio unreachable — fall back to historical (local postgres only)
-                traceback.print_exc()
-                result = _historical_calc(d)
-                result["dealio_error"] = str(live_err)
-        else:
+    # For past months, use historical (the value is historical by definition).
+    if not is_current_month:
+        try:
             result = _with_retry(_historical_calc, d)
-    except Exception as e:
-        traceback.print_exc()
-        return JSONResponse(status_code=500, content={"detail": str(e)})
+            cache.set(_ck, result)
+            return JSONResponse(content=result)
+        except Exception as e:
+            traceback.print_exc()
+            return JSONResponse(status_code=500, content={"detail": str(e)})
 
-    if result.get("is_live", False):
+    # Current month — card must show LIVE data only.
+    # On success: cache short-TTL (normal) AND long-TTL "last-known-live" (15 min).
+    # On failure: serve last-known-live with a freshness marker so the card
+    # keeps showing the most recent real live value while dealio recovers.
+    _last_ck = f"live_eez_last_known_v1:{d}"
+    try:
+        result = _with_retry(_live_calc, d)
+        result["computed_at"] = datetime.now(_TZ).isoformat(timespec="seconds")
+        result["is_stale"] = False
         cache.set(_ck, result)
-    return JSONResponse(content=result)
+        cache.set_long(_last_ck, result, ttl=15 * 60)
+        return JSONResponse(content=result)
+    except Exception as live_err:
+        traceback.print_exc()
+        stale = cache.get_long(_last_ck)
+        if stale is not None:
+            stale = {**stale, "is_stale": True, "dealio_error": str(live_err)}
+            return JSONResponse(content=stale)
+        # No recent live value available — tell the client so it can show "Unavailable".
+        return JSONResponse(
+            status_code=503,
+            content={
+                "detail": "Live dealio data unavailable",
+                "dealio_error": str(live_err),
+            },
+        )
 
 
 def _historical_calc(d) -> dict:

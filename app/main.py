@@ -72,8 +72,14 @@ def warm_cache():
         print(f"[warm_cache] dashboard: {e}")
 
     _ck = f"live_eez_v24:{today}"
+    _last_ck = f"live_eez_last_known_v1:{today}"
     try:
-        cache.set(_ck, _live_calc(today))
+        from datetime import datetime as _dt
+        result = _live_calc(today)
+        result["computed_at"] = _dt.now(_TZ).isoformat(timespec="seconds")
+        result["is_stale"] = False
+        cache.set(_ck, result)
+        cache.set_long(_last_ck, result, ttl=15 * 60)
     except Exception as e:
         print(f"[warm_cache] live_eez: {e}")
 

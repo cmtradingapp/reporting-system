@@ -407,16 +407,37 @@
       const text = await res.text();
       let data;
       try { data = JSON.parse(text); } catch { throw new Error('Server error'); }
+
+      if (res.status === 503) {
+        el.textContent = '—';
+        if (badge) { badge.style.display = 'inline'; badge.textContent = 'UNAVAILABLE'; badge.style.background = '#6e7681'; }
+        if (upd) upd.textContent = 'live data unavailable';
+        return;
+      }
       if (!res.ok) throw new Error(data.detail || 'error');
       const neg = data.total < 0;
       const abs = Math.abs(data.total);
       el.textContent = (neg ? '-$' : '$') + abs.toLocaleString('en-US');
-      if (data.is_live) {
-        badge.style.display = 'inline';
-        upd.textContent = 'as of ' + new Date().toLocaleTimeString();
-      } else {
-        badge.style.display = 'none';
-        upd.textContent = '';
+      if (badge) {
+        if (data.is_stale) {
+          badge.style.display = 'inline';
+          badge.textContent = 'STALE';
+          badge.style.background = '#d29922';
+        } else if (data.is_live) {
+          badge.style.display = 'inline';
+          badge.textContent = 'LIVE';
+          badge.style.background = '';
+        } else {
+          badge.style.display = 'none';
+        }
+      }
+      if (upd) {
+        if (data.computed_at) {
+          const t = new Date(data.computed_at).toLocaleTimeString();
+          upd.textContent = (data.is_stale ? 'last live at ' : 'as of ') + t;
+        } else {
+          upd.textContent = data.is_live ? ('as of ' + new Date().toLocaleTimeString()) : '';
+        }
       }
 
       // Start EEZ

@@ -23,3 +23,20 @@ def set(key: str, data):
 def invalidate_all():
     with _lock:
         _store.clear()
+
+
+# Long-TTL "last-known-good" cache (separate namespace, caller sets TTL).
+_long_store: dict = {}  # key -> (data, expires_at_unix)
+
+
+def set_long(key: str, data, ttl: int):
+    with _lock:
+        _long_store[key] = (data, time.time() + ttl)
+
+
+def get_long(key: str):
+    with _lock:
+        entry = _long_store.get(key)
+        if entry and time.time() < entry[1]:
+            return entry[0]
+    return None
