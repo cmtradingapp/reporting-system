@@ -1321,7 +1321,7 @@ def upsert_crm_users(df: pd.DataFrame):
                 WHERE id = 6119;
                 UPDATE crm_users SET department_='Sales', team='Conversion', office='ABJ-NG', office_name='ABJ Nigeria'
                 WHERE id = 6479;
-                UPDATE crm_users SET department_='Sales', team='Conversion', office='SA', office_name='South Africa'
+                UPDATE crm_users SET department_='Excluded', team='Conversion', office='SA', office_name='South Africa'
                 WHERE id = 6492;
             """)
         conn.commit()
