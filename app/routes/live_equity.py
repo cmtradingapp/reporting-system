@@ -249,48 +249,108 @@ def _live_calc(d) -> dict:
     finally:
         conn.close()
 
-    # Single dealio connection for all live queries — reduces connection overhead.
+    # Fetch live dealio snapshot. Prefer the remote replica (most current), but fall
+    # back to locally-synced copies (dealio_positions / dealio_users / dealio_trades_mt5)
+    # when the replica is unhealthy (recovery conflicts, SSL drops). Local tables are
+    # refreshed every ~1 min, so this is still "live" in practice.
     floating_map     = {}
     bal_map          = {}
     today_closed_pnl = 0.0
+    data_source      = "remote"
+    local_synced_at  = None
     if equity_logins:
-        dc = get_dealio_connection()
         try:
-            with dc.cursor() as cur:
-                cur.execute("""
-                    SELECT login,
-                           SUM(COALESCE(computedcommission,0)
-                             + COALESCE(computedprofit,0)
-                             + COALESCE(computedswap,0))
-                    FROM dealio.positions
-                    WHERE login = ANY(%s) AND cmd < 2 AND symbol NOT IN %s
-                    GROUP BY login
-                """, (equity_logins, _EXCLUDED_SYMBOLS_TUPLE))
-                floating_map = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
+            dc = get_dealio_connection()
+            try:
+                with dc.cursor() as cur:
+                    cur.execute("""
+                        SELECT login,
+                               SUM(COALESCE(computedcommission,0)
+                                 + COALESCE(computedprofit,0)
+                                 + COALESCE(computedswap,0))
+                        FROM dealio.positions
+                        WHERE login = ANY(%s) AND cmd < 2 AND symbol NOT IN %s
+                        GROUP BY login
+                    """, (equity_logins, _EXCLUDED_SYMBOLS_TUPLE))
+                    floating_map = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
 
-                cur.execute(
-                    "SELECT login, compbalance FROM dealio.users WHERE login = ANY(%s)",
-                    (equity_logins,)
-                )
-                bal_map = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
+                    cur.execute(
+                        "SELECT login, compbalance FROM dealio.users WHERE login = ANY(%s)",
+                        (equity_logins,)
+                    )
+                    bal_map = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
 
-                cur.execute("""
-                    SELECT login,
-                           SUM(COALESCE(computedcommission,0)
-                             + COALESCE(computedprofit,0)
-                             + COALESCE(computedswap,0))
-                    FROM dealio.trades_mt5
-                    WHERE login = ANY(%s)
-                      AND entry = 1
-                      AND closetime >= %s::date
-                      AND closetime <  %s::date + INTERVAL '1 day'
-                      AND cmd < 2
-                      AND symbol NOT IN %s
-                    GROUP BY login
-                """, (equity_logins, str(d), str(d), _EXCLUDED_SYMBOLS_TUPLE))
-                today_closed_pnl = sum(float(r[1] or 0) for r in cur.fetchall())
-        finally:
-            dc.close()
+                    cur.execute("""
+                        SELECT login,
+                               SUM(COALESCE(computedcommission,0)
+                                 + COALESCE(computedprofit,0)
+                                 + COALESCE(computedswap,0))
+                        FROM dealio.trades_mt5
+                        WHERE login = ANY(%s)
+                          AND entry = 1
+                          AND closetime >= %s::date
+                          AND closetime <  %s::date + INTERVAL '1 day'
+                          AND cmd < 2
+                          AND symbol NOT IN %s
+                        GROUP BY login
+                    """, (equity_logins, str(d), str(d), _EXCLUDED_SYMBOLS_TUPLE))
+                    today_closed_pnl = sum(float(r[1] or 0) for r in cur.fetchall())
+            finally:
+                dc.close()
+        except Exception as remote_err:
+            # Remote replica unhealthy — use local synced copies.
+            traceback.print_exc()
+            print(f"[live_eez] remote dealio failed ({remote_err}); using local snapshot")
+            data_source = "local_snapshot"
+            conn3 = get_connection()
+            try:
+                with conn3.cursor() as cur:
+                    cur.execute("""
+                        SELECT login,
+                               SUM(COALESCE(computed_commission,0)
+                                 + COALESCE(computed_profit,0)
+                                 + COALESCE(computed_swap,0))
+                        FROM dealio_positions
+                        WHERE login = ANY(%s) AND cmd < 2 AND symbol NOT IN %s
+                        GROUP BY login
+                    """, (equity_logins, _EXCLUDED_SYMBOLS_TUPLE))
+                    floating_map = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
+
+                    # dealio_users: compbalance ≈ balance - credit (local table does not
+                    # store compbalance directly). DISTINCT ON handles multi-sourceid rows.
+                    cur.execute("""
+                        SELECT DISTINCT ON (login)
+                               login,
+                               COALESCE(balance,0) - COALESCE(credit,0) AS compbalance
+                        FROM dealio_users
+                        WHERE login = ANY(%s)
+                        ORDER BY login, lastupdate DESC NULLS LAST
+                    """, (equity_logins,))
+                    bal_map = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
+
+                    cur.execute("""
+                        SELECT COALESCE(SUM(
+                            COALESCE(computed_commission,0)
+                          + COALESCE(computed_profit,0)
+                          + COALESCE(computed_swap,0)
+                        ), 0)
+                        FROM dealio_trades_mt5
+                        WHERE login = ANY(%s)
+                          AND entry = 1
+                          AND close_time >= %s::date
+                          AND close_time <  %s::date + INTERVAL '1 day'
+                          AND cmd < 2
+                          AND symbol NOT IN %s
+                    """, (equity_logins, str(d), str(d), _EXCLUDED_SYMBOLS_TUPLE))
+                    today_closed_pnl = float(cur.fetchone()[0] or 0)
+
+                    # Freshness indicator for the card.
+                    cur.execute("SELECT MAX(last_update) FROM dealio_positions")
+                    row = cur.fetchone()
+                    if row and row[0]:
+                        local_synced_at = row[0].isoformat(timespec="seconds")
+            finally:
+                conn3.close()
 
     current_floating = sum(floating_map.values())
     open_logins      = list(floating_map.keys())
@@ -346,4 +406,6 @@ def _live_calc(d) -> dict:
         "daily_start_net_equity": round(start_net_equity),
         "is_live":                True,
         "date":                   str(d),
+        "data_source":            data_source,       # "remote" or "local_snapshot"
+        "local_synced_at":        local_synced_at,   # last_update of local positions (if fallback)
     }
