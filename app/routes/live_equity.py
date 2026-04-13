@@ -15,7 +15,7 @@ router = APIRouter()
 
 _RETRYABLE_ERRORS = ("conflict with recovery", "ssl syscall error", "eof detected", "timeout expired")
 
-def _with_retry(fn, *args, retries=2, delay=0.5):
+def _with_retry(fn, *args, retries=1, delay=0):
     """Retry fn on transient dealio replica errors (replication conflict, SSL drop, timeout)."""
     for attempt in range(retries):
         try:
