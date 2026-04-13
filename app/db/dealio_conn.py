@@ -48,7 +48,7 @@ def get_dealio_connection():
         user=DEALIO_PG_USER,
         password=DEALIO_PG_PASSWORD,
         dbname=DEALIO_PG_DB,
-        connect_timeout=15,
+        connect_timeout=30,
         options="-c statement_timeout=120000",
         sslmode="require",
         sslcert=DEALIO_PG_SSLCERT,

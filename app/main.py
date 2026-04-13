@@ -71,7 +71,7 @@ def warm_cache():
     except Exception as e:
         print(f"[warm_cache] dashboard: {e}")
 
-    _ck = f"live_eez_v23:{today}"
+    _ck = f"live_eez_v24:{today}"
     try:
         cache.set(_ck, _live_calc(today))
     except Exception as e:
