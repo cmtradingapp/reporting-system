@@ -48,8 +48,10 @@ def get_dealio_connection():
         user=DEALIO_PG_USER,
         password=DEALIO_PG_PASSWORD,
         dbname=DEALIO_PG_DB,
-        connect_timeout=30,
-        options="-c statement_timeout=120000",
+        connect_timeout=12,
+        # Cap remote statement time to 10s so a slow/cancelled query fails over
+        # to the local snapshot quickly instead of blocking the user request.
+        options="-c statement_timeout=10000",
         sslmode="require",
         sslcert=DEALIO_PG_SSLCERT,
         sslkey=DEALIO_PG_SSLKEY,
