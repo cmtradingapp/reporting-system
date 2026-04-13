@@ -364,10 +364,10 @@
       document.getElementById('ftc-rr').textContent      = fmtNum(data.ftc.rr);
 
       // Net Deposits
-      document.getElementById('nd-sales-daily').textContent = fmtMoney(data.net_deposits_sales.daily);
-      document.getElementById('nd-ret-daily').textContent   = fmtMoney(data.net_deposits_retention.daily);
-      document.getElementById('nd-monthly').textContent     = fmtMoney(data.net_deposits.monthly);
-      document.getElementById('nd-rr').textContent          = fmtMoney(data.net_deposits.rr);
+      const _ndSd = document.getElementById('nd-sales-daily'); if (_ndSd) _ndSd.textContent = fmtMoney(data.net_deposits_sales.daily);
+      const _ndRd = document.getElementById('nd-ret-daily'); if (_ndRd) _ndRd.textContent = fmtMoney(data.net_deposits_retention.daily);
+      const _ndM = document.getElementById('nd-monthly'); if (_ndM) _ndM.textContent = fmtMoney(data.net_deposits.monthly);
+      const _ndR = document.getElementById('nd-rr'); if (_ndR) _ndR.textContent = fmtMoney(data.net_deposits.rr);
 
       // Open Volume
       {% if not current_user.role.startswith('sales') %}
