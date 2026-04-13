@@ -459,6 +459,8 @@
         </div>
       </div>
     </div>
+    {% set _hide_net_cards = current_user.email in ['oluwaseun.a@cmtrading.com', 'elissa.b@cmtrading.com', 'precious.ib@cmtrading.com'] %}
+    {% if not _hide_net_cards %}
     <div class="col-6 col-md-2" id="kpi-daily-net">
       <div class="kpi-card text-center">
         <div class="kpi-split" style="display:flex;justify-content:center;align-items:center;gap:14px;">
@@ -498,6 +500,7 @@
         <div class="kpi-label">NET RR</div>
       </div>
     </div>
+    {% endif %}
     {% if not current_user.role.startswith('sales') %}
     <div class="col-6 col-md-2" id="kpi-vol">
       <div class="kpi-card text-center">

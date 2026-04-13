@@ -187,6 +187,8 @@
       </div>
       {% endif %}
 
+      {% set _hide_net_cards = current_user.email in ['oluwaseun.a@cmtrading.com', 'elissa.b@cmtrading.com', 'precious.ib@cmtrading.com'] %}
+      {% if not _hide_net_cards %}
       <!-- Daily Net / Daily Ret Net -->
       <div class="col-6 col-md-2">
         <div class="kpi-card">
@@ -219,6 +221,7 @@
           <div class="kpi-label">NET RR</div>
         </div>
       </div>
+      {% endif %}
 
       {% if not current_user.role.startswith('sales') %}
       <!-- Open Volume -->
