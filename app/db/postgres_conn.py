@@ -414,6 +414,8 @@ def ensure_table():
             comment        TEXT,
             balance        DOUBLE PRECISION,
             credit         DOUBLE PRECISION,
+            compbalance    DOUBLE PRECISION,
+            compcredit     DOUBLE PRECISION,
             leverage       INTEGER,
             status         TEXT,
             regdate        TIMESTAMP,
@@ -424,8 +426,11 @@ def ensure_table():
             synced_at      TIMESTAMPTZ DEFAULT NOW(),
             PRIMARY KEY (login, sourceid)
         );
+        ALTER TABLE dealio_users ADD COLUMN IF NOT EXISTS compbalance DOUBLE PRECISION;
+        ALTER TABLE dealio_users ADD COLUMN IF NOT EXISTS compcredit  DOUBLE PRECISION;
         CREATE INDEX IF NOT EXISTS idx_dealio_users_lastupdate ON dealio_users (lastupdate);
         CREATE INDEX IF NOT EXISTS idx_dealio_users_group      ON dealio_users (groupname);
+        CREATE INDEX IF NOT EXISTS idx_dealio_users_login      ON dealio_users (login);
 
         CREATE TABLE IF NOT EXISTS dealio_trades_mt4 (
             ticket          BIGINT           NOT NULL,
@@ -2220,7 +2225,7 @@ def upsert_dealio_users(df: pd.DataFrame):
         "login", "sourceid", "sourcename", "sourcetype",
         "groupname", "groupcurrency", "name", "email",
         "country", "city", "zipcode", "address", "phone", "comment",
-        "balance", "credit", "leverage", "status",
+        "balance", "credit", "compbalance", "compcredit", "leverage", "status",
         "regdate", "lastdate", "lastupdate", "agentaccount", "isenabled",
     ]
     rows = [tuple(_clean(row.get(c)) for c in cols) for _, row in df.iterrows()]

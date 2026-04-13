@@ -316,12 +316,10 @@ def _live_calc(d) -> dict:
                     """, (equity_logins, _EXCLUDED_SYMBOLS_TUPLE))
                     floating_map = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
 
-                    # dealio_users: compbalance ≈ balance - credit (local table does not
-                    # store compbalance directly). DISTINCT ON handles multi-sourceid rows.
+                    # Use compbalance directly from local dealio_users (synced from remote).
+                    # A login may have multiple sourceid rows; pick the most recently updated.
                     cur.execute("""
-                        SELECT DISTINCT ON (login)
-                               login,
-                               COALESCE(balance,0) - COALESCE(credit,0) AS compbalance
+                        SELECT DISTINCT ON (login) login, COALESCE(compbalance,0)
                         FROM dealio_users
                         WHERE login = ANY(%s)
                         ORDER BY login, lastupdate DESC NULLS LAST

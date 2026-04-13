@@ -79,6 +79,8 @@ _USERS_COLS = """
     comment,
     balance,
     credit,
+    compbalance,
+    compcredit,
     leverage,
     status,
     regdate,
