@@ -717,6 +717,11 @@ def _to_classification_int(v):
 
 
 def upsert_accounts(df: pd.DataFrame):
+    # LEFT JOINs in source query (user_additional_info_rel, aggregated_user_data) can yield
+    # duplicate rows per accountid. Dedupe (keep last) to avoid
+    # "ON CONFLICT DO UPDATE command cannot affect row a second time" errors.
+    if not df.empty and "accountid" in df.columns:
+        df = df.drop_duplicates(subset=["accountid"], keep="last")
     src_cols = [
         "accountid", "is_test_account", "first_name", "last_name", "full_name",
         "email", "gender", "customer_language", "country_iso", "campaign",
