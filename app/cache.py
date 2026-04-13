@@ -4,7 +4,7 @@ import time
 _lock = threading.Lock()
 _store: dict = {}  # key -> (data, expires_at_unix)
 
-TTL = 90   # seconds (90 s; warm_cache refreshes every 60 s)
+TTL = 300  # seconds (5 min; warm_cache refreshes every 60 s for hot keys, cold keys stay warm 5x longer between visits)
 
 
 def get(key: str):
