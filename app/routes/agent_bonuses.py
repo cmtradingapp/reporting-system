@@ -309,7 +309,7 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"bon_sales_v18:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"bon_sales_v19:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -387,6 +387,7 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
           AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'
           AND (%(is_admin)s OR au.role IS NULL OR au.role NOT IN ('admin', 'general'))
+          AND (COALESCE(bon.ftd100_count, 0) > 0 OR COALESCE(tgt.target_ftc, 0) > 1)
         ORDER BY u.office_name NULLS LAST, COALESCE(bon.ftd100_count, 0) DESC, u.agent_name
     """
 
@@ -491,7 +492,7 @@ async def agent_bonuses_sales_accounts_api(request: Request, date_from: str, dat
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"bon_sales_acct_v13:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"bon_sales_acct_v14:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -605,6 +606,7 @@ async def agent_bonuses_sales_accounts_api(request: Request, date_from: str, dat
           AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'
           AND (%(is_admin)s OR au.role IS NULL OR au.role NOT IN ('admin', 'general'))
+          AND (COALESCE(at.ftd100_total, 0) > 0 OR COALESCE(at.target_ftc, 0) > 1)
         ORDER BY u.office_name NULLS LAST, u.agent_name, c.accountid
     """
 
