@@ -26,22 +26,22 @@
     .q-btn:hover { background: #2d333a; color: #c9d1d9; }
     .q-btn.active { background: #388bfd; border-color: #388bfd; color: #fff; }
 
-    .fsa-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-    .fsa-table th { background: #161b22; color: #8b949e; font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; padding: 8px 12px; border-bottom: 1px solid #30363d; }
-    .fsa-table td { padding: 8px 12px; border-bottom: 1px solid #21262d; color: #e0e0e0; }
+    .fsa-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    .fsa-table th { background: #161b22; color: #8b949e; font-weight: 600; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.5px; padding: 5px 10px; border-bottom: 1px solid #30363d; }
+    .fsa-table td { padding: 5px 10px; border-bottom: 1px solid #21262d; color: #e0e0e0; }
     .fsa-table tr:hover td { background: rgba(56,139,253,0.04); }
-    .fsa-table .row-header { color: #8b949e; font-weight: 600; }
+    .fsa-table .row-header { color: #c9d1d9; font-weight: 600; }
     .fsa-table .total-row td { border-top: 2px solid #30363d; font-weight: 700; color: #fff; }
 
-    .card-dark { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
-    .card-dark h6 { color: #8b949e; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 14px; }
+    .card-dark { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; }
+    .card-dark h6 { color: #8b949e; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px; }
 
     .age-table th, .age-table td { text-align: center; }
     .age-table th:first-child, .age-table td:first-child { text-align: left; }
-    .age-count-row td { background: rgba(63,185,80,0.15); }
-    .age-count-row td.row-header { background: rgba(63,185,80,0.22); }
-    .age-pct-row td { background: rgba(210,153,34,0.15); color: #d29922; }
-    .age-pct-row td.row-header { background: rgba(210,153,34,0.22); color: #d29922; }
+    .age-count-row td { background: rgba(56,139,253,0.06); }
+    .age-count-row td.row-header { color: #c9d1d9; }
+    .age-pct-row td { background: rgba(56,139,253,0.03); color: #8b949e; }
+    .age-pct-row td.row-header { color: #8b949e; }
 
     #loading { display: none; text-align: center; padding: 60px; color: #8b949e; }
     #error-msg { display: none; }
@@ -152,32 +152,37 @@
   <!-- Section 3 content -->
   <div id="section3">
 
-    <!-- 3a: Client counts -->
-    <div class="card-dark">
-      <h6>3(a) Number of Clients</h6>
-      <table class="fsa-table">
-        <thead><tr><th></th><th>Active</th><th>Inactive</th><th>Total</th></tr></thead>
-        <tbody>
-          <tr><td class="row-header">Beginning of Period (BOP)</td><td id="active-bop">—</td><td id="inactive-bop">—</td><td id="total-bop">—</td></tr>
-          <tr><td class="row-header">End of Period (EOP)</td><td id="active-eop">—</td><td id="inactive-eop">—</td><td id="total-eop">—</td></tr>
-          <tr class="total-row"><td class="row-header">Net Change</td><td id="net-active">—</td><td id="net-inactive">—</td><td id="net-total">—</td></tr>
-        </tbody>
-      </table>
-    </div>
-
-    <!-- 3b-f: Period summary -->
-    <div class="card-dark">
-      <h6>3(b–f) Period Summary</h6>
-      <table class="fsa-table">
-        <thead><tr><th></th><th>Count / Value</th></tr></thead>
-        <tbody>
-          <tr><td class="row-header">(b) New clients during the quarter</td><td id="new-clients">—</td></tr>
-          <tr><td class="row-header">(c) Clients that ceased during the quarter</td><td id="ceased-clients">—</td></tr>
-          <tr><td class="row-header">(d) Clients' Funds (USD)</td><td id="clients-funds">—</td></tr>
-          <tr><td class="row-header">(e) Classification – Natural Persons</td><td id="classification">—</td></tr>
-          <tr><td class="row-header">(f) Classification – Legal Persons</td><td>0</td></tr>
-        </tbody>
-      </table>
+    <div class="row g-3 mb-0">
+      <!-- 3a: Client counts -->
+      <div class="col-lg-6">
+        <div class="card-dark" style="margin-bottom:0;">
+          <h6>3(a) Number of Clients</h6>
+          <table class="fsa-table">
+            <thead><tr><th></th><th style="text-align:right">Active</th><th style="text-align:right">Inactive</th><th style="text-align:right">Total</th></tr></thead>
+            <tbody>
+              <tr><td class="row-header">BOP</td><td style="text-align:right" id="active-bop">—</td><td style="text-align:right" id="inactive-bop">—</td><td style="text-align:right" id="total-bop">—</td></tr>
+              <tr><td class="row-header">EOP</td><td style="text-align:right" id="active-eop">—</td><td style="text-align:right" id="inactive-eop">—</td><td style="text-align:right" id="total-eop">—</td></tr>
+              <tr class="total-row"><td class="row-header">Net Change</td><td style="text-align:right" id="net-active">—</td><td style="text-align:right" id="net-inactive">—</td><td style="text-align:right" id="net-total">—</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <!-- 3b-f: Period summary -->
+      <div class="col-lg-6">
+        <div class="card-dark" style="margin-bottom:0;">
+          <h6>3(b–f) Period Summary</h6>
+          <table class="fsa-table">
+            <thead><tr><th></th><th style="text-align:right">Value</th></tr></thead>
+            <tbody>
+              <tr><td class="row-header">(b) New clients</td><td style="text-align:right;color:#fff" id="new-clients">—</td></tr>
+              <tr><td class="row-header">(c) Ceased clients</td><td style="text-align:right;color:#fff" id="ceased-clients">—</td></tr>
+              <tr><td class="row-header">(d) Clients' Funds (USD)</td><td style="text-align:right;color:#fff" id="clients-funds">—</td></tr>
+              <tr><td class="row-header">(e) Natural Persons</td><td style="text-align:right;color:#fff" id="classification">—</td></tr>
+              <tr><td class="row-header">(f) Legal Persons</td><td style="text-align:right;color:#fff">0</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
     <!-- 3g: Age groups (horizontal layout matching FSA form) -->
