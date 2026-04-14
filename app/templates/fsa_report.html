@@ -47,6 +47,9 @@
     .cls-table td:nth-child(4), .cls-table th:nth-child(4) { border-left: 1px solid #30363d; }
     .cls-table td:nth-child(6), .cls-table th:nth-child(6) { border-left: 1px solid #30363d; }
 
+    .s4-table th, .s4-table td { text-align: center; }
+    .s4-table th:first-child, .s4-table td:first-child { text-align: left; }
+
     #loading { display: none; text-align: center; padding: 60px; color: #8b949e; }
     #error-msg { display: none; }
 
@@ -286,7 +289,7 @@
     <!-- 4c: Geographic breakdown -->
     <div class="card-dark" style="overflow-x:auto;">
       <h6>4(c) Geographical Breakdown of Clients</h6>
-      <table class="fsa-table" style="font-size:0.78rem;">
+      <table class="fsa-table s4-table" style="font-size:0.78rem;">
         <thead>
           <tr>
             <th rowspan="2">Country</th>
@@ -451,15 +454,15 @@
           const tr = document.createElement('tr');
           tr.innerHTML = `
             <td class="row-header">${c.name}</td>
-            <td style="text-align:center">Yes</td>
-            <td style="text-align:center;border-left:1px solid #30363d">${fmt(c.active)}</td>
-            <td style="text-align:center">${fmt(c.inactive)}</td>
-            <td style="text-align:center">${fmt(total)}</td>
-            <td style="text-align:center;border-left:1px solid #30363d">${pct(c.active, grandTotal)}</td>
-            <td style="text-align:center">${pct(c.inactive, grandTotal)}</td>
-            <td style="text-align:center">${pct(total, grandTotal)}</td>
-            <td style="text-align:right;border-left:1px solid #30363d">${fmtUSD(c.cfds)}</td>
-            <td style="text-align:right">${fmtUSD(c.cfds)}</td>
+            <td>Yes</td>
+            <td style="border-left:1px solid #30363d">${fmt(c.active)}</td>
+            <td>${fmt(c.inactive)}</td>
+            <td>${fmt(total)}</td>
+            <td style="border-left:1px solid #30363d">${pct(c.active, grandTotal)}</td>
+            <td>${pct(c.inactive, grandTotal)}</td>
+            <td>${pct(total, grandTotal)}</td>
+            <td style="border-left:1px solid #30363d">${fmtUSD(c.cfds)}</td>
+            <td>${fmtUSD(c.cfds)}</td>
           `;
           tbody.appendChild(tr);
         });
@@ -469,14 +472,14 @@
         totRow.innerHTML = `
           <td class="row-header">Total</td>
           <td></td>
-          <td style="text-align:center;border-left:1px solid #30363d">${fmt(totAct)}</td>
-          <td style="text-align:center">${fmt(totInact)}</td>
-          <td style="text-align:center">${fmt(totAll)}</td>
-          <td style="text-align:center;border-left:1px solid #30363d">${pct(totAct, totAll)}</td>
-          <td style="text-align:center">${pct(totInact, totAll)}</td>
-          <td style="text-align:center">100%</td>
-          <td style="text-align:right;border-left:1px solid #30363d">${fmtUSD(totCfds)}</td>
-          <td style="text-align:right">${fmtUSD(totCfds)}</td>
+          <td style="border-left:1px solid #30363d">${fmt(totAct)}</td>
+          <td>${fmt(totInact)}</td>
+          <td>${fmt(totAll)}</td>
+          <td style="border-left:1px solid #30363d">${pct(totAct, totAll)}</td>
+          <td>${pct(totInact, totAll)}</td>
+          <td>100%</td>
+          <td style="border-left:1px solid #30363d">${fmtUSD(totCfds)}</td>
+          <td>${fmtUSD(totCfds)}</td>
         `;
 
         document.getElementById('s4-total-value').textContent = fmtUSD(totCfds);
