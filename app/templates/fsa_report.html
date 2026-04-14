@@ -43,6 +43,10 @@
     .age-pct-row td { background: rgba(56,139,253,0.03); color: #8b949e; }
     .age-pct-row td.row-header { color: #8b949e; }
 
+    .cls-table td:nth-child(2), .cls-table th:nth-child(2) { border-left: 1px solid #30363d; }
+    .cls-table td:nth-child(4), .cls-table th:nth-child(4) { border-left: 1px solid #30363d; }
+    .cls-table td:nth-child(6), .cls-table th:nth-child(6) { border-left: 1px solid #30363d; }
+
     #loading { display: none; text-align: center; padding: 60px; color: #8b949e; }
     #error-msg { display: none; }
 
@@ -158,11 +162,11 @@
         <div class="card-dark h-100" style="margin-bottom:0;">
           <h6>3(a) Number of Clients</h6>
           <table class="fsa-table">
-            <thead><tr><th></th><th style="text-align:right">Active</th><th style="text-align:right">Inactive</th><th style="text-align:right">Total</th></tr></thead>
+            <thead><tr><th></th><th style="text-align:center">Active</th><th style="text-align:center">Inactive</th><th style="text-align:center">Total</th></tr></thead>
             <tbody>
-              <tr><td class="row-header">Beginning of Period</td><td style="text-align:right" id="active-bop">—</td><td style="text-align:right" id="inactive-bop">—</td><td style="text-align:right" id="total-bop">—</td></tr>
-              <tr><td class="row-header">End of Period</td><td style="text-align:right" id="active-eop">—</td><td style="text-align:right" id="inactive-eop">—</td><td style="text-align:right" id="total-eop">—</td></tr>
-              <tr class="total-row"><td class="row-header">Net Change</td><td style="text-align:right" id="net-active">—</td><td style="text-align:right" id="net-inactive">—</td><td style="text-align:right" id="net-total">—</td></tr>
+              <tr><td class="row-header">Beginning of Period</td><td style="text-align:center" id="active-bop">—</td><td style="text-align:center" id="inactive-bop">—</td><td style="text-align:center" id="total-bop">—</td></tr>
+              <tr><td class="row-header">End of Period</td><td style="text-align:center" id="active-eop">—</td><td style="text-align:center" id="inactive-eop">—</td><td style="text-align:center" id="total-eop">—</td></tr>
+              <tr class="total-row"><td class="row-header">Net Change</td><td style="text-align:center" id="net-active">—</td><td style="text-align:center" id="net-inactive">—</td><td style="text-align:center" id="net-total">—</td></tr>
             </tbody>
           </table>
         </div>
@@ -175,8 +179,7 @@
             <thead><tr><th></th><th style="text-align:right">Value</th></tr></thead>
             <tbody>
               <tr><td class="row-header">(b) Clients gained/lost during period</td><td style="text-align:right;color:#fff" id="new-clients">—</td></tr>
-              <tr><td class="row-header">(c) Ceased clients</td><td style="text-align:right;color:#fff" id="ceased-clients">—</td></tr>
-              <tr><td class="row-header">(d) Clients' Funds (USD)</td><td style="text-align:right;color:#fff" id="clients-funds">—</td></tr>
+              <tr><td class="row-header">(c) Clients' Funds (USD)</td><td style="text-align:right;color:#fff" id="clients-funds">—</td></tr>
               <tr><td class="row-header">(e) Natural Persons</td><td style="text-align:right;color:#fff" id="classification">—</td></tr>
               <tr><td class="row-header">(f) Legal Persons</td><td style="text-align:right;color:#fff">0</td></tr>
             </tbody>
@@ -232,10 +235,10 @@
     <!-- 3h: Classification of Active Clients -->
     <div class="card-dark" style="overflow-x:auto;">
       <h6>3(h) Classification of Active Clients</h6>
-      <table class="fsa-table age-table">
+      <table class="fsa-table age-table cls-table">
         <thead>
           <tr>
-            <th>Client Type</th>
+            <th></th>
             <th colspan="2">Natural Person</th>
             <th colspan="2">Legal Entities</th>
             <th colspan="2">Total</th>
@@ -334,9 +337,7 @@
 
         // 3b-f
         const newClients = (c.active_eop + c.inactive_eop) - (c.active_bop + c.inactive_bop);
-        const ceasedClients = 0; // No deletion tracking; net = new - ceased
         document.getElementById('new-clients').textContent = fmt(Math.max(newClients, 0));
-        document.getElementById('ceased-clients').textContent = fmt(ceasedClients);
         document.getElementById('clients-funds').textContent = fmtUSD(d.clients_funds);
         document.getElementById('classification').textContent = fmt(c.active_eop + c.inactive_eop);
 
