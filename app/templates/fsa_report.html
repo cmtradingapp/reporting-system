@@ -145,7 +145,7 @@
   <!-- Section tabs -->
   <div class="d-flex gap-2 mb-4">
     <button class="section-tab active" data-sec="3">Section 3</button>
-    <button class="section-tab disabled" data-sec="4" disabled>Section 4</button>
+    <button class="section-tab" data-sec="4">Section 4</button>
     <button class="section-tab disabled" data-sec="5" disabled>Section 5</button>
   </div>
 
@@ -264,6 +264,52 @@
 
   </div><!-- /section3 -->
 
+  <!-- Section 4: Geographical Service Areas -->
+  <div id="section4" style="display:none;">
+
+    <!-- 4a-b: Summary -->
+    <div class="row g-3 mb-3">
+      <div class="col-lg-6">
+        <div class="card-dark h-100" style="margin-bottom:0;">
+          <h6>4(a) Total Trading Value</h6>
+          <div style="font-size:1.3rem;font-weight:700;color:#fff;" id="s4-total-value">—</div>
+        </div>
+      </div>
+      <div class="col-lg-6">
+        <div class="card-dark h-100" style="margin-bottom:0;">
+          <h6>4(b) Number of Countries</h6>
+          <div style="font-size:1.3rem;font-weight:700;color:#fff;">9</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4c: Geographic breakdown -->
+    <div class="card-dark" style="overflow-x:auto;">
+      <h6>4(c) Geographical Breakdown of Clients</h6>
+      <table class="fsa-table" style="font-size:0.78rem;">
+        <thead>
+          <tr>
+            <th rowspan="2">Country</th>
+            <th rowspan="2">Part of<br>Target Market</th>
+            <th colspan="3" style="border-left:1px solid #30363d">Number of Clients</th>
+            <th colspan="3" style="border-left:1px solid #30363d">Proportion of Clients</th>
+            <th colspan="2" style="border-left:1px solid #30363d">Trading Value in USD</th>
+          </tr>
+          <tr>
+            <th style="border-left:1px solid #30363d">Active</th><th>Inactive</th><th>Total</th>
+            <th style="border-left:1px solid #30363d">Active</th><th>Inactive</th><th>Total</th>
+            <th style="border-left:1px solid #30363d">CFDs</th><th>Total</th>
+          </tr>
+        </thead>
+        <tbody id="s4-tbody"></tbody>
+        <tfoot>
+          <tr class="total-row" id="s4-totals"></tr>
+        </tfoot>
+      </table>
+    </div>
+
+  </div><!-- /section4 -->
+
 </div>
 </div>
 
@@ -311,20 +357,39 @@
   function fmtUSD(n){ return '$' + n.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}); }
   function pct(n, total){ return total ? (n/total*100).toFixed(1)+'%' : '0%'; }
 
+  // Section tab switching
+  let activeSec = '3';
+  const secTabs = document.querySelectorAll('.section-tab:not(.disabled)');
+  secTabs.forEach(t => t.addEventListener('click', ()=>{
+    secTabs.forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    activeSec = t.dataset.sec;
+    load();
+  }));
+
+  function hideAllSections(){
+    document.getElementById('section3').style.display = 'none';
+    document.getElementById('section4').style.display = 'none';
+  }
+
   function load(){
     const year = +yearSel.value;
     const quarter = getQ();
     document.getElementById('loading').style.display = 'block';
     document.getElementById('error-msg').style.display = 'none';
-    document.getElementById('section3').style.display = 'none';
+    hideAllSections();
 
+    if(activeSec === '3') loadSection3(year, quarter);
+    else if(activeSec === '4') loadSection4(year, quarter);
+  }
+
+  function loadSection3(year, quarter){
     fetch(`/api/fsa-report/section3?year=${year}&quarter=${quarter}`)
       .then(r => r.json())
       .then(d => {
         if(d.error){ throw new Error(d.error); }
         const c = d.counts;
 
-        // 3a: Client counts
         document.getElementById('active-bop').textContent = fmt(c.active_bop);
         document.getElementById('inactive-bop').textContent = fmt(c.inactive_bop);
         document.getElementById('total-bop').textContent = fmt(c.active_bop + c.inactive_bop);
@@ -335,13 +400,11 @@
         document.getElementById('net-inactive').textContent = fmt(c.inactive_eop - c.inactive_bop);
         document.getElementById('net-total').textContent = fmt((c.active_eop+c.inactive_eop) - (c.active_bop+c.inactive_bop));
 
-        // 3b-f
         const newClients = (c.active_eop + c.inactive_eop) - (c.active_bop + c.inactive_bop);
         document.getElementById('new-clients').textContent = fmt(Math.max(newClients, 0));
         document.getElementById('clients-funds').textContent = fmtUSD(d.clients_funds);
         document.getElementById('classification').textContent = fmt(c.active_eop + c.inactive_eop);
 
-        // 3g: Age groups
         const ag = d.age_groups;
         const ageKeys = [
           ['under_18','u18'],['18_25','18-25'],['26_35','26-35'],['36_45','36-45'],
@@ -355,14 +418,12 @@
         });
         document.getElementById('age-total').textContent = fmt(ageTotal);
 
-        // 3h: Classification of active clients
         const cls = d.classification;
         const ta = cls.total_active;
         document.getElementById('cls-pep').textContent = fmt(cls.pep);
         document.getElementById('cls-pep-pct').textContent = pct(cls.pep, ta);
         document.getElementById('cls-pep-total').textContent = fmt(cls.pep);
         document.getElementById('cls-pep-total-pct').textContent = pct(cls.pep, ta);
-        // Non-Face-to-Face = all active clients (online broker)
         document.getElementById('cls-nftf').textContent = fmt(ta);
         document.getElementById('cls-nftf-pct').textContent = '100.00%';
         document.getElementById('cls-nftf-total').textContent = fmt(ta);
@@ -371,12 +432,65 @@
         document.getElementById('loading').style.display = 'none';
         document.getElementById('section3').style.display = 'block';
       })
-      .catch(e => {
+      .catch(showError);
+  }
+
+  function loadSection4(year, quarter){
+    fetch(`/api/fsa-report/section4?year=${year}&quarter=${quarter}`)
+      .then(r => r.json())
+      .then(d => {
+        if(d.error){ throw new Error(d.error); }
+        const tbody = document.getElementById('s4-tbody');
+        tbody.innerHTML = '';
+        let totAct=0, totInact=0, totCfds=0;
+        const grandTotal = d.countries.reduce((s,c) => s + c.active + c.inactive, 0);
+
+        d.countries.forEach(c => {
+          const total = c.active + c.inactive;
+          totAct += c.active; totInact += c.inactive; totCfds += c.cfds;
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td class="row-header">${c.name}</td>
+            <td style="text-align:center">Yes</td>
+            <td style="text-align:center;border-left:1px solid #30363d">${fmt(c.active)}</td>
+            <td style="text-align:center">${fmt(c.inactive)}</td>
+            <td style="text-align:center">${fmt(total)}</td>
+            <td style="text-align:center;border-left:1px solid #30363d">${pct(c.active, grandTotal)}</td>
+            <td style="text-align:center">${pct(c.inactive, grandTotal)}</td>
+            <td style="text-align:center">${pct(total, grandTotal)}</td>
+            <td style="text-align:right;border-left:1px solid #30363d">${fmtUSD(c.cfds)}</td>
+            <td style="text-align:right">${fmtUSD(c.cfds)}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+
+        const totAll = totAct + totInact;
+        const totRow = document.getElementById('s4-totals');
+        totRow.innerHTML = `
+          <td class="row-header">Total</td>
+          <td></td>
+          <td style="text-align:center;border-left:1px solid #30363d">${fmt(totAct)}</td>
+          <td style="text-align:center">${fmt(totInact)}</td>
+          <td style="text-align:center">${fmt(totAll)}</td>
+          <td style="text-align:center;border-left:1px solid #30363d">${pct(totAct, totAll)}</td>
+          <td style="text-align:center">${pct(totInact, totAll)}</td>
+          <td style="text-align:center">100%</td>
+          <td style="text-align:right;border-left:1px solid #30363d">${fmtUSD(totCfds)}</td>
+          <td style="text-align:right">${fmtUSD(totCfds)}</td>
+        `;
+
+        document.getElementById('s4-total-value').textContent = fmtUSD(totCfds);
         document.getElementById('loading').style.display = 'none';
-        const em = document.getElementById('error-msg');
-        em.textContent = e.message;
-        em.style.display = 'block';
-      });
+        document.getElementById('section4').style.display = 'block';
+      })
+      .catch(showError);
+  }
+
+  function showError(e){
+    document.getElementById('loading').style.display = 'none';
+    const em = document.getElementById('error-msg');
+    em.textContent = e.message;
+    em.style.display = 'block';
   }
 
   load();

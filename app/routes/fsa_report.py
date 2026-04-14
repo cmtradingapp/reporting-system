@@ -9,6 +9,20 @@ router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
 FSA_COUNTRIES = ('CM','KE','SE','ZM','DK','NL','ES','FI','NO')
+FSA_COUNTRY_NAMES = {
+    'CM': 'Cameroon', 'KE': 'Kenya', 'SE': 'Sweden', 'ZM': 'Zambia',
+    'DK': 'Denmark', 'NL': 'Netherlands', 'ES': 'Spain', 'FI': 'Finland', 'NO': 'Norway',
+}
+EXCLUDED_SYMBOLS = (
+    'Cashback','CFDRollover','CommEUR','CommUSD','CommGBP','CommJPY',
+    'CorrectiEUR','CorrectiGBP','CorrectiJPY','Correction',
+    'CredExp','CredExpEUR','CredExpGBP','CredExpJPY',
+    'Dividend','DividendEUR','DividendGBP','DividendJPY',
+    'Dormant','EarnedCr','EarnedCrEUR','FEE','INACT-FEE',
+    'Inactivity','Rollover','SPREAD',
+    'ZeroingEUR','ZeroingGBP','ZeroingJPY','ZeroingKES',
+    'ZeroingNGN','ZeroingUSD','ZeroingZAR',
+)
 
 def _quarter_dates(year: int, quarter: int):
     q_start_month = (quarter - 1) * 3 + 1
@@ -140,6 +154,82 @@ async def fsa_report_section3(request: Request, year: int = 2026, quarter: int =
             "age_groups": age_groups,
             "classification": classification,
         })
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+    finally:
+        conn.close()
+
+
+@router.get("/api/fsa-report/section4")
+async def fsa_report_section4(request: Request, year: int = 2026, quarter: int = 1):
+    user = await get_current_user(request)
+    if isinstance(user, RedirectResponse):
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    if user.get("role") != "admin":
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+
+    q_start, q_end, q_end_excl = _quarter_dates(year, quarter)
+
+    base_filter = """
+        a.funded = 1
+        AND a.is_test_account = 0
+        AND (a.sales_rep_id IS NULL OR a.sales_rep_id != 3303)
+    """
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            # Query 1: Active/Inactive counts per country at EOP
+            cur.execute(f"""
+                SELECT
+                  a.country_iso,
+                  SUM(CASE WHEN a.compliance_status IN ('4','9') THEN 1 ELSE 0 END) AS active,
+                  SUM(CASE WHEN a.compliance_status NOT IN ('4','9') THEN 1 ELSE 0 END) AS inactive
+                FROM accounts a
+                WHERE {base_filter}
+                  AND a.createdtime < %(q_end_excl)s
+                  AND a.country_iso IN %(countries)s
+                GROUP BY a.country_iso
+            """, {"q_end_excl": q_end_excl, "countries": FSA_COUNTRIES})
+            country_counts = {}
+            for row in cur.fetchall():
+                country_counts[row[0]] = {"active": row[1] or 0, "inactive": row[2] or 0}
+
+            # Query 2: Trading value (notional_value) per country during the quarter
+            # All instruments are CFDs for this broker
+            cur.execute(f"""
+                SELECT
+                  a.country_iso,
+                  COALESCE(SUM(t.notional_value), 0) AS trading_value
+                FROM dealio_trades_mt4 t
+                JOIN trading_accounts ta ON ta.login::bigint = t.login
+                JOIN accounts a ON a.accountid = ta.vtigeraccountid
+                WHERE t.close_time >= %(q_start)s
+                  AND t.close_time < %(q_end_excl)s
+                  AND t.cmd IN (0, 1)
+                  AND t.symbol NOT IN %(excl)s
+                  AND {base_filter}
+                  AND a.country_iso IN %(countries)s
+                GROUP BY a.country_iso
+            """, {"q_start": q_start, "q_end_excl": q_end_excl,
+                  "countries": FSA_COUNTRIES, "excl": EXCLUDED_SYMBOLS})
+            country_volume = {}
+            for row in cur.fetchall():
+                country_volume[row[0]] = float(row[1] or 0)
+
+        # Build response per country
+        countries = []
+        for iso in FSA_COUNTRIES:
+            cc = country_counts.get(iso, {"active": 0, "inactive": 0})
+            countries.append({
+                "iso": iso,
+                "name": FSA_COUNTRY_NAMES.get(iso, iso),
+                "active": cc["active"],
+                "inactive": cc["inactive"],
+                "cfds": country_volume.get(iso, 0),
+            })
+
+        return JSONResponse({"countries": countries})
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
     finally:
