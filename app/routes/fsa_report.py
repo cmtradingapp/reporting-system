@@ -75,20 +75,19 @@ async def fsa_report_section3(request: Request, year: int = 2026, quarter: int =
                 "inactive_eop": row[3] or 0,
             }
 
-            # Query 2: Clients' Funds (latest equity per login at quarter end)
+            # Query 2: Clients' Funds from daily_equity_zeroed (last day of quarter)
+            # Find the latest snapshot day on or before quarter end
             cur.execute(f"""
-                SELECT COALESCE(SUM(GREATEST(sub.convertedequity, 0)), 0)
-                FROM (
-                  SELECT DISTINCT ON (ddp.login) ddp.login, ddp.convertedequity
-                  FROM dealio_daily_profits ddp
-                  JOIN trading_accounts ta ON ta.login::bigint = ddp.login
-                  JOIN accounts a ON a.accountid = ta.vtigeraccountid
-                  WHERE ddp.date <= %(q_end)s
-                    AND a.is_test_account = 0
-                    AND (a.sales_rep_id IS NULL OR a.sales_rep_id != 3303)
-                    AND a.country_iso IN ('CM','KE','SE','ZM','DK','NL','ES','FI','NO')
-                  ORDER BY ddp.login, ddp.date DESC
-                ) sub
+                SELECT COALESCE(SUM(GREATEST(dez.end_equity_zeroed, 0)), 0)
+                FROM daily_equity_zeroed dez
+                JOIN trading_accounts ta ON ta.login = dez.login
+                JOIN accounts a ON a.accountid = ta.vtigeraccountid
+                WHERE dez.day = (
+                    SELECT MAX(day) FROM daily_equity_zeroed WHERE day <= %(q_end)s
+                )
+                  AND a.is_test_account = 0
+                  AND (a.sales_rep_id IS NULL OR a.sales_rep_id != 3303)
+                  AND a.country_iso IN ('CM','KE','SE','ZM','DK','NL','ES','FI','NO')
             """, {"q_end": q_end})
             clients_funds = float(cur.fetchone()[0])
 
