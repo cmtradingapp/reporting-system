@@ -284,18 +284,6 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
             else:
                 new_leads_today = new_leads_month = new_live_today = new_live_month = 0
 
-        today = datetime.now(_TZ).date()
-        month_end           = last_day_of_month(dt_from)
-        working_days        = count_working_days(dt_from, month_end, holidays)
-        working_days_passed = count_working_days(dt_from, min(dt_to, today), holidays)
-        working_days_left   = working_days - working_days_passed
-
-        safe_wdp        = working_days_passed if working_days_passed > 0 else 1
-        grand_ftc_rr    = round(grand_ftc  / safe_wdp * working_days)
-        grand_ftd_rr    = round(grand_ftd  / safe_wdp * working_days)
-        grand_net_rr    = round(grand_net  / safe_wdp * working_days, 2)
-        open_volume_rr  = round(open_volume / safe_wdp * working_days) if open_volume > 0 else round(open_volume)
-
         data = [
             {
                 "office_name":  r[0],
@@ -313,6 +301,31 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
             }
             for r in rows
         ]
+
+        # For restricted users, derive card values from filtered rows
+        if not role_filter['is_full_access']:
+            grand_ftc  = sum(r["ftc"] for r in data)
+            grand_net  = sum(r["net_deposits"] for r in data)
+            grand_ftd  = sum(r["ftd_count"] for r in data)
+            daily_ftd  = sum(r["daily_ftd"] for r in data)
+            daily_ftc  = sum(r["daily_ftc"] for r in data)
+            daily_net  = sum(r["daily_net"] for r in data)
+            open_volume = 0.0
+            end_equity_zeroed = 0.0
+            new_leads_today = new_leads_month = new_live_today = new_live_month = 0
+
+        today = datetime.now(_TZ).date()
+        month_end           = last_day_of_month(dt_from)
+        working_days        = count_working_days(dt_from, month_end, holidays)
+        working_days_passed = count_working_days(dt_from, min(dt_to, today), holidays)
+        working_days_left   = working_days - working_days_passed
+
+        safe_wdp        = working_days_passed if working_days_passed > 0 else 1
+        grand_ftc_rr    = round(grand_ftc  / safe_wdp * working_days)
+        grand_ftd_rr    = round(grand_ftd  / safe_wdp * working_days)
+        grand_net_rr    = round(grand_net  / safe_wdp * working_days, 2)
+        open_volume_rr  = round(open_volume / safe_wdp * working_days) if open_volume > 0 else round(open_volume)
+
         _result = {
             "rows":                 data,
             "total_ftc":            sum(r["ftc"] for r in data),
@@ -547,18 +560,6 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
             else:
                 new_leads_today = new_leads_month = new_live_today = new_live_month = 0
 
-        today               = datetime.now(_TZ).date()
-        month_end           = last_day_of_month(dt_from)
-        working_days        = count_working_days(dt_from, month_end, holidays)
-        working_days_passed = count_working_days(dt_from, min(dt_to, today), holidays)
-        working_days_left   = working_days - working_days_passed
-
-        safe_wdp       = working_days_passed if working_days_passed > 0 else 1
-        grand_ftc_rr   = round(grand_ftc   / safe_wdp * working_days)
-        grand_ftd_rr   = round(grand_ftd   / safe_wdp * working_days)
-        grand_net_rr   = round(grand_net   / safe_wdp * working_days, 2)
-        open_volume_rr = round(open_volume / safe_wdp * working_days) if open_volume > 0 else round(open_volume)
-
         data = [
             {
                 "office_name":     r[0],
@@ -575,6 +576,31 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
             }
             for r in rows
         ]
+
+        # For restricted users, derive card values from filtered rows
+        if not role_filter['is_full_access']:
+            grand_net  = sum(r["net_usd"] for r in data)
+            grand_ftc  = 0
+            grand_ftd  = 0
+            daily_net  = sum(r["daily_net_usd"] for r in data)
+            daily_net_retention = daily_net
+            daily_ftd  = 0
+            daily_ftc  = 0
+            open_volume = sum(r["open_volume_usd"] for r in data)
+            new_leads_today = new_leads_month = new_live_today = new_live_month = 0
+
+        today               = datetime.now(_TZ).date()
+        month_end           = last_day_of_month(dt_from)
+        working_days        = count_working_days(dt_from, month_end, holidays)
+        working_days_passed = count_working_days(dt_from, min(dt_to, today), holidays)
+        working_days_left   = working_days - working_days_passed
+
+        safe_wdp       = working_days_passed if working_days_passed > 0 else 1
+        grand_ftc_rr   = round(grand_ftc   / safe_wdp * working_days)
+        grand_ftd_rr   = round(grand_ftd   / safe_wdp * working_days)
+        grand_net_rr   = round(grand_net   / safe_wdp * working_days, 2)
+        open_volume_rr = round(open_volume / safe_wdp * working_days) if open_volume > 0 else round(open_volume)
+
         _result = {
             "rows":                    data,
             "daily_net_retention":     round(daily_net_retention, 2),
