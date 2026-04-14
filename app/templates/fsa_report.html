@@ -36,6 +36,13 @@
     .card-dark { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
     .card-dark h6 { color: #8b949e; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 14px; }
 
+    .age-table th, .age-table td { text-align: center; }
+    .age-table th:first-child, .age-table td:first-child { text-align: left; }
+    .age-count-row td { background: rgba(63,185,80,0.15); }
+    .age-count-row td.row-header { background: rgba(63,185,80,0.22); }
+    .age-pct-row td { background: rgba(210,153,34,0.15); color: #d29922; }
+    .age-pct-row td.row-header { background: rgba(210,153,34,0.22); color: #d29922; }
+
     #loading { display: none; text-align: center; padding: 60px; color: #8b949e; }
     #error-msg { display: none; }
 
@@ -173,20 +180,43 @@
       </table>
     </div>
 
-    <!-- 3g: Age groups -->
-    <div class="card-dark">
+    <!-- 3g: Age groups (horizontal layout matching FSA form) -->
+    <div class="card-dark" style="overflow-x:auto;">
       <h6>3(g) Age Groups</h6>
-      <table class="fsa-table">
-        <thead><tr><th>Age Group</th><th>Count</th><th>%</th></tr></thead>
+      <table class="fsa-table age-table">
+        <thead>
+          <tr>
+            <th>Age Group</th>
+            <th>Less than<br>18 Years</th>
+            <th>18 to 25<br>Years</th>
+            <th>26 to 35<br>Years</th>
+            <th>36 to 45<br>Years</th>
+            <th>46 to 55<br>Years</th>
+            <th>56 to 65<br>Years</th>
+            <th>66+<br>Years</th>
+          </tr>
+        </thead>
         <tbody>
-          <tr><td class="row-header">Under 18</td><td id="age-u18">—</td><td id="pct-u18">—</td></tr>
-          <tr><td class="row-header">18 – 25</td><td id="age-18-25">—</td><td id="pct-18-25">—</td></tr>
-          <tr><td class="row-header">26 – 35</td><td id="age-26-35">—</td><td id="pct-26-35">—</td></tr>
-          <tr><td class="row-header">36 – 45</td><td id="age-36-45">—</td><td id="pct-36-45">—</td></tr>
-          <tr><td class="row-header">46 – 55</td><td id="age-46-55">—</td><td id="pct-46-55">—</td></tr>
-          <tr><td class="row-header">56 – 65</td><td id="age-56-65">—</td><td id="pct-56-65">—</td></tr>
-          <tr><td class="row-header">Over 65</td><td id="age-65p">—</td><td id="pct-65p">—</td></tr>
-          <tr class="total-row"><td class="row-header">Total</td><td id="age-total">—</td><td>100%</td></tr>
+          <tr class="age-count-row">
+            <td class="row-header">Number of Clients</td>
+            <td id="age-u18">—</td>
+            <td id="age-18-25">—</td>
+            <td id="age-26-35">—</td>
+            <td id="age-36-45">—</td>
+            <td id="age-46-55">—</td>
+            <td id="age-56-65">—</td>
+            <td id="age-65p">—</td>
+          </tr>
+          <tr class="age-pct-row">
+            <td class="row-header">Proportion</td>
+            <td id="pct-u18">—</td>
+            <td id="pct-18-25">—</td>
+            <td id="pct-26-35">—</td>
+            <td id="pct-36-45">—</td>
+            <td id="pct-46-55">—</td>
+            <td id="pct-56-65">—</td>
+            <td id="pct-65p">—</td>
+          </tr>
         </tbody>
       </table>
     </div>
@@ -272,7 +302,7 @@
           document.getElementById('age-'+id).textContent = fmt(ag[k]);
           document.getElementById('pct-'+id).textContent = pct(ag[k], ageTotal);
         });
-        document.getElementById('age-total').textContent = fmt(ageTotal);
+        // age-total row removed (horizontal layout)
 
         document.getElementById('loading').style.display = 'none';
         document.getElementById('section3').style.display = 'block';
