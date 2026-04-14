@@ -429,6 +429,7 @@
       </div>
     </div>
     {% endif %}
+    {% if show_sales %}
     <div class="col-6 col-md-2" id="kpi-ftd-ftc">
       <div class="kpi-card text-center">
         <div style="display:flex;justify-content:center;align-items:center;gap:10px;">
@@ -459,6 +460,7 @@
         </div>
       </div>
     </div>
+    {% endif %}
     {% set _hide_net_cards = current_user.email in ['oluwaseun.a@cmtrading.com', 'elissa.b@cmtrading.com', 'precious.ib@cmtrading.com'] %}
     {% if not _hide_net_cards %}
     <div class="col-6 col-md-2" id="kpi-daily-net">
