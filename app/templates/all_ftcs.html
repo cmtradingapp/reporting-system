@@ -88,7 +88,7 @@
     {% if current_user.role == 'admin' or (_ap is not none and 'ftc_date' in _ap) %}
     <a href="/ftc-date" class="sidebar-link"><i class="bi bi-calendar2-check"></i>FTC Date</a>
     {% endif %}
-    {% if current_user.role != 'marketing' %}
+    {% if (_ap is none and current_user.role not in ('marketing', 'agent')) or (_ap is not none and 'all_ftcs' in _ap) %}
     <a href="/all-ftcs" class="sidebar-link active"><i class="bi bi-people"></i>All FTCs</a>
     {% endif %}
     {% if current_user.role == 'admin' %}
