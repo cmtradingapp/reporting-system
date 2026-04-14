@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>FSA Quarterly Report</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet"/>
+  <style>
+    body { background-color: #0f1117; color: #e0e0e0; font-family: 'Segoe UI', sans-serif; display: flex; min-height: 100vh; }
+    .sidebar { width: 220px; min-height: 100vh; background-color: #161b22; border-right: 1px solid #30363d; display: flex; flex-direction: column; position: fixed; top: 0; left: 0; bottom: 0; z-index: 100; }
+    .sidebar-brand { padding: 20px 20px 16px; border-bottom: 1px solid #30363d; font-weight: 700; font-size: 1rem; color: #e0e0e0; }
+    .sidebar-nav { padding: 12px 0; flex: 1; }
+    .sidebar-link { display: flex; align-items: center; gap: 10px; padding: 10px 20px; color: #8b949e; text-decoration: none; font-size: 0.9rem; transition: background 0.15s, color 0.15s; border-left: 3px solid transparent; }
+    .sidebar-link:hover { background-color: #21262d; color: #e0e0e0; }
+    .sidebar-link.active { color: #3fb950; border-left-color: #3fb950; background-color: rgba(63,185,80,0.08); }
+    .main-content { margin-left: 220px; flex: 1; min-width: 0; }
+
+    .section-tab { background: #21262d; border: 1px solid #30363d; color: #8b949e; padding: 6px 18px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; transition: all 0.15s; }
+    .section-tab:hover:not(.disabled) { background: #2d333a; color: #c9d1d9; }
+    .section-tab.active { background: #388bfd; border-color: #388bfd; color: #fff; }
+    .section-tab.disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .q-btn { background: #21262d; border: 1px solid #30363d; color: #8b949e; padding: 5px 16px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; transition: all 0.15s; }
+    .q-btn:hover { background: #2d333a; color: #c9d1d9; }
+    .q-btn.active { background: #388bfd; border-color: #388bfd; color: #fff; }
+
+    .fsa-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .fsa-table th { background: #161b22; color: #8b949e; font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; padding: 8px 12px; border-bottom: 1px solid #30363d; }
+    .fsa-table td { padding: 8px 12px; border-bottom: 1px solid #21262d; color: #e0e0e0; }
+    .fsa-table tr:hover td { background: rgba(56,139,253,0.04); }
+    .fsa-table .row-header { color: #8b949e; font-weight: 600; }
+    .fsa-table .total-row td { border-top: 2px solid #30363d; font-weight: 700; color: #fff; }
+
+    .card-dark { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+    .card-dark h6 { color: #8b949e; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 14px; }
+
+    #loading { display: none; text-align: center; padding: 60px; color: #8b949e; }
+    #error-msg { display: none; }
+
+    .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 99; }
+    .sidebar-overlay.show { display: block; }
+    .sidebar-toggle { display: none; position: fixed; top: 12px; left: 12px; z-index: 300; background: #161b22; border: 1px solid #30363d; color: #e0e0e0; border-radius: 8px; padding: 7px 10px; cursor: pointer; font-size: 1.1rem; line-height: 1; }
+    .mob-topbar { display: none; }
+    @media (max-width: 767px) {
+      body { display: block; }
+      .sidebar-toggle { display: block; }
+      .sidebar { transform: translateX(-240px); transition: transform 0.25s ease; }
+      .sidebar.open { transform: translateX(0); box-shadow: 4px 0 20px rgba(0,0,0,0.6); }
+      .mob-topbar { display:flex; align-items:center; justify-content:center; position:fixed; top:0; left:0; right:0; height:48px; background:#161b22; border-bottom:1px solid #30363d; z-index:150; }
+      .mob-topbar-title { font-size:0.92rem; font-weight:700; color:#e0e0e0; padding:0 44px; }
+      .main-content { margin-left: 0 !important; padding-top: 48px; }
+    }
+    @media (min-width: 768px) and (max-width: 1024px) {
+      body { display:block; }
+      .sidebar-toggle { display:block; }
+      .sidebar { transform:translateX(-240px); transition:transform 0.25s ease; }
+      .sidebar.open { transform:translateX(0); box-shadow:4px 0 20px rgba(0,0,0,0.6); }
+      .mob-topbar { display:flex; align-items:center; justify-content:center; position:fixed; top:0; left:0; right:0; height:48px; background:#161b22; border-bottom:1px solid #30363d; z-index:150; }
+      .mob-topbar-title { font-size:0.95rem; font-weight:700; color:#e0e0e0; padding:0 44px; }
+      .main-content { margin-left:0 !important; padding-top:48px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="mob-topbar"><span class="mob-topbar-title">FSA Quarterly Report</span></div>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+<button class="sidebar-toggle" id="sidebar-toggle"><i class="bi bi-list"></i></button>
+<div class="sidebar">
+  <div class="sidebar-brand">
+    <i class="bi bi-bar-chart-fill text-success me-2"></i>Reporting System
+  </div>
+  <nav class="sidebar-nav">
+    {% set _ap = current_user.allowed_pages_list %}
+    {% if _ap is none or 'performance' in _ap %}
+    <a href="/performance" class="sidebar-link"><i class="bi bi-trophy"></i>Performance Report</a>
+    {% endif %}
+    {% if (_ap is none and current_user.role in ('admin', 'marketing', 'general')) or (_ap is not none and 'marketing' in _ap) %}
+    <a href="/campaign-performance" class="sidebar-link"><i class="bi bi-graph-up-arrow"></i>Marketing Performance</a>
+    {% endif %}
+    {% if _ap is none or 'agent_bonuses' in _ap %}
+    <a href="/agent-bonuses" class="sidebar-link"><i class="bi bi-cash-stack"></i>Agent Bonuses</a>
+    {% endif %}
+    {% if (_ap is none and current_user.role in ('admin', 'general')) or (_ap is not none and 'dashboard' in _ap) %}
+    <a href="/dashboard" class="sidebar-link"><i class="bi bi-speedometer2"></i>Dashboard</a>
+    {% endif %}
+    {% if current_user.role == 'admin' or (_ap is not none and 'ftc_date' in _ap) %}
+    <a href="/ftc-date" class="sidebar-link"><i class="bi bi-calendar2-check"></i>FTC Date</a>
+    {% endif %}
+    {% if current_user.role == 'admin' %}
+    <a href="/fsa-report" class="sidebar-link active"><i class="bi bi-file-earmark-text"></i>FSA Report</a>
+    <a href="/data-sync" class="sidebar-link"><i class="bi bi-database"></i>Data Sync</a>
+    <a href="/holidays" class="sidebar-link"><i class="bi bi-calendar-x"></i>Holidays</a>
+    {% endif %}
+    {% if (_ap is none and current_user.role not in ('marketing', 'agent')) or (_ap is not none and 'all_ftcs' in _ap) %}
+    <a href="/all-ftcs" class="sidebar-link"><i class="bi bi-people"></i>All FTCs</a>
+    {% endif %}
+    {% if current_user.role == 'admin' %}
+    <a href="/transactions-report" class="sidebar-link"><i class="bi bi-receipt"></i>Transactions Report</a>
+    {% endif %}
+  </nav>
+  <div style="padding:14px 20px;border-top:1px solid #30363d;">
+    <div style="font-size:0.68rem;color:#8b949e;margin-bottom:2px;">Signed in as</div>
+    <div style="font-weight:600;font-size:0.82rem;color:#e0e0e0;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ current_user.full_name }}</div>
+    <div style="font-size:0.7rem;color:#3fb950;margin-bottom:8px;">{{ current_user.role | replace('_', ' ') | title }}</div>
+    <div style="display:flex;gap:12px;align-items:center;">
+      {% if current_user.role == 'admin' %}<a href="/admin/users" style="color:#8b949e;text-decoration:none;font-size:1.05rem;" title="Admin Users"><i class="bi bi-people-fill"></i></a>{% endif %}
+      <a href="/logout" style="color:#f85149;text-decoration:none;font-size:1.05rem;" title="Logout"><i class="bi bi-box-arrow-right"></i></a>
+    </div>
+  </div>
+</div>
+
+<div class="main-content">
+<div class="container-fluid px-4 py-4">
+
+  <!-- Header -->
+  <div class="mb-3 d-flex align-items-center gap-3 flex-wrap">
+    <h4 class="fw-bold text-white mb-0">FSA Quarterly Report</h4>
+  </div>
+
+  <!-- Selectors -->
+  <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
+    <select id="year-select" class="form-select form-select-sm" style="width:auto;background:#21262d;border-color:#30363d;color:#e0e0e0;font-size:0.85rem;"></select>
+    <div id="quarter-btns" class="d-flex gap-2">
+      <button class="q-btn" data-q="1">Q1</button>
+      <button class="q-btn" data-q="2">Q2</button>
+      <button class="q-btn" data-q="3">Q3</button>
+      <button class="q-btn" data-q="4">Q4</button>
+    </div>
+  </div>
+
+  <!-- Section tabs -->
+  <div class="d-flex gap-2 mb-4">
+    <button class="section-tab active" data-sec="3">Section 3</button>
+    <button class="section-tab disabled" data-sec="4" disabled>Section 4</button>
+    <button class="section-tab disabled" data-sec="5" disabled>Section 5</button>
+  </div>
+
+  <!-- Loading / Error -->
+  <div id="loading"><div class="spinner-border text-secondary" role="status"></div><div class="mt-2">Loading...</div></div>
+  <div id="error-msg" class="alert alert-danger"></div>
+
+  <!-- Section 3 content -->
+  <div id="section3">
+
+    <!-- 3a: Client counts -->
+    <div class="card-dark">
+      <h6>3(a) Number of Clients</h6>
+      <table class="fsa-table">
+        <thead><tr><th></th><th>Active</th><th>Inactive</th><th>Total</th></tr></thead>
+        <tbody>
+          <tr><td class="row-header">Beginning of Period (BOP)</td><td id="active-bop">—</td><td id="inactive-bop">—</td><td id="total-bop">—</td></tr>
+          <tr><td class="row-header">End of Period (EOP)</td><td id="active-eop">—</td><td id="inactive-eop">—</td><td id="total-eop">—</td></tr>
+          <tr class="total-row"><td class="row-header">Net Change</td><td id="net-active">—</td><td id="net-inactive">—</td><td id="net-total">—</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 3b-f: Period summary -->
+    <div class="card-dark">
+      <h6>3(b–f) Period Summary</h6>
+      <table class="fsa-table">
+        <thead><tr><th></th><th>Count / Value</th></tr></thead>
+        <tbody>
+          <tr><td class="row-header">(b) New clients during the quarter</td><td id="new-clients">—</td></tr>
+          <tr><td class="row-header">(c) Clients that ceased during the quarter</td><td id="ceased-clients">—</td></tr>
+          <tr><td class="row-header">(d) Clients' Funds (USD)</td><td id="clients-funds">—</td></tr>
+          <tr><td class="row-header">(e) Classification – Natural Persons</td><td id="classification">—</td></tr>
+          <tr><td class="row-header">(f) Classification – Legal Persons</td><td>0</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 3g: Age groups -->
+    <div class="card-dark">
+      <h6>3(g) Age Groups</h6>
+      <table class="fsa-table">
+        <thead><tr><th>Age Group</th><th>Count</th><th>%</th></tr></thead>
+        <tbody>
+          <tr><td class="row-header">Under 18</td><td id="age-u18">—</td><td id="pct-u18">—</td></tr>
+          <tr><td class="row-header">18 – 25</td><td id="age-18-25">—</td><td id="pct-18-25">—</td></tr>
+          <tr><td class="row-header">26 – 35</td><td id="age-26-35">—</td><td id="pct-26-35">—</td></tr>
+          <tr><td class="row-header">36 – 45</td><td id="age-36-45">—</td><td id="pct-36-45">—</td></tr>
+          <tr><td class="row-header">46 – 55</td><td id="age-46-55">—</td><td id="pct-46-55">—</td></tr>
+          <tr><td class="row-header">56 – 65</td><td id="age-56-65">—</td><td id="pct-56-65">—</td></tr>
+          <tr><td class="row-header">Over 65</td><td id="age-65p">—</td><td id="pct-65p">—</td></tr>
+          <tr class="total-row"><td class="row-header">Total</td><td id="age-total">—</td><td>100%</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div><!-- /section3 -->
+
+</div>
+</div>
+
+<script>
+(function(){
+  const yearSel = document.getElementById('year-select');
+  const qBtns = document.querySelectorAll('.q-btn');
+  const now = new Date();
+  const curYear = now.getFullYear();
+  const curQ = Math.ceil((now.getMonth()+1)/3);
+
+  // Populate years
+  for(let y=curYear; y>=2024; y--){
+    const o = document.createElement('option');
+    o.value = y; o.textContent = y;
+    yearSel.appendChild(o);
+  }
+  yearSel.value = curYear;
+
+  // Set current quarter active
+  qBtns.forEach(b => { if(+b.dataset.q === curQ) b.classList.add('active'); });
+
+  function getQ(){ return +document.querySelector('.q-btn.active')?.dataset.q || 1; }
+
+  qBtns.forEach(b => b.addEventListener('click', ()=>{
+    qBtns.forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    load();
+  }));
+  yearSel.addEventListener('change', load);
+
+  function fmt(n){ return n.toLocaleString('en-US'); }
+  function fmtUSD(n){ return '$' + n.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+  function pct(n, total){ return total ? (n/total*100).toFixed(1)+'%' : '0%'; }
+
+  function load(){
+    const year = +yearSel.value;
+    const quarter = getQ();
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('error-msg').style.display = 'none';
+    document.getElementById('section3').style.display = 'none';
+
+    fetch(`/api/fsa-report/section3?year=${year}&quarter=${quarter}`)
+      .then(r => r.json())
+      .then(d => {
+        if(d.error){ throw new Error(d.error); }
+        const c = d.counts;
+
+        // 3a: Client counts
+        document.getElementById('active-bop').textContent = fmt(c.active_bop);
+        document.getElementById('inactive-bop').textContent = fmt(c.inactive_bop);
+        document.getElementById('total-bop').textContent = fmt(c.active_bop + c.inactive_bop);
+        document.getElementById('active-eop').textContent = fmt(c.active_eop);
+        document.getElementById('inactive-eop').textContent = fmt(c.inactive_eop);
+        document.getElementById('total-eop').textContent = fmt(c.active_eop + c.inactive_eop);
+        document.getElementById('net-active').textContent = fmt(c.active_eop - c.active_bop);
+        document.getElementById('net-inactive').textContent = fmt(c.inactive_eop - c.inactive_bop);
+        document.getElementById('net-total').textContent = fmt((c.active_eop+c.inactive_eop) - (c.active_bop+c.inactive_bop));
+
+        // 3b-f
+        const newClients = (c.active_eop + c.inactive_eop) - (c.active_bop + c.inactive_bop);
+        const ceasedClients = 0; // No deletion tracking; net = new - ceased
+        document.getElementById('new-clients').textContent = fmt(Math.max(newClients, 0));
+        document.getElementById('ceased-clients').textContent = fmt(ceasedClients);
+        document.getElementById('clients-funds').textContent = fmtUSD(d.clients_funds);
+        document.getElementById('classification').textContent = fmt(c.active_eop + c.inactive_eop);
+
+        // 3g: Age groups
+        const ag = d.age_groups;
+        const ageKeys = [
+          ['under_18','u18'],['18_25','18-25'],['26_35','26-35'],['36_45','36-45'],
+          ['46_55','46-55'],['56_65','56-65'],['over_65','65p']
+        ];
+        let ageTotal = 0;
+        ageKeys.forEach(([k]) => { ageTotal += ag[k]; });
+        ageKeys.forEach(([k, id]) => {
+          document.getElementById('age-'+id).textContent = fmt(ag[k]);
+          document.getElementById('pct-'+id).textContent = pct(ag[k], ageTotal);
+        });
+        document.getElementById('age-total').textContent = fmt(ageTotal);
+
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('section3').style.display = 'block';
+      })
+      .catch(e => {
+        document.getElementById('loading').style.display = 'none';
+        const em = document.getElementById('error-msg');
+        em.textContent = e.message;
+        em.style.display = 'block';
+      });
+  }
+
+  load();
+
+  // Sidebar mobile toggle
+  const tog = document.getElementById('sidebar-toggle');
+  const sb = document.querySelector('.sidebar');
+  const ov = document.getElementById('sidebar-overlay');
+  if(tog){
+    tog.addEventListener('click', ()=>{ sb.classList.toggle('open'); ov.classList.toggle('show'); });
+    ov.addEventListener('click', ()=>{ sb.classList.remove('open'); ov.classList.remove('show'); });
+  }
+})();
+</script>
+</body>
+</html>
