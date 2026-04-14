@@ -1319,7 +1319,7 @@ def upsert_crm_users(df: pd.DataFrame):
                 WHERE id IN (3750, 3614);
                 UPDATE crm_users SET department_='Sales', team='Conversion', office='GMT', office_name='GMT'
                 WHERE id = 6119;
-                UPDATE crm_users SET department_='Sales', team='Conversion', office='ABJ-NG', office_name='ABJ Nigeria'
+                UPDATE crm_users SET department_='Excluded', team='Conversion', office='ABJ-NG', office_name='ABJ Nigeria'
                 WHERE id = 6479;
                 UPDATE crm_users SET department_='Excluded', team='Conversion', office='SA', office_name='South Africa'
                 WHERE id = 6492;
