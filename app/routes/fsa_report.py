@@ -119,10 +119,27 @@ async def fsa_report_section3(request: Request, year: int = 2026, quarter: int =
                 "over_65": age_row[6] or 0,
             }
 
+            # Query 4: Classification of active clients (PEP + total active EOP)
+            cur.execute(f"""
+                SELECT
+                  COUNT(*) AS total_active,
+                  SUM(CASE WHEN pep_sanctions = 1 THEN 1 ELSE 0 END) AS pep_count
+                FROM accounts
+                WHERE {base_filter}
+                  AND compliance_status IN ('4','9')
+                  AND createdtime < %(q_end_excl)s
+            """, {"q_end_excl": q_end_excl})
+            cls_row = cur.fetchone()
+            classification = {
+                "total_active": cls_row[0] or 0,
+                "pep": cls_row[1] or 0,
+            }
+
         return JSONResponse({
             "counts": counts,
             "clients_funds": clients_funds,
             "age_groups": age_groups,
+            "classification": classification,
         })
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)

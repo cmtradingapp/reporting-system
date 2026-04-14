@@ -167,6 +167,7 @@ def ensure_table():
             END IF;
         END $$;
         ALTER TABLE accounts ADD COLUMN IF NOT EXISTS classification_int SMALLINT;
+        ALTER TABLE accounts ADD COLUMN IF NOT EXISTS pep_sanctions SMALLINT;
         CREATE INDEX IF NOT EXISTS idx_accounts_classification_int ON accounts (classification_int);
 
         CREATE TABLE IF NOT EXISTS sync_log (

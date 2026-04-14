@@ -109,7 +109,8 @@ def get_accounts(hours: int = 24) -> pd.DataFrame:
                 IF(u.date_of_birth < '1900-01-01', NULL, u.date_of_birth)  AS birth_date,
                 IFNULL(uair.cf_customer_id, u.id)                          AS customer_id,
                 UPPER(crmdb.app.display_name)                              AS regulation,
-                uair.sales_client_potential
+                uair.sales_client_potential,
+                u.pep_sanctions
             FROM crmdb.users u
             LEFT JOIN crmdb.user_additional_info_rel uair ON (u.id = uair.user_id)
             LEFT JOIN crmdb.aggregated_user_data aud ON (u.id = aud.user_id AND 0 <> aud.latest)
@@ -198,7 +199,8 @@ def get_accounts_full():
                     IF(u.date_of_birth < '1900-01-01', NULL, u.date_of_birth)  AS birth_date,
                     IFNULL(uair.cf_customer_id, u.id)                          AS customer_id,
                     UPPER(crmdb.app.display_name)                              AS regulation,
-                    uair.sales_client_potential
+                    uair.sales_client_potential,
+                    u.pep_sanctions
                 FROM crmdb.users u
                 LEFT JOIN crmdb.user_additional_info_rel uair ON (u.id = uair.user_id)
                 LEFT JOIN crmdb.aggregated_user_data aud ON (u.id = aud.user_id AND 0 <> aud.latest)
@@ -290,7 +292,8 @@ def get_accounts_by_qual_date(from_date: str) -> pd.DataFrame:
                 IF(u.date_of_birth < '1900-01-01', NULL, u.date_of_birth)  AS birth_date,
                 IFNULL(uair.cf_customer_id, u.id)                          AS customer_id,
                 UPPER(crmdb.app.display_name)                              AS regulation,
-                uair.sales_client_potential
+                uair.sales_client_potential,
+                u.pep_sanctions
             FROM crmdb.users u
             LEFT JOIN crmdb.user_additional_info_rel uair ON (u.id = uair.user_id)
             LEFT JOIN crmdb.aggregated_user_data aud ON (u.id = aud.user_id AND 0 <> aud.latest)
@@ -374,7 +377,8 @@ def get_accounts_by_created_date(from_date: str) -> pd.DataFrame:
                 IF(u.date_of_birth < '1900-01-01', NULL, u.date_of_birth)  AS birth_date,
                 IFNULL(uair.cf_customer_id, u.id)                          AS customer_id,
                 UPPER(crmdb.app.display_name)                              AS regulation,
-                uair.sales_client_potential
+                uair.sales_client_potential,
+                u.pep_sanctions
             FROM crmdb.users u
             LEFT JOIN crmdb.user_additional_info_rel uair ON (u.id = uair.user_id)
             LEFT JOIN crmdb.aggregated_user_data aud ON (u.id = aud.user_id AND 0 <> aud.latest)

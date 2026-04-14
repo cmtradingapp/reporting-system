@@ -226,6 +226,36 @@
       </table>
     </div>
 
+    <!-- 3h: Classification of Active Clients -->
+    <div class="card-dark" style="overflow-x:auto;">
+      <h6>3(h) Classification of Active Clients</h6>
+      <table class="fsa-table age-table">
+        <thead>
+          <tr>
+            <th>Client Type</th>
+            <th colspan="2">Natural Person</th>
+            <th colspan="2">Legal Entities</th>
+            <th colspan="2">Total</th>
+          </tr>
+          <tr>
+            <th></th>
+            <th>Number</th><th>Proportion</th>
+            <th>Number</th><th>Proportion</th>
+            <th>Number</th><th>Proportion</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="row-header">Politically Exposed Persons (PEP)</td><td id="cls-pep">—</td><td id="cls-pep-pct">—</td><td>0</td><td>0.00%</td><td id="cls-pep-total">—</td><td id="cls-pep-total-pct">—</td></tr>
+          <tr><td class="row-header">From FATF High Risk Countries</td><td>0</td><td>0.00%</td><td>0</td><td>0.00%</td><td>0</td><td>0.00%</td></tr>
+          <tr><td class="row-header">Featured on the EU Sanction List</td><td>0</td><td>0.00%</td><td>0</td><td>0.00%</td><td>0</td><td>0.00%</td></tr>
+          <tr><td class="row-header">Non-Face-to-Face</td><td id="cls-nftf">—</td><td id="cls-nftf-pct">—</td><td>0</td><td>0.00%</td><td id="cls-nftf-total">—</td><td id="cls-nftf-total-pct">—</td></tr>
+          <tr><td class="row-header">High Net Worth</td><td>0</td><td>0.00%</td><td>0</td><td>0.00%</td><td>0</td><td>0.00%</td></tr>
+          <tr><td class="row-header">Institutional Investors</td><td>0</td><td>0.00%</td><td>0</td><td>0.00%</td><td>0</td><td>0.00%</td></tr>
+          <tr><td class="row-header">Convicted or under investigation of any financial crime</td><td>0</td><td>0.00%</td><td>0</td><td>0.00%</td><td>0</td><td>0.00%</td></tr>
+        </tbody>
+      </table>
+    </div>
+
   </div><!-- /section3 -->
 
 </div>
@@ -320,6 +350,19 @@
           document.getElementById('pct-'+id).textContent = pct(ag[k], ageTotal);
         });
         // age-total row removed (horizontal layout)
+
+        // 3h: Classification of active clients
+        const cls = d.classification;
+        const ta = cls.total_active;
+        document.getElementById('cls-pep').textContent = fmt(cls.pep);
+        document.getElementById('cls-pep-pct').textContent = pct(cls.pep, ta);
+        document.getElementById('cls-pep-total').textContent = fmt(cls.pep);
+        document.getElementById('cls-pep-total-pct').textContent = pct(cls.pep, ta);
+        // Non-Face-to-Face = all active clients (online broker)
+        document.getElementById('cls-nftf').textContent = fmt(ta);
+        document.getElementById('cls-nftf-pct').textContent = '100.00%';
+        document.getElementById('cls-nftf-total').textContent = fmt(ta);
+        document.getElementById('cls-nftf-total-pct').textContent = '100.00%';
 
         document.getElementById('loading').style.display = 'none';
         document.getElementById('section3').style.display = 'block';
