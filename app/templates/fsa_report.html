@@ -247,8 +247,15 @@
   }
   yearSel.value = curYear;
 
-  // Set current quarter active
-  qBtns.forEach(b => { if(+b.dataset.q === curQ) b.classList.add('active'); });
+  // Default to last completed quarter (or Q1 if none completed yet)
+  const defaultQ = curQ > 1 ? curQ - 1 : 1;
+  qBtns.forEach(b => { if(+b.dataset.q === defaultQ) b.classList.add('active'); });
+
+  // When year changes, pick sensible default quarter
+  function pickDefaultQ(year) {
+    if(year < curYear) { return 4; }
+    return defaultQ;
+  }
 
   function getQ(){ return +document.querySelector('.q-btn.active')?.dataset.q || 1; }
 
@@ -257,7 +264,12 @@
     b.classList.add('active');
     load();
   }));
-  yearSel.addEventListener('change', load);
+  yearSel.addEventListener('change', ()=>{
+    const dq = pickDefaultQ(+yearSel.value);
+    qBtns.forEach(x => x.classList.remove('active'));
+    qBtns.forEach(b => { if(+b.dataset.q === dq) b.classList.add('active'); });
+    load();
+  });
 
   function fmt(n){ return n.toLocaleString('en-US'); }
   function fmtUSD(n){ return '$' + n.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}); }
