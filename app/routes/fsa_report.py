@@ -195,27 +195,42 @@ async def fsa_report_section4(request: Request, year: int = 2026, quarter: int =
             for row in cur.fetchall():
                 country_counts[row[0]] = {"active": row[1] or 0, "inactive": row[2] or 0}
 
-            # Query 2: Trading value (notional_value) per country during the quarter
-            # All instruments are CFDs for this broker
-            cur.execute(f"""
-                SELECT
-                  a.country_iso,
-                  COALESCE(SUM(t.notional_value), 0) AS trading_value
-                FROM dealio_trades_mt4 t
+            # Query 2: Trading value = open volume (by open_time) + close volume (by close_time)
+            trade_join = f"""
                 JOIN trading_accounts ta ON ta.login::bigint = t.login
                 JOIN accounts a ON a.accountid = ta.vtigeraccountid
-                WHERE t.close_time >= %(q_start)s
-                  AND t.close_time < %(q_end_excl)s
-                  AND t.cmd IN (0, 1)
-                  AND t.symbol NOT IN %(excl)s
-                  AND {base_filter}
-                  AND a.country_iso IN %(countries)s
+            """
+            trade_where = f"""
+                AND t.cmd IN (0, 1)
+                AND t.symbol NOT IN %(excl)s
+                AND {base_filter}
+                AND a.country_iso IN %(countries)s
+            """
+            params = {"q_start": q_start, "q_end_excl": q_end_excl,
+                      "countries": FSA_COUNTRIES, "excl": EXCLUDED_SYMBOLS}
+
+            # Open volume (trades opened during quarter)
+            cur.execute(f"""
+                SELECT a.country_iso, COALESCE(SUM(t.notional_value), 0)
+                FROM dealio_trades_mt4 t {trade_join}
+                WHERE t.open_time >= %(q_start)s AND t.open_time < %(q_end_excl)s
+                  {trade_where}
                 GROUP BY a.country_iso
-            """, {"q_start": q_start, "q_end_excl": q_end_excl,
-                  "countries": FSA_COUNTRIES, "excl": EXCLUDED_SYMBOLS})
+            """, params)
             country_volume = {}
             for row in cur.fetchall():
                 country_volume[row[0]] = float(row[1] or 0)
+
+            # Close volume (trades closed during quarter)
+            cur.execute(f"""
+                SELECT a.country_iso, COALESCE(SUM(t.notional_value), 0)
+                FROM dealio_trades_mt4 t {trade_join}
+                WHERE t.close_time >= %(q_start)s AND t.close_time < %(q_end_excl)s
+                  {trade_where}
+                GROUP BY a.country_iso
+            """, params)
+            for row in cur.fetchall():
+                country_volume[row[0]] = country_volume.get(row[0], 0) + float(row[1] or 0)
 
         # Build response per country
         countries = []
