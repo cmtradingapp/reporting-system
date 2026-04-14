@@ -152,10 +152,10 @@
   <!-- Section 3 content -->
   <div id="section3">
 
-    <div class="row g-3 mb-0">
+    <div class="row g-3 mb-3">
       <!-- 3a: Client counts -->
       <div class="col-lg-6">
-        <div class="card-dark" style="margin-bottom:0;">
+        <div class="card-dark h-100" style="margin-bottom:0;">
           <h6>3(a) Number of Clients</h6>
           <table class="fsa-table">
             <thead><tr><th></th><th style="text-align:right">Active</th><th style="text-align:right">Inactive</th><th style="text-align:right">Total</th></tr></thead>
@@ -169,7 +169,7 @@
       </div>
       <!-- 3b-f: Period summary -->
       <div class="col-lg-6">
-        <div class="card-dark" style="margin-bottom:0;">
+        <div class="card-dark h-100" style="margin-bottom:0;">
           <h6>3(b–f) Period Summary</h6>
           <table class="fsa-table">
             <thead><tr><th></th><th style="text-align:right">Value</th></tr></thead>
@@ -199,6 +199,7 @@
             <th>46 to 55<br>Years</th>
             <th>56 to 65<br>Years</th>
             <th>66+<br>Years</th>
+            <th>Total</th>
           </tr>
         </thead>
         <tbody>
@@ -211,6 +212,7 @@
             <td id="age-46-55">—</td>
             <td id="age-56-65">—</td>
             <td id="age-65p">—</td>
+            <td id="age-total" style="font-weight:700">—</td>
           </tr>
           <tr class="age-pct-row">
             <td class="row-header">Proportion</td>
@@ -221,6 +223,7 @@
             <td id="pct-46-55">—</td>
             <td id="pct-56-65">—</td>
             <td id="pct-65p">—</td>
+            <td style="font-weight:700">100%</td>
           </tr>
         </tbody>
       </table>
@@ -349,7 +352,7 @@
           document.getElementById('age-'+id).textContent = fmt(ag[k]);
           document.getElementById('pct-'+id).textContent = pct(ag[k], ageTotal);
         });
-        // age-total row removed (horizontal layout)
+        document.getElementById('age-total').textContent = fmt(ageTotal);
 
         // 3h: Classification of active clients
         const cls = d.classification;
