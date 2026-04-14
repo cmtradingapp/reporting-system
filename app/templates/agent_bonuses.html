@@ -1260,6 +1260,12 @@
 
     const tbody = document.getElementById('sales-tbody');
     const tfoot = document.getElementById('sales-tfoot');
+    // Capture expanded offices before clearing
+    const salExpandedOffices = new Set();
+    tbody.querySelectorAll('tr.office-row').forEach(tr => {
+      if (tr.querySelector('.chevron')?.classList.contains('open'))
+        salExpandedOffices.add(tr.dataset.officeName);
+    });
     tbody.innerHTML = '';
     tfoot.innerHTML = '';
 
@@ -1320,6 +1326,7 @@
       const offTr = document.createElement('tr');
       offTr.className = 'office-row';
       offTr.dataset.officeId = officeId;
+      offTr.dataset.officeName = office.officeName;
       offTr.innerHTML = `
         <td>
           <span class="chevron">&#9654;</span>
@@ -1380,6 +1387,13 @@
         tbody.appendChild(agTr);
       });
 
+      // Restore expand state
+      if (salExpandedOffices.has(office.officeName)) {
+        offTr.querySelector('.chevron').classList.add('open');
+        tbody.querySelectorAll(`tr.sales-agent-row[data-parent-office="${officeId}"]`)
+          .forEach(r => r.style.display = '');
+      }
+
       // Office click: toggle agent rows
       offTr.addEventListener('click', () => {
         const chevron = offTr.querySelector('.chevron');
@@ -1439,6 +1453,17 @@
 
     const tbody = document.getElementById('bonus-tbody');
     const tfoot = document.getElementById('bonus-tfoot');
+    // Capture expanded offices/depts before clearing
+    const bonExpandedOffices = new Set();
+    const bonExpandedDepts = new Set();
+    tbody.querySelectorAll('tr.office-row').forEach(tr => {
+      if (tr.querySelector('.chevron')?.classList.contains('open'))
+        bonExpandedOffices.add(tr.dataset.officeName);
+    });
+    tbody.querySelectorAll('tr.dept-row').forEach(tr => {
+      if (tr.querySelector('.chevron')?.classList.contains('open'))
+        bonExpandedDepts.add(tr.dataset.deptName);
+    });
     tbody.innerHTML = '';
     tfoot.innerHTML = '';
 
@@ -1501,6 +1526,7 @@
       const offTr = document.createElement('tr');
       offTr.className = 'office-row';
       offTr.dataset.officeId = officeId;
+      offTr.dataset.officeName = office.officeName;
       offTr.innerHTML = `
         <td>
           <span class="chevron">&#9654;</span>
@@ -1557,6 +1583,7 @@
         deptTr.className = 'dept-row';
         deptTr.dataset.parentOffice = officeId;
         deptTr.dataset.deptId = deptId;
+        deptTr.dataset.deptName = dept.deptName;
         deptTr.style.display = 'none';
         deptTr.innerHTML = `
           <td>
@@ -1628,6 +1655,20 @@
           agRows.forEach(r => r.style.display = isOpen ? 'none' : '');
         });
       });
+
+      // Restore expand state for retention
+      if (bonExpandedOffices.has(office.officeName)) {
+        offTr.querySelector('.chevron').classList.add('open');
+        tbody.querySelectorAll(`tr.dept-row[data-parent-office="${officeId}"]`).forEach(dTr => {
+          dTr.style.display = '';
+          const dName = dTr.dataset.deptName;
+          if (bonExpandedDepts.has(dName)) {
+            dTr.querySelector('.chevron')?.classList.add('open');
+            const dId = dTr.dataset.deptId;
+            tbody.querySelectorAll(`tr[data-parent-dept="${dId}"]`).forEach(r => r.style.display = '');
+          }
+        });
+      }
 
       // Office click: toggle dept rows (and hide children when closing)
       offTr.addEventListener('click', () => {

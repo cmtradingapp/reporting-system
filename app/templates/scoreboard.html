@@ -1188,9 +1188,26 @@
       `;
       tbody.appendChild(offTr);
 
-      // Agent sub-rows (hidden by default, sorted alphabetically)
-      const sortedAgents = [...office.agents].sort((a, b) =>
-        (a.agent_name || '').localeCompare(b.agent_name || ''));
+      // Agent sub-rows (sorted by active column)
+      const agentColMap = {
+        name: 'agent_name', targetTotal: 'target_ftc', ftdCountTotal: 'ftd_count',
+        ftd100Total: 'ftd100', total: 'ftc', ftd100RrTotal: 'ftd100_rr',
+        ftcRrTotal: 'ftc_rr', missingTo100RrFtd100Total: 'missing_to_100rr_ftd100',
+        missingTo100RrTotal: 'missing_to_100rr', ftd100RrPctTotal: 'ftd100_rr_pct',
+        ftcRrPctTotal: 'ftc_rr_pct', ftd100TgtPctTotal: 'ftd100_tgt_pct',
+        ftcTgtPctTotal: 'ftc_tgt_pct', netDepositsTotal: 'net_deposits',
+        needOnTargetTotal: 'need_on_target', missingTo100Total: 'missing_to_100',
+        perWdTotal: 'per_wd',
+      };
+      const sortedAgents = [...office.agents].sort((a, b) => {
+        if (sortState.col === 'name')
+          return sortState.dir === 'asc'
+            ? (a.agent_name || '').localeCompare(b.agent_name || '')
+            : (b.agent_name || '').localeCompare(a.agent_name || '');
+        const key = agentColMap[sortState.col] || 'ftc';
+        const av = a[key] ?? 0, bv = b[key] ?? 0;
+        return sortState.dir === 'desc' ? bv - av : av - bv;
+      });
       sortedAgents.forEach(r => {
         agentCount++;
         const ftcHtml  = r.ftc > 0
@@ -1790,9 +1807,26 @@
         `;
         tbody.appendChild(deptTr);
 
-        // Sort agents within dept alphabetically
-        const sortedAgents = [...dept.agents].sort((a, b) =>
-          (a.agent_name || '').localeCompare(b.agent_name || ''));
+        // Sort agents within dept by active column
+        const retAgentColMap = {
+          'ret-name': 'agent_name', 'ret-targetNet': 'target_net_prorated',
+          'ret-netRrPct': 'net_rr_pct', 'ret-miss100Rr': 'missing_100_rr',
+          'ret-depUsd': 'deposit_usd', 'ret-stdCount': 'std_count',
+          'ret-netUsd': 'net_usd', 'ret-netRr': 'net_rr',
+          'ret-netTgtPct': 'target_net_pct', 'ret-openVol': 'open_volume_usd',
+          'ret-volRr': 'vol_rr', 'ret-volRrPct': 'target_vol_rr_pct',
+          'ret-needOnTgt': 'need_on_target', 'ret-miss100': 'missing_100',
+          'ret-perWd': 'per_wd', 'ret-rdpNet': 'rdp_net',
+        };
+        const sortedAgents = [...dept.agents].sort((a, b) => {
+          if (retSortState.col === 'ret-name')
+            return retSortState.dir === 'asc'
+              ? (a.agent_name || '').localeCompare(b.agent_name || '')
+              : (b.agent_name || '').localeCompare(a.agent_name || '');
+          const key = retAgentColMap[retSortState.col] || 'net_usd';
+          const av = a[key] ?? 0, bv = b[key] ?? 0;
+          return retSortState.dir === 'desc' ? bv - av : av - bv;
+        });
 
         // Agent rows (hidden by default)
         sortedAgents.forEach(r => {
