@@ -195,12 +195,13 @@ async def fsa_report_section4(request: Request, year: int = 2026, quarter: int =
             for row in cur.fetchall():
                 country_counts[row[0]] = {"active": row[1] or 0, "inactive": row[2] or 0}
 
-            # Query 2: Trading value = open volume (by open_time) + close volume (by close_time)
+            # Query 2: Trading value from dealio_trades_mt5
+            # open volume (entry=0, by open_time) + close volume (entry=1, by close_time)
             trade_join = f"""
                 JOIN trading_accounts ta ON ta.login::bigint = t.login
                 JOIN accounts a ON a.accountid = ta.vtigeraccountid
             """
-            trade_where = f"""
+            trade_base = f"""
                 AND t.cmd IN (0, 1)
                 AND t.symbol NOT IN %(excl)s
                 AND {base_filter}
@@ -209,24 +210,27 @@ async def fsa_report_section4(request: Request, year: int = 2026, quarter: int =
             params = {"q_start": q_start, "q_end_excl": q_end_excl,
                       "countries": FSA_COUNTRIES, "excl": EXCLUDED_SYMBOLS}
 
-            # Open volume (trades opened during quarter)
+            # Open volume (entry=0, filtered by open_time)
             cur.execute(f"""
                 SELECT a.country_iso, COALESCE(SUM(t.notional_value), 0)
-                FROM dealio_trades_mt4 t {trade_join}
+                FROM dealio_trades_mt5 t {trade_join}
                 WHERE t.open_time >= %(q_start)s AND t.open_time < %(q_end_excl)s
-                  {trade_where}
+                  AND t.entry = 0
+                  {trade_base}
                 GROUP BY a.country_iso
             """, params)
             country_volume = {}
             for row in cur.fetchall():
                 country_volume[row[0]] = float(row[1] or 0)
 
-            # Close volume (trades closed during quarter)
+            # Close volume (entry=1, filtered by close_time)
             cur.execute(f"""
                 SELECT a.country_iso, COALESCE(SUM(t.notional_value), 0)
-                FROM dealio_trades_mt4 t {trade_join}
+                FROM dealio_trades_mt5 t {trade_join}
                 WHERE t.close_time >= %(q_start)s AND t.close_time < %(q_end_excl)s
-                  {trade_where}
+                  AND t.entry = 1
+                  AND t.close_time > '1971-01-01'
+                  {trade_base}
                 GROUP BY a.country_iso
             """, params)
             for row in cur.fetchall():
