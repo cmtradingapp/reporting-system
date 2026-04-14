@@ -806,8 +806,10 @@
     const dNetRet    = fRet.reduce((s,r)   => s + (r.daily_net_usd ?? 0), 0);
     const dNet       = dNetSal + dNetRet;
     const netFmt = v => (v < 0 ? '-$' : '$') + Math.round(Math.abs(v)).toLocaleString();
-    document.getElementById('stat-grand-ftc').textContent    = ftc.toLocaleString();
-    document.getElementById('stat-grand-ftc-rr').textContent = Math.round(ftc / safeWdp * workingDays).toLocaleString();
+    const ftcEl = document.getElementById('stat-grand-ftc');
+    if (ftcEl) ftcEl.textContent = ftc.toLocaleString();
+    const ftcRrEl = document.getElementById('stat-grand-ftc-rr');
+    if (ftcRrEl) ftcRrEl.textContent = Math.round(ftc / safeWdp * workingDays).toLocaleString();
     const ftdRrEl = document.getElementById('stat-grand-ftd-rr');
     if (ftdRrEl) ftdRrEl.textContent = Math.round(ftd / safeWdp * workingDays).toLocaleString();
     const ftdEl = document.getElementById('stat-total-ftd');
@@ -1044,8 +1046,10 @@
   function updateStats(data) {
     const netFmt = v => (v < 0 ? '-$' : '$') + Math.round(Math.abs(v)).toLocaleString();
     const volFmt = v => Math.round(v).toLocaleString();
-    document.getElementById('stat-grand-ftc').textContent      = data.grand_ftc.toLocaleString();
-    document.getElementById('stat-grand-ftc-rr').textContent   = data.grand_ftc_rr.toLocaleString();
+    const ftcEl2 = document.getElementById('stat-grand-ftc');
+    if (ftcEl2) ftcEl2.textContent = data.grand_ftc.toLocaleString();
+    const ftcRrEl2 = document.getElementById('stat-grand-ftc-rr');
+    if (ftcRrEl2) ftcRrEl2.textContent = data.grand_ftc_rr.toLocaleString();
     const ftdRrEl = document.getElementById('stat-grand-ftd-rr');
     if (ftdRrEl) ftdRrEl.textContent = (data.grand_ftd_rr ?? 0).toLocaleString();
     const gNetEl2 = document.getElementById('stat-grand-net'); if (gNetEl2) gNetEl2.textContent = netFmt(data.grand_net);
