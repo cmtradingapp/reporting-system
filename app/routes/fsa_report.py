@@ -80,7 +80,7 @@ async def fsa_report_section3(request: Request, year: int = 2026, quarter: int =
             cur.execute(f"""
                 SELECT COALESCE(SUM(GREATEST(dez.end_equity_zeroed, 0)), 0)
                 FROM daily_equity_zeroed dez
-                JOIN trading_accounts ta ON ta.login = dez.login
+                JOIN trading_accounts ta ON ta.login::bigint = dez.login
                 JOIN accounts a ON a.accountid = ta.vtigeraccountid
                 WHERE dez.day = (
                     SELECT MAX(day) FROM daily_equity_zeroed WHERE day <= %(q_end)s
