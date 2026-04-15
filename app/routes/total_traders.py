@@ -70,15 +70,18 @@ async def total_traders_options(request: Request):
     if not _has_access(user):
         return JSONResponse(status_code=403, content={"detail": "Forbidden"})
 
-    _ck = "total_traders_opts_v1"
+    _ck = "total_traders_opts_v2"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
 
+    # All offices/teams where at least one Retention agent exists (matches the page filter).
     sql = """
         SELECT DISTINCT u.office_name, u.department
         FROM crm_users u
-        WHERE u.id IN (SELECT DISTINCT assigned_to FROM accounts WHERE assigned_to IS NOT NULL)
+        WHERE u.department_ = 'Retention'
+          AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%'
+          AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%'
     """
     conn = get_connection()
     try:
