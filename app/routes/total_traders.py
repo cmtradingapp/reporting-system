@@ -181,7 +181,7 @@ async def total_traders_api(
             ftc_groups_list = parsed
 
     def _ck_part(v): return ",".join(sorted(v)) if v else ""
-    _ck = (f"total_traders_v5:{date_from}:{end_date}:{_ck_part(f_office)}:{_ck_part(f_team)}"
+    _ck = (f"total_traders_v6:{date_from}:{end_date}:{_ck_part(f_office)}:{_ck_part(f_team)}"
            f":{f_classification}:{ftc_groups}")
     _hit = cache.get(_ck)
     if _hit is not None:
@@ -226,7 +226,6 @@ async def total_traders_api(
           {base_excl}
           AND d.open_time::date >= %(date_from)s
           AND d.open_time::date <  %(date_to_excl)s
-          AND EXTRACT(DOW FROM d.open_time::date) NOT IN (0,6)
           {filters_sql}
         GROUP BY 1
     """
@@ -254,7 +253,6 @@ async def total_traders_api(
           {base_excl}
           AND d.open_time::date >= %(date_from)s
           AND d.open_time::date <  %(date_to_excl)s
-          AND EXTRACT(DOW FROM d.open_time::date) NOT IN (0,6)
           {filters_sql}
     """
 
@@ -272,7 +270,6 @@ async def total_traders_api(
           {base_excl}
           AND t.confirmation_time::date >= %(date_from)s
           AND t.confirmation_time::date <  %(date_to_excl)s
-          AND EXTRACT(DOW FROM t.confirmation_time::date) NOT IN (0,6)
           {filters_sql}
         GROUP BY 1
     """
@@ -290,7 +287,6 @@ async def total_traders_api(
           {base_excl}
           AND t.confirmation_time::date >= %(date_from)s
           AND t.confirmation_time::date <  %(date_to_excl)s
-          AND EXTRACT(DOW FROM t.confirmation_time::date) NOT IN (0,6)
           {filters_sql}
     """
 
