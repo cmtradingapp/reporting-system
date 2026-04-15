@@ -377,13 +377,31 @@ def run_transaction_type_names_backfill_etl() -> dict:
 
 
 def run_dealio_users_etl(hours: int = 24) -> dict:
+    """Incremental sync: fetch rows with lastupdate > local MAX(lastupdate).
+
+    Falls back to `now - hours` if the local table is empty. The local max is
+    overlapped by 1 minute to avoid missing rows written with the same
+    lastupdate as the previous high-water mark.
+    """
     start = time.time()
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
     status = "success"
     error_msg = None
     rows = 0
+    # Determine incremental cutoff from local high-water mark
+    since = None
     try:
-        df = get_dealio_users(hours=hours)
+        with _pg_conn() as _c, _c.cursor() as _cur:
+            _cur.execute("SELECT MAX(lastupdate) FROM dealio_users")
+            row = _cur.fetchone()
+            if row and row[0]:
+                since = row[0] - timedelta(minutes=1)
+    except Exception:
+        since = None
+    if since is None:
+        since = datetime.now(timezone.utc) - timedelta(hours=hours)
+    cutoff = since
+    try:
+        df = get_dealio_users(since=since, statement_timeout_ms=120000)
         rows = len(df)
         upsert_dealio_users(df)
     except Exception as e:
@@ -393,7 +411,7 @@ def run_dealio_users_etl(hours: int = 24) -> dict:
     finally:
         duration_ms = int((time.time() - start) * 1000)
         log_sync("dealio_users", cutoff, rows, duration_ms, status, error_msg)
-    return {"status": status, "rows_synced": rows, "lookback_hours": hours}
+    return {"status": status, "rows_synced": rows, "since": str(cutoff)}
 
 
 def run_dealio_users_full_etl() -> dict:

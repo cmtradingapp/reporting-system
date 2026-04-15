@@ -90,9 +90,15 @@ _USERS_COLS = """
     isenabled
 """
 
-def get_dealio_users(hours: int = 24) -> pd.DataFrame:
-    """Fetch dealio.users updated within the last N hours."""
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+def get_dealio_users(hours: int = 24, since: datetime | None = None,
+                     statement_timeout_ms: int = 60000) -> pd.DataFrame:
+    """Fetch dealio.users updated since a cutoff.
+
+    If `since` is provided, uses it directly (incremental sync). Otherwise
+    falls back to `now - hours`. `statement_timeout_ms` overrides the
+    connection default so ETL backfills don't get killed at 10s.
+    """
+    cutoff = since if since is not None else (datetime.now(timezone.utc) - timedelta(hours=hours))
     sql = f"""
         SELECT {_USERS_COLS}
         FROM dealio.users
@@ -101,6 +107,8 @@ def get_dealio_users(hours: int = 24) -> pd.DataFrame:
     """
     conn = get_dealio_connection()
     try:
+        with conn.cursor() as _cur:
+            _cur.execute(f"SET statement_timeout={int(statement_timeout_ms)}")
         df = pd.read_sql(sql, conn, params={"cutoff": cutoff})
         return df
     finally:
