@@ -181,7 +181,7 @@ async def total_traders_api(
             ftc_groups_list = parsed
 
     def _ck_part(v): return ",".join(sorted(v)) if v else ""
-    _ck = (f"total_traders_v4:{date_from}:{end_date}:{_ck_part(f_office)}:{_ck_part(f_team)}"
+    _ck = (f"total_traders_v5:{date_from}:{end_date}:{_ck_part(f_office)}:{_ck_part(f_team)}"
            f":{f_classification}:{ftc_groups}")
     _hit = cache.get(_ck)
     if _hit is not None:
@@ -226,6 +226,7 @@ async def total_traders_api(
           {base_excl}
           AND d.open_time::date >= %(date_from)s
           AND d.open_time::date <  %(date_to_excl)s
+          AND EXTRACT(DOW FROM d.open_time::date) NOT IN (0,6)
           {filters_sql}
         GROUP BY 1
     """
@@ -253,6 +254,7 @@ async def total_traders_api(
           {base_excl}
           AND d.open_time::date >= %(date_from)s
           AND d.open_time::date <  %(date_to_excl)s
+          AND EXTRACT(DOW FROM d.open_time::date) NOT IN (0,6)
           {filters_sql}
     """
 
@@ -270,6 +272,7 @@ async def total_traders_api(
           {base_excl}
           AND t.confirmation_time::date >= %(date_from)s
           AND t.confirmation_time::date <  %(date_to_excl)s
+          AND EXTRACT(DOW FROM t.confirmation_time::date) NOT IN (0,6)
           {filters_sql}
         GROUP BY 1
     """
@@ -287,6 +290,7 @@ async def total_traders_api(
           {base_excl}
           AND t.confirmation_time::date >= %(date_from)s
           AND t.confirmation_time::date <  %(date_to_excl)s
+          AND EXTRACT(DOW FROM t.confirmation_time::date) NOT IN (0,6)
           {filters_sql}
     """
 
@@ -312,10 +316,12 @@ async def total_traders_api(
     labels, traders_series, deps_series = [], [], []
     cur_d = dt_from
     while cur_d <= dt_end:
-        key = cur_d.strftime("%Y-%m-%d")
-        labels.append(key)
-        traders_series.append(traders_map.get(key, 0))
-        deps_series.append(deps_map.get(key, 0))
+        # Skip weekends (Saturday=5, Sunday=6)
+        if cur_d.weekday() < 5:
+            key = cur_d.strftime("%Y-%m-%d")
+            labels.append(key)
+            traders_series.append(traders_map.get(key, 0))
+            deps_series.append(deps_map.get(key, 0))
         cur_d += timedelta(days=1)
 
     result = {
