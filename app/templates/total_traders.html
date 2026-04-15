@@ -338,7 +338,7 @@ function renderKPIs(d) {
 const _MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 function fmtDateLabel(iso) {
   const [y,m,dd] = iso.split('-').map(Number);
-  return `${_MONTHS[m-1]} ${dd}`;
+  return `${dd} ${_MONTHS[m-1]}`;
 }
 
 function renderChart(d) {
