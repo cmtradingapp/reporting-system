@@ -125,8 +125,10 @@ def _build_filters(office, team, classification, ftc_groups_list, params):
 @router.get("/api/total-traders")
 async def total_traders_api(
     request: Request,
+    date_from: str = None,
+    date_to: str = None,
     end_date: str = None,
-    days_back: int = 30,
+    days_back: int = None,
     f_office: Optional[List[str]] = Query(default=None),
     f_team: Optional[List[str]] = Query(default=None),
     f_classification: str = None,
@@ -138,17 +140,34 @@ async def total_traders_api(
     if not _has_access(user):
         return JSONResponse(status_code=403, content={"detail": "Forbidden"})
 
-    if not end_date:
-        end_date = datetime.now(_TZ).date().strftime("%Y-%m-%d")
     try:
-        dt_end = datetime.strptime(end_date, "%Y-%m-%d").date()
+        if date_from and date_to:
+            dt_from = datetime.strptime(date_from, "%Y-%m-%d").date()
+            dt_end  = datetime.strptime(date_to,   "%Y-%m-%d").date()
+            if dt_from > dt_end:
+                dt_from, dt_end = dt_end, dt_from
+        else:
+            if not end_date:
+                end_date = datetime.now(_TZ).date().strftime("%Y-%m-%d")
+            dt_end = datetime.strptime(end_date, "%Y-%m-%d").date()
+            days_back_val = max(1, min(int(days_back or 30), 365))
+            dt_from = dt_end - timedelta(days=days_back_val - 1)
     except ValueError:
-        return JSONResponse(status_code=400, content={"detail": "Invalid end_date"})
+        return JSONResponse(status_code=400, content={"detail": "Invalid date"})
 
-    days_back = max(1, min(int(days_back or 30), 365))
-    dt_from = dt_end - timedelta(days=days_back - 1)
+    # Apply optional "days back" shrink within the chosen range
+    if days_back:
+        try:
+            db = max(1, min(int(days_back), 365))
+            new_from = dt_end - timedelta(days=db - 1)
+            if new_from > dt_from:
+                dt_from = new_from
+        except (TypeError, ValueError):
+            pass
+
     dt_excl = dt_end + timedelta(days=1)
-    date_from = dt_from.strftime("%Y-%m-%d")
+    date_from    = dt_from.strftime("%Y-%m-%d")
+    end_date     = dt_end.strftime("%Y-%m-%d")
     date_to_excl = dt_excl.strftime("%Y-%m-%d")
 
     ftc_groups_list = None
@@ -159,7 +178,7 @@ async def total_traders_api(
             ftc_groups_list = parsed
 
     def _ck_part(v): return ",".join(sorted(v)) if v else ""
-    _ck = (f"total_traders_v1:{end_date}:{days_back}:{_ck_part(f_office)}:{_ck_part(f_team)}"
+    _ck = (f"total_traders_v2:{date_from}:{end_date}:{_ck_part(f_office)}:{_ck_part(f_team)}"
            f":{f_classification}:{ftc_groups}")
     _hit = cache.get(_ck)
     if _hit is not None:
@@ -288,7 +307,6 @@ async def total_traders_api(
     result = {
         "date_from": date_from,
         "date_to": end_date,
-        "days_back": days_back,
         "totals": {
             "traders": traders_total,
             "depositors": deps_total,

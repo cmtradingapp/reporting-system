@@ -26,6 +26,10 @@
     .filter-label { font-size: 0.78rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.8px; display: block; margin-bottom: 4px; }
     .group-cb-wrap { display: flex; align-items: center; gap: 5px; font-size: 0.8rem; color: #c9d1d9; white-space: nowrap; }
     .group-cb-wrap input[type=checkbox] { accent-color: #3fb950; width: 14px; height: 14px; cursor: pointer; }
+    .period-btn { background-color: #21262d; border: 1px solid #30363d; color: #8b949e; font-size: 0.82rem; padding: 5px 12px; border-radius: 6px; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+    .period-btn:hover { background-color: #2d333a; color: #c9d1d9; border-color: #484f58; }
+    .period-btn.active { background-color: rgba(35,134,54,0.25); border-color: #238636; color: #3fb950; font-weight: 600; }
+    .filter-sep { width: 1px; height: 28px; background-color: #30363d; margin: 0 6px; }
     .kpi-card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 20px 24px; display: flex; flex-direction: column; gap: 6px; min-height: 110px; }
     .kpi-label { font-size: 0.72rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; }
     .kpi-value { font-size: 2.1rem; font-weight: 700; color: #e0e0e0; font-variant-numeric: tabular-nums; }
@@ -109,14 +113,38 @@
 
   <!-- Filter bar -->
   <div class="filter-card">
+    <!-- Year + Month quick selectors -->
+    <div class="d-flex flex-wrap align-items-center gap-1 mb-3">
+      <button class="period-btn year-btn" data-year="2024">2024</button>
+      <button class="period-btn year-btn" data-year="2025">2025</button>
+      <button class="period-btn year-btn" data-year="2026">2026</button>
+      <div class="filter-sep"></div>
+      <button class="period-btn month-btn" data-month="1">Jan</button>
+      <button class="period-btn month-btn" data-month="2">Feb</button>
+      <button class="period-btn month-btn" data-month="3">Mar</button>
+      <button class="period-btn month-btn" data-month="4">Apr</button>
+      <button class="period-btn month-btn" data-month="5">May</button>
+      <button class="period-btn month-btn" data-month="6">Jun</button>
+      <button class="period-btn month-btn" data-month="7">Jul</button>
+      <button class="period-btn month-btn" data-month="8">Aug</button>
+      <button class="period-btn month-btn" data-month="9">Sep</button>
+      <button class="period-btn month-btn" data-month="10">Oct</button>
+      <button class="period-btn month-btn" data-month="11">Nov</button>
+      <button class="period-btn month-btn" data-month="12">Dec</button>
+    </div>
+
     <div class="d-flex align-items-end gap-3 flex-wrap mb-3">
       <div>
-        <label class="filter-label">End Date</label>
-        <input type="date" id="endDate" class="form-control" style="width:170px;" />
+        <label class="filter-label">From</label>
+        <input type="date" id="dateFrom" class="form-control" style="width:160px;" />
+      </div>
+      <div>
+        <label class="filter-label">To</label>
+        <input type="date" id="dateTo" class="form-control" style="width:160px;" />
       </div>
       <div>
         <label class="filter-label">Days Back</label>
-        <input type="number" id="daysBack" class="form-control" style="width:110px;" min="1" max="365" value="30" />
+        <input type="number" id="daysBack" class="form-control" style="width:110px;" min="1" max="365" placeholder="—" />
       </div>
       <div>
         <label class="filter-label">Office</label>
@@ -191,6 +219,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 <script>
 const fmt = n => (n ?? 0).toLocaleString('en-US');
 let chart = null;
@@ -246,20 +275,43 @@ async function loadOptions() {
   sddTeam.setOptions(d.teams || []);
 }
 
+const pad = n => String(n).padStart(2,'0');
+const todayStr = () => { const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
+const firstOfMonth = (y,m) => `${y}-${pad(m)}-01`;
+const lastOfMonth  = (y,m) => { const d=new Date(y,m,0); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
+
+const state = { year: new Date().getFullYear(), month: new Date().getMonth()+1 };
+
+function activateYear(y) { document.querySelectorAll('.year-btn').forEach(b => b.classList.toggle('active', parseInt(b.dataset.year)===y)); }
+function activateMonth(m) { document.querySelectorAll('.month-btn').forEach(b => b.classList.toggle('active', parseInt(b.dataset.month)===m)); }
+
+function applyYearMonth(y, m) {
+  state.year = y; state.month = m;
+  activateYear(y); activateMonth(m);
+  const now = new Date();
+  const isCur = (y === now.getFullYear() && m === now.getMonth()+1);
+  document.getElementById('dateFrom').value = firstOfMonth(y, m);
+  document.getElementById('dateTo').value   = isCur ? todayStr() : lastOfMonth(y, m);
+  document.getElementById('daysBack').value = '';
+}
+
 function initDates() {
-  const today = new Date();
-  document.getElementById('endDate').value = today.toISOString().slice(0,10);
+  applyYearMonth(state.year, state.month);
+  document.querySelectorAll('.year-btn').forEach(btn => btn.addEventListener('click', () => { applyYearMonth(parseInt(btn.dataset.year), state.month); loadData(); }));
+  document.querySelectorAll('.month-btn').forEach(btn => btn.addEventListener('click', () => { applyYearMonth(state.year, parseInt(btn.dataset.month)); loadData(); }));
 }
 
 async function loadData() {
   const spin = document.getElementById('spinner');
   spin.classList.add('active');
   try {
-    const endDate = document.getElementById('endDate').value;
-    const daysBack = document.getElementById('daysBack').value || 30;
+    const dateFrom = document.getElementById('dateFrom').value;
+    const dateTo   = document.getElementById('dateTo').value;
+    const daysBack = document.getElementById('daysBack').value;
     const params = new URLSearchParams();
-    if (endDate) params.set('end_date', endDate);
-    params.set('days_back', daysBack);
+    if (dateFrom) params.set('date_from', dateFrom);
+    if (dateTo)   params.set('date_to', dateTo);
+    if (daysBack) params.set('days_back', daysBack);
     sddOffice.getValues().forEach(v => params.append('f_office', v));
     sddTeam.getValues().forEach(v => params.append('f_team', v));
     const cls = document.getElementById('filterClass').value;
@@ -283,21 +335,40 @@ function renderKPIs(d) {
   document.getElementById('kpiPeriod').textContent = d.date_from + ' → ' + d.date_to;
 }
 
+const _MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+function fmtDateLabel(iso) {
+  const [y,m,dd] = iso.split('-').map(Number);
+  return `${_MONTHS[m-1]} ${dd}`;
+}
+
 function renderChart(d) {
   const ctx = document.getElementById('chart').getContext('2d');
   if (chart) chart.destroy();
+  const labels = d.series.labels.map(fmtDateLabel);
   chart = new Chart(ctx, {
-    type: 'line',
+    plugins: [ChartDataLabels],
     data: {
-      labels: d.series.labels,
+      labels: labels,
       datasets: [
-        { label: 'Traders',    data: d.series.traders,    borderColor: '#3fb950', backgroundColor: 'rgba(63,185,80,0.15)', tension: 0.25, fill: true, pointRadius: 2 },
-        { label: 'Depositors', data: d.series.depositors, borderColor: '#58a6ff', backgroundColor: 'rgba(88,166,255,0.10)', tension: 0.25, fill: true, pointRadius: 2 },
+        {
+          type: 'bar', label: 'Depositors', data: d.series.depositors,
+          backgroundColor: 'rgba(88,166,255,0.55)', borderColor: '#58a6ff', borderWidth: 1, order: 2,
+          datalabels: { anchor: 'end', align: 'top', color: '#58a6ff', font: { size: 10, weight: '600' },
+                        formatter: v => v > 0 ? v.toLocaleString('en-US') : '' }
+        },
+        {
+          type: 'line', label: 'Traders', data: d.series.traders,
+          borderColor: '#3fb950', backgroundColor: 'rgba(63,185,80,0.15)', tension: 0.25, fill: true,
+          pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: '#3fb950', pointBorderColor: '#0f1117', pointBorderWidth: 1.5, order: 1,
+          datalabels: { anchor: 'end', align: 'top', color: '#3fb950', font: { size: 10, weight: '600' },
+                        formatter: v => v > 0 ? v.toLocaleString('en-US') : '' }
+        },
       ]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      layout: { padding: { top: 20 } },
       plugins: {
         legend: { labels: { color: '#c9d1d9' } },
         tooltip: { mode: 'index', intersect: false },
