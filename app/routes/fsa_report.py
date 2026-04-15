@@ -9,6 +9,10 @@ router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
 FSA_COUNTRIES = ('CM','KE','SE','ZM','DK','NL','ES','FI','NO')
+# Aruba (AW) is a constituent country of the Kingdom of the Netherlands.
+# Included in filters so its clients are counted, but rolled up under NL for display
+# (Section 4 uses CASE to normalize AW -> NL; display loop still shows 9 countries).
+FSA_COUNTRIES_FILTER = FSA_COUNTRIES + ('AW',)
 FSA_COUNTRY_NAMES = {
     'CM': 'Cameroon', 'KE': 'Kenya', 'SE': 'Sweden', 'ZM': 'Zambia',
     'DK': 'Denmark', 'NL': 'Netherlands', 'ES': 'Spain', 'FI': 'Finland', 'NO': 'Norway',
@@ -65,7 +69,7 @@ async def fsa_report_section3(request: Request, year: int = 2026, quarter: int =
         funded = 1
         AND is_test_account = 0
         AND (sales_rep_id IS NULL OR sales_rep_id != 3303)
-        AND country_iso IN ('CM','KE','SE','ZM','DK','NL','ES','FI','NO')
+        AND country_iso IN ('CM','KE','SE','ZM','DK','NL','ES','FI','NO','AW')
     """
 
     conn = get_connection()
@@ -101,7 +105,7 @@ async def fsa_report_section3(request: Request, year: int = 2026, quarter: int =
                 )
                   AND a.is_test_account = 0
                   AND (a.sales_rep_id IS NULL OR a.sales_rep_id != 3303)
-                  AND a.country_iso IN ('CM','KE','SE','ZM','DK','NL','ES','FI','NO')
+                  AND a.country_iso IN ('CM','KE','SE','ZM','DK','NL','ES','FI','NO','AW')
             """, {"q_end": q_end})
             clients_funds = float(cur.fetchone()[0])
 
@@ -180,17 +184,18 @@ async def fsa_report_section4(request: Request, year: int = 2026, quarter: int =
     try:
         with conn.cursor() as cur:
             # Query 1: Active/Inactive counts per country at EOP
+            # Map AW -> NL so Aruba clients are counted under Netherlands
             cur.execute(f"""
                 SELECT
-                  a.country_iso,
+                  CASE WHEN a.country_iso = 'AW' THEN 'NL' ELSE a.country_iso END AS country_iso,
                   SUM(CASE WHEN a.compliance_status IN ('4','9') THEN 1 ELSE 0 END) AS active,
                   SUM(CASE WHEN a.compliance_status NOT IN ('4','9') THEN 1 ELSE 0 END) AS inactive
                 FROM accounts a
                 WHERE {base_filter}
                   AND a.createdtime < %(q_end_excl)s
                   AND a.country_iso IN %(countries)s
-                GROUP BY a.country_iso
-            """, {"q_end_excl": q_end_excl, "countries": FSA_COUNTRIES})
+                GROUP BY CASE WHEN a.country_iso = 'AW' THEN 'NL' ELSE a.country_iso END
+            """, {"q_end_excl": q_end_excl, "countries": FSA_COUNTRIES_FILTER})
             country_counts = {}
             for row in cur.fetchall():
                 country_counts[row[0]] = {"active": row[1] or 0, "inactive": row[2] or 0}
@@ -208,30 +213,32 @@ async def fsa_report_section4(request: Request, year: int = 2026, quarter: int =
                 AND a.country_iso IN %(countries)s
             """
             params = {"q_start": q_start, "q_end_excl": q_end_excl,
-                      "countries": FSA_COUNTRIES, "excl": EXCLUDED_SYMBOLS}
+                      "countries": FSA_COUNTRIES_FILTER, "excl": EXCLUDED_SYMBOLS}
 
-            # Open volume (entry=0, filtered by open_time)
+            # Open volume (entry=0, filtered by open_time); AW rolled into NL
             cur.execute(f"""
-                SELECT a.country_iso, COALESCE(SUM(t.notional_value), 0)
+                SELECT CASE WHEN a.country_iso = 'AW' THEN 'NL' ELSE a.country_iso END AS country_iso,
+                       COALESCE(SUM(t.notional_value), 0)
                 FROM dealio_trades_mt5 t {trade_join}
                 WHERE t.open_time >= %(q_start)s AND t.open_time < %(q_end_excl)s
                   AND t.entry = 0
                   {trade_base}
-                GROUP BY a.country_iso
+                GROUP BY CASE WHEN a.country_iso = 'AW' THEN 'NL' ELSE a.country_iso END
             """, params)
             country_volume = {}
             for row in cur.fetchall():
                 country_volume[row[0]] = float(row[1] or 0)
 
-            # Close volume (entry=1, filtered by close_time)
+            # Close volume (entry=1, filtered by close_time); AW rolled into NL
             cur.execute(f"""
-                SELECT a.country_iso, COALESCE(SUM(t.notional_value), 0)
+                SELECT CASE WHEN a.country_iso = 'AW' THEN 'NL' ELSE a.country_iso END AS country_iso,
+                       COALESCE(SUM(t.notional_value), 0)
                 FROM dealio_trades_mt5 t {trade_join}
                 WHERE t.close_time >= %(q_start)s AND t.close_time < %(q_end_excl)s
                   AND t.entry = 1
                   AND t.close_time > '1971-01-01'
                   {trade_base}
-                GROUP BY a.country_iso
+                GROUP BY CASE WHEN a.country_iso = 'AW' THEN 'NL' ELSE a.country_iso END
             """, params)
             for row in cur.fetchall():
                 country_volume[row[0]] = country_volume.get(row[0], 0) + float(row[1] or 0)
