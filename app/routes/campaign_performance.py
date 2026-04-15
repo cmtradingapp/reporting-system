@@ -420,23 +420,39 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
 
             base_p = {"date_from": date_from, "date_to_excl": date_to_exclusive,
                       **qual_params, **camp_filter_params}
+            # Traders logic (matches FTC Date report): accounts with at least one trade
+            # (open position or closed trade pair from dealio_trades_mt5) having
+            # notional_value > 0 and open_time::date within the period.
             cur.execute(f"""
-                SELECT COUNT(DISTINCT t.vtigeraccountid)
-                FROM transactions t
-                JOIN accounts a  ON a.accountid = t.vtigeraccountid
+                WITH traded AS (
+                    SELECT DISTINCT ta.vtigeraccountid AS accountid
+                    FROM (
+                        SELECT p.login, p.notional_value, p.open_time
+                        FROM dealio_positions p
+                        UNION ALL
+                        SELECT ex.login, ex.notional_value, en.open_time
+                        FROM dealio_trades_mt5 ex
+                        JOIN dealio_trades_mt5 en
+                            ON en.position_id = ex.position_id
+                           AND en.source_id   = ex.source_id
+                           AND en.entry       = 0
+                        WHERE ex.entry = 1
+                          AND ex.close_time > '1971-01-01'
+                    ) d
+                    JOIN trading_accounts ta ON ta.login::bigint = d.login::bigint
+                    WHERE d.notional_value > 0
+                      AND ta.vtigeraccountid IS NOT NULL
+                      AND ta.vtigeraccountid::text != ''
+                      AND d.open_time::date >= %(date_from)s
+                      AND d.open_time::date <  %(date_to_excl)s
+                )
+                SELECT COUNT(DISTINCT a.accountid)
+                FROM traded tr
+                JOIN accounts a ON a.accountid = tr.accountid
                 {camp_join}
-                LEFT JOIN crm_users u ON u.id = t.original_deposit_owner
-                WHERE t.transactionapproval = 'Approved'
-                  AND (t.deleted = 0 OR t.deleted IS NULL)
-                  AND t.transaction_type_name IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
-                  AND t.vtigeraccountid IS NOT NULL
-                  AND a.is_test_account = 0
-                  {_TXN_ACCT_FILTERS}
-                  AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
-                  AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
-                  AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'
-                  AND t.confirmation_time::date >= %(date_from)s
-                  AND t.confirmation_time::date <  %(date_to_excl)s
+                {kpi_cu_join}
+                WHERE a.is_test_account = 0
+                {_ACCT_FILTERS}
                 {extra_where}
                 {camp_filter_where}
             """, base_p)
@@ -480,7 +496,7 @@ async def campaign_performance_api(
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
     def _ck_part(v): return ','.join(sorted(v)) if v else ''
-    _ck = (f"camp_perf_v10:{date_from}:{date_to}:{f_classification}:{q_date_from}:{q_date_to}"
+    _ck = (f"camp_perf_v11:{date_from}:{date_to}:{f_classification}:{q_date_from}:{q_date_to}"
            f":{_ck_part(f_mkt_group)}:{_ck_part(f_legacy_id)}:{_ck_part(f_campaign_name)}"
            f":{_ck_part(f_channel)}:{_ck_part(f_sub_channel)}:{_ck_part(f_affiliate)}"
            f":{_ck_part(f_country)}:{_ck_part(f_office)}:{_ck_part(f_agent)}:{_ck_part(f_team)}"
@@ -730,7 +746,6 @@ def _camp_table_calc(
                 " THEN t.usdamount ELSE 0 END), 0) AS deposits",
                 "COALESCE(SUM(CASE WHEN t.transaction_type_name IN ('Withdrawal', 'Deposit Cancelled')"
                 " THEN t.usdamount ELSE 0 END), 0) AS withdrawals",
-                "COUNT(DISTINCT t.vtigeraccountid) AS traders",
             ]
             txn_sql = (
                 f"SELECT {', '.join(txn_sel)}"
@@ -789,6 +804,62 @@ def _camp_table_calc(
             cur.execute(ftc_sql, ftc_params)
             ftc_rows = cur.fetchall()
 
+            # ── Traders query (matches FTC Date logic: real trades) ───────
+            traders_params = {"date_from": date_from, "date_to_excl": date_to_exclusive}
+            traders_filter_where, _, _ = _build_filter_clauses(
+                f_mkt_group, f_legacy_id, f_campaign_name, f_channel, f_sub_channel,
+                f_affiliate, f_classification, ftc_groups_list, date_to, traders_params,
+                q_date_from=q_date_from, q_date_to_excl=q_date_to_excl,
+                f_country=f_country, f_office=f_office, f_agent=f_agent, f_team=f_team,
+                f_segmentation=f_segmentation
+            )
+            if period == "day":
+                tr_period_sql = "d.open_time::date"
+            elif period == "month":
+                tr_period_sql = "date_trunc('month', d.open_time)::date"
+            elif period == "year":
+                tr_period_sql = "date_trunc('year', d.open_time)::date"
+            else:
+                tr_period_sql = ""
+
+            tr_sel, tr_grp = [], []
+            p = 1
+            if has_period: tr_sel.append(f"{tr_period_sql} AS period"); tr_grp.append(str(p)); p += 1
+            if has_g1: tr_sel.append(f"{g1_sql} AS g1"); tr_grp.append(str(p)); p += 1
+            if has_g2: tr_sel.append(f"{g2_sql} AS g2"); tr_grp.append(str(p)); p += 1
+            tr_sel.append("COUNT(DISTINCT a.accountid) AS traders")
+
+            traders_sql = (
+                "WITH d AS ("
+                "  SELECT p.login, p.notional_value, p.open_time FROM dealio_positions p"
+                "  UNION ALL"
+                "  SELECT ex.login, ex.notional_value, en.open_time"
+                "    FROM dealio_trades_mt5 ex"
+                "    JOIN dealio_trades_mt5 en"
+                "      ON en.position_id = ex.position_id"
+                "     AND en.source_id   = ex.source_id"
+                "     AND en.entry       = 0"
+                "   WHERE ex.entry = 1 AND ex.close_time > '1971-01-01'"
+                ") "
+                f"SELECT {', '.join(tr_sel)}"
+                " FROM d"
+                " JOIN trading_accounts ta ON ta.login::bigint = d.login::bigint"
+                " JOIN accounts a ON a.accountid = ta.vtigeraccountid"
+                " LEFT JOIN campaigns c ON SPLIT_PART(a.campaign, '.', 1) = c.crmid"
+                f"{extra_joins}"
+                " WHERE d.notional_value > 0"
+                "   AND ta.vtigeraccountid IS NOT NULL AND ta.vtigeraccountid::text != ''"
+                "   AND a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)"
+                "   AND d.open_time::date >= %(date_from)s"
+                "   AND d.open_time::date <  %(date_to_excl)s"
+                + _ACCT_FILTERS +
+                f"\n{traders_filter_where}"
+            )
+            if tr_grp:
+                traders_sql += f" GROUP BY {', '.join(tr_grp)}"
+            cur.execute(traders_sql, traders_params)
+            traders_rows = cur.fetchall()
+
         # ── Merge rows ────────────────────────────────────────────────────
         def _parse_acct(r):
             off = 0
@@ -809,7 +880,14 @@ def _camp_table_calc(
             per = str(r[off]) if has_period else None; off += int(has_period)
             g1  = r[off] if has_g1 else None;          off += int(has_g1)
             g2  = r[off] if has_g2 else None;          off += int(has_g2)
-            return per, g1, g2, int(r[off] or 0), float(r[off + 1] or 0), float(r[off + 2] or 0), int(r[off + 3] or 0)
+            return per, g1, g2, int(r[off] or 0), float(r[off + 1] or 0), float(r[off + 2] or 0)
+
+        def _parse_traders(r):
+            off = 0
+            per = str(r[off]) if has_period else None; off += int(has_period)
+            g1  = r[off] if has_g1 else None;          off += int(has_g1)
+            g2  = r[off] if has_g2 else None;          off += int(has_g2)
+            return per, g1, g2, int(r[off] or 0)
 
         merged: dict = {}
         for r in acct_rows:
@@ -827,7 +905,7 @@ def _camp_table_calc(
             merged[k]["ftc"] = ftc
 
         for r in txn_rows:
-            per, g1, g2, ftd, deps, wds, traders = _parse_txn(r)
+            per, g1, g2, ftd, deps, wds = _parse_txn(r)
             k = (per, g1, g2)
             if k not in merged:
                 merged[k] = {"period": per, "g1": g1, "g2": g2, "leads": 0, "live_accounts": 0, "ftc": 0,
@@ -837,8 +915,15 @@ def _camp_table_calc(
                 "deposits": round(deps, 2),
                 "withdrawals": round(wds, 2),
                 "net_deposits": round(deps - wds, 2),
-                "traders": traders,
             })
+
+        for r in traders_rows:
+            per, g1, g2, traders = _parse_traders(r)
+            k = (per, g1, g2)
+            if k not in merged:
+                merged[k] = {"period": per, "g1": g1, "g2": g2, "leads": 0, "live_accounts": 0, "ftc": 0,
+                              "ftd": 0, "deposits": 0.0, "withdrawals": 0.0, "net_deposits": 0.0, "traders": 0}
+            merged[k]["traders"] = traders
 
         # Translate country ISO codes to full names
         if group1 == "country" or group2 == "country":
@@ -930,7 +1015,7 @@ async def campaign_performance_table_api(
         return JSONResponse(status_code=400, content={"detail": "Invalid period"})
 
     def _ck_part(v): return ','.join(sorted(v)) if v else ''
-    _ck = (f"camp_tbl_v11:{date_from}:{date_to}:{group1}:{group2}:{period}"
+    _ck = (f"camp_tbl_v12:{date_from}:{date_to}:{group1}:{group2}:{period}"
            f":{_ck_part(f_mkt_group)}:{_ck_part(f_legacy_id)}:{_ck_part(f_campaign_name)}:{_ck_part(f_channel)}"
            f":{_ck_part(f_sub_channel)}:{_ck_part(f_affiliate)}:{f_classification}:{ftc_groups}"
            f":{q_date_from}:{q_date_to}:{_ck_part(f_country)}:{_ck_part(f_office)}:{_ck_part(f_agent)}:{_ck_part(f_team)}"
