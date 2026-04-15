@@ -206,6 +206,13 @@
         <div class="kpi-sub">Unique accounts with approved deposit</div>
       </div>
     </div>
+    <div class="col-md-6 col-lg-4">
+      <div class="kpi-card">
+        <div class="kpi-label"><i class="bi bi-percent me-1"></i>Depositors %</div>
+        <div class="kpi-value" id="kpiDepositorPct">—</div>
+        <div class="kpi-sub">Depositors / Traders</div>
+      </div>
+    </div>
   </div>
 
   <!-- Chart -->
@@ -332,6 +339,7 @@ async function loadData() {
 function renderKPIs(d) {
   document.getElementById('kpiTraders').textContent = fmt(d.totals.traders);
   document.getElementById('kpiDepositors').textContent = fmt(d.totals.depositors);
+  document.getElementById('kpiDepositorPct').textContent = (d.totals.depositor_pct ?? 0).toFixed(2) + '%';
   document.getElementById('kpiPeriod').textContent = d.date_from + ' → ' + d.date_to;
 }
 

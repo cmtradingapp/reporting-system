@@ -178,7 +178,7 @@ async def total_traders_api(
             ftc_groups_list = parsed
 
     def _ck_part(v): return ",".join(sorted(v)) if v else ""
-    _ck = (f"total_traders_v2:{date_from}:{end_date}:{_ck_part(f_office)}:{_ck_part(f_team)}"
+    _ck = (f"total_traders_v3:{date_from}:{end_date}:{_ck_part(f_office)}:{_ck_part(f_team)}"
            f":{f_classification}:{ftc_groups}")
     _hit = cache.get(_ck)
     if _hit is not None:
@@ -189,8 +189,14 @@ async def total_traders_api(
         "date_to_excl": date_to_excl,
         "ref_date": end_date,
     }
-    filters_sql, needs_cu = _build_filters(f_office, f_team, f_classification, ftc_groups_list, params)
-    cu_join = "LEFT JOIN crm_users u ON u.id = a.assigned_to" if needs_cu else ""
+    filters_sql, _ = _build_filters(f_office, f_team, f_classification, ftc_groups_list, params)
+    # Always join crm_users so we can apply the standard "test agent" exclusion used on other pages
+    cu_join = "LEFT JOIN crm_users u ON u.id = a.assigned_to"
+    base_excl = (
+        "AND a.accountid IS NOT NULL AND a.accountid::text != ''\n          "
+        "AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'\n          "
+        "AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'"
+    )
 
     # ── Traders: daily + total ────────────────────────────────────────────
     traders_daily_sql = f"""
@@ -213,6 +219,7 @@ async def total_traders_api(
         WHERE d.notional_value > 0
           AND ta.vtigeraccountid IS NOT NULL AND ta.vtigeraccountid::text != ''
           AND a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)
+          {base_excl}
           AND d.open_time::date >= %(date_from)s
           AND d.open_time::date <  %(date_to_excl)s
           {filters_sql}
@@ -239,6 +246,7 @@ async def total_traders_api(
         WHERE d.notional_value > 0
           AND ta.vtigeraccountid IS NOT NULL AND ta.vtigeraccountid::text != ''
           AND a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)
+          {base_excl}
           AND d.open_time::date >= %(date_from)s
           AND d.open_time::date <  %(date_to_excl)s
           {filters_sql}
@@ -255,6 +263,7 @@ async def total_traders_api(
           AND t.transaction_type_name = 'Deposit'
           AND t.vtigeraccountid IS NOT NULL
           AND a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)
+          {base_excl}
           AND t.confirmation_time::date >= %(date_from)s
           AND t.confirmation_time::date <  %(date_to_excl)s
           {filters_sql}
@@ -271,6 +280,7 @@ async def total_traders_api(
           AND t.transaction_type_name = 'Deposit'
           AND t.vtigeraccountid IS NOT NULL
           AND a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)
+          {base_excl}
           AND t.confirmation_time::date >= %(date_from)s
           AND t.confirmation_time::date <  %(date_to_excl)s
           {filters_sql}
@@ -310,6 +320,7 @@ async def total_traders_api(
         "totals": {
             "traders": traders_total,
             "depositors": deps_total,
+            "depositor_pct": round((deps_total / traders_total * 100), 2) if traders_total else 0.0,
         },
         "series": {
             "labels": labels,
