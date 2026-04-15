@@ -89,6 +89,9 @@
     {% if current_user.role == 'admin' or (_ap is not none and 'ftc_date' in _ap) %}
     <a href="/ftc-date" class="sidebar-link"><i class="bi bi-calendar2-check"></i>FTC Date</a>
     {% endif %}
+    {% if current_user.role == 'admin' or (_ap is not none and 'total_traders' in _ap) %}
+    <a href="/total-traders" class="sidebar-link"><i class="bi bi-activity"></i>Total Traders</a>
+    {% endif %}
     {% if current_user.role == 'admin' %}
     <a href="/fsa-report" class="sidebar-link"><i class="bi bi-file-earmark-text"></i>FSA Report</a>
     <a href="/data-sync" class="sidebar-link"><i class="bi bi-database"></i>Data Sync</a>

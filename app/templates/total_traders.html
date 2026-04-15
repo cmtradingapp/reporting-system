@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Total Traders — Reporting System</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet"/>
+  <style>
+    body { background-color: #0f1117; color: #e0e0e0; font-family: 'Segoe UI', sans-serif; display: flex; min-height: 100vh; }
+    .sidebar { width: 220px; min-height: 100vh; background-color: #161b22; border-right: 1px solid #30363d; display: flex; flex-direction: column; position: fixed; top: 0; left: 0; bottom: 0; z-index: 100; }
+    .sidebar-brand { padding: 20px 20px 16px; border-bottom: 1px solid #30363d; font-weight: 700; font-size: 1rem; }
+    .sidebar-nav { padding: 12px 0; flex: 1; }
+    .sidebar-link { display: flex; align-items: center; gap: 10px; padding: 10px 20px; color: #8b949e; text-decoration: none; font-size: 0.9rem; border-left: 3px solid transparent; }
+    .sidebar-link:hover { background-color: #21262d; color: #e0e0e0; }
+    .sidebar-link.active { color: #3fb950; border-left-color: #3fb950; background-color: rgba(63,185,80,0.08); }
+    .main-content { margin-left: 220px; flex: 1; min-width: 0; }
+    .card { background-color: #161b22 !important; border: 1px solid #30363d; border-radius: 12px; }
+    .filter-card { background-color: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 16px 20px; margin-bottom: 24px; }
+    .form-control, .form-select { background-color: #0f1117; border: 1px solid #30363d; color: #e0e0e0; border-radius: 8px; font-size: 0.88rem; }
+    .form-control:focus, .form-select:focus { background-color: #0f1117; border-color: #238636; color: #e0e0e0; box-shadow: 0 0 0 3px rgba(35,134,54,0.2); }
+    .form-select option { background-color: #161b22; }
+    .btn-apply { background: linear-gradient(135deg, #238636, #2ea043); border: none; color: #fff; font-weight: 600; border-radius: 8px; padding: 7px 20px; font-size: 0.88rem; }
+    .btn-apply:hover { background: linear-gradient(135deg, #2ea043, #3fb950); color: #fff; }
+    .filter-label { font-size: 0.78rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.8px; display: block; margin-bottom: 4px; }
+    .group-cb-wrap { display: flex; align-items: center; gap: 5px; font-size: 0.8rem; color: #c9d1d9; white-space: nowrap; }
+    .group-cb-wrap input[type=checkbox] { accent-color: #3fb950; width: 14px; height: 14px; cursor: pointer; }
+    .kpi-card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 20px 24px; display: flex; flex-direction: column; gap: 6px; min-height: 110px; }
+    .kpi-label { font-size: 0.72rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; }
+    .kpi-value { font-size: 2.1rem; font-weight: 700; color: #e0e0e0; font-variant-numeric: tabular-nums; }
+    .kpi-sub { font-size: 0.75rem; color: #8b949e; }
+    .spinner-overlay { display:none; position: fixed; inset:0; background: rgba(0,0,0,0.55); z-index: 9998; align-items: center; justify-content: center; }
+    .spinner-overlay.active { display: flex; }
+    .sdd-wrap { position: relative; display: inline-block; }
+    .sdd-btn { background:#0f1117; border:1px solid #30363d; color:#e0e0e0; border-radius:8px; padding:6px 10px; font-size:0.85rem; min-width:160px; text-align:left; cursor:pointer; }
+    .sdd-btn:hover { border-color:#238636; }
+    .sdd-panel { display:none; position:absolute; top:100%; left:0; margin-top:4px; min-width:220px; max-width:320px; background:#161b22; border:1px solid #30363d; border-radius:8px; z-index:200; padding:8px; box-shadow:0 6px 20px rgba(0,0,0,0.5); }
+    .sdd-panel.open { display:block; }
+    .sdd-search { width:100%; background:#0f1117; border:1px solid #30363d; color:#e0e0e0; border-radius:6px; padding:4px 8px; font-size:0.82rem; margin-bottom:6px; }
+    .sdd-list { max-height:240px; overflow-y:auto; }
+    .sdd-item { display:flex; align-items:center; gap:6px; padding:4px 6px; border-radius:4px; font-size:0.85rem; color:#c9d1d9; cursor:pointer; }
+    .sdd-item:hover { background:#21262d; }
+    .sdd-cb { accent-color:#3fb950; width:14px; height:14px; }
+    @media (max-width: 1024px) {
+      .sidebar { display:none; }
+      .main-content { margin-left:0; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="sidebar-brand"><i class="bi bi-bar-chart-fill text-success me-2"></i>Reporting System</div>
+  <nav class="sidebar-nav">
+    {% set _ap = current_user.allowed_pages_list %}
+    {% if _ap is none or 'performance' in _ap %}
+    <a href="/performance" class="sidebar-link"><i class="bi bi-trophy"></i>Performance Report</a>
+    {% endif %}
+    {% if (_ap is none and current_user.role in ('admin', 'marketing', 'general')) or (_ap is not none and 'marketing' in _ap) %}
+    <a href="/campaign-performance" class="sidebar-link"><i class="bi bi-graph-up-arrow"></i>Marketing Performance</a>
+    {% endif %}
+    {% if _ap is none or 'agent_bonuses' in _ap %}
+    <a href="/agent-bonuses" class="sidebar-link"><i class="bi bi-cash-stack"></i>Agent Bonuses</a>
+    {% endif %}
+    {% if (_ap is none and current_user.role in ('admin', 'general')) or (_ap is not none and 'dashboard' in _ap) %}
+    <a href="/dashboard" class="sidebar-link"><i class="bi bi-speedometer2"></i>Dashboard</a>
+    {% endif %}
+    {% if current_user.role == 'admin' or (_ap is not none and 'ftc_date' in _ap) %}
+    <a href="/ftc-date" class="sidebar-link"><i class="bi bi-calendar2-check"></i>FTC Date</a>
+    {% endif %}
+    {% if current_user.role == 'admin' or (_ap is not none and 'total_traders' in _ap) %}
+    <a href="/total-traders" class="sidebar-link active"><i class="bi bi-activity"></i>Total Traders</a>
+    {% endif %}
+    {% if current_user.role == 'admin' %}
+    <a href="/fsa-report" class="sidebar-link"><i class="bi bi-file-earmark-text"></i>FSA Report</a>
+    <a href="/data-sync" class="sidebar-link"><i class="bi bi-database"></i>Data Sync</a>
+    <a href="/holidays" class="sidebar-link"><i class="bi bi-calendar-x"></i>Holidays</a>
+    {% endif %}
+    {% if (_ap is none and current_user.role not in ('marketing', 'agent')) or (_ap is not none and 'all_ftcs' in _ap) %}
+    <a href="/all-ftcs" class="sidebar-link"><i class="bi bi-people-fill"></i>All FTCs</a>
+    {% endif %}
+    {% if current_user.role == 'admin' %}
+    <a href="/transactions-report" class="sidebar-link"><i class="bi bi-receipt"></i>Transactions Report</a>
+    {% endif %}
+  </nav>
+  <div style="padding:14px 20px;border-top:1px solid #30363d;">
+    <div style="font-size:0.68rem;color:#8b949e;margin-bottom:2px;">Signed in as</div>
+    <div style="font-weight:600;font-size:0.82rem;color:#e0e0e0;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ current_user.full_name }}</div>
+    <div style="font-size:0.7rem;color:#3fb950;margin-bottom:8px;">{{ current_user.role | replace('_', ' ') | title }}</div>
+    <div style="display:flex;gap:12px;align-items:center;">
+      {% if current_user.role == 'admin' %}<a href="/admin/users" style="color:#8b949e;text-decoration:none;font-size:1.05rem;"><i class="bi bi-people-fill"></i></a>{% endif %}
+      <a href="/logout" style="color:#f85149;text-decoration:none;font-size:1.05rem;"><i class="bi bi-box-arrow-right"></i></a>
+    </div>
+  </div>
+</div>
+
+<div class="main-content">
+
+<div class="spinner-overlay" id="spinner">
+  <div class="text-center text-white">
+    <div class="spinner-border text-success mb-3" style="width:3rem;height:3rem;"></div>
+    <div>Loading data…</div>
+  </div>
+</div>
+
+<div class="container-fluid px-4 py-4">
+  <h4 class="fw-bold text-white mb-3">Total Traders</h4>
+
+  <!-- Filter bar -->
+  <div class="filter-card">
+    <div class="d-flex align-items-end gap-3 flex-wrap mb-3">
+      <div>
+        <label class="filter-label">End Date</label>
+        <input type="date" id="endDate" class="form-control" style="width:170px;" />
+      </div>
+      <div>
+        <label class="filter-label">Days Back</label>
+        <input type="number" id="daysBack" class="form-control" style="width:110px;" min="1" max="365" value="30" />
+      </div>
+      <div>
+        <label class="filter-label">Office</label>
+        <div class="sdd-wrap" id="sddOffice">
+          <button class="sdd-btn" type="button">All</button>
+          <div class="sdd-panel"><input class="sdd-search" placeholder="Search…"/><div class="sdd-list"></div></div>
+        </div>
+      </div>
+      <div>
+        <label class="filter-label">Team</label>
+        <div class="sdd-wrap" id="sddTeam">
+          <button class="sdd-btn" type="button">All</button>
+          <div class="sdd-panel"><input class="sdd-search" placeholder="Search…"/><div class="sdd-list"></div></div>
+        </div>
+      </div>
+      <div>
+        <label class="filter-label">Classification</label>
+        <select id="filterClass" class="form-select" style="width:180px;">
+          <option value="">All</option>
+          <option value="High Quality">High Quality</option>
+          <option value="Low Quality">Low Quality</option>
+          <option value="No segmentation">No segmentation</option>
+        </select>
+      </div>
+      <div>
+        <button class="btn-apply" onclick="loadData()"><i class="bi bi-arrow-clockwise me-1"></i>Apply</button>
+      </div>
+    </div>
+
+    <div class="d-flex align-items-end gap-3 flex-wrap">
+      <div>
+        <label class="filter-label">FTC Groups</label>
+        <div class="d-flex gap-3 flex-wrap" style="padding-top:2px;">
+          <label class="group-cb-wrap"><input type="checkbox" class="ftc-cb" value="0 - 7 days"   checked> 0–7</label>
+          <label class="group-cb-wrap"><input type="checkbox" class="ftc-cb" value="8 - 14 days"  checked> 8–14</label>
+          <label class="group-cb-wrap"><input type="checkbox" class="ftc-cb" value="15 - 30 days" checked> 15–30</label>
+          <label class="group-cb-wrap"><input type="checkbox" class="ftc-cb" value="31 - 60 days" checked> 31–60</label>
+          <label class="group-cb-wrap"><input type="checkbox" class="ftc-cb" value="61 - 90 days" checked> 61–90</label>
+          <label class="group-cb-wrap"><input type="checkbox" class="ftc-cb" value="91 - 120 days" checked> 91–120</label>
+          <label class="group-cb-wrap"><input type="checkbox" class="ftc-cb" value="120+ days"    checked> 120+</label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPI cards -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-6 col-lg-4">
+      <div class="kpi-card">
+        <div class="kpi-label"><i class="bi bi-people me-1"></i>Total Traders</div>
+        <div class="kpi-value" id="kpiTraders">—</div>
+        <div class="kpi-sub" id="kpiPeriod">—</div>
+      </div>
+    </div>
+    <div class="col-md-6 col-lg-4">
+      <div class="kpi-card">
+        <div class="kpi-label"><i class="bi bi-cash-coin me-1"></i>Total Depositors</div>
+        <div class="kpi-value" id="kpiDepositors">—</div>
+        <div class="kpi-sub">Unique accounts with approved deposit</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chart -->
+  <div class="card mb-4">
+    <div class="card-body">
+      <div style="height:420px;"><canvas id="chart"></canvas></div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+const fmt = n => (n ?? 0).toLocaleString('en-US');
+let chart = null;
+
+// ── Searchable multi-select dropdown ────────────────────────────────────────
+class SDD {
+  constructor(el) {
+    this.el = el;
+    this.btn = el.querySelector('.sdd-btn');
+    this.panel = el.querySelector('.sdd-panel');
+    this.search = el.querySelector('.sdd-search');
+    this.list = el.querySelector('.sdd-list');
+    this.values = new Set();
+    this.options = [];
+    this.btn.addEventListener('click', e => { e.stopPropagation(); this.toggle(); });
+    this.search.addEventListener('input', () => this.renderList());
+    document.addEventListener('click', e => { if (!el.contains(e.target)) this.close(); });
+  }
+  setOptions(opts) { this.options = opts; this.renderList(); this.updateBtn(); }
+  toggle() { this.panel.classList.toggle('open'); }
+  close() { this.panel.classList.remove('open'); }
+  renderList() {
+    const q = this.search.value.trim().toLowerCase();
+    const filtered = this.options.filter(o => !q || o.toLowerCase().includes(q));
+    this.list.innerHTML = filtered.map(o => {
+      const chk = this.values.has(o) ? 'checked' : '';
+      return `<label class="sdd-item"><input type="checkbox" class="sdd-cb" data-v="${o.replace(/"/g,'&quot;')}" ${chk}> ${o}</label>`;
+    }).join('');
+    this.list.querySelectorAll('.sdd-cb').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const v = cb.getAttribute('data-v');
+        if (cb.checked) this.values.add(v); else this.values.delete(v);
+        this.updateBtn();
+      });
+    });
+  }
+  updateBtn() {
+    if (this.values.size === 0) this.btn.textContent = 'All';
+    else if (this.values.size === 1) this.btn.textContent = [...this.values][0];
+    else this.btn.textContent = this.values.size + ' selected';
+  }
+  getValues() { return [...this.values]; }
+}
+
+const sddOffice = new SDD(document.getElementById('sddOffice'));
+const sddTeam   = new SDD(document.getElementById('sddTeam'));
+
+async function loadOptions() {
+  const r = await fetch('/api/total-traders/options');
+  if (!r.ok) return;
+  const d = await r.json();
+  sddOffice.setOptions(d.offices || []);
+  sddTeam.setOptions(d.teams || []);
+}
+
+function initDates() {
+  const today = new Date();
+  document.getElementById('endDate').value = today.toISOString().slice(0,10);
+}
+
+async function loadData() {
+  const spin = document.getElementById('spinner');
+  spin.classList.add('active');
+  try {
+    const endDate = document.getElementById('endDate').value;
+    const daysBack = document.getElementById('daysBack').value || 30;
+    const params = new URLSearchParams();
+    if (endDate) params.set('end_date', endDate);
+    params.set('days_back', daysBack);
+    sddOffice.getValues().forEach(v => params.append('f_office', v));
+    sddTeam.getValues().forEach(v => params.append('f_team', v));
+    const cls = document.getElementById('filterClass').value;
+    if (cls) params.set('f_classification', cls);
+    const ftcChecked = [...document.querySelectorAll('.ftc-cb:checked')].map(cb => cb.value);
+    if (ftcChecked.length) params.set('ftc_groups', ftcChecked.join(','));
+
+    const r = await fetch('/api/total-traders?' + params.toString());
+    if (!r.ok) { alert('Error loading data'); return; }
+    const d = await r.json();
+    renderKPIs(d);
+    renderChart(d);
+  } finally {
+    spin.classList.remove('active');
+  }
+}
+
+function renderKPIs(d) {
+  document.getElementById('kpiTraders').textContent = fmt(d.totals.traders);
+  document.getElementById('kpiDepositors').textContent = fmt(d.totals.depositors);
+  document.getElementById('kpiPeriod').textContent = d.date_from + ' → ' + d.date_to;
+}
+
+function renderChart(d) {
+  const ctx = document.getElementById('chart').getContext('2d');
+  if (chart) chart.destroy();
+  chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: d.series.labels,
+      datasets: [
+        { label: 'Traders',    data: d.series.traders,    borderColor: '#3fb950', backgroundColor: 'rgba(63,185,80,0.15)', tension: 0.25, fill: true, pointRadius: 2 },
+        { label: 'Depositors', data: d.series.depositors, borderColor: '#58a6ff', backgroundColor: 'rgba(88,166,255,0.10)', tension: 0.25, fill: true, pointRadius: 2 },
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#c9d1d9' } },
+        tooltip: { mode: 'index', intersect: false },
+      },
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: { ticks: { color: '#8b949e', maxRotation: 0, autoSkip: true }, grid: { color: '#21262d' } },
+        y: { beginAtZero: true, ticks: { color: '#8b949e' }, grid: { color: '#21262d' } }
+      }
+    }
+  });
+}
+
+(async () => {
+  initDates();
+  await loadOptions();
+  await loadData();
+})();
+</script>
+</body>
+</html>

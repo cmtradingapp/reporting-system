@@ -10,6 +10,7 @@ from app.routes.trading_accounts_sync import router as trading_accounts_sync_rou
 from app.routes.ftd100_sync import router as ftd100_sync_router
 from app.routes.scoreboard import router as scoreboard_router
 from app.routes.ftc_date import router as ftc_date_router
+from app.routes.total_traders import router as total_traders_router
 from app.routes.agent_bonuses import router as agent_bonuses_router
 from app.routes.data_sync import router as data_sync_router
 from app.routes.holidays import router as holidays_router
@@ -350,6 +351,7 @@ app.include_router(trading_accounts_sync_router)
 app.include_router(ftd100_sync_router)
 app.include_router(scoreboard_router)
 app.include_router(ftc_date_router)
+app.include_router(total_traders_router)
 app.include_router(agent_bonuses_router)
 app.include_router(data_sync_router)
 app.include_router(holidays_router)
