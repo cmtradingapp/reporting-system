@@ -178,7 +178,7 @@ async def total_traders_api(
             ftc_groups_list = parsed
 
     def _ck_part(v): return ",".join(sorted(v)) if v else ""
-    _ck = (f"total_traders_v3:{date_from}:{end_date}:{_ck_part(f_office)}:{_ck_part(f_team)}"
+    _ck = (f"total_traders_v4:{date_from}:{end_date}:{_ck_part(f_office)}:{_ck_part(f_team)}"
            f":{f_classification}:{ftc_groups}")
     _hit = cache.get(_ck)
     if _hit is not None:
@@ -195,7 +195,8 @@ async def total_traders_api(
     base_excl = (
         "AND a.accountid IS NOT NULL AND a.accountid::text != ''\n          "
         "AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'\n          "
-        "AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'"
+        "AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'\n          "
+        "AND u.department_ = 'Retention'"
     )
 
     # ── Traders: daily + total ────────────────────────────────────────────
