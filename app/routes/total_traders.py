@@ -202,11 +202,11 @@ async def total_traders_api(
         "AND u.department_ = 'Retention'"
     )
 
-    # ── Traders: daily + total (uses mv_retention_traders MV, original_deposit_owner) ─
+    # ── Traders: daily + total (uses mv_retention_traders MV, assigned_to) ─
     traders_daily_sql = f"""
         SELECT a.day, COUNT(DISTINCT a.accountid) AS cnt
         FROM mv_retention_traders a
-        LEFT JOIN crm_users u ON u.id = a.original_deposit_owner
+        LEFT JOIN crm_users u ON u.id = a.assigned_to
         WHERE a.accountid IS NOT NULL AND a.accountid::text != ''
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
@@ -220,7 +220,7 @@ async def total_traders_api(
     traders_total_sql = f"""
         SELECT COUNT(DISTINCT a.accountid)
         FROM mv_retention_traders a
-        LEFT JOIN crm_users u ON u.id = a.original_deposit_owner
+        LEFT JOIN crm_users u ON u.id = a.assigned_to
         WHERE a.accountid IS NOT NULL AND a.accountid::text != ''
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
