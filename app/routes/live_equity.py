@@ -116,7 +116,7 @@ def _historical_calc(d) -> dict:
             SELECT convertedbalance, convertedfloatingpnl
             FROM dealio_daily_profits
             WHERE login = ta.login::bigint
-              AND date::date <= %(d)s
+              AND date < %(d)s::date + INTERVAL '1 day'
             ORDER BY date DESC
             LIMIT 1
         ) d
@@ -231,10 +231,11 @@ def _live_calc(d) -> dict:
                 FROM (
                     SELECT DISTINCT ON (login) login, convertedbalance, convertedfloatingpnl
                     FROM dealio_daily_profits
-                    WHERE date::date = %(d)s::date - INTERVAL '1 day'
+                    WHERE login = ANY(%(logins)s)
+                      AND date >= (%(d)s::date - INTERVAL '1 day')
+                      AND date <  %(d)s::date
                     ORDER BY login, date DESC
                 ) d
-                WHERE d.login = ANY(%(logins)s)
             """, {"d": str(d), "logins": equity_logins})
             start_net_equity = float(cur.fetchone()[0] or 0)
 
@@ -376,10 +377,11 @@ def _live_calc(d) -> dict:
                     FROM (
                         SELECT DISTINCT ON (login) login, convertedfloatingpnl
                         FROM dealio_daily_profits
-                        WHERE date::date = %(d)s::date - INTERVAL '1 day'
+                        WHERE login = ANY(%(logins)s)
+                          AND date >= (%(d)s::date - INTERVAL '1 day')
+                          AND date <  %(d)s::date
                         ORDER BY login, date DESC
                     ) d
-                    WHERE d.login = ANY(%(logins)s)
                 """, {"d": str(d), "logins": open_logins})
                 eod_floating_yesterday = float(cur.fetchone()[0] or 0)
         finally:
