@@ -56,13 +56,7 @@ async def scoreboard_page(request: Request):
     if role == "marketing" and ap is None:
         return RedirectResponse(url="/campaign-performance", status_code=302)
     if ap is not None and "performance" not in ap:
-        if "agent_bonuses" in ap:
-            return RedirectResponse(url="/agent-bonuses", status_code=302)
-        if "dashboard" in ap:
-            return RedirectResponse(url="/dashboard", status_code=302)
-        # Fallback: show the first allowed page or return 403
-        from fastapi.responses import PlainTextResponse
-        return PlainTextResponse("No accessible pages configured for your account.", status_code=403)
+        return RedirectResponse(url="/agent-bonuses", status_code=302)
     if role == "agent":
         dept = user.get("department_") or ""
         show_sales = dept != "Retention"

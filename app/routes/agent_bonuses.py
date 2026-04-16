@@ -133,10 +133,7 @@ async def agent_bonuses_page(request: Request):
     if role == "marketing" and ap is None:
         return RedirectResponse(url="/campaign-performance", status_code=302)
     if ap is not None and "agent_bonuses" not in ap:
-        if "performance" in ap:
-            return RedirectResponse(url="/performance", status_code=302)
-        from fastapi.responses import PlainTextResponse
-        return PlainTextResponse("No accessible pages configured for your account.", status_code=403)
+        return RedirectResponse(url="/performance", status_code=302)
     if role == "agent":
         dept = user.get("department_") or ""
         show_sales = dept != "Retention"
