@@ -133,6 +133,12 @@ async def agent_bonuses_page(request: Request):
     if role == "marketing" and ap is None:
         return RedirectResponse(url="/campaign-performance", status_code=302)
     if ap is not None and "agent_bonuses" not in ap:
+        _page_urls = {"performance": "/performance", "marketing": "/campaign-performance",
+                       "dashboard": "/dashboard", "total_traders": "/total-traders",
+                       "agent_bonuses": "/agent-bonuses", "data_sync": "/data-sync"}
+        for p in ap:
+            if p in _page_urls:
+                return RedirectResponse(url=_page_urls[p], status_code=302)
         return RedirectResponse(url="/performance", status_code=302)
     if role == "agent":
         dept = user.get("department_") or ""
