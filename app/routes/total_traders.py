@@ -22,6 +22,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from app.auth.dependencies import get_current_user
+from app.auth.role_filters import get_role_filter
 from app.db.postgres_conn import get_connection
 from app import cache
 
@@ -181,8 +182,9 @@ async def total_traders_api(
             ftc_groups_list = parsed
 
     def _ck_part(v): return ",".join(sorted(v)) if v else ""
-    _ck = (f"total_traders_v6:{date_from}:{end_date}:{_ck_part(f_office)}:{_ck_part(f_team)}"
-           f":{f_classification}:{ftc_groups}")
+    _user_role = user.get("role", "")
+    _ck = (f"total_traders_v7:{date_from}:{end_date}:{_ck_part(f_office)}:{_ck_part(f_team)}"
+           f":{f_classification}:{ftc_groups}:{_user_role}")
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -193,6 +195,16 @@ async def total_traders_api(
         "ref_date": end_date,
     }
     filters_sql, _ = _build_filters(f_office, f_team, f_classification, ftc_groups_list, params)
+
+    # Apply role-based filter (e.g. retention_cy sees only Cyprus office)
+    rf = get_role_filter(user)
+    role_sql = ""
+    if rf['crm_where']:
+        role_sql = rf['crm_where']
+        for i, val in enumerate(rf['crm_params']):
+            key = f'_rf{i}'
+            role_sql = role_sql.replace('%s', f'%({key})s', 1)
+            params[key] = val
     # Always join crm_users so we can apply the standard "test agent" exclusion used on other pages
     cu_join = "LEFT JOIN crm_users u ON u.id = a.assigned_to"
     base_excl = (
@@ -214,6 +226,7 @@ async def total_traders_api(
           AND a.day >= %(date_from)s
           AND a.day <  %(date_to_excl)s
           {filters_sql}
+          {role_sql}
         GROUP BY 1
     """
 
@@ -228,6 +241,7 @@ async def total_traders_api(
           AND a.day >= %(date_from)s
           AND a.day <  %(date_to_excl)s
           {filters_sql}
+          {role_sql}
     """
 
     # ── Depositors: daily + total (uses original_deposit_owner for dept filter) ─
@@ -248,6 +262,7 @@ async def total_traders_api(
           AND t.confirmation_time >= %(date_from)s::date
           AND t.confirmation_time <  %(date_to_excl)s::date
           {filters_sql}
+          {role_sql}
         GROUP BY 1
     """
 
@@ -268,6 +283,7 @@ async def total_traders_api(
           AND t.confirmation_time >= %(date_from)s::date
           AND t.confirmation_time <  %(date_to_excl)s::date
           {filters_sql}
+          {role_sql}
     """
 
     conn = get_connection()
