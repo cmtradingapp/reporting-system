@@ -20,7 +20,7 @@ def _get_pool() -> ThreadedConnectionPool:
             if _pool is None:
                 _pool = ThreadedConnectionPool(
                     minconn=2,
-                    maxconn=25,
+                    maxconn=40,
                     host=POSTGRES_HOST,
                     port=POSTGRES_PORT,
                     user=POSTGRES_USER,
