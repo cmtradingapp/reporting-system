@@ -2892,6 +2892,7 @@ _MV_ORDER = [
     "mv_run_rate",        # depends on mv_daily_kpis — must be last
     "mv_account_stats",   # independent — new leads + live accounts
     "mv_std_clients",     # independent — STD (second deposit after $240 running total)
+    "mv_retention_traders",  # independent — total traders report (positions+trades per day/account)
 ]
 
 # Module-level status dict updated by refresh_materialized_views()

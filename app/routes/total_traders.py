@@ -202,57 +202,31 @@ async def total_traders_api(
         "AND u.department_ = 'Retention'"
     )
 
-    # ── Traders: daily + total ────────────────────────────────────────────
+    # ── Traders: daily + total (uses mv_retention_traders MV) ─────────────
     traders_daily_sql = f"""
-        WITH d AS (
-            SELECT p.login, p.notional_value, p.open_time FROM dealio_positions p
-            UNION ALL
-            SELECT ex.login, ex.notional_value, en.open_time
-            FROM dealio_trades_mt5 ex
-            JOIN dealio_trades_mt5 en
-              ON en.position_id = ex.position_id
-             AND en.source_id   = ex.source_id
-             AND en.entry       = 0
-            WHERE ex.entry = 1 AND ex.close_time > '1971-01-01'
-        )
-        SELECT d.open_time::date AS day, COUNT(DISTINCT a.accountid) AS cnt
-        FROM d
-        JOIN trading_accounts ta ON ta.login::bigint = d.login::bigint
-        JOIN accounts a ON a.accountid = ta.vtigeraccountid
-        {cu_join}
-        WHERE d.notional_value > 0
-          AND ta.vtigeraccountid IS NOT NULL AND ta.vtigeraccountid::text != ''
-          AND a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)
-          {base_excl}
-          AND d.open_time::date >= %(date_from)s
-          AND d.open_time::date <  %(date_to_excl)s
+        SELECT a.day, COUNT(DISTINCT a.accountid) AS cnt
+        FROM mv_retention_traders a
+        LEFT JOIN crm_users u ON u.id = a.assigned_to
+        WHERE a.accountid IS NOT NULL AND a.accountid::text != ''
+          AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
+          AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
+          AND u.department_ = 'Retention'
+          AND a.day >= %(date_from)s
+          AND a.day <  %(date_to_excl)s
           {filters_sql}
         GROUP BY 1
     """
 
     traders_total_sql = f"""
-        WITH d AS (
-            SELECT p.login, p.notional_value, p.open_time FROM dealio_positions p
-            UNION ALL
-            SELECT ex.login, ex.notional_value, en.open_time
-            FROM dealio_trades_mt5 ex
-            JOIN dealio_trades_mt5 en
-              ON en.position_id = ex.position_id
-             AND en.source_id   = ex.source_id
-             AND en.entry       = 0
-            WHERE ex.entry = 1 AND ex.close_time > '1971-01-01'
-        )
         SELECT COUNT(DISTINCT a.accountid)
-        FROM d
-        JOIN trading_accounts ta ON ta.login::bigint = d.login::bigint
-        JOIN accounts a ON a.accountid = ta.vtigeraccountid
-        {cu_join}
-        WHERE d.notional_value > 0
-          AND ta.vtigeraccountid IS NOT NULL AND ta.vtigeraccountid::text != ''
-          AND a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)
-          {base_excl}
-          AND d.open_time::date >= %(date_from)s
-          AND d.open_time::date <  %(date_to_excl)s
+        FROM mv_retention_traders a
+        LEFT JOIN crm_users u ON u.id = a.assigned_to
+        WHERE a.accountid IS NOT NULL AND a.accountid::text != ''
+          AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
+          AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
+          AND u.department_ = 'Retention'
+          AND a.day >= %(date_from)s
+          AND a.day <  %(date_to_excl)s
           {filters_sql}
     """
 
