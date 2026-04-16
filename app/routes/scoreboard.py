@@ -373,7 +373,7 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"perf_ret_v16:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"perf_ret_v17:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -399,6 +399,7 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
             COALESCE(dk.daily_net_usd, 0)::float              AS daily_net_usd,
             COALESCE(u.status, '')                             AS status,
             COALESCE(std.std_count, 0)::int                   AS std_count,
+            COALESCE(trd.traders_count, 0)::int               AS traders_count,
             COALESCE(rdp.rdp_net, 0)::float                   AS rdp_net
         FROM crm_users u
         LEFT JOIN ({tgt_subq}) tgt ON tgt.agent_id = u.id
@@ -431,6 +432,13 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
               AND second_deposit_date::date < %(date_to_excl)s::date
             GROUP BY assigned_to
         ) std ON std.agent_id = u.id
+        LEFT JOIN (
+            SELECT assigned_to AS agent_id, COUNT(DISTINCT accountid) AS traders_count
+            FROM mv_retention_traders
+            WHERE day >= %(date_from)s::date
+              AND day < %(date_to_excl)s::date
+            GROUP BY assigned_to
+        ) trd ON trd.agent_id = u.id
         LEFT JOIN (
             SELECT a.assigned_to AS agent_id,
                    SUM(CASE WHEN t.transaction_type_name IN ('Deposit', 'Withdrawal Cancelled')
@@ -578,7 +586,8 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
                 "daily_net_usd":   round(float(r[7] or 0), 2),
                 "status":          r[8] or '',
                 "std_count":       int(r[9] or 0),
-                "rdp_net":         round(float(r[10] or 0), 2),
+                "traders_count":   int(r[10] or 0),
+                "rdp_net":         round(float(r[11] or 0), 2),
             }
             for r in rows
         ]
