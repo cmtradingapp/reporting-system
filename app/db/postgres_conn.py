@@ -2633,12 +2633,8 @@ def fetch_dealio_daily_profits_stats() -> dict:
 
 _MV_SETUP_SQL = [
     # ── mv_daily_kpis ────────────────────────────────────────────────────────
-    # Drop first so definition changes (e.g. bonus filter removal) take effect on restart.
-    # CASCADE also drops mv_run_rate which depends on it.
-    "DROP MATERIALIZED VIEW IF EXISTS mv_run_rate CASCADE",
-    "DROP MATERIALIZED VIEW IF EXISTS mv_daily_kpis CASCADE",
     """
-    CREATE MATERIALIZED VIEW mv_daily_kpis AS
+    CREATE MATERIALIZED VIEW IF NOT EXISTS mv_daily_kpis AS
     SELECT
         t.original_deposit_owner                                             AS agent_id,
         t.confirmation_time::date                                            AS tx_date,
@@ -2756,7 +2752,7 @@ _MV_SETUP_SQL = [
 
     # ── mv_run_rate  (depends on mv_daily_kpis — must come last) ─────────────
     """
-    CREATE MATERIALIZED VIEW mv_run_rate AS
+    CREATE MATERIALIZED VIEW IF NOT EXISTS mv_run_rate AS
     WITH tagged AS (
         SELECT k.agent_id, k.tx_date, k.qual_date,
                k.net_usd, k.deposit_usd, k.ftd_count, k.ftc_count,
@@ -2795,9 +2791,8 @@ _MV_SETUP_SQL = [
 
     # ── mv_account_stats  (new leads + live accounts — today and MTD) ─────────
     # Drop first so the definition can be updated on restart
-    "DROP MATERIALIZED VIEW IF EXISTS mv_account_stats CASCADE",
     """
-    CREATE MATERIALIZED VIEW mv_account_stats AS
+    CREATE MATERIALIZED VIEW IF NOT EXISTS mv_account_stats AS
     SELECT
         1                                                                           AS id,
         COUNT(*) FILTER (WHERE createdtime::date = CURRENT_DATE)                    AS new_leads_today,
@@ -2813,9 +2808,8 @@ _MV_SETUP_SQL = [
     "CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_account_stats_u ON mv_account_stats (id)",
 
     # ── mv_std_clients  (STD — second deposit after running total hits $240) ───
-    "DROP MATERIALIZED VIEW IF EXISTS mv_std_clients CASCADE",
     """
-    CREATE MATERIALIZED VIEW mv_std_clients AS
+    CREATE MATERIALIZED VIEW IF NOT EXISTS mv_std_clients AS
     WITH ordered_tx AS (
         SELECT
             t.vtigeraccountid AS accountid,
