@@ -202,11 +202,11 @@ async def total_traders_api(
         "AND u.department_ = 'Retention'"
     )
 
-    # ── Traders: daily + total (uses mv_retention_traders MV) ─────────────
+    # ── Traders: daily + total (uses mv_retention_traders MV, original_deposit_owner) ─
     traders_daily_sql = f"""
         SELECT a.day, COUNT(DISTINCT a.accountid) AS cnt
         FROM mv_retention_traders a
-        LEFT JOIN crm_users u ON u.id = a.assigned_to
+        LEFT JOIN crm_users u ON u.id = a.original_deposit_owner
         WHERE a.accountid IS NOT NULL AND a.accountid::text != ''
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
@@ -220,7 +220,7 @@ async def total_traders_api(
     traders_total_sql = f"""
         SELECT COUNT(DISTINCT a.accountid)
         FROM mv_retention_traders a
-        LEFT JOIN crm_users u ON u.id = a.assigned_to
+        LEFT JOIN crm_users u ON u.id = a.original_deposit_owner
         WHERE a.accountid IS NOT NULL AND a.accountid::text != ''
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
@@ -230,18 +230,21 @@ async def total_traders_api(
           {filters_sql}
     """
 
-    # ── Depositors: daily + total (distinct accountids with Approved Deposit) ─
+    # ── Depositors: daily + total (uses original_deposit_owner for dept filter) ─
     depositors_daily_sql = f"""
         SELECT t.confirmation_time::date AS day, COUNT(DISTINCT a.accountid) AS cnt
         FROM transactions t
         JOIN accounts a ON a.accountid = t.vtigeraccountid
-        {cu_join}
+        LEFT JOIN crm_users u ON u.id = t.original_deposit_owner
         WHERE t.transactionapproval = 'Approved'
           AND (t.deleted = 0 OR t.deleted IS NULL)
           AND t.transaction_type_name = 'Deposit'
           AND t.vtigeraccountid IS NOT NULL
           AND a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)
-          {base_excl}
+          AND a.accountid IS NOT NULL AND a.accountid::text != ''
+          AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
+          AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
+          AND u.department_ = 'Retention'
           AND t.confirmation_time::date >= %(date_from)s
           AND t.confirmation_time::date <  %(date_to_excl)s
           {filters_sql}
@@ -252,13 +255,16 @@ async def total_traders_api(
         SELECT COUNT(DISTINCT a.accountid)
         FROM transactions t
         JOIN accounts a ON a.accountid = t.vtigeraccountid
-        {cu_join}
+        LEFT JOIN crm_users u ON u.id = t.original_deposit_owner
         WHERE t.transactionapproval = 'Approved'
           AND (t.deleted = 0 OR t.deleted IS NULL)
           AND t.transaction_type_name = 'Deposit'
           AND t.vtigeraccountid IS NOT NULL
           AND a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)
-          {base_excl}
+          AND a.accountid IS NOT NULL AND a.accountid::text != ''
+          AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
+          AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
+          AND u.department_ = 'Retention'
           AND t.confirmation_time::date >= %(date_from)s
           AND t.confirmation_time::date <  %(date_to_excl)s
           {filters_sql}
