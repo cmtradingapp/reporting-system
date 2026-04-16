@@ -245,8 +245,8 @@ async def total_traders_api(
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
           AND u.department_ = 'Retention'
-          AND t.confirmation_time::date >= %(date_from)s
-          AND t.confirmation_time::date <  %(date_to_excl)s
+          AND t.confirmation_time >= %(date_from)s::date
+          AND t.confirmation_time <  %(date_to_excl)s::date
           {filters_sql}
         GROUP BY 1
     """
@@ -265,8 +265,8 @@ async def total_traders_api(
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
           AND u.department_ = 'Retention'
-          AND t.confirmation_time::date >= %(date_from)s
-          AND t.confirmation_time::date <  %(date_to_excl)s
+          AND t.confirmation_time >= %(date_from)s::date
+          AND t.confirmation_time <  %(date_to_excl)s::date
           {filters_sql}
     """
 
