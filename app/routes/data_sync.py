@@ -95,7 +95,7 @@ async def data_sync_page(request: Request):
     user = await get_current_user(request)
     if isinstance(user, RedirectResponse):
         return user
-    if user.get("role") != "admin":
+    if user.get("role") != "admin" and "data_sync" not in (user.get("allowed_pages_list") or []):
         return RedirectResponse(url="/performance", status_code=302)
     jobs = {
         "accounts_stats":  lambda: _cached("accounts_stats",  fetch_accounts_stats),

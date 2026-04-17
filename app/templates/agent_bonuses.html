@@ -261,15 +261,19 @@
     {% if current_user.role == 'admin' or (_ap is not none and 'total_traders' in _ap) %}
     <a href="/total-traders" class="sidebar-link"><i class="bi bi-activity"></i>Total Traders</a>
     {% endif %}
-    {% if current_user.role == 'admin' %}
+    {% if current_user.role == 'admin' or (_ap is not none and 'fsa_report' in _ap) %}
     <a href="/fsa-report" class="sidebar-link"><i class="bi bi-file-earmark-text"></i>FSA Report</a>
+    {% endif %}
+    {% if current_user.role == 'admin' or (_ap is not none and 'data_sync' in _ap) %}
     <a href="/data-sync" class="sidebar-link"><i class="bi bi-database"></i>Data Sync</a>
+    {% endif %}
+    {% if current_user.role == 'admin' or (_ap is not none and 'holidays' in _ap) %}
     <a href="/holidays" class="sidebar-link"><i class="bi bi-calendar-x"></i>Holidays</a>
     {% endif %}
     {% if (_ap is none and current_user.role not in ('marketing', 'agent')) or (_ap is not none and 'all_ftcs' in _ap) %}
     <a href="/all-ftcs" class="sidebar-link"><i class="bi bi-people"></i>All FTCs</a>
     {% endif %}
-    {% if current_user.role == 'admin' %}
+    {% if current_user.role == 'admin' or (_ap is not none and 'transactions_report' in _ap) %}
     <a href="/transactions-report" class="sidebar-link"><i class="bi bi-receipt"></i>Transactions Report</a>
     {% endif %}
   </nav>

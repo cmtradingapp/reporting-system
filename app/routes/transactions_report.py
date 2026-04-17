@@ -13,7 +13,7 @@ async def transactions_report_page(request: Request):
     user = await get_current_user(request)
     if isinstance(user, RedirectResponse):
         return user
-    if user.get("role") != "admin":
+    if user.get("role") != "admin" and "transactions_report" not in (user.get("allowed_pages_list") or []):
         return RedirectResponse(url="/performance", status_code=302)
     return templates.TemplateResponse("transactions_report.html", {
         "request": request,
@@ -26,7 +26,7 @@ async def transactions_report_api(request: Request):
     user = await get_current_user(request)
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
-    if user.get("role") != "admin":
+    if user.get("role") != "admin" and "transactions_report" not in (user.get("allowed_pages_list") or []):
         return JSONResponse(status_code=403, content={"detail": "Forbidden"})
 
     conn = get_connection()

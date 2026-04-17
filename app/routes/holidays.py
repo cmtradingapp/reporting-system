@@ -13,7 +13,7 @@ async def holidays_page(request: Request):
     user = await get_current_user(request)
     if isinstance(user, RedirectResponse):
         return user
-    if user.get("role") != "admin":
+    if user.get("role") != "admin" and "holidays" not in (user.get("allowed_pages_list") or []):
         return RedirectResponse(url="/performance")
     conn = get_connection()
     try:

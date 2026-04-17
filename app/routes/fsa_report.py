@@ -50,7 +50,7 @@ async def fsa_report_page(request: Request):
     user = await get_current_user(request)
     if isinstance(user, RedirectResponse):
         return user
-    if user.get("role") != "admin":
+    if user.get("role") != "admin" and "fsa_report" not in (user.get("allowed_pages_list") or []):
         return RedirectResponse(url="/performance")
     return templates.TemplateResponse("fsa_report.html", {"request": request, "current_user": user})
 
@@ -60,7 +60,7 @@ async def fsa_report_section3(request: Request, year: int = 2026, quarter: int =
     user = await get_current_user(request)
     if isinstance(user, RedirectResponse):
         return JSONResponse({"error": "unauthorized"}, status_code=401)
-    if user.get("role") != "admin":
+    if user.get("role") != "admin" and "fsa_report" not in (user.get("allowed_pages_list") or []):
         return JSONResponse({"error": "forbidden"}, status_code=403)
 
     q_start, q_end, q_end_excl = _quarter_dates(year, quarter)
@@ -169,7 +169,7 @@ async def fsa_report_section4(request: Request, year: int = 2026, quarter: int =
     user = await get_current_user(request)
     if isinstance(user, RedirectResponse):
         return JSONResponse({"error": "unauthorized"}, status_code=401)
-    if user.get("role") != "admin":
+    if user.get("role") != "admin" and "fsa_report" not in (user.get("allowed_pages_list") or []):
         return JSONResponse({"error": "forbidden"}, status_code=403)
 
     q_start, q_end, q_end_excl = _quarter_dates(year, quarter)
