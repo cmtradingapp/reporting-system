@@ -496,6 +496,19 @@ function renderMatrix(d) {
     }
   }
 
+  function sumTotals(ids) {
+    let t = 0, d = 0, n = 0;
+    ids.forEach(id => { const at = agentTotals[id] || {}; t += at.traders || 0; d += at.depositors || 0; n += at.net || 0; });
+    return { traders: t, depositors: d, net: n };
+  }
+
+  // Index distinct totals per agent
+  const agentTotals = {};  // agentId -> {traders, depositors, net}
+  m.agents.forEach(a => { agentTotals[a.id] = { traders: 0, depositors: 0, net: 0 }; });
+  for (const [aid, v] of Object.entries(m.totals_traders || {})) agentTotals[aid] = { ...agentTotals[aid], traders: v };
+  for (const [aid, v] of Object.entries(m.totals_depositors || {})) { if (agentTotals[aid]) agentTotals[aid].depositors = v; }
+  for (const [aid, v] of Object.entries(m.totals_net || {})) { if (agentTotals[aid]) agentTotals[aid].net = v; }
+
   // Group agents: office -> dept -> [agents]
   const officeMap = new Map();
   m.agents.forEach(a => {
@@ -520,19 +533,18 @@ function renderMatrix(d) {
     return totals;
   }
 
-  function makeCells(dayTotals, cls) {
+  function makeCells(dayTotals, totalsObj) {
     let html = '';
-    let totalT = 0, totalD = 0, totalN = 0;
     days.forEach(day => {
       const t = dayTotals[day].traders;
       const dep = dayTotals[day].depositors;
       const n = dayTotals[day].net;
-      totalT += t; totalD += dep; totalN += n;
       const nCls = n < 0 ? ' val-neg' : (n === 0 ? ' val-zero' : '');
       html += `<td class="day-sep">${fmtN(t)}</td><td>${fmtN(dep)}</td><td class="${nCls}">${fmtMoney(n)}</td><td>${fmtPct(dep, t)}</td>`;
     });
-    const nCls = totalN < 0 ? ' val-neg' : (totalN === 0 ? ' val-zero' : '');
-    html += `<td class="day-sep"><b>${fmtN(totalT)}</b></td><td><b>${fmtN(totalD)}</b></td><td class="${nCls}"><b>${fmtMoney(totalN)}</b></td><td><b>${fmtPct(totalD, totalT)}</b></td>`;
+    const tt = totalsObj.traders, td = totalsObj.depositors, tn = totalsObj.net;
+    const nCls = tn < 0 ? ' val-neg' : (tn === 0 ? ' val-zero' : '');
+    html += `<td class="day-sep"><b>${fmtN(tt)}</b></td><td><b>${fmtN(td)}</b></td><td class="${nCls}"><b>${fmtMoney(tn)}</b></td><td><b>${fmtPct(td, tt)}</b></td>`;
     return html;
   }
 
@@ -559,9 +571,9 @@ function renderMatrix(d) {
   tbody.innerHTML = '';
 
   // Grand totals
-  let grandT = 0, grandD = 0, grandN = 0;
   const grandDays = {};
   days.forEach(d => { grandDays[d] = { traders: 0, depositors: 0, net: 0 }; });
+  const allActiveAgentIds = [];
 
   let offIdx = 0;
   for (const [officeName, deptMap] of officeMap) {
@@ -572,6 +584,7 @@ function renderMatrix(d) {
     // Skip offices with zero activity across all days
     const hasActivity = days.some(d => offDays[d].traders > 0 || offDays[d].depositors > 0 || offDays[d].net !== 0);
     if (!hasActivity) continue;
+    allActiveAgentIds.push(...allAgentIds);
     days.forEach(d => { grandDays[d].traders += offDays[d].traders; grandDays[d].depositors += offDays[d].depositors; grandDays[d].net += offDays[d].net; });
 
     // Office row
@@ -579,7 +592,7 @@ function renderMatrix(d) {
     offTr.className = 'office-row';
     offTr.dataset.officeId = officeId;
     offTr.dataset.officeName = officeName;
-    offTr.innerHTML = `<td class="col-name"><span class="chevron">&#9654;</span>${officeName}</td>` + makeCells(offDays);
+    offTr.innerHTML = `<td class="col-name"><span class="chevron">&#9654;</span>${officeName}</td>` + makeCells(offDays, sumTotals(allAgentIds));
     tbody.appendChild(offTr);
 
     let deptIdx = 0;
@@ -598,7 +611,7 @@ function renderMatrix(d) {
       deptTr.dataset.deptId = deptId;
       deptTr.dataset.deptName = deptName;
       deptTr.style.display = 'none';
-      deptTr.innerHTML = `<td class="col-name"><span class="chevron">&#9654;</span>${deptName}</td>` + makeCells(deptDays);
+      deptTr.innerHTML = `<td class="col-name"><span class="chevron">&#9654;</span>${deptName}</td>` + makeCells(deptDays, sumTotals(deptAgentIds));
       tbody.appendChild(deptTr);
 
       // Agent rows
@@ -617,7 +630,7 @@ function renderMatrix(d) {
         agTr.dataset.parentOffice = officeId;
         agTr.dataset.parentDept = deptId;
         agTr.style.display = 'none';
-        agTr.innerHTML = `<td class="col-name">${a.agent_name}</td>` + makeCells(agentDays);
+        agTr.innerHTML = `<td class="col-name">${a.agent_name}</td>` + makeCells(agentDays, agentTotals[a.id] || {traders:0,depositors:0,net:0});
         tbody.appendChild(agTr);
       });
     }
@@ -671,16 +684,15 @@ function renderMatrix(d) {
 
   // Grand total footer
   const tfoot = document.getElementById('matrixTfoot');
+  const grandTotals = sumTotals(allActiveAgentIds);
   let footHtml = '<tr><td class="col-name"><b>Total</b></td>';
-  let gt = 0, gd = 0, gn = 0;
   days.forEach(day => {
     const t = grandDays[day].traders, dep = grandDays[day].depositors, n = grandDays[day].net;
-    gt += t; gd += dep; gn += n;
     const nCls = n < 0 ? ' val-neg' : (n === 0 ? ' val-zero' : '');
     footHtml += `<td class="day-sep"><b>${fmtN(t)}</b></td><td><b>${fmtN(dep)}</b></td><td class="${nCls}"><b>${fmtMoney(n)}</b></td><td><b>${fmtPct(dep, t)}</b></td>`;
   });
-  const gnCls = gn < 0 ? ' val-neg' : (gn === 0 ? ' val-zero' : '');
-  footHtml += `<td class="day-sep"><b>${fmtN(gt)}</b></td><td><b>${fmtN(gd)}</b></td><td class="${gnCls}"><b>${fmtMoney(gn)}</b></td><td><b>${fmtPct(gd, gt)}</b></td></tr>`;
+  const gnCls = grandTotals.net < 0 ? ' val-neg' : (grandTotals.net === 0 ? ' val-zero' : '');
+  footHtml += `<td class="day-sep"><b>${fmtN(grandTotals.traders)}</b></td><td><b>${fmtN(grandTotals.depositors)}</b></td><td class="${gnCls}"><b>${fmtMoney(grandTotals.net)}</b></td><td><b>${fmtPct(grandTotals.depositors, grandTotals.traders)}</b></td></tr>`;
   tfoot.innerHTML = footHtml;
 }
 
