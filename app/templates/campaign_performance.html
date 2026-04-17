@@ -937,7 +937,8 @@
     rebuildThead(g1Label, g2Label, perLabel, hasG1, hasG2, hasPer);
 
     const colsBefore = (hasG1 ? 1 : 0) + (hasG2 ? 1 : 0) + (hasPer ? 1 : 0) || 1;
-    const rows = tblData.rows || [];
+    const _allZero = r => !r.leads && !r.live_accounts && !r.ftd && !r.ftc && !r.deposits && !r.withdrawals && !r.net_deposits && !r.traders;
+    const rows = (tblData.rows || []).filter(r => !_allZero(r));
     const totals = tblData.totals || {};
     const tbody = document.getElementById('tbl-tbody');
 
@@ -984,7 +985,7 @@
       agg.children.push(r);
     });
 
-    const g1List = Object.values(g1Map).sort(cmpRows);
+    const g1List = Object.values(g1Map).filter(r => !_allZero(r)).sort(cmpRows);
 
     let html = '';
     g1List.forEach(g => {
