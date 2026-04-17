@@ -190,11 +190,9 @@ async def fsa_report_section4(request: Request, year: int = 2026, quarter: int =
             for row in cur.fetchall():
                 country_counts[row[0]] = {"active": row[1] or 0, "inactive": row[2] or 0}
 
-            # Query 2: Trading volume per country
-            # Matches performance report / PBI formula:
-            #   - Open positions (dealio_positions) by open_time
-            #   - Closed trades (dealio_trades_mt5 entry=1) mapped back to open_time via position_id
-            # AW rolled into NL
+            # Query 2: Open volume per country
+            # Same as performance report / PBI: dealio_positions + closed trades
+            # mapped back to open_time via position_id
             vol_params = {"q_start": q_start, "q_end_excl": q_end_excl,
                           "countries": FSA_COUNTRIES_FILTER}
 
@@ -239,6 +237,25 @@ async def fsa_report_section4(request: Request, year: int = 2026, quarter: int =
             country_volume = {}
             for row in cur.fetchall():
                 country_volume[row[0]] = float(row[1] or 0)
+
+            # Query 3: Close volume per country (entry=1 by close_time)
+            cur.execute(f"""
+                SELECT
+                    CASE WHEN a.country_iso = 'AW' THEN 'NL' ELSE a.country_iso END AS country_iso,
+                    COALESCE(SUM(t.notional_value), 0)
+                FROM dealio_trades_mt5 t
+                JOIN trading_accounts ta ON ta.login::bigint = t.login
+                JOIN accounts a ON a.accountid = ta.vtigeraccountid
+                WHERE t.close_time >= %(q_start)s AND t.close_time < %(q_end_excl)s
+                  AND t.entry = 1
+                  AND t.close_time > '1971-01-01'
+                  AND a.is_test_account = 0
+                  AND {base_filter}
+                  AND a.country_iso IN %(countries)s
+                GROUP BY CASE WHEN a.country_iso = 'AW' THEN 'NL' ELSE a.country_iso END
+            """, vol_params)
+            for row in cur.fetchall():
+                country_volume[row[0]] = country_volume.get(row[0], 0) + float(row[1] or 0)
 
         # Build response per country
         countries = []
