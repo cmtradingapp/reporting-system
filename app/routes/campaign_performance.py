@@ -5,7 +5,7 @@ from fastapi.templating import Jinja2Templates
 from app.auth.dependencies import get_current_user
 from app.db.postgres_conn import get_connection
 from app import cache
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 _TZ = ZoneInfo("Europe/Nicosia")
@@ -284,10 +284,18 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
     kpi_cu_join = "LEFT JOIN crm_users cu ON cu.id = a.assigned_to" if kpi_needs_cu else ""
     all_extra = f"{extra_where} {camp_filter_where}".strip()
 
+    # Only use mv_account_stats shortcut when viewing current month with no filters
+    _now = datetime.now(_TZ).date()
+    _is_current_month = (
+        not all_extra
+        and date_from == date(_now.year, _now.month, 1).strftime("%Y-%m-%d")
+        and date_to == _now.strftime("%Y-%m-%d")
+    )
+
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            if not all_extra:
+            if _is_current_month:
                 cur.execute("""
                     SELECT new_leads_today, new_leads_month, new_live_today, new_live_month
                     FROM mv_account_stats LIMIT 1
@@ -420,20 +428,17 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
 
             base_p = {"date_from": date_from, "date_to_excl": date_to_exclusive,
                       **qual_params, **camp_filter_params}
-            # Traders from mv_volume_stats (pre-aggregated, much faster)
+            # Traders — exact same logic as Total Traders page
             cur.execute(f"""
-                SELECT COUNT(DISTINCT v.accountid)
-                FROM mv_volume_stats v
-                JOIN accounts a ON a.accountid = v.accountid
-                {camp_join}
-                {kpi_cu_join}
-                WHERE v.has_positive_notional = 1
-                  AND v.open_date >= %(date_from)s
-                  AND v.open_date <  %(date_to_excl)s
-                  AND a.is_test_account = 0
-                {_ACCT_FILTERS}
-                {extra_where}
-                {camp_filter_where}
+                SELECT COUNT(DISTINCT rt.accountid)
+                FROM mv_retention_traders rt
+                LEFT JOIN crm_users u ON u.id = rt.assigned_to
+                WHERE rt.accountid IS NOT NULL AND rt.accountid::text != ''
+                  AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
+                  AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
+                  AND u.department_ = 'Retention'
+                  AND rt.day >= %(date_from)s
+                  AND rt.day <  %(date_to_excl)s
             """, base_p)
             row = cur.fetchone()
             traders_count = int(row[0] or 0) if row else 0
@@ -793,11 +798,11 @@ def _camp_table_calc(
                 f_segmentation=f_segmentation
             )
             if period == "day":
-                tr_period_sql = "v.open_date"
+                tr_period_sql = "rt.day"
             elif period == "month":
-                tr_period_sql = "date_trunc('month', v.open_date)::date"
+                tr_period_sql = "date_trunc('month', rt.day)::date"
             elif period == "year":
-                tr_period_sql = "date_trunc('year', v.open_date)::date"
+                tr_period_sql = "date_trunc('year', rt.day)::date"
             else:
                 tr_period_sql = ""
 
@@ -810,13 +815,17 @@ def _camp_table_calc(
 
             traders_sql = (
                 f"SELECT {', '.join(tr_sel)}"
-                " FROM mv_volume_stats v"
-                " JOIN accounts a ON a.accountid = v.accountid"
+                " FROM mv_retention_traders rt"
+                " JOIN accounts a ON a.accountid = rt.accountid"
+                " LEFT JOIN crm_users u ON u.id = rt.assigned_to"
                 " LEFT JOIN campaigns c ON SPLIT_PART(a.campaign, '.', 1) = c.crmid"
                 f"{extra_joins}"
-                " WHERE v.has_positive_notional = 1"
-                "   AND v.open_date >= %(date_from)s"
-                "   AND v.open_date <  %(date_to_excl)s"
+                " WHERE rt.accountid IS NOT NULL AND rt.accountid::text != ''"
+                "   AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'"
+                "   AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'"
+                "   AND u.department_ = 'Retention'"
+                "   AND rt.day >= %(date_from)s"
+                "   AND rt.day <  %(date_to_excl)s"
                 "   AND a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)"
                 + _ACCT_FILTERS +
                 f"\n{traders_filter_where}"
