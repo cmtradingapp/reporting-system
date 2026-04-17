@@ -54,7 +54,7 @@ GROUP_LABELS = {
     "agent_name":           "Agent",
     "agent_team":           "Agent Team",
     "country":              "Country",
-    "client_classification": "Client Classification Category",
+    "client_classification": "Sales Client Potential",
     "segmentation":         "Segmentation",
     "none":                 "",
 }
