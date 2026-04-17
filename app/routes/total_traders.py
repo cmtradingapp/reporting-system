@@ -287,6 +287,19 @@ async def total_traders_api(
           {role_sql}
     """
 
+    # Daily NET $ (for chart tooltip)
+    net_daily_sql = f"""
+        SELECT k.tx_date AS day, SUM(k.net_usd)::float AS net_usd
+        FROM mv_daily_kpis k
+        JOIN crm_users u ON u.id = k.agent_id
+        WHERE u.department_ = 'Retention'
+          AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
+          AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
+          AND k.tx_date >= %(date_from)s AND k.tx_date < %(date_to_excl)s
+          {role_sql}
+        GROUP BY 1
+    """
+
     is_admin = user.get("role") == "admin"
 
     # ── Matrix queries: per-agent, per-day breakdown (role-filtered) ───────
@@ -537,6 +550,9 @@ async def total_traders_api(
             cur.execute(depositors_total_sql, params)
             deps_total = int(cur.fetchone()[0] or 0)
 
+            cur.execute(net_daily_sql, params)
+            net_map = {r[0].strftime("%Y-%m-%d"): round(float(r[1]), 2) for r in cur.fetchall()}
+
             # Matrix: per-agent per-day breakdown (role-filtered for all users)
             cur.execute(matrix_agents_sql, params)
             agents = [{"id": r[0], "office_name": r[1], "dept_name": r[2], "agent_name": r[3]}
@@ -590,7 +606,7 @@ async def total_traders_api(
     finally:
         conn.close()
 
-    labels, traders_series, deps_series, avg_score_series = [], [], [], []
+    labels, traders_series, deps_series, avg_score_series, net_series = [], [], [], [], []
     cur_d = dt_from
     while cur_d <= dt_end:
         # Skip weekends (Saturday=5, Sunday=6)
@@ -600,6 +616,7 @@ async def total_traders_api(
             traders_series.append(traders_map.get(key, 0))
             deps_series.append(deps_map.get(key, 0))
             avg_score_series.append(avg_score_map.get(key, 0))
+            net_series.append(net_map.get(key, 0))
         cur_d += timedelta(days=1)
 
     result = {
@@ -616,6 +633,7 @@ async def total_traders_api(
             "traders": traders_series,
             "depositors": deps_series,
             "avg_score": avg_score_series,
+            "net": net_series,
         },
     }
     if matrix_data:

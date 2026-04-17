@@ -412,6 +412,7 @@ function renderChart(d) {
   const ctx = document.getElementById('chart').getContext('2d');
   if (chart) chart.destroy();
   const labels = d.series.labels.map(fmtDateLabel);
+  const netData = d.series.net || [];
   chart = new Chart(ctx, {
     plugins: [ChartDataLabels],
     data: {
@@ -446,7 +447,21 @@ function renderChart(d) {
       layout: { padding: { top: 20 } },
       plugins: {
         legend: { labels: { color: '#c9d1d9' } },
-        tooltip: { mode: 'index', intersect: false },
+        tooltip: {
+          mode: 'index', intersect: false,
+          callbacks: {
+            afterBody: function(items) {
+              if (!items.length) return '';
+              const idx = items[0].dataIndex;
+              const n = netData[idx] || 0;
+              const sign = n >= 0 ? '' : '-';
+              const abs = Math.abs(n);
+              const formatted = abs >= 1000 ? Math.round(abs).toLocaleString('en-US') : abs.toFixed(2);
+              const color = n >= 0 ? '#3fb950' : '#f85149';
+              return `NET $: ${sign}$${formatted}`;
+            }
+          }
+        },
       },
       interaction: { mode: 'index', intersect: false },
       scales: {
