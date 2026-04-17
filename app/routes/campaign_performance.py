@@ -826,8 +826,6 @@ def _camp_table_calc(
                 "   AND u.department_ = 'Retention'"
                 "   AND rt.day >= %(date_from)s"
                 "   AND rt.day <  %(date_to_excl)s"
-                "   AND a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)"
-                + _ACCT_FILTERS +
                 f"\n{traders_filter_where}"
             )
             if tr_grp:

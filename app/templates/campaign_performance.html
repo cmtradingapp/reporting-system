@@ -679,7 +679,7 @@
       netEl.textContent = fmtMoney(v);
       netEl.style.color = v >= 0 ? '#3fb950' : '#f85149';
     }
-    // traders card is set by updateKpiFromTableTotals (matches Total Traders page)
+    s('stat-traders', (data.traders_count ?? 0).toLocaleString('en-US'));
   }
 
   // ── Table state ──────────────────────────────────────────────────────────
