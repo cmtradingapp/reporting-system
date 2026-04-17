@@ -370,6 +370,9 @@
   // Section tab switching
   let activeSec = '3';
   const secTabs = document.querySelectorAll('.section-tab:not(.disabled)');
+  const cache = {};  // key: "section-year-quarter" -> data
+  function cacheKey(sec, y, q){ return sec+'-'+y+'-'+q; }
+
   secTabs.forEach(t => t.addEventListener('click', ()=>{
     secTabs.forEach(x => x.classList.remove('active'));
     t.classList.add('active');
@@ -385,12 +388,74 @@
   function load(){
     const year = +yearSel.value;
     const quarter = getQ();
-    document.getElementById('loading').style.display = 'block';
     document.getElementById('error-msg').style.display = 'none';
     hideAllSections();
 
+    const ck = cacheKey(activeSec, year, quarter);
+    if(cache[ck]){
+      if(activeSec === '3') renderSection3(cache[ck]);
+      else if(activeSec === '4') renderSection4(cache[ck]);
+      return;
+    }
+
+    document.getElementById('loading').style.display = 'block';
     if(activeSec === '3') loadSection3(year, quarter);
     else if(activeSec === '4') loadSection4(year, quarter);
+
+    // Prefetch the other section in background
+    const otherSec = activeSec === '3' ? '4' : '3';
+    const ock = cacheKey(otherSec, year, quarter);
+    if(!cache[ock]){
+      fetch(`/api/fsa-report/section${otherSec}?year=${year}&quarter=${quarter}`)
+        .then(r => r.json())
+        .then(d => { if(!d.error) cache[ock] = d; })
+        .catch(()=>{});
+    }
+  }
+
+  function renderSection3(d){
+    const c = d.counts;
+    document.getElementById('active-bop').textContent = fmt(c.active_bop);
+    document.getElementById('inactive-bop').textContent = fmt(c.inactive_bop);
+    document.getElementById('total-bop').textContent = fmt(c.active_bop + c.inactive_bop);
+    document.getElementById('active-eop').textContent = fmt(c.active_eop);
+    document.getElementById('inactive-eop').textContent = fmt(c.inactive_eop);
+    document.getElementById('total-eop').textContent = fmt(c.active_eop + c.inactive_eop);
+    document.getElementById('net-active').textContent = fmt(c.active_eop - c.active_bop);
+    document.getElementById('net-inactive').textContent = fmt(c.inactive_eop - c.inactive_bop);
+    document.getElementById('net-total').textContent = fmt((c.active_eop+c.inactive_eop) - (c.active_bop+c.inactive_bop));
+
+    const newClients = (c.active_eop + c.inactive_eop) - (c.active_bop + c.inactive_bop);
+    document.getElementById('new-clients').textContent = fmt(Math.max(newClients, 0));
+    document.getElementById('clients-funds').textContent = fmtUSD(d.clients_funds);
+    document.getElementById('classification').textContent = fmt(c.active_eop + c.inactive_eop);
+
+    const ag = d.age_groups;
+    const ageKeys = [
+      ['under_18','u18'],['18_25','18-25'],['26_35','26-35'],['36_45','36-45'],
+      ['46_55','46-55'],['56_65','56-65'],['over_65','65p']
+    ];
+    let ageTotal = 0;
+    ageKeys.forEach(([k]) => { ageTotal += ag[k]; });
+    ageKeys.forEach(([k, id]) => {
+      document.getElementById('age-'+id).textContent = fmt(ag[k]);
+      document.getElementById('pct-'+id).textContent = pct(ag[k], ageTotal);
+    });
+    document.getElementById('age-total').textContent = fmt(ageTotal);
+
+    const cls = d.classification;
+    const ta = cls.total_active;
+    document.getElementById('cls-pep').textContent = fmt(cls.pep);
+    document.getElementById('cls-pep-pct').textContent = pct(cls.pep, ta);
+    document.getElementById('cls-pep-total').textContent = fmt(cls.pep);
+    document.getElementById('cls-pep-total-pct').textContent = pct(cls.pep, ta);
+    document.getElementById('cls-nftf').textContent = fmt(ta);
+    document.getElementById('cls-nftf-pct').textContent = '100.00%';
+    document.getElementById('cls-nftf-total').textContent = fmt(ta);
+    document.getElementById('cls-nftf-total-pct').textContent = '100.00%';
+
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('section3').style.display = 'block';
   }
 
   function loadSection3(year, quarter){
@@ -398,51 +463,55 @@
       .then(r => r.json())
       .then(d => {
         if(d.error){ throw new Error(d.error); }
-        const c = d.counts;
-
-        document.getElementById('active-bop').textContent = fmt(c.active_bop);
-        document.getElementById('inactive-bop').textContent = fmt(c.inactive_bop);
-        document.getElementById('total-bop').textContent = fmt(c.active_bop + c.inactive_bop);
-        document.getElementById('active-eop').textContent = fmt(c.active_eop);
-        document.getElementById('inactive-eop').textContent = fmt(c.inactive_eop);
-        document.getElementById('total-eop').textContent = fmt(c.active_eop + c.inactive_eop);
-        document.getElementById('net-active').textContent = fmt(c.active_eop - c.active_bop);
-        document.getElementById('net-inactive').textContent = fmt(c.inactive_eop - c.inactive_bop);
-        document.getElementById('net-total').textContent = fmt((c.active_eop+c.inactive_eop) - (c.active_bop+c.inactive_bop));
-
-        const newClients = (c.active_eop + c.inactive_eop) - (c.active_bop + c.inactive_bop);
-        document.getElementById('new-clients').textContent = fmt(Math.max(newClients, 0));
-        document.getElementById('clients-funds').textContent = fmtUSD(d.clients_funds);
-        document.getElementById('classification').textContent = fmt(c.active_eop + c.inactive_eop);
-
-        const ag = d.age_groups;
-        const ageKeys = [
-          ['under_18','u18'],['18_25','18-25'],['26_35','26-35'],['36_45','36-45'],
-          ['46_55','46-55'],['56_65','56-65'],['over_65','65p']
-        ];
-        let ageTotal = 0;
-        ageKeys.forEach(([k]) => { ageTotal += ag[k]; });
-        ageKeys.forEach(([k, id]) => {
-          document.getElementById('age-'+id).textContent = fmt(ag[k]);
-          document.getElementById('pct-'+id).textContent = pct(ag[k], ageTotal);
-        });
-        document.getElementById('age-total').textContent = fmt(ageTotal);
-
-        const cls = d.classification;
-        const ta = cls.total_active;
-        document.getElementById('cls-pep').textContent = fmt(cls.pep);
-        document.getElementById('cls-pep-pct').textContent = pct(cls.pep, ta);
-        document.getElementById('cls-pep-total').textContent = fmt(cls.pep);
-        document.getElementById('cls-pep-total-pct').textContent = pct(cls.pep, ta);
-        document.getElementById('cls-nftf').textContent = fmt(ta);
-        document.getElementById('cls-nftf-pct').textContent = '100.00%';
-        document.getElementById('cls-nftf-total').textContent = fmt(ta);
-        document.getElementById('cls-nftf-total-pct').textContent = '100.00%';
-
-        document.getElementById('loading').style.display = 'none';
-        document.getElementById('section3').style.display = 'block';
+        cache[cacheKey('3', year, quarter)] = d;
+        renderSection3(d);
       })
       .catch(showError);
+  }
+
+  function renderSection4(d){
+    const tbody = document.getElementById('s4-tbody');
+    tbody.innerHTML = '';
+    let totAct=0, totInact=0, totCfds=0;
+    const grandTotal = d.countries.reduce((s,c) => s + c.active + c.inactive, 0);
+
+    d.countries.forEach(c => {
+      const total = c.active + c.inactive;
+      totAct += c.active; totInact += c.inactive; totCfds += c.cfds;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="row-header">${c.name}</td>
+        <td>Yes</td>
+        <td style="border-left:1px solid #30363d">${fmt(c.active)}</td>
+        <td>${fmt(c.inactive)}</td>
+        <td>${fmt(total)}</td>
+        <td style="border-left:1px solid #30363d">${pct(c.active, grandTotal)}</td>
+        <td>${pct(c.inactive, grandTotal)}</td>
+        <td>${pct(total, grandTotal)}</td>
+        <td style="border-left:1px solid #30363d">${fmtUSD(c.cfds)}</td>
+        <td>${fmtUSD(c.cfds)}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    const totAll = totAct + totInact;
+    const totRow = document.getElementById('s4-totals');
+    totRow.innerHTML = `
+      <td class="row-header">Total</td>
+      <td></td>
+      <td style="border-left:1px solid #30363d">${fmt(totAct)}</td>
+      <td>${fmt(totInact)}</td>
+      <td>${fmt(totAll)}</td>
+      <td style="border-left:1px solid #30363d">${pct(totAct, totAll)}</td>
+      <td>${pct(totInact, totAll)}</td>
+      <td>100%</td>
+      <td style="border-left:1px solid #30363d">${fmtUSD(totCfds)}</td>
+      <td>${fmtUSD(totCfds)}</td>
+    `;
+
+    document.getElementById('s4-total-value').textContent = fmtUSD(totCfds);
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('section4').style.display = 'block';
   }
 
   function loadSection4(year, quarter){
@@ -450,48 +519,8 @@
       .then(r => r.json())
       .then(d => {
         if(d.error){ throw new Error(d.error); }
-        const tbody = document.getElementById('s4-tbody');
-        tbody.innerHTML = '';
-        let totAct=0, totInact=0, totCfds=0;
-        const grandTotal = d.countries.reduce((s,c) => s + c.active + c.inactive, 0);
-
-        d.countries.forEach(c => {
-          const total = c.active + c.inactive;
-          totAct += c.active; totInact += c.inactive; totCfds += c.cfds;
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td class="row-header">${c.name}</td>
-            <td>Yes</td>
-            <td style="border-left:1px solid #30363d">${fmt(c.active)}</td>
-            <td>${fmt(c.inactive)}</td>
-            <td>${fmt(total)}</td>
-            <td style="border-left:1px solid #30363d">${pct(c.active, grandTotal)}</td>
-            <td>${pct(c.inactive, grandTotal)}</td>
-            <td>${pct(total, grandTotal)}</td>
-            <td style="border-left:1px solid #30363d">${fmtUSD(c.cfds)}</td>
-            <td>${fmtUSD(c.cfds)}</td>
-          `;
-          tbody.appendChild(tr);
-        });
-
-        const totAll = totAct + totInact;
-        const totRow = document.getElementById('s4-totals');
-        totRow.innerHTML = `
-          <td class="row-header">Total</td>
-          <td></td>
-          <td style="border-left:1px solid #30363d">${fmt(totAct)}</td>
-          <td>${fmt(totInact)}</td>
-          <td>${fmt(totAll)}</td>
-          <td style="border-left:1px solid #30363d">${pct(totAct, totAll)}</td>
-          <td>${pct(totInact, totAll)}</td>
-          <td>100%</td>
-          <td style="border-left:1px solid #30363d">${fmtUSD(totCfds)}</td>
-          <td>${fmtUSD(totCfds)}</td>
-        `;
-
-        document.getElementById('s4-total-value').textContent = fmtUSD(totCfds);
-        document.getElementById('loading').style.display = 'none';
-        document.getElementById('section4').style.display = 'block';
+        cache[cacheKey('4', year, quarter)] = d;
+        renderSection4(d);
       })
       .catch(showError);
   }
