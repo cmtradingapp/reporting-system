@@ -17,16 +17,6 @@ FSA_COUNTRY_NAMES = {
     'CM': 'Cameroon', 'KE': 'Kenya', 'SE': 'Sweden', 'ZM': 'Zambia',
     'DK': 'Denmark', 'NL': 'Netherlands', 'ES': 'Spain', 'FI': 'Finland', 'NO': 'Norway',
 }
-EXCLUDED_SYMBOLS = (
-    'Cashback','CFDRollover','CommEUR','CommUSD','CommGBP','CommJPY',
-    'CorrectiEUR','CorrectiGBP','CorrectiJPY','Correction',
-    'CredExp','CredExpEUR','CredExpGBP','CredExpJPY',
-    'Dividend','DividendEUR','DividendGBP','DividendJPY',
-    'Dormant','EarnedCr','EarnedCrEUR','FEE','INACT-FEE',
-    'Inactivity','Rollover','SPREAD',
-    'ZeroingEUR','ZeroingGBP','ZeroingJPY','ZeroingKES',
-    'ZeroingNGN','ZeroingUSD','ZeroingZAR',
-)
 
 def _quarter_dates(year: int, quarter: int):
     q_start_month = (quarter - 1) * 3 + 1
@@ -200,48 +190,55 @@ async def fsa_report_section4(request: Request, year: int = 2026, quarter: int =
             for row in cur.fetchall():
                 country_counts[row[0]] = {"active": row[1] or 0, "inactive": row[2] or 0}
 
-            # Query 2: Trading value from dealio_trades_mt5
-            # open volume (entry=0, by open_time) + close volume (entry=1, by close_time)
-            trade_join = f"""
-                JOIN trading_accounts ta ON ta.login::bigint = t.login
-                JOIN accounts a ON a.accountid = ta.vtigeraccountid
-            """
-            trade_base = f"""
-                AND t.cmd IN (0, 1)
-                AND t.symbol NOT IN %(excl)s
-                AND {base_filter}
-                AND a.country_iso IN %(countries)s
-            """
-            params = {"q_start": q_start, "q_end_excl": q_end_excl,
-                      "countries": FSA_COUNTRIES_FILTER, "excl": EXCLUDED_SYMBOLS}
+            # Query 2: Trading volume per country
+            # Matches performance report / PBI formula:
+            #   - Open positions (dealio_positions) by open_time
+            #   - Closed trades (dealio_trades_mt5 entry=1) mapped back to open_time via position_id
+            # AW rolled into NL
+            vol_params = {"q_start": q_start, "q_end_excl": q_end_excl,
+                          "countries": FSA_COUNTRIES_FILTER}
 
-            # Open volume (entry=0, filtered by open_time); AW rolled into NL
             cur.execute(f"""
-                SELECT CASE WHEN a.country_iso = 'AW' THEN 'NL' ELSE a.country_iso END AS country_iso,
-                       COALESCE(SUM(t.notional_value), 0)
-                FROM dealio_trades_mt5 t {trade_join}
-                WHERE t.open_time >= %(q_start)s AND t.open_time < %(q_end_excl)s
-                  AND t.entry = 0
-                  {trade_base}
-                GROUP BY CASE WHEN a.country_iso = 'AW' THEN 'NL' ELSE a.country_iso END
-            """, params)
+                SELECT country_iso, COALESCE(SUM(notional_usd), 0)
+                FROM (
+                    -- Open positions by open_time
+                    SELECT
+                        CASE WHEN a.country_iso = 'AW' THEN 'NL' ELSE a.country_iso END AS country_iso,
+                        p.notional_value AS notional_usd
+                    FROM dealio_positions p
+                    JOIN trading_accounts ta ON ta.login::bigint = p.login
+                    JOIN accounts a ON a.accountid = ta.vtigeraccountid
+                    WHERE p.open_time::date >= %(q_start)s AND p.open_time::date < %(q_end_excl)s
+                      AND ta.vtigeraccountid IS NOT NULL
+                      AND a.is_test_account = 0
+                      AND {base_filter}
+                      AND a.country_iso IN %(countries)s
+
+                    UNION ALL
+
+                    -- Closed trades (entry=1) mapped to open_time via position_id
+                    SELECT
+                        CASE WHEN a.country_iso = 'AW' THEN 'NL' ELSE a.country_iso END AS country_iso,
+                        ex.notional_value AS notional_usd
+                    FROM dealio_trades_mt5 ex
+                    JOIN dealio_trades_mt5 en ON en.position_id = ex.position_id
+                                             AND en.source_id = ex.source_id
+                                             AND en.entry = 0
+                    JOIN trading_accounts ta ON ta.login::bigint = ex.login
+                    JOIN accounts a ON a.accountid = ta.vtigeraccountid
+                    WHERE ex.entry = 1
+                      AND ex.close_time > '1971-01-01'
+                      AND en.open_time::date >= %(q_start)s AND en.open_time::date < %(q_end_excl)s
+                      AND ta.vtigeraccountid IS NOT NULL
+                      AND a.is_test_account = 0
+                      AND {base_filter}
+                      AND a.country_iso IN %(countries)s
+                ) combined
+                GROUP BY country_iso
+            """, vol_params)
             country_volume = {}
             for row in cur.fetchall():
                 country_volume[row[0]] = float(row[1] or 0)
-
-            # Close volume (entry=1, filtered by close_time); AW rolled into NL
-            cur.execute(f"""
-                SELECT CASE WHEN a.country_iso = 'AW' THEN 'NL' ELSE a.country_iso END AS country_iso,
-                       COALESCE(SUM(t.notional_value), 0)
-                FROM dealio_trades_mt5 t {trade_join}
-                WHERE t.close_time >= %(q_start)s AND t.close_time < %(q_end_excl)s
-                  AND t.entry = 1
-                  AND t.close_time > '1971-01-01'
-                  {trade_base}
-                GROUP BY CASE WHEN a.country_iso = 'AW' THEN 'NL' ELSE a.country_iso END
-            """, params)
-            for row in cur.fetchall():
-                country_volume[row[0]] = country_volume.get(row[0], 0) + float(row[1] or 0)
 
         # Build response per country
         countries = []
