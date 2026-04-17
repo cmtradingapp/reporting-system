@@ -68,6 +68,10 @@
     .matrix-table .chevron.open { transform:rotate(90deg); }
     .matrix-table .val-neg { color:#f85149; }
     .matrix-table .val-zero { color:#484f58; }
+    .matrix-table th.sortable { cursor:pointer; user-select:none; }
+    .matrix-table th.sortable:hover { background:#1f2937; }
+    .matrix-table th .sort-arrow { font-size:0.6rem; margin-left:2px; opacity:0.4; }
+    .matrix-table th.sort-active .sort-arrow { opacity:1; color:#58a6ff; }
     @media (max-width: 1024px) {
       .sidebar { display:none; }
       .main-content { margin-left:0; }
@@ -459,14 +463,16 @@ function renderMatrix(d) {
   const thead = document.getElementById('matrixThead');
   let h1 = '<tr><th class="col-name" rowspan="2">Office / Dept / Agent</th>';
   let h2 = '<tr>';
+  let colIdx = 1;
+  const arrow = '<span class="sort-arrow">▲</span>';
   days.forEach(day => {
     const parts = day.split('-');
     const label = parseInt(parts[2]) + '/' + parseInt(parts[1]) + '/' + parts[0];
     h1 += `<th class="date-group day-sep" colspan="4">${label}</th>`;
-    h2 += '<th class="date-sub day-sep">Traders</th><th class="date-sub">#Dep</th><th class="date-sub">NET</th><th class="date-sub">%Dep</th>';
+    h2 += `<th class="date-sub day-sep sortable" data-sort-col="${colIdx++}">Traders${arrow}</th><th class="date-sub sortable" data-sort-col="${colIdx++}">#Dep${arrow}</th><th class="date-sub sortable" data-sort-col="${colIdx++}">NET${arrow}</th><th class="date-sub sortable" data-sort-col="${colIdx++}">%Dep${arrow}</th>`;
   });
   h1 += '<th class="date-group day-sep" colspan="4" style="background:#1a2636;">Total</th></tr>';
-  h2 += '<th class="date-sub day-sep" style="background:#1a2636;">Traders</th><th class="date-sub" style="background:#1a2636;">#Dep</th><th class="date-sub" style="background:#1a2636;">NET</th><th class="date-sub" style="background:#1a2636;">%Dep</th></tr>';
+  h2 += `<th class="date-sub day-sep sortable" data-sort-col="${colIdx++}" style="background:#1a2636;">Traders${arrow}</th><th class="date-sub sortable" data-sort-col="${colIdx++}" style="background:#1a2636;">#Dep${arrow}</th><th class="date-sub sortable" data-sort-col="${colIdx++}" style="background:#1a2636;">NET${arrow}</th><th class="date-sub sortable" data-sort-col="${colIdx++}" style="background:#1a2636;">%Dep${arrow}</th></tr>`;
   thead.innerHTML = h1 + h2;
 
   // Index agent data: agentId -> { day -> {traders, depositors, net} }
@@ -677,6 +683,57 @@ function renderMatrix(d) {
           tbody.querySelectorAll(`tr.agent-row[data-parent-dept="${did}"]`).forEach(r => r.style.display = '');
         }
       });
+    });
+  }
+
+  // ── Sort handlers on sub-headers ─────────────────────────────────────
+  let matrixSortCol = null, matrixSortAsc = true;
+  thead.querySelectorAll('th.sortable').forEach(th => {
+    th.addEventListener('click', e => {
+      e.stopPropagation();
+      const col = parseInt(th.dataset.sortCol);
+      if (matrixSortCol === col) matrixSortAsc = !matrixSortAsc;
+      else { matrixSortCol = col; matrixSortAsc = false; } // default desc
+      thead.querySelectorAll('th.sortable').forEach(t => { t.classList.remove('sort-active'); t.querySelector('.sort-arrow').textContent = '▲'; });
+      th.classList.add('sort-active');
+      th.querySelector('.sort-arrow').textContent = matrixSortAsc ? '▲' : '▼';
+      sortMatrixByCol(col, matrixSortAsc);
+    });
+  });
+
+  function parseCellVal(tr, col) {
+    const td = tr.children[col];
+    if (!td) return 0;
+    const txt = (td.textContent || '').replace(/[,%]/g, '').trim();
+    if (txt === '' || txt === '—') return 0;
+    return parseFloat(txt) || 0;
+  }
+
+  function sortMatrixByCol(col, asc) {
+    const tbody = document.getElementById('matrixTbody');
+    // Collect office groups: [{offTr, depts: [{deptTr, agents: [agTr...]}]}]
+    const groups = [];
+    let cur = null, curDept = null;
+    Array.from(tbody.children).forEach(tr => {
+      if (tr.classList.contains('office-row')) {
+        cur = { offTr: tr, depts: [] }; curDept = null; groups.push(cur);
+      } else if (tr.classList.contains('dept-row') && cur) {
+        curDept = { deptTr: tr, agents: [] }; cur.depts.push(curDept);
+      } else if (tr.classList.contains('agent-row') && curDept) {
+        curDept.agents.push(tr);
+      }
+    });
+    const cmp = (a, b) => asc ? a - b : b - a;
+    // Sort agents within each dept
+    groups.forEach(g => g.depts.forEach(d => d.agents.sort((a, b) => cmp(parseCellVal(a, col), parseCellVal(b, col)))));
+    // Sort depts within each office
+    groups.forEach(g => g.depts.sort((a, b) => cmp(parseCellVal(a.deptTr, col), parseCellVal(b.deptTr, col))));
+    // Sort offices
+    groups.sort((a, b) => cmp(parseCellVal(a.offTr, col), parseCellVal(b.offTr, col)));
+    // Re-append in order
+    groups.forEach(g => {
+      tbody.appendChild(g.offTr);
+      g.depts.forEach(d => { tbody.appendChild(d.deptTr); d.agents.forEach(a => tbody.appendChild(a)); });
     });
   }
 
