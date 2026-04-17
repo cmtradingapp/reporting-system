@@ -287,15 +287,31 @@ async def total_traders_api(
           {role_sql}
     """
 
-    # Daily NET $ (for chart tooltip)
-    net_daily_sql = f"""
-        SELECT k.tx_date AS day, SUM(k.net_usd)::float AS net_usd
-        FROM mv_daily_kpis k
-        JOIN crm_users u ON u.id = k.agent_id
-        WHERE u.department_ = 'Retention'
+    # Daily NET $ (for chart tooltip) — uses raw transactions so all filters apply
+    _net_base = """
+        FROM transactions t
+        JOIN accounts a ON a.accountid = t.vtigeraccountid
+        LEFT JOIN crm_users u ON u.id = t.original_deposit_owner
+        WHERE t.transactionapproval = 'Approved'
+          AND (t.deleted = 0 OR t.deleted IS NULL)
+          AND t.transaction_type_name IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
+          AND t.vtigeraccountid IS NOT NULL
+          AND a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)
+          AND a.accountid IS NOT NULL AND a.accountid::text != ''
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
-          AND k.tx_date >= %(date_from)s AND k.tx_date < %(date_to_excl)s
+          AND u.department_ = 'Retention'
+          AND t.confirmation_time >= %(date_from)s::date
+          AND t.confirmation_time <  %(date_to_excl)s::date
+    """
+    net_daily_sql = f"""
+        SELECT t.confirmation_time::date AS day,
+               COALESCE(SUM(CASE
+                 WHEN t.transaction_type_name IN ('Deposit','Withdrawal Cancelled') THEN t.usdamount
+                 WHEN t.transaction_type_name IN ('Withdrawal','Deposit Cancelled') THEN -t.usdamount
+               END), 0)::float AS net_usd
+        {_net_base}
+          {filters_sql}
           {role_sql}
         GROUP BY 1
     """
@@ -351,14 +367,13 @@ async def total_traders_api(
         GROUP BY 1, 2
     """
     matrix_net_sql = f"""
-        SELECT k.agent_id, k.tx_date AS day,
-               SUM(k.net_usd)::float AS net_usd
-        FROM mv_daily_kpis k
-        JOIN crm_users u ON u.id = k.agent_id
-        WHERE u.department_ = 'Retention'
-          AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
-          AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
-          AND k.tx_date >= %(date_from)s AND k.tx_date < %(date_to_excl)s
+        SELECT t.original_deposit_owner AS agent_id, t.confirmation_time::date AS day,
+               COALESCE(SUM(CASE
+                 WHEN t.transaction_type_name IN ('Deposit','Withdrawal Cancelled') THEN t.usdamount
+                 WHEN t.transaction_type_name IN ('Withdrawal','Deposit Cancelled') THEN -t.usdamount
+               END), 0)::float AS net_usd
+        {_net_base}
+          {filters_sql}
           {role_sql}
         GROUP BY 1, 2
     """
@@ -458,13 +473,13 @@ async def total_traders_api(
     """
     # NET total per agent (sum is correct for NET, no distinct needed)
     matrix_net_total_sql = f"""
-        SELECT k.agent_id, SUM(k.net_usd)::float AS net_usd
-        FROM mv_daily_kpis k
-        JOIN crm_users u ON u.id = k.agent_id
-        WHERE u.department_ = 'Retention'
-          AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
-          AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
-          AND k.tx_date >= %(date_from)s AND k.tx_date < %(date_to_excl)s
+        SELECT t.original_deposit_owner AS agent_id,
+               COALESCE(SUM(CASE
+                 WHEN t.transaction_type_name IN ('Deposit','Withdrawal Cancelled') THEN t.usdamount
+                 WHEN t.transaction_type_name IN ('Withdrawal','Deposit Cancelled') THEN -t.usdamount
+               END), 0)::float AS net_usd
+        {_net_base}
+          {filters_sql}
           {role_sql}
         GROUP BY 1
     """
