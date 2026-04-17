@@ -184,7 +184,7 @@ async def total_traders_api(
 
     def _ck_part(v): return ",".join(sorted(v)) if v else ""
     _user_role = user.get("role", "")
-    _ck = (f"total_traders_v7:{date_from}:{end_date}:{_ck_part(f_office)}:{_ck_part(f_team)}"
+    _ck = (f"total_traders_v8:{date_from}:{end_date}:{_ck_part(f_office)}:{_ck_part(f_team)}"
            f":{f_classification}:{ftc_groups}:{_user_role}")
     _hit = cache.get(_ck)
     if _hit is not None:
@@ -349,6 +349,64 @@ async def total_traders_api(
           {role_sql}
         GROUP BY 1, 2
     """
+    # Avg score per agent per day
+    matrix_avg_score_sql = f"""
+        SELECT rt.assigned_to AS agent_id, rt.day,
+               ROUND(AVG(
+                 CASE
+                   WHEN a.classification_int IS NOT NULL AND a.classification_int > 0
+                     THEN a.classification_int
+                   WHEN a.birth_date IS NOT NULL
+                     THEN CASE
+                       WHEN DATE_PART('year', AGE(rt.day, a.birth_date::date)) < 25 THEN 3
+                       WHEN DATE_PART('year', AGE(rt.day, a.birth_date::date)) < 30 THEN 5
+                       WHEN DATE_PART('year', AGE(rt.day, a.birth_date::date)) < 40 THEN 6
+                       ELSE 7
+                     END
+                   ELSE NULL
+                 END
+               ), 2) AS avg_score
+        FROM mv_retention_traders rt
+        JOIN accounts a ON a.accountid = rt.accountid
+        LEFT JOIN crm_users u ON u.id = rt.assigned_to
+        WHERE rt.accountid IS NOT NULL AND rt.accountid::text != ''
+          AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
+          AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
+          AND u.department_ = 'Retention'
+          AND rt.day >= %(date_from)s AND rt.day < %(date_to_excl)s
+          {filters_sql}
+          {role_sql}
+        GROUP BY 1, 2
+    """
+    matrix_avg_score_total_sql = f"""
+        SELECT rt.assigned_to AS agent_id,
+               ROUND(AVG(
+                 CASE
+                   WHEN a.classification_int IS NOT NULL AND a.classification_int > 0
+                     THEN a.classification_int
+                   WHEN a.birth_date IS NOT NULL
+                     THEN CASE
+                       WHEN DATE_PART('year', AGE(%(ref_date)s::date, a.birth_date::date)) < 25 THEN 3
+                       WHEN DATE_PART('year', AGE(%(ref_date)s::date, a.birth_date::date)) < 30 THEN 5
+                       WHEN DATE_PART('year', AGE(%(ref_date)s::date, a.birth_date::date)) < 40 THEN 6
+                       ELSE 7
+                     END
+                   ELSE NULL
+                 END
+               ), 2) AS avg_score
+        FROM mv_retention_traders rt
+        JOIN accounts a ON a.accountid = rt.accountid
+        LEFT JOIN crm_users u ON u.id = rt.assigned_to
+        WHERE rt.accountid IS NOT NULL AND rt.accountid::text != ''
+          AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
+          AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
+          AND u.department_ = 'Retention'
+          AND rt.day >= %(date_from)s AND rt.day < %(date_to_excl)s
+          {filters_sql}
+          {role_sql}
+        GROUP BY 1
+    """
+
     # Distinct totals per agent (not sum of daily — an account active on multiple days counts once)
     matrix_traders_total_sql = f"""
         SELECT a.assigned_to AS agent_id,
@@ -398,6 +456,65 @@ async def total_traders_api(
         GROUP BY 1
     """
 
+    # Avg Sales Client Potential per day (with age-based fallback for NULL/0)
+    avg_score_daily_sql = f"""
+        SELECT rt.day,
+               ROUND(AVG(
+                 CASE
+                   WHEN a.classification_int IS NOT NULL AND a.classification_int > 0
+                     THEN a.classification_int
+                   WHEN a.birth_date IS NOT NULL
+                     THEN CASE
+                       WHEN DATE_PART('year', AGE(rt.day, a.birth_date::date)) < 25 THEN 3
+                       WHEN DATE_PART('year', AGE(rt.day, a.birth_date::date)) < 30 THEN 5
+                       WHEN DATE_PART('year', AGE(rt.day, a.birth_date::date)) < 40 THEN 6
+                       ELSE 7
+                     END
+                   ELSE NULL
+                 END
+               ), 2) AS avg_score
+        FROM mv_retention_traders rt
+        JOIN accounts a ON a.accountid = rt.accountid
+        LEFT JOIN crm_users u ON u.id = rt.assigned_to
+        WHERE rt.accountid IS NOT NULL AND rt.accountid::text != ''
+          AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
+          AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
+          AND u.department_ = 'Retention'
+          AND rt.day >= %(date_from)s
+          AND rt.day <  %(date_to_excl)s
+          {filters_sql}
+          {role_sql}
+        GROUP BY 1
+    """
+
+    avg_score_total_sql = f"""
+        SELECT ROUND(AVG(
+                 CASE
+                   WHEN a.classification_int IS NOT NULL AND a.classification_int > 0
+                     THEN a.classification_int
+                   WHEN a.birth_date IS NOT NULL
+                     THEN CASE
+                       WHEN DATE_PART('year', AGE(%(ref_date)s::date, a.birth_date::date)) < 25 THEN 3
+                       WHEN DATE_PART('year', AGE(%(ref_date)s::date, a.birth_date::date)) < 30 THEN 5
+                       WHEN DATE_PART('year', AGE(%(ref_date)s::date, a.birth_date::date)) < 40 THEN 6
+                       ELSE 7
+                     END
+                   ELSE NULL
+                 END
+               ), 2) AS avg_score
+        FROM mv_retention_traders rt
+        JOIN accounts a ON a.accountid = rt.accountid
+        LEFT JOIN crm_users u ON u.id = rt.assigned_to
+        WHERE rt.accountid IS NOT NULL AND rt.accountid::text != ''
+          AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
+          AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
+          AND u.department_ = 'Retention'
+          AND rt.day >= %(date_from)s
+          AND rt.day <  %(date_to_excl)s
+          {filters_sql}
+          {role_sql}
+    """
+
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -406,6 +523,13 @@ async def total_traders_api(
 
             cur.execute(traders_total_sql, params)
             traders_total = int(cur.fetchone()[0] or 0)
+
+            cur.execute(avg_score_daily_sql, params)
+            avg_score_map = {r[0].strftime("%Y-%m-%d"): float(r[1]) for r in cur.fetchall() if r[1] is not None}
+
+            cur.execute(avg_score_total_sql, params)
+            row = cur.fetchone()
+            avg_score_total = float(row[0]) if row and row[0] is not None else 0.0
 
             cur.execute(depositors_daily_sql, params)
             deps_map = {r[0].strftime("%Y-%m-%d"): int(r[1]) for r in cur.fetchall()}
@@ -442,6 +566,14 @@ async def total_traders_api(
             cur.execute(matrix_net_total_sql, params)
             m_net_total = {int(r[0]): round(float(r[1]), 2) for r in cur.fetchall()}
 
+            cur.execute(matrix_avg_score_sql, params)
+            m_avg_score = {}
+            for r in cur.fetchall():
+                m_avg_score.setdefault(int(r[0]), {})[r[1].strftime("%Y-%m-%d")] = float(r[2]) if r[2] else 0
+
+            cur.execute(matrix_avg_score_total_sql, params)
+            m_avg_score_total = {int(r[0]): float(r[1]) for r in cur.fetchall() if r[1] is not None}
+
             matrix_data = {
                 "agents": agents,
                 "traders": {str(k): v for k, v in m_traders.items()},
@@ -450,13 +582,15 @@ async def total_traders_api(
                 "totals_traders": {str(k): v for k, v in m_traders_total.items()},
                 "totals_depositors": {str(k): v for k, v in m_deps_total.items()},
                 "totals_net": {str(k): v for k, v in m_net_total.items()},
+                "avg_score": {str(k): v for k, v in m_avg_score.items()},
+                "totals_avg_score": {str(k): v for k, v in m_avg_score_total.items()},
             }
     except Exception as e:
         return JSONResponse(status_code=500, content={"detail": str(e)})
     finally:
         conn.close()
 
-    labels, traders_series, deps_series = [], [], []
+    labels, traders_series, deps_series, avg_score_series = [], [], [], []
     cur_d = dt_from
     while cur_d <= dt_end:
         # Skip weekends (Saturday=5, Sunday=6)
@@ -465,6 +599,7 @@ async def total_traders_api(
             labels.append(key)
             traders_series.append(traders_map.get(key, 0))
             deps_series.append(deps_map.get(key, 0))
+            avg_score_series.append(avg_score_map.get(key, 0))
         cur_d += timedelta(days=1)
 
     result = {
@@ -474,11 +609,13 @@ async def total_traders_api(
             "traders": traders_total,
             "depositors": deps_total,
             "depositor_pct": round((deps_total / traders_total * 100), 2) if traders_total else 0.0,
+            "avg_score": avg_score_total,
         },
         "series": {
             "labels": labels,
             "traders": traders_series,
             "depositors": deps_series,
+            "avg_score": avg_score_series,
         },
     }
     if matrix_data:

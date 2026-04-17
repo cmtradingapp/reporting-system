@@ -54,8 +54,8 @@
     .matrix-table th.date-group { text-align:center; border-bottom:none; font-size:0.95rem; font-weight:800; color:#e0e0e0; }
     .matrix-table th.date-sub { font-size:0.84rem; color:#8b949e; font-weight:600; }
     .matrix-table .day-sep { border-left:3px solid #539bf5 !important; }
-    .matrix-table td:nth-child(4n+2):not(.col-name) { padding-right:16px; }
-    .matrix-table td:nth-child(4n+3):not(.col-name) { padding-left:16px; }
+    .matrix-table td:nth-child(5n+2):not(.col-name) { padding-right:16px; }
+    .matrix-table td:nth-child(5n+3):not(.col-name) { padding-left:16px; }
     .matrix-table .office-row td { background:#1c2333; font-weight:700; color:#e0e0e0; cursor:pointer; }
     .matrix-table .office-row td.col-name { background:#1c2333; }
     .matrix-table .dept-row td { background:#151d2b; font-weight:600; color:#c9d1d9; cursor:pointer; }
@@ -222,25 +222,32 @@
 
   <!-- KPI cards -->
   <div class="row g-3 mb-4">
-    <div class="col-md-6 col-lg-4">
+    <div class="col-md-6 col-lg-3">
       <div class="kpi-card">
         <div class="kpi-label"><i class="bi bi-people me-1"></i>Total Traders</div>
         <div class="kpi-value" id="kpiTraders">—</div>
         <div class="kpi-sub" id="kpiPeriod">—</div>
       </div>
     </div>
-    <div class="col-md-6 col-lg-4">
+    <div class="col-md-6 col-lg-3">
       <div class="kpi-card">
         <div class="kpi-label"><i class="bi bi-cash-coin me-1"></i>Total Depositors</div>
         <div class="kpi-value" id="kpiDepositors">—</div>
         <div class="kpi-sub">Unique accounts with approved deposit</div>
       </div>
     </div>
-    <div class="col-md-6 col-lg-4">
+    <div class="col-md-6 col-lg-3">
       <div class="kpi-card">
         <div class="kpi-label"><i class="bi bi-percent me-1"></i>Depositors %</div>
         <div class="kpi-value" id="kpiDepositorPct">—</div>
         <div class="kpi-sub">Depositors / Traders</div>
+      </div>
+    </div>
+    <div class="col-md-6 col-lg-3">
+      <div class="kpi-card">
+        <div class="kpi-label"><i class="bi bi-star me-1"></i>Avg Sales Client Potential</div>
+        <div class="kpi-value" id="kpiAvgScore" style="color:#d29922;">—</div>
+        <div class="kpi-sub">Avg score of traders (1–10)</div>
       </div>
     </div>
   </div>
@@ -391,6 +398,7 @@ function renderKPIs(d) {
   document.getElementById('kpiTraders').textContent = fmt(d.totals.traders);
   document.getElementById('kpiDepositors').textContent = fmt(d.totals.depositors);
   document.getElementById('kpiDepositorPct').textContent = (d.totals.depositor_pct ?? 0).toFixed(2) + '%';
+  document.getElementById('kpiAvgScore').textContent = (d.totals.avg_score ?? 0).toFixed(2);
   document.getElementById('kpiPeriod').textContent = d.date_from + ' → ' + d.date_to;
 }
 
@@ -410,17 +418,25 @@ function renderChart(d) {
       labels: labels,
       datasets: [
         {
-          type: 'bar', label: 'Depositors', data: d.series.depositors,
-          backgroundColor: 'rgba(88,166,255,0.55)', borderColor: '#58a6ff', borderWidth: 1, order: 2,
+          type: 'bar', label: 'Depositors', data: d.series.depositors, yAxisID: 'y',
+          backgroundColor: 'rgba(88,166,255,0.55)', borderColor: '#58a6ff', borderWidth: 1, order: 3,
           datalabels: { anchor: 'end', align: 'top', color: '#58a6ff', font: { size: 10, weight: '600' },
                         formatter: v => v > 0 ? v.toLocaleString('en-US') : '' }
         },
         {
-          type: 'line', label: 'Traders', data: d.series.traders,
+          type: 'line', label: 'Traders', data: d.series.traders, yAxisID: 'y',
           borderColor: '#3fb950', backgroundColor: 'rgba(63,185,80,0.15)', tension: 0.25, fill: true,
           pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: '#3fb950', pointBorderColor: '#0f1117', pointBorderWidth: 1.5, order: 1,
           datalabels: { anchor: 'end', align: 'top', color: '#3fb950', font: { size: 10, weight: '600' },
                         formatter: v => v > 0 ? v.toLocaleString('en-US') : '' }
+        },
+        {
+          type: 'line', label: 'Avg Score', data: d.series.avg_score, yAxisID: 'y1',
+          borderColor: '#d29922', backgroundColor: 'rgba(210,153,34,0.1)', tension: 0.3, fill: false,
+          pointRadius: 3, pointHoverRadius: 5, pointBackgroundColor: '#d29922', pointBorderColor: '#0f1117', pointBorderWidth: 1.5,
+          borderWidth: 2, borderDash: [5, 3], order: 2,
+          datalabels: { anchor: 'end', align: 'bottom', color: '#d29922', font: { size: 9, weight: '600' },
+                        formatter: v => v > 0 ? v.toFixed(1) : '' }
         },
       ]
     },
@@ -435,7 +451,8 @@ function renderChart(d) {
       interaction: { mode: 'index', intersect: false },
       scales: {
         x: { ticks: { color: '#8b949e', maxRotation: 0, autoSkip: true }, grid: { color: '#21262d' } },
-        y: { beginAtZero: true, ticks: { color: '#8b949e' }, grid: { color: '#21262d' } }
+        y: { beginAtZero: true, ticks: { color: '#8b949e' }, grid: { color: '#21262d' }, position: 'left' },
+        y1: { beginAtZero: true, max: 10, ticks: { color: '#d29922', stepSize: 1 }, grid: { drawOnChartArea: false }, position: 'right', title: { display: true, text: 'Avg Score', color: '#d29922', font: { size: 11 } } }
       }
     }
   });
@@ -472,11 +489,11 @@ function renderMatrix(d) {
   days.forEach(day => {
     const parts = day.split('-');
     const label = parseInt(parts[2]) + '/' + parseInt(parts[1]) + '/' + parts[0];
-    h1 += `<th class="date-group day-sep" colspan="4">${label}</th>`;
-    h2 += `<th class="date-sub day-sep sortable" data-sort-col="${colIdx++}">Traders${arrow}</th><th class="date-sub sortable" data-sort-col="${colIdx++}">#Dep${arrow}</th><th class="date-sub sortable" data-sort-col="${colIdx++}">NET${arrow}</th><th class="date-sub sortable" data-sort-col="${colIdx++}">%Dep${arrow}</th>`;
+    h1 += `<th class="date-group day-sep" colspan="5">${label}</th>`;
+    h2 += `<th class="date-sub day-sep sortable" data-sort-col="${colIdx++}">Traders${arrow}</th><th class="date-sub sortable" data-sort-col="${colIdx++}">Avg Score${arrow}</th><th class="date-sub sortable" data-sort-col="${colIdx++}">#Dep${arrow}</th><th class="date-sub sortable" data-sort-col="${colIdx++}">NET${arrow}</th><th class="date-sub sortable" data-sort-col="${colIdx++}">%Dep${arrow}</th>`;
   });
-  h1 += '<th class="date-group day-sep" colspan="4" style="background:#1a2636;">Total</th></tr>';
-  h2 += `<th class="date-sub day-sep sortable" data-sort-col="${colIdx++}" style="background:#1a2636;">Traders${arrow}</th><th class="date-sub sortable" data-sort-col="${colIdx++}" style="background:#1a2636;">#Dep${arrow}</th><th class="date-sub sortable" data-sort-col="${colIdx++}" style="background:#1a2636;">NET${arrow}</th><th class="date-sub sortable" data-sort-col="${colIdx++}" style="background:#1a2636;">%Dep${arrow}</th></tr>`;
+  h1 += '<th class="date-group day-sep" colspan="5" style="background:#1a2636;">Total</th></tr>';
+  h2 += `<th class="date-sub day-sep sortable" data-sort-col="${colIdx++}" style="background:#1a2636;">Traders${arrow}</th><th class="date-sub sortable" data-sort-col="${colIdx++}" style="background:#1a2636;">Avg Score${arrow}</th><th class="date-sub sortable" data-sort-col="${colIdx++}" style="background:#1a2636;">#Dep${arrow}</th><th class="date-sub sortable" data-sort-col="${colIdx++}" style="background:#1a2636;">NET${arrow}</th><th class="date-sub sortable" data-sort-col="${colIdx++}" style="background:#1a2636;">%Dep${arrow}</th></tr>`;
   thead.innerHTML = h1 + h2;
 
   // Index agent data: agentId -> { day -> {traders, depositors, net} }
@@ -503,11 +520,23 @@ function renderMatrix(d) {
       agentData[aid][day].net = v;
     }
   }
+  for (const [aid, dayMap] of Object.entries(m.avg_score || {})) {
+    if (!agentData[aid]) agentData[aid] = {};
+    for (const [day, v] of Object.entries(dayMap)) {
+      if (!agentData[aid][day]) agentData[aid][day] = {};
+      agentData[aid][day].avg_score = v;
+    }
+  }
 
   function sumTotals(ids) {
-    let t = 0, d = 0, n = 0;
-    ids.forEach(id => { const at = agentTotals[id] || {}; t += at.traders || 0; d += at.depositors || 0; n += at.net || 0; });
-    return { traders: t, depositors: d, net: n };
+    let t = 0, d = 0, n = 0, scoreSum = 0, scoreCount = 0;
+    ids.forEach(id => {
+      const at = agentTotals[id] || {};
+      t += at.traders || 0; d += at.depositors || 0; n += at.net || 0;
+      const s = (m.totals_avg_score || {})[String(id)];
+      if (s) { scoreSum += s * (at.traders || 1); scoreCount += at.traders || 1; }
+    });
+    return { traders: t, depositors: d, net: n, avg_score: scoreCount > 0 ? Math.round(scoreSum / scoreCount * 100) / 100 : 0 };
   }
 
   // Index distinct totals per agent
@@ -516,6 +545,7 @@ function renderMatrix(d) {
   for (const [aid, v] of Object.entries(m.totals_traders || {})) agentTotals[aid] = { ...agentTotals[aid], traders: v };
   for (const [aid, v] of Object.entries(m.totals_depositors || {})) { if (agentTotals[aid]) agentTotals[aid].depositors = v; }
   for (const [aid, v] of Object.entries(m.totals_net || {})) { if (agentTotals[aid]) agentTotals[aid].net = v; }
+  for (const [aid, v] of Object.entries(m.totals_avg_score || {})) { if (agentTotals[aid]) agentTotals[aid].avg_score = v; }
 
   // Group agents: office -> dept -> [agents]
   const officeMap = new Map();
@@ -528,7 +558,7 @@ function renderMatrix(d) {
 
   function sumDays(ids) {
     const totals = {};
-    days.forEach(day => { totals[day] = { traders: 0, depositors: 0, net: 0 }; });
+    days.forEach(day => { totals[day] = { traders: 0, depositors: 0, net: 0, _scoreSum: 0, _scoreN: 0 }; });
     ids.forEach(id => {
       const ad = agentData[id] || {};
       days.forEach(day => {
@@ -536,23 +566,27 @@ function renderMatrix(d) {
         totals[day].traders += dd.traders || 0;
         totals[day].depositors += dd.depositors || 0;
         totals[day].net += dd.net || 0;
+        if (dd.avg_score) { totals[day]._scoreSum += dd.avg_score * (dd.traders || 1); totals[day]._scoreN += dd.traders || 1; }
       });
     });
+    days.forEach(day => { totals[day].avg_score = totals[day]._scoreN > 0 ? Math.round(totals[day]._scoreSum / totals[day]._scoreN * 100) / 100 : 0; });
     return totals;
   }
 
+  const fmtScore = v => v > 0 ? v.toFixed(2) : '';
   function makeCells(dayTotals, totalsObj) {
     let html = '';
     days.forEach(day => {
       const t = dayTotals[day].traders;
+      const sc = dayTotals[day].avg_score || 0;
       const dep = dayTotals[day].depositors;
       const n = dayTotals[day].net;
       const nCls = n < 0 ? ' val-neg' : (n === 0 ? ' val-zero' : '');
-      html += `<td class="day-sep">${fmtN(t)}</td><td>${fmtN(dep)}</td><td class="${nCls}">${fmtMoney(n)}</td><td>${fmtPct(dep, t)}</td>`;
+      html += `<td class="day-sep">${fmtN(t)}</td><td style="color:#d29922;">${fmtScore(sc)}</td><td>${fmtN(dep)}</td><td class="${nCls}">${fmtMoney(n)}</td><td>${fmtPct(dep, t)}</td>`;
     });
-    const tt = totalsObj.traders, td = totalsObj.depositors, tn = totalsObj.net;
+    const tt = totalsObj.traders, tsc = totalsObj.avg_score || 0, td = totalsObj.depositors, tn = totalsObj.net;
     const nCls = tn < 0 ? ' val-neg' : (tn === 0 ? ' val-zero' : '');
-    html += `<td class="day-sep"><b>${fmtN(tt)}</b></td><td><b>${fmtN(td)}</b></td><td class="${nCls}"><b>${fmtMoney(tn)}</b></td><td><b>${fmtPct(td, tt)}</b></td>`;
+    html += `<td class="day-sep"><b>${fmtN(tt)}</b></td><td style="color:#d29922;"><b>${fmtScore(tsc)}</b></td><td><b>${fmtN(td)}</b></td><td class="${nCls}"><b>${fmtMoney(tn)}</b></td><td><b>${fmtPct(td, tt)}</b></td>`;
     return html;
   }
 
@@ -580,7 +614,7 @@ function renderMatrix(d) {
 
   // Grand totals
   const grandDays = {};
-  days.forEach(d => { grandDays[d] = { traders: 0, depositors: 0, net: 0 }; });
+  days.forEach(d => { grandDays[d] = { traders: 0, depositors: 0, net: 0, _scoreSum: 0, _scoreN: 0 }; });
   const allActiveAgentIds = [];
 
   let offIdx = 0;
@@ -593,7 +627,7 @@ function renderMatrix(d) {
     const hasActivity = days.some(d => offDays[d].traders > 0 || offDays[d].depositors > 0 || offDays[d].net !== 0);
     if (!hasActivity) continue;
     allActiveAgentIds.push(...allAgentIds);
-    days.forEach(d => { grandDays[d].traders += offDays[d].traders; grandDays[d].depositors += offDays[d].depositors; grandDays[d].net += offDays[d].net; });
+    days.forEach(d => { grandDays[d].traders += offDays[d].traders; grandDays[d].depositors += offDays[d].depositors; grandDays[d].net += offDays[d].net; if (offDays[d].avg_score) { grandDays[d]._scoreSum += offDays[d].avg_score * offDays[d].traders; grandDays[d]._scoreN += offDays[d].traders; } });
 
     // Office row
     const offTr = document.createElement('tr');
@@ -629,7 +663,7 @@ function renderMatrix(d) {
         let agentHasActivity = false;
         days.forEach(day => {
           const dd = ad[day] || {};
-          agentDays[day] = { traders: dd.traders || 0, depositors: dd.depositors || 0, net: dd.net || 0 };
+          agentDays[day] = { traders: dd.traders || 0, avg_score: dd.avg_score || 0, depositors: dd.depositors || 0, net: dd.net || 0 };
           if (agentDays[day].traders > 0 || agentDays[day].depositors > 0 || agentDays[day].net !== 0) agentHasActivity = true;
         });
         if (!agentHasActivity) return;
@@ -638,7 +672,8 @@ function renderMatrix(d) {
         agTr.dataset.parentOffice = officeId;
         agTr.dataset.parentDept = deptId;
         agTr.style.display = 'none';
-        agTr.innerHTML = `<td class="col-name">${a.agent_name}</td>` + makeCells(agentDays, agentTotals[a.id] || {traders:0,depositors:0,net:0});
+        const at = agentTotals[a.id] || {traders:0,depositors:0,net:0,avg_score:0};
+        agTr.innerHTML = `<td class="col-name">${a.agent_name}</td>` + makeCells(agentDays, at);
         tbody.appendChild(agTr);
       });
     }
@@ -744,16 +779,20 @@ function renderMatrix(d) {
   // Grand total footer
   const tfoot = document.getElementById('matrixTfoot');
   // Grand total: use KPI totals for traders/depositors (true distinct), sum NET from agents
-  const grandNetTotal = sumTotals(allActiveAgentIds).net;
+  const grandTotals = sumTotals(allActiveAgentIds);
+  const grandNetTotal = grandTotals.net;
   const gtTraders = d.totals.traders, gtDeps = d.totals.depositors;
+  // Compute avg_score for each grand day
+  days.forEach(day => { grandDays[day].avg_score = grandDays[day]._scoreN > 0 ? Math.round(grandDays[day]._scoreSum / grandDays[day]._scoreN * 100) / 100 : 0; });
   let footHtml = '<tr><td class="col-name"><b>Total</b></td>';
   days.forEach(day => {
-    const t = grandDays[day].traders, dep = grandDays[day].depositors, n = grandDays[day].net;
+    const t = grandDays[day].traders, sc = grandDays[day].avg_score, dep = grandDays[day].depositors, n = grandDays[day].net;
     const nCls = n < 0 ? ' val-neg' : (n === 0 ? ' val-zero' : '');
-    footHtml += `<td class="day-sep"><b>${fmtN(t)}</b></td><td><b>${fmtN(dep)}</b></td><td class="${nCls}"><b>${fmtMoney(n)}</b></td><td><b>${fmtPct(dep, t)}</b></td>`;
+    footHtml += `<td class="day-sep"><b>${fmtN(t)}</b></td><td style="color:#d29922;"><b>${fmtScore(sc)}</b></td><td><b>${fmtN(dep)}</b></td><td class="${nCls}"><b>${fmtMoney(n)}</b></td><td><b>${fmtPct(dep, t)}</b></td>`;
   });
   const gnCls = grandNetTotal < 0 ? ' val-neg' : (grandNetTotal === 0 ? ' val-zero' : '');
-  footHtml += `<td class="day-sep"><b>${fmtN(gtTraders)}</b></td><td><b>${fmtN(gtDeps)}</b></td><td class="${gnCls}"><b>${fmtMoney(grandNetTotal)}</b></td><td><b>${fmtPct(gtDeps, gtTraders)}</b></td></tr>`;
+  const gtAvgScore = d.totals.avg_score || 0;
+  footHtml += `<td class="day-sep"><b>${fmtN(gtTraders)}</b></td><td style="color:#d29922;"><b>${fmtScore(gtAvgScore)}</b></td><td><b>${fmtN(gtDeps)}</b></td><td class="${gnCls}"><b>${fmtMoney(grandNetTotal)}</b></td><td><b>${fmtPct(gtDeps, gtTraders)}</b></td></tr>`;
   tfoot.innerHTML = footHtml;
 }
 
