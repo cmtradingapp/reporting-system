@@ -566,6 +566,9 @@ function renderMatrix(d) {
     const allAgentIds = [];
     for (const agents of deptMap.values()) agents.forEach(a => allAgentIds.push(a.id));
     const offDays = sumDays(allAgentIds);
+    // Skip offices with zero activity across all days
+    const hasActivity = days.some(d => offDays[d].traders > 0 || offDays[d].depositors > 0 || offDays[d].net !== 0);
+    if (!hasActivity) continue;
     days.forEach(d => { grandDays[d].traders += offDays[d].traders; grandDays[d].depositors += offDays[d].depositors; grandDays[d].net += offDays[d].net; });
 
     // Office row
