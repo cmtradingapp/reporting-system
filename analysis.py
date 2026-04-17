@@ -34,8 +34,10 @@ for mk, ml in months:
             f" WHERE t.transactionapproval='Approved'"
             f" AND (t.deleted=0 OR t.deleted IS NULL)"
             f" AND t.vtigeraccountid IS NOT NULL"
-            f" AND a.is_test_account=0"
+            f" AND a.is_test_account=0 AND (a.is_demo=0 OR a.is_demo IS NULL)"
+            f" AND a.accountid IS NOT NULL AND a.accountid::text!=''"
             f" AND TRIM(COALESCE(u.agent_name,u.full_name,'')) NOT ILIKE 'test%%'"
+            f" AND TRIM(COALESCE(u.full_name,'')) NOT ILIKE 'test%%'"
             f" AND u.department_='Retention'"
             f" AND t.confirmation_time>='{d}'::date AND t.confirmation_time<'{e}'::date"
             f" AND ({sc2}) {qf}")
@@ -50,6 +52,26 @@ for mk, ml in months:
             f" AND t.transaction_type_name IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')", {})
         net_val = float(cur.fetchone()[0] or 0)
         results[(ml, q)] = (traders, deps, net_val)
+    # Also get the TOTAL net (no quality split) to verify against Total Traders page
+    cur.execute(
+        f"SELECT COALESCE(SUM(CASE"
+        f" WHEN t.transaction_type_name IN ('Deposit','Withdrawal Cancelled') THEN t.usdamount"
+        f" WHEN t.transaction_type_name IN ('Withdrawal','Deposit Cancelled') THEN -t.usdamount"
+        f" END),0)"
+        f" FROM transactions t"
+        f" JOIN accounts a ON a.accountid=t.vtigeraccountid"
+        f" LEFT JOIN crm_users u ON u.id=t.original_deposit_owner"
+        f" WHERE t.transactionapproval='Approved'"
+        f" AND (t.deleted=0 OR t.deleted IS NULL)"
+        f" AND t.vtigeraccountid IS NOT NULL"
+        f" AND a.is_test_account=0 AND (a.is_demo=0 OR a.is_demo IS NULL)"
+        f" AND a.accountid IS NOT NULL AND a.accountid::text!=''"
+        f" AND TRIM(COALESCE(u.agent_name,u.full_name,'')) NOT ILIKE 'test%%'"
+        f" AND TRIM(COALESCE(u.full_name,'')) NOT ILIKE 'test%%'"
+        f" AND u.department_='Retention'"
+        f" AND t.confirmation_time>='{d}'::date AND t.confirmation_time<'{e}'::date"
+        f" AND t.transaction_type_name IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')", {})
+    results[(ml, 'ALL')] = float(cur.fetchone()[0] or 0)
 conn.close()
 
 def fs(n):
@@ -58,13 +80,15 @@ def fs(n):
 print(f"{'Month':<8}|{'Quality':<6}|{'Traders':>8}|{'Deps':>6}|{'NET $':>14}|{'NET/Trader':>11}")
 print('-' * 60)
 for mk, ml in months:
-    for q in ['High', 'Low']:
-        t, d, n = results.get((ml, q), (0, 0, 0))
+    for q_label in ['High', 'Low']:
+        t, d, n = results.get((ml, q_label), (0, 0, 0))
         npt = n / t if t else 0
-        print(f"{ml:<8}|{q:<6}|{t:>8,}|{d:>6,}|{fs(n):>14}|{fs(npt):>11}")
+        print(f"{ml:<8}|{q_label:<6}|{t:>8,}|{d:>6,}|{fs(n):>14}|{fs(npt):>11}")
     h = results.get((ml, 'High'), (0, 0, 0))
     l = results.get((ml, 'Low'), (0, 0, 0))
     tt, td, tn = h[0]+l[0], h[1]+l[1], h[2]+l[2]
+    real_total = results.get((ml, 'ALL'), 0)
     tnpt = tn / tt if tt else 0
-    print(f"{'':>8}|{'TOTAL':<6}|{tt:>8,}|{td:>6,}|{fs(tn):>14}|{fs(tnpt):>11}")
+    print(f"{'':>8}|{'H+L':<6}|{tt:>8,}|{td:>6,}|{fs(tn):>14}|{fs(tnpt):>11}")
+    print(f"{'':>8}|{'PAGE':<6}|{'':>8}|{'':>6}|{fs(real_total):>14}|{'':>11}")
     print('-' * 60)
