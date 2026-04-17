@@ -255,6 +255,11 @@
   <!-- Chart -->
   <div class="card mb-4">
     <div class="card-body">
+      <div class="d-flex align-items-center gap-2 mb-2" id="chartFilterBar" style="display:none !important;">
+        <span style="font-size:0.82rem;color:#8b949e;">Showing:</span>
+        <span id="chartFilterLabel" style="font-size:0.88rem;color:#58a6ff;font-weight:600;"></span>
+        <button class="btn btn-sm btn-outline-secondary" onclick="resetChartFilter()" style="font-size:0.75rem;padding:2px 8px;">Show All</button>
+      </div>
       <div style="height:420px;"><canvas id="chart"></canvas></div>
     </div>
   </div>
@@ -263,7 +268,7 @@
   <div class="card mb-4" id="matrixCard" style="display:none;">
     <div class="card-body">
       <div class="d-flex justify-content-between align-items-center mb-3">
-        <h6 class="text-white fw-bold mb-0">Traders by Office, Date</h6>
+        <h6 class="text-white fw-bold mb-0">Traders by Office, Date <span style="font-size:0.7rem;color:#8b949e;font-weight:400;margin-left:8px;">Double-click a row to filter chart</span></h6>
         <div class="d-flex gap-2">
           <button class="btn btn-sm btn-outline-secondary" onclick="expandAllMatrix()">Expand All</button>
           <button class="btn btn-sm btn-outline-secondary" onclick="collapseAllMatrix()">Collapse All</button>
@@ -287,6 +292,10 @@
 <script>
 const fmt = n => (n ?? 0).toLocaleString('en-US');
 let chart = null;
+let _lastData = null; // store last API response for chart filtering
+let _matrixAgentData = null; // agent data from matrix
+let _matrixAgentGroups = null; // office->dept->agentIds mapping
+let _chartFilterIds = null; // filtered agent IDs or null for all
 
 // ── Searchable multi-select dropdown ────────────────────────────────────────
 class SDD {
@@ -409,10 +418,10 @@ function fmtDateLabel(iso) {
 }
 
 function renderChart(d) {
+  _lastData = d;
   const ctx = document.getElementById('chart').getContext('2d');
   if (chart) chart.destroy();
   const labels = d.series.labels.map(fmtDateLabel);
-  const netData = d.series.net || [];
   chart = new Chart(ctx, {
     plugins: [ChartDataLabels],
     data: {
@@ -453,7 +462,8 @@ function renderChart(d) {
             afterBody: function(items) {
               if (!items.length) return '';
               const idx = items[0].dataIndex;
-              const n = netData[idx] || 0;
+              const nd = chart._netData || _lastData.series.net || [];
+              const n = nd[idx] || 0;
               const sign = n >= 0 ? '' : '-';
               const abs = Math.abs(n);
               const formatted = abs >= 1000 ? Math.round(abs).toLocaleString('en-US') : abs.toFixed(2);
@@ -471,6 +481,73 @@ function renderChart(d) {
       }
     }
   });
+  chart._netData = d.series.net || [];
+  // Reset filter bar on fresh render
+  document.getElementById('chartFilterBar').style.cssText = 'display:none !important;';
+  _chartFilterIds = null;
+}
+
+// ── Chart filtering from matrix clicks ────────────────────────────────────
+function updateChartForAgents(agentIds, label) {
+  if (!_lastData || !_matrixAgentData) return;
+  const d = _lastData;
+  const days = d.series.labels;
+  const m = d.matrix;
+
+  const traders = [], depositors = [], avgScores = [], nets = [];
+  days.forEach(day => {
+    let tSet = new Set(), depSet = new Set(), scoreSum = 0, scoreN = 0, net = 0;
+    agentIds.forEach(id => {
+      const ad = _matrixAgentData[id] || {};
+      const dd = ad[day] || {};
+      // traders: count distinct accountids — we only have counts, so sum them
+      tSet = null; // can't do true distinct across agents, use sum as proxy
+      if (dd.traders) { }
+      if (dd.depositors) { }
+    });
+    // Use summed counts (same as matrix table does)
+    let tCount = 0, dCount = 0;
+    agentIds.forEach(id => {
+      const ad = _matrixAgentData[id] || {};
+      const dd = ad[day] || {};
+      tCount += dd.traders || 0;
+      dCount += dd.depositors || 0;
+      net += dd.net || 0;
+      if (dd.avg_score) { scoreSum += dd.avg_score * (dd.traders || 1); scoreN += dd.traders || 1; }
+    });
+    traders.push(tCount);
+    depositors.push(dCount);
+    avgScores.push(scoreN > 0 ? Math.round(scoreSum / scoreN * 100) / 100 : 0);
+    nets.push(Math.round(net * 100) / 100);
+  });
+
+  // Update chart datasets
+  chart.data.datasets[0].data = depositors;
+  chart.data.datasets[1].data = traders;
+  chart.data.datasets[2].data = avgScores;
+  chart.update();
+
+  // Update tooltip net data
+  chart._netData = nets;
+
+  // Show filter bar
+  const bar = document.getElementById('chartFilterBar');
+  bar.style.cssText = '';
+  document.getElementById('chartFilterLabel').textContent = label;
+
+  _chartFilterIds = agentIds;
+}
+
+function resetChartFilter() {
+  if (!_lastData) return;
+  const d = _lastData;
+  chart.data.datasets[0].data = d.series.depositors;
+  chart.data.datasets[1].data = d.series.traders;
+  chart.data.datasets[2].data = d.series.avg_score;
+  chart.update();
+  chart._netData = d.series.net || [];
+  document.getElementById('chartFilterBar').style.cssText = 'display:none !important;';
+  _chartFilterIds = null;
 }
 
 // ── Matrix table ──────────────────────────────────────────────────────────
@@ -513,6 +590,7 @@ function renderMatrix(d) {
 
   // Index agent data: agentId -> { day -> {traders, depositors, net} }
   const agentData = {};
+  _matrixAgentData = agentData;
   m.agents.forEach(a => { agentData[a.id] = {}; });
   for (const [aid, dayMap] of Object.entries(m.traders || {})) {
     if (!agentData[aid]) agentData[aid] = {};
@@ -649,6 +727,7 @@ function renderMatrix(d) {
     offTr.className = 'office-row';
     offTr.dataset.officeId = officeId;
     offTr.dataset.officeName = officeName;
+    offTr.dataset.agentIds = JSON.stringify(allAgentIds);
     offTr.innerHTML = `<td class="col-name"><span class="chevron">&#9654;</span>${officeName}</td>` + makeCells(offDays, sumTotals(allAgentIds));
     tbody.appendChild(offTr);
 
@@ -667,6 +746,7 @@ function renderMatrix(d) {
       deptTr.dataset.parentOffice = officeId;
       deptTr.dataset.deptId = deptId;
       deptTr.dataset.deptName = deptName;
+      deptTr.dataset.agentIds = JSON.stringify(deptAgentIds);
       deptTr.style.display = 'none';
       deptTr.innerHTML = `<td class="col-name"><span class="chevron">&#9654;</span>${deptName}</td>` + makeCells(deptDays, sumTotals(deptAgentIds));
       tbody.appendChild(deptTr);
@@ -686,6 +766,8 @@ function renderMatrix(d) {
         agTr.className = 'agent-row';
         agTr.dataset.parentOffice = officeId;
         agTr.dataset.parentDept = deptId;
+        agTr.dataset.agentIds = JSON.stringify([a.id]);
+        agTr.dataset.agentName = a.agent_name;
         agTr.style.display = 'none';
         const at = agentTotals[a.id] || {traders:0,depositors:0,net:0,avg_score:0};
         agTr.innerHTML = `<td class="col-name">${a.agent_name}</td>` + makeCells(agentDays, at);
@@ -739,6 +821,23 @@ function renderMatrix(d) {
       });
     });
   }
+
+  // ── Double-click to filter chart ──────────────────────────────────────
+  tbody.querySelectorAll('tr.office-row, tr.dept-row, tr.agent-row').forEach(tr => {
+    tr.addEventListener('dblclick', e => {
+      e.stopPropagation();
+      const ids = JSON.parse(tr.dataset.agentIds || '[]');
+      if (!ids.length) return;
+      let label = '';
+      if (tr.classList.contains('office-row')) label = tr.dataset.officeName;
+      else if (tr.classList.contains('dept-row')) label = tr.dataset.deptName;
+      else label = tr.dataset.agentName || 'Agent';
+      updateChartForAgents(ids, label);
+      // Scroll to chart
+      document.getElementById('chart').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+    tr.style.cursor = 'pointer';
+  });
 
   // ── Sort handlers on sub-headers ─────────────────────────────────────
   let matrixSortCol = null, matrixSortAsc = true;
