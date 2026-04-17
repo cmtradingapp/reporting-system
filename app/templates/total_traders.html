@@ -52,8 +52,8 @@
     .matrix-table th.col-name { text-align:left; position:sticky; left:0; z-index:3; background:#161b22; min-width:200px; }
     .matrix-table td.col-name { text-align:left; position:sticky; left:0; z-index:1; background:#0f1117; min-width:200px; }
     .matrix-table th.date-group { text-align:center; border-bottom:none; font-size:0.95rem; font-weight:800; color:#e0e0e0; }
-    .matrix-table th.date-sub { font-size:0.78rem; color:#8b949e; font-weight:600; }
-    .matrix-table .day-sep { border-left:3px solid #1f6feb !important; }
+    .matrix-table th.date-sub { font-size:0.84rem; color:#8b949e; font-weight:600; }
+    .matrix-table .day-sep { border-left:3px solid #388bfd !important; }
     .matrix-table td:nth-child(4n+2):not(.col-name) { padding-right:16px; }
     .matrix-table td:nth-child(4n+3):not(.col-name) { padding-left:16px; }
     .matrix-table .office-row td { background:#1c2333; font-weight:700; color:#e0e0e0; cursor:pointer; }
@@ -587,6 +587,9 @@ function renderMatrix(d) {
       const deptId = officeId + '_d' + deptIdx++;
       const deptAgentIds = agents.map(a => a.id);
       const deptDays = sumDays(deptAgentIds);
+      // Skip depts with no activity
+      const deptHasActivity = days.some(d => deptDays[d].traders > 0 || deptDays[d].depositors > 0 || deptDays[d].net !== 0);
+      if (!deptHasActivity) continue;
 
       // Dept row
       const deptTr = document.createElement('tr');
@@ -602,10 +605,13 @@ function renderMatrix(d) {
       agents.forEach(a => {
         const ad = agentData[a.id] || {};
         const agentDays = {};
+        let agentHasActivity = false;
         days.forEach(day => {
           const dd = ad[day] || {};
           agentDays[day] = { traders: dd.traders || 0, depositors: dd.depositors || 0, net: dd.net || 0 };
+          if (agentDays[day].traders > 0 || agentDays[day].depositors > 0 || agentDays[day].net !== 0) agentHasActivity = true;
         });
+        if (!agentHasActivity) return;
         const agTr = document.createElement('tr');
         agTr.className = 'agent-row';
         agTr.dataset.parentOffice = officeId;
