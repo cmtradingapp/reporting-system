@@ -420,38 +420,17 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
 
             base_p = {"date_from": date_from, "date_to_excl": date_to_exclusive,
                       **qual_params, **camp_filter_params}
-            # Traders logic (matches FTC Date report): accounts with at least one trade
-            # (open position or closed trade pair from dealio_trades_mt5) having
-            # notional_value > 0 and open_time::date within the period.
+            # Traders from mv_volume_stats (pre-aggregated, much faster)
             cur.execute(f"""
-                WITH traded AS (
-                    SELECT DISTINCT ta.vtigeraccountid AS accountid
-                    FROM (
-                        SELECT p.login, p.notional_value, p.open_time
-                        FROM dealio_positions p
-                        UNION ALL
-                        SELECT ex.login, ex.notional_value, en.open_time
-                        FROM dealio_trades_mt5 ex
-                        JOIN dealio_trades_mt5 en
-                            ON en.position_id = ex.position_id
-                           AND en.source_id   = ex.source_id
-                           AND en.entry       = 0
-                        WHERE ex.entry = 1
-                          AND ex.close_time > '1971-01-01'
-                    ) d
-                    JOIN trading_accounts ta ON ta.login::bigint = d.login::bigint
-                    WHERE d.notional_value > 0
-                      AND ta.vtigeraccountid IS NOT NULL
-                      AND ta.vtigeraccountid::text != ''
-                      AND d.open_time::date >= %(date_from)s
-                      AND d.open_time::date <  %(date_to_excl)s
-                )
-                SELECT COUNT(DISTINCT a.accountid)
-                FROM traded tr
-                JOIN accounts a ON a.accountid = tr.accountid
+                SELECT COUNT(DISTINCT v.accountid)
+                FROM mv_volume_stats v
+                JOIN accounts a ON a.accountid = v.accountid
                 {camp_join}
                 {kpi_cu_join}
-                WHERE a.is_test_account = 0
+                WHERE v.has_positive_notional = 1
+                  AND v.open_date >= %(date_from)s
+                  AND v.open_date <  %(date_to_excl)s
+                  AND a.is_test_account = 0
                 {_ACCT_FILTERS}
                 {extra_where}
                 {camp_filter_where}
@@ -814,11 +793,11 @@ def _camp_table_calc(
                 f_segmentation=f_segmentation
             )
             if period == "day":
-                tr_period_sql = "d.open_time::date"
+                tr_period_sql = "v.open_date"
             elif period == "month":
-                tr_period_sql = "date_trunc('month', d.open_time)::date"
+                tr_period_sql = "date_trunc('month', v.open_date)::date"
             elif period == "year":
-                tr_period_sql = "date_trunc('year', d.open_time)::date"
+                tr_period_sql = "date_trunc('year', v.open_date)::date"
             else:
                 tr_period_sql = ""
 
@@ -830,28 +809,15 @@ def _camp_table_calc(
             tr_sel.append("COUNT(DISTINCT a.accountid) AS traders")
 
             traders_sql = (
-                "WITH d AS ("
-                "  SELECT p.login, p.notional_value, p.open_time FROM dealio_positions p"
-                "  UNION ALL"
-                "  SELECT ex.login, ex.notional_value, en.open_time"
-                "    FROM dealio_trades_mt5 ex"
-                "    JOIN dealio_trades_mt5 en"
-                "      ON en.position_id = ex.position_id"
-                "     AND en.source_id   = ex.source_id"
-                "     AND en.entry       = 0"
-                "   WHERE ex.entry = 1 AND ex.close_time > '1971-01-01'"
-                ") "
                 f"SELECT {', '.join(tr_sel)}"
-                " FROM d"
-                " JOIN trading_accounts ta ON ta.login::bigint = d.login::bigint"
-                " JOIN accounts a ON a.accountid = ta.vtigeraccountid"
+                " FROM mv_volume_stats v"
+                " JOIN accounts a ON a.accountid = v.accountid"
                 " LEFT JOIN campaigns c ON SPLIT_PART(a.campaign, '.', 1) = c.crmid"
                 f"{extra_joins}"
-                " WHERE d.notional_value > 0"
-                "   AND ta.vtigeraccountid IS NOT NULL AND ta.vtigeraccountid::text != ''"
+                " WHERE v.has_positive_notional = 1"
+                "   AND v.open_date >= %(date_from)s"
+                "   AND v.open_date <  %(date_to_excl)s"
                 "   AND a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)"
-                "   AND d.open_time::date >= %(date_from)s"
-                "   AND d.open_time::date <  %(date_to_excl)s"
                 + _ACCT_FILTERS +
                 f"\n{traders_filter_where}"
             )
