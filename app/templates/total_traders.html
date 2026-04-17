@@ -46,6 +46,25 @@
     .sdd-item { display:flex; align-items:center; gap:6px; padding:4px 6px; border-radius:4px; font-size:0.85rem; color:#c9d1d9; cursor:pointer; }
     .sdd-item:hover { background:#21262d; }
     .sdd-cb { accent-color:#3fb950; width:14px; height:14px; }
+    .matrix-table { width:100%; border-collapse:collapse; font-size:0.78rem; white-space:nowrap; }
+    .matrix-table th, .matrix-table td { padding:5px 8px; border:1px solid #21262d; text-align:right; }
+    .matrix-table th { background:#161b22; color:#8b949e; font-weight:600; position:sticky; top:0; z-index:2; }
+    .matrix-table th.col-name { text-align:left; position:sticky; left:0; z-index:3; background:#161b22; min-width:200px; }
+    .matrix-table td.col-name { text-align:left; position:sticky; left:0; z-index:1; background:#0f1117; min-width:200px; }
+    .matrix-table th.date-group { text-align:center; border-bottom:none; }
+    .matrix-table th.date-sub { font-size:0.68rem; color:#6e7681; }
+    .matrix-table .office-row td { background:#1c2333; font-weight:700; color:#e0e0e0; cursor:pointer; }
+    .matrix-table .office-row td.col-name { background:#1c2333; }
+    .matrix-table .dept-row td { background:#151d2b; font-weight:600; color:#c9d1d9; cursor:pointer; }
+    .matrix-table .dept-row td.col-name { background:#151d2b; padding-left:24px; }
+    .matrix-table .agent-row td { background:#0f1117; color:#b0b8c1; }
+    .matrix-table .agent-row td.col-name { background:#0f1117; padding-left:44px; }
+    .matrix-table tfoot td { background:#1a2636; font-weight:700; color:#e0e0e0; border-top:2px solid #30363d; }
+    .matrix-table tfoot td.col-name { background:#1a2636; }
+    .matrix-table .chevron { display:inline-block; transition:transform 0.15s; margin-right:4px; font-size:0.7rem; }
+    .matrix-table .chevron.open { transform:rotate(90deg); }
+    .matrix-table .val-neg { color:#f85149; }
+    .matrix-table .val-zero { color:#484f58; }
     @media (max-width: 1024px) {
       .sidebar { display:none; }
       .main-content { margin-left:0; }
@@ -222,6 +241,28 @@
     </div>
   </div>
 
+  {% if is_admin %}
+  <!-- Matrix Table -->
+  <div class="card mb-4" id="matrixCard" style="display:none;">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h6 class="text-white fw-bold mb-0">Traders by Office, Date</h6>
+        <div class="d-flex gap-2">
+          <button class="btn btn-sm btn-outline-secondary" onclick="expandAllMatrix()">Expand All</button>
+          <button class="btn btn-sm btn-outline-secondary" onclick="collapseAllMatrix()">Collapse All</button>
+        </div>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="matrix-table" id="matrixTable">
+          <thead id="matrixThead"></thead>
+          <tbody id="matrixTbody"></tbody>
+          <tfoot id="matrixTfoot"></tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
 </div>
 </div>
 
@@ -331,6 +372,7 @@ async function loadData() {
     const d = await r.json();
     renderKPIs(d);
     renderChart(d);
+    if (d.matrix) renderMatrix(d);
   } finally {
     spin.classList.remove('active');
   }
@@ -387,6 +429,272 @@ function renderChart(d) {
         y: { beginAtZero: true, ticks: { color: '#8b949e' }, grid: { color: '#21262d' } }
       }
     }
+  });
+}
+
+// ── Matrix table ──────────────────────────────────────────────────────────
+const fmtN = n => n == null || n === 0 ? '' : n.toLocaleString('en-US');
+const fmtMoney = n => {
+  if (n == null || n === 0) return '';
+  const neg = n < 0;
+  const abs = Math.abs(n);
+  let s;
+  if (abs >= 1000) s = Math.round(abs).toLocaleString('en-US');
+  else s = abs.toFixed(abs < 10 ? 2 : 0);
+  return neg ? '-' + s : s;
+};
+const fmtPct = (dep, trd) => trd > 0 ? (dep / trd * 100).toFixed(2) + '%' : '';
+
+let matrixExpandState = new Map(); // office -> Set(dept)
+
+function renderMatrix(d) {
+  const card = document.getElementById('matrixCard');
+  if (!card) return;
+  card.style.display = '';
+  const m = d.matrix;
+  const days = d.series.labels; // weekday labels
+
+  // Build header
+  const thead = document.getElementById('matrixThead');
+  let h1 = '<tr><th class="col-name" rowspan="2">Office / Dept / Agent</th>';
+  let h2 = '<tr>';
+  days.forEach(day => {
+    const parts = day.split('-');
+    const label = parseInt(parts[2]) + '/' + parseInt(parts[1]) + '/' + parts[0];
+    h1 += `<th class="date-group" colspan="4">${label}</th>`;
+    h2 += '<th class="date-sub">Traders</th><th class="date-sub">#Dep</th><th class="date-sub">NET</th><th class="date-sub">%Dep</th>';
+  });
+  h1 += '<th class="date-group" colspan="4" style="background:#1a2636;">Total</th></tr>';
+  h2 += '<th class="date-sub" style="background:#1a2636;">Traders</th><th class="date-sub" style="background:#1a2636;">#Dep</th><th class="date-sub" style="background:#1a2636;">NET</th><th class="date-sub" style="background:#1a2636;">%Dep</th></tr>';
+  thead.innerHTML = h1 + h2;
+
+  // Index agent data: agentId -> { day -> {traders, depositors, net} }
+  const agentData = {};
+  m.agents.forEach(a => { agentData[a.id] = {}; });
+  for (const [aid, dayMap] of Object.entries(m.traders || {})) {
+    if (!agentData[aid]) agentData[aid] = {};
+    for (const [day, v] of Object.entries(dayMap)) {
+      if (!agentData[aid][day]) agentData[aid][day] = {};
+      agentData[aid][day].traders = v;
+    }
+  }
+  for (const [aid, dayMap] of Object.entries(m.depositors || {})) {
+    if (!agentData[aid]) agentData[aid] = {};
+    for (const [day, v] of Object.entries(dayMap)) {
+      if (!agentData[aid][day]) agentData[aid][day] = {};
+      agentData[aid][day].depositors = v;
+    }
+  }
+  for (const [aid, dayMap] of Object.entries(m.net || {})) {
+    if (!agentData[aid]) agentData[aid] = {};
+    for (const [day, v] of Object.entries(dayMap)) {
+      if (!agentData[aid][day]) agentData[aid][day] = {};
+      agentData[aid][day].net = v;
+    }
+  }
+
+  // Group agents: office -> dept -> [agents]
+  const officeMap = new Map();
+  m.agents.forEach(a => {
+    if (!officeMap.has(a.office_name)) officeMap.set(a.office_name, new Map());
+    const deptMap = officeMap.get(a.office_name);
+    if (!deptMap.has(a.dept_name)) deptMap.set(a.dept_name, []);
+    deptMap.get(a.dept_name).push(a);
+  });
+
+  function sumDays(ids) {
+    const totals = {};
+    days.forEach(day => { totals[day] = { traders: 0, depositors: 0, net: 0 }; });
+    ids.forEach(id => {
+      const ad = agentData[id] || {};
+      days.forEach(day => {
+        const dd = ad[day] || {};
+        totals[day].traders += dd.traders || 0;
+        totals[day].depositors += dd.depositors || 0;
+        totals[day].net += dd.net || 0;
+      });
+    });
+    return totals;
+  }
+
+  function makeCells(dayTotals, cls) {
+    let html = '';
+    let totalT = 0, totalD = 0, totalN = 0;
+    days.forEach(day => {
+      const t = dayTotals[day].traders;
+      const dep = dayTotals[day].depositors;
+      const n = dayTotals[day].net;
+      totalT += t; totalD += dep; totalN += n;
+      const nCls = n < 0 ? ' val-neg' : (n === 0 ? ' val-zero' : '');
+      html += `<td>${fmtN(t)}</td><td>${fmtN(dep)}</td><td class="${nCls}">${fmtMoney(n)}</td><td>${fmtPct(dep, t)}</td>`;
+    });
+    const nCls = totalN < 0 ? ' val-neg' : (totalN === 0 ? ' val-zero' : '');
+    html += `<td><b>${fmtN(totalT)}</b></td><td><b>${fmtN(totalD)}</b></td><td class="${nCls}"><b>${fmtMoney(totalN)}</b></td><td><b>${fmtPct(totalD, totalT)}</b></td>`;
+    return html;
+  }
+
+  // Save expand state
+  const oldState = new Map();
+  document.querySelectorAll('#matrixTbody tr.office-row').forEach(tr => {
+    const oName = tr.dataset.officeName;
+    const isOpen = tr.querySelector('.chevron')?.classList.contains('open');
+    if (isOpen) {
+      const depts = new Set();
+      document.querySelectorAll(`#matrixTbody tr.dept-row[data-parent-office="${tr.dataset.officeId}"]`).forEach(dr => {
+        if (dr.querySelector('.chevron')?.classList.contains('open')) depts.add(dr.dataset.deptName);
+      });
+      oldState.set(oName, depts);
+    }
+  });
+  if (matrixExpandState.size > 0 && oldState.size === 0) {
+    // use saved state from previous render
+  } else {
+    matrixExpandState = oldState;
+  }
+
+  const tbody = document.getElementById('matrixTbody');
+  tbody.innerHTML = '';
+
+  // Grand totals
+  let grandT = 0, grandD = 0, grandN = 0;
+  const grandDays = {};
+  days.forEach(d => { grandDays[d] = { traders: 0, depositors: 0, net: 0 }; });
+
+  let offIdx = 0;
+  for (const [officeName, deptMap] of officeMap) {
+    const officeId = 'off_' + offIdx++;
+    const allAgentIds = [];
+    for (const agents of deptMap.values()) agents.forEach(a => allAgentIds.push(a.id));
+    const offDays = sumDays(allAgentIds);
+    days.forEach(d => { grandDays[d].traders += offDays[d].traders; grandDays[d].depositors += offDays[d].depositors; grandDays[d].net += offDays[d].net; });
+
+    // Office row
+    const offTr = document.createElement('tr');
+    offTr.className = 'office-row';
+    offTr.dataset.officeId = officeId;
+    offTr.dataset.officeName = officeName;
+    offTr.innerHTML = `<td class="col-name"><span class="chevron">&#9654;</span>${officeName}</td>` + makeCells(offDays);
+    tbody.appendChild(offTr);
+
+    let deptIdx = 0;
+    for (const [deptName, agents] of deptMap) {
+      const deptId = officeId + '_d' + deptIdx++;
+      const deptAgentIds = agents.map(a => a.id);
+      const deptDays = sumDays(deptAgentIds);
+
+      // Dept row
+      const deptTr = document.createElement('tr');
+      deptTr.className = 'dept-row';
+      deptTr.dataset.parentOffice = officeId;
+      deptTr.dataset.deptId = deptId;
+      deptTr.dataset.deptName = deptName;
+      deptTr.style.display = 'none';
+      deptTr.innerHTML = `<td class="col-name"><span class="chevron">&#9654;</span>${deptName}</td>` + makeCells(deptDays);
+      tbody.appendChild(deptTr);
+
+      // Agent rows
+      agents.forEach(a => {
+        const ad = agentData[a.id] || {};
+        const agentDays = {};
+        days.forEach(day => {
+          const dd = ad[day] || {};
+          agentDays[day] = { traders: dd.traders || 0, depositors: dd.depositors || 0, net: dd.net || 0 };
+        });
+        const agTr = document.createElement('tr');
+        agTr.className = 'agent-row';
+        agTr.dataset.parentOffice = officeId;
+        agTr.dataset.parentDept = deptId;
+        agTr.style.display = 'none';
+        agTr.innerHTML = `<td class="col-name">${a.agent_name}</td>` + makeCells(agentDays);
+        tbody.appendChild(agTr);
+      });
+    }
+
+    // Restore expand state
+    const wasOpen = matrixExpandState.has(officeName);
+    if (wasOpen) {
+      offTr.querySelector('.chevron').classList.add('open');
+      tbody.querySelectorAll(`tr.dept-row[data-parent-office="${officeId}"]`).forEach(dr => {
+        dr.style.display = '';
+        const openDepts = matrixExpandState.get(officeName);
+        if (openDepts && openDepts.has(dr.dataset.deptName)) {
+          dr.querySelector('.chevron').classList.add('open');
+          tbody.querySelectorAll(`tr.agent-row[data-parent-dept="${dr.dataset.deptId}"]`).forEach(ar => ar.style.display = '');
+        }
+      });
+    }
+
+    // Click handlers
+    offTr.addEventListener('click', () => {
+      const chev = offTr.querySelector('.chevron');
+      const isOpen = chev.classList.contains('open');
+      if (isOpen) {
+        chev.classList.remove('open');
+        tbody.querySelectorAll(`tr[data-parent-office="${officeId}"]`).forEach(r => {
+          r.style.display = 'none';
+          const dc = r.querySelector('.chevron');
+          if (dc) dc.classList.remove('open');
+        });
+      } else {
+        chev.classList.add('open');
+        tbody.querySelectorAll(`tr.dept-row[data-parent-office="${officeId}"]`).forEach(r => r.style.display = '');
+      }
+    });
+    tbody.querySelectorAll(`tr.dept-row[data-parent-office="${officeId}"]`).forEach(deptTr => {
+      deptTr.addEventListener('click', e => {
+        e.stopPropagation();
+        const chev = deptTr.querySelector('.chevron');
+        const isOpen = chev.classList.contains('open');
+        const did = deptTr.dataset.deptId;
+        if (isOpen) {
+          chev.classList.remove('open');
+          tbody.querySelectorAll(`tr.agent-row[data-parent-dept="${did}"]`).forEach(r => r.style.display = 'none');
+        } else {
+          chev.classList.add('open');
+          tbody.querySelectorAll(`tr.agent-row[data-parent-dept="${did}"]`).forEach(r => r.style.display = '');
+        }
+      });
+    });
+  }
+
+  // Grand total footer
+  const tfoot = document.getElementById('matrixTfoot');
+  let footHtml = '<tr><td class="col-name"><b>Total</b></td>';
+  let gt = 0, gd = 0, gn = 0;
+  days.forEach(day => {
+    const t = grandDays[day].traders, dep = grandDays[day].depositors, n = grandDays[day].net;
+    gt += t; gd += dep; gn += n;
+    const nCls = n < 0 ? ' val-neg' : (n === 0 ? ' val-zero' : '');
+    footHtml += `<td><b>${fmtN(t)}</b></td><td><b>${fmtN(dep)}</b></td><td class="${nCls}"><b>${fmtMoney(n)}</b></td><td><b>${fmtPct(dep, t)}</b></td>`;
+  });
+  const gnCls = gn < 0 ? ' val-neg' : (gn === 0 ? ' val-zero' : '');
+  footHtml += `<td><b>${fmtN(gt)}</b></td><td><b>${fmtN(gd)}</b></td><td class="${gnCls}"><b>${fmtMoney(gn)}</b></td><td><b>${fmtPct(gd, gt)}</b></td></tr>`;
+  tfoot.innerHTML = footHtml;
+}
+
+function expandAllMatrix() {
+  const tbody = document.getElementById('matrixTbody');
+  tbody.querySelectorAll('tr.office-row').forEach(tr => {
+    tr.querySelector('.chevron').classList.add('open');
+    const oid = tr.dataset.officeId;
+    tbody.querySelectorAll(`tr[data-parent-office="${oid}"]`).forEach(r => {
+      r.style.display = '';
+      const c = r.querySelector('.chevron');
+      if (c) c.classList.add('open');
+    });
+  });
+}
+
+function collapseAllMatrix() {
+  const tbody = document.getElementById('matrixTbody');
+  tbody.querySelectorAll('tr.office-row').forEach(tr => {
+    tr.querySelector('.chevron').classList.remove('open');
+    const oid = tr.dataset.officeId;
+    tbody.querySelectorAll(`tr[data-parent-office="${oid}"]`).forEach(r => {
+      r.style.display = 'none';
+      const c = r.querySelector('.chevron');
+      if (c) c.classList.remove('open');
+    });
   });
 }
 

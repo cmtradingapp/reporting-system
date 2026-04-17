@@ -60,6 +60,7 @@ async def total_traders_page(request: Request):
     return templates.TemplateResponse("total_traders.html", {
         "request": request,
         "current_user": user,
+        "is_admin": user.get("role") == "admin",
     })
 
 
@@ -286,6 +287,74 @@ async def total_traders_api(
           {role_sql}
     """
 
+    is_admin = user.get("role") == "admin"
+
+    # ── Matrix queries (admin only): per-agent, per-day breakdown ──────────
+    matrix_traders_sql = ""
+    matrix_deps_sql = ""
+    matrix_net_sql = ""
+    matrix_agents_sql = ""
+    if is_admin:
+        matrix_agents_sql = f"""
+            SELECT u.id, COALESCE(u.office_name, 'N/A') AS office_name,
+                   COALESCE(u.department, 'N/A') AS dept_name,
+                   COALESCE(u.agent_name, u.full_name, 'N/A') AS agent_name
+            FROM crm_users u
+            WHERE u.department_ = 'Retention'
+              AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
+              AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
+              {role_sql}
+            ORDER BY u.office_name, u.department, u.agent_name
+        """
+        matrix_traders_sql = f"""
+            SELECT a.assigned_to AS agent_id, a.day,
+                   COUNT(DISTINCT a.accountid) AS traders
+            FROM mv_retention_traders a
+            LEFT JOIN crm_users u ON u.id = a.assigned_to
+            WHERE a.accountid IS NOT NULL AND a.accountid::text != ''
+              AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
+              AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
+              AND u.department_ = 'Retention'
+              AND a.day >= %(date_from)s AND a.day < %(date_to_excl)s
+              {filters_sql}
+              {role_sql}
+            GROUP BY 1, 2
+        """
+        matrix_deps_sql = f"""
+            SELECT t.original_deposit_owner AS agent_id,
+                   t.confirmation_time::date AS day,
+                   COUNT(DISTINCT a.accountid) AS depositors
+            FROM transactions t
+            JOIN accounts a ON a.accountid = t.vtigeraccountid
+            LEFT JOIN crm_users u ON u.id = t.original_deposit_owner
+            WHERE t.transactionapproval = 'Approved'
+              AND (t.deleted = 0 OR t.deleted IS NULL)
+              AND t.transaction_type_name = 'Deposit'
+              AND t.vtigeraccountid IS NOT NULL
+              AND a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)
+              AND a.accountid IS NOT NULL AND a.accountid::text != ''
+              AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
+              AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
+              AND u.department_ = 'Retention'
+              AND t.confirmation_time >= %(date_from)s::date
+              AND t.confirmation_time < %(date_to_excl)s::date
+              {filters_sql}
+              {role_sql}
+            GROUP BY 1, 2
+        """
+        matrix_net_sql = f"""
+            SELECT k.agent_id, k.tx_date AS day,
+                   SUM(k.net_usd)::float AS net_usd
+            FROM mv_daily_kpis k
+            JOIN crm_users u ON u.id = k.agent_id
+            WHERE u.department_ = 'Retention'
+              AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
+              AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
+              AND k.tx_date >= %(date_from)s AND k.tx_date < %(date_to_excl)s
+              {role_sql}
+            GROUP BY 1, 2
+        """
+
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -300,6 +369,34 @@ async def total_traders_api(
 
             cur.execute(depositors_total_sql, params)
             deps_total = int(cur.fetchone()[0] or 0)
+
+            matrix_data = None
+            if is_admin:
+                cur.execute(matrix_agents_sql, params)
+                agents = [{"id": r[0], "office_name": r[1], "dept_name": r[2], "agent_name": r[3]}
+                          for r in cur.fetchall()]
+
+                cur.execute(matrix_traders_sql, params)
+                m_traders = {}
+                for r in cur.fetchall():
+                    m_traders.setdefault(int(r[0]), {})[r[1].strftime("%Y-%m-%d")] = int(r[2])
+
+                cur.execute(matrix_deps_sql, params)
+                m_deps = {}
+                for r in cur.fetchall():
+                    m_deps.setdefault(int(r[0]), {})[r[1].strftime("%Y-%m-%d")] = int(r[2])
+
+                cur.execute(matrix_net_sql, params)
+                m_net = {}
+                for r in cur.fetchall():
+                    m_net.setdefault(int(r[0]), {})[r[1].strftime("%Y-%m-%d")] = round(float(r[2]), 2)
+
+                matrix_data = {
+                    "agents": agents,
+                    "traders": {str(k): v for k, v in m_traders.items()},
+                    "depositors": {str(k): v for k, v in m_deps.items()},
+                    "net": {str(k): v for k, v in m_net.items()},
+                }
     except Exception as e:
         return JSONResponse(status_code=500, content={"detail": str(e)})
     finally:
@@ -330,5 +427,7 @@ async def total_traders_api(
             "depositors": deps_series,
         },
     }
+    if matrix_data:
+        result["matrix"] = matrix_data
     cache.set(_ck, result)
     return JSONResponse(content=result)
