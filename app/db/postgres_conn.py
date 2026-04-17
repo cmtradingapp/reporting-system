@@ -2893,6 +2893,52 @@ _MV_ORDER = [
 _mv_refresh_status: dict = {mv: {"last_refresh": None, "last_error": None} for mv in _MV_ORDER}
 
 
+def refresh_single_mv(mv_name: str) -> None:
+    """Refresh a single MV by name. Uses advisory lock to avoid conflicts with full refresh."""
+    from datetime import datetime, timezone
+    if mv_name not in _MV_ORDER:
+        return
+    lock_conn = get_connection()
+    try:
+        with lock_conn.cursor() as cur:
+            cur.execute("SELECT pg_try_advisory_lock(123456789)")
+            got_lock = cur.fetchone()[0]
+        if not got_lock:
+            lock_conn.close()
+            return
+    except Exception:
+        lock_conn.close()
+        return
+    try:
+        conn = get_connection()
+        try:
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(f"REFRESH MATERIALIZED VIEW CONCURRENTLY {mv_name}")
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                with conn.cursor() as cur:
+                    cur.execute(f"REFRESH MATERIALIZED VIEW {mv_name}")
+                conn.commit()
+            _mv_refresh_status[mv_name]["last_refresh"] = datetime.now(timezone.utc).isoformat()
+            _mv_refresh_status[mv_name]["last_error"] = None
+        except Exception as e:
+            conn.rollback()
+            _mv_refresh_status[mv_name]["last_error"] = str(e)
+            print(f"[refresh_single_mv] {mv_name}: {e}")
+        finally:
+            conn.close()
+    finally:
+        try:
+            with lock_conn.cursor() as cur:
+                cur.execute("SELECT pg_advisory_unlock(123456789)")
+            lock_conn.commit()
+        except Exception:
+            pass
+        lock_conn.close()
+
+
 def refresh_materialized_views() -> None:
     """Refresh all MVs. Uses an advisory lock so only one process refreshes at a time.
     Tries CONCURRENTLY first (non-blocking); falls back to plain refresh if no unique index.

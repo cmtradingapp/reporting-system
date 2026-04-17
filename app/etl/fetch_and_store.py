@@ -72,6 +72,12 @@ def run_accounts_etl(hours: int = 24) -> dict:
     finally:
         duration_ms = int((time.time() - start) * 1000)
         log_sync("crm_accounts", cutoff, rows, duration_ms, status, error_msg)
+    if status == "success":
+        try:
+            from app.db.postgres_conn import refresh_single_mv
+            refresh_single_mv("mv_retention_traders")
+        except Exception as e:
+            print(f"[run_accounts_etl] mv_retention_traders refresh failed: {e}")
     return {
         "status": status,
         "accounts_synced": rows,
@@ -815,6 +821,12 @@ def run_dealio_trades_mt5_etl(hours: int = 24) -> dict:
     finally:
         duration_ms = int((time.time() - start) * 1000)
         log_sync("dealio_trades_mt5", cutoff, rows, duration_ms, status, error_msg)
+    if status == "success":
+        try:
+            from app.db.postgres_conn import refresh_single_mv
+            refresh_single_mv("mv_retention_traders")
+        except Exception as e:
+            print(f"[run_dealio_trades_mt5_etl] mv_retention_traders refresh failed: {e}")
     return {"status": status, "rows_synced": rows, "lookback_hours": hours}
 
 
@@ -943,4 +955,11 @@ def run_dealio_positions_etl() -> dict:
     finally:
         duration_ms = int((time.time() - start) * 1000)
         log_sync("dealio_positions", cutoff, rows, duration_ms, status, error_msg)
+    # Refresh mv_retention_traders after positions sync (last source table to update)
+    if status == "success":
+        try:
+            from app.db.postgres_conn import refresh_single_mv
+            refresh_single_mv("mv_retention_traders")
+        except Exception as e:
+            print(f"[run_dealio_positions_etl] mv_retention_traders refresh failed: {e}")
     return {"status": status, "rows_synced": rows}
