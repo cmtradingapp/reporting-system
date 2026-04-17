@@ -47,13 +47,13 @@
     .sdd-item:hover { background:#21262d; }
     .sdd-cb { accent-color:#3fb950; width:14px; height:14px; }
     .matrix-table { width:100%; border-collapse:collapse; font-size:0.88rem; white-space:nowrap; }
-    .matrix-table th, .matrix-table td { padding:7px 12px; border:1px solid #21262d; text-align:right; }
+    .matrix-table th, .matrix-table td { padding:7px 12px; border:1px solid #21262d; text-align:center; }
     .matrix-table th { background:#161b22; color:#c9d1d9; font-weight:700; font-size:0.92rem; position:sticky; top:0; z-index:2; }
     .matrix-table th.col-name { text-align:left; position:sticky; left:0; z-index:3; background:#161b22; min-width:200px; }
     .matrix-table td.col-name { text-align:left; position:sticky; left:0; z-index:1; background:#0f1117; min-width:200px; }
     .matrix-table th.date-group { text-align:center; border-bottom:none; font-size:0.95rem; font-weight:800; color:#e0e0e0; }
     .matrix-table th.date-sub { font-size:0.84rem; color:#8b949e; font-weight:600; }
-    .matrix-table .day-sep { border-left:3px solid #388bfd !important; }
+    .matrix-table .day-sep { border-left:3px solid #539bf5 !important; }
     .matrix-table td:nth-child(4n+2):not(.col-name) { padding-right:16px; }
     .matrix-table td:nth-child(4n+3):not(.col-name) { padding-left:16px; }
     .matrix-table .office-row td { background:#1c2333; font-weight:700; color:#e0e0e0; cursor:pointer; }
@@ -684,15 +684,17 @@ function renderMatrix(d) {
 
   // Grand total footer
   const tfoot = document.getElementById('matrixTfoot');
-  const grandTotals = sumTotals(allActiveAgentIds);
+  // Grand total: use KPI totals for traders/depositors (true distinct), sum NET from agents
+  const grandNetTotal = sumTotals(allActiveAgentIds).net;
+  const gtTraders = d.totals.traders, gtDeps = d.totals.depositors;
   let footHtml = '<tr><td class="col-name"><b>Total</b></td>';
   days.forEach(day => {
     const t = grandDays[day].traders, dep = grandDays[day].depositors, n = grandDays[day].net;
     const nCls = n < 0 ? ' val-neg' : (n === 0 ? ' val-zero' : '');
     footHtml += `<td class="day-sep"><b>${fmtN(t)}</b></td><td><b>${fmtN(dep)}</b></td><td class="${nCls}"><b>${fmtMoney(n)}</b></td><td><b>${fmtPct(dep, t)}</b></td>`;
   });
-  const gnCls = grandTotals.net < 0 ? ' val-neg' : (grandTotals.net === 0 ? ' val-zero' : '');
-  footHtml += `<td class="day-sep"><b>${fmtN(grandTotals.traders)}</b></td><td><b>${fmtN(grandTotals.depositors)}</b></td><td class="${gnCls}"><b>${fmtMoney(grandTotals.net)}</b></td><td><b>${fmtPct(grandTotals.depositors, grandTotals.traders)}</b></td></tr>`;
+  const gnCls = grandNetTotal < 0 ? ' val-neg' : (grandNetTotal === 0 ? ' val-zero' : '');
+  footHtml += `<td class="day-sep"><b>${fmtN(gtTraders)}</b></td><td><b>${fmtN(gtDeps)}</b></td><td class="${gnCls}"><b>${fmtMoney(grandNetTotal)}</b></td><td><b>${fmtPct(gtDeps, gtTraders)}</b></td></tr>`;
   tfoot.innerHTML = footHtml;
 }
 
