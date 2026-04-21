@@ -249,7 +249,6 @@
       #kpi-new-leads      { order:11; }
       #kpi-new-live       { order:12; }
       #kpi-rdp-net        { order:13; }
-      #kpi-start-equity   { display:none !important; }
       .date-input { width:120px; }
       .cnt-badge { display:none; }
       #row-count, #ret-row-count { display:none; }
@@ -531,12 +530,6 @@
     </div>
     {% endif %}
     {% if current_user.role in ('admin', 'general') %}
-    <div class="col-6 col-md-2" id="kpi-start-equity">
-      <div class="kpi-card text-center">
-        <div class="kpi-value" style="color:#8b949e;" id="stat-start-equity-zeroed">—</div>
-        <div class="kpi-label">Start EEZ<span id="start-eez-date" style="display:block;font-size:0.55rem;color:#484f58;font-weight:400;text-transform:none;letter-spacing:0;margin-top:1px;"></span></div>
-      </div>
-    </div>
     <div class="col-6 col-md-2" id="kpi-live-equity">
       <div class="kpi-card text-center">
         <div class="kpi-value" style="color:#58a6ff;" id="stat-live-equity-zeroed">—</div>
