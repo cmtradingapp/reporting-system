@@ -153,7 +153,7 @@ async def fsa_report_section3(request: Request, year: int = 2026, quarter: int =
             "age_groups": age_groups,
             "classification": classification,
         }
-        cache.set(_ck, _result)
+        cache.set(_ck, _result, ttl=3600)
         return JSONResponse(_result)
     except Exception as e1:
         return JSONResponse({"error": str(e1)}, status_code=500)
@@ -217,7 +217,7 @@ async def fsa_report_section4(request: Request, year: int = 2026, quarter: int =
                     FROM dealio_positions p
                     JOIN trading_accounts ta ON ta.login::bigint = p.login
                     JOIN accounts a ON a.accountid = ta.vtigeraccountid
-                    WHERE p.open_time::date >= %(q_start)s AND p.open_time::date < %(q_end_excl)s
+                    WHERE p.open_time >= %(q_start)s AND p.open_time < %(q_end_excl)s
                       AND ta.vtigeraccountid IS NOT NULL
                       AND a.is_test_account = 0
                       AND {base_filter}
@@ -237,7 +237,7 @@ async def fsa_report_section4(request: Request, year: int = 2026, quarter: int =
                     JOIN accounts a ON a.accountid = ta.vtigeraccountid
                     WHERE ex.entry = 1
                       AND ex.close_time > '1971-01-01'
-                      AND en.open_time::date >= %(q_start)s AND en.open_time::date < %(q_end_excl)s
+                      AND en.open_time >= %(q_start)s AND en.open_time < %(q_end_excl)s
                       AND ta.vtigeraccountid IS NOT NULL
                       AND a.is_test_account = 0
                       AND {base_filter}
@@ -281,7 +281,7 @@ async def fsa_report_section4(request: Request, year: int = 2026, quarter: int =
             })
 
         _result = {"countries": countries}
-        cache.set(_ck, _result)
+        cache.set(_ck, _result, ttl=3600)
         return JSONResponse(_result)
     except Exception as e2:
         return JSONResponse({"error": str(e2)}, status_code=500)
@@ -347,7 +347,7 @@ async def fsa_report_section5(request: Request, year: int = 2026, quarter: int =
             "total_equity": total_equity,
             "equity_ratio": equity_ratio,
         }
-        cache.set(_ck, _result)
+        cache.set(_ck, _result, ttl=3600)
         return JSONResponse(_result)
     except Exception as e3:
         return JSONResponse({"error": str(e3)}, status_code=500)
@@ -402,7 +402,7 @@ async def fsa_report_section6(request: Request, year: int = 2026, quarter: int =
                     FROM dealio_positions p
                     JOIN trading_accounts ta ON ta.login::bigint = p.login
                     JOIN accounts a ON a.accountid = ta.vtigeraccountid
-                    WHERE p.open_time::date >= %(q_start)s AND p.open_time::date < %(q_end_excl)s
+                    WHERE p.open_time >= %(q_start)s AND p.open_time < %(q_end_excl)s
                       AND ta.vtigeraccountid IS NOT NULL
                       AND a.is_test_account = 0
                       AND {base_filter}
@@ -421,7 +421,7 @@ async def fsa_report_section6(request: Request, year: int = 2026, quarter: int =
                     JOIN accounts a ON a.accountid = ta.vtigeraccountid
                     WHERE ex.entry = 1
                       AND ex.close_time > '1971-01-01'
-                      AND en.open_time::date >= %(q_start)s AND en.open_time::date < %(q_end_excl)s
+                      AND en.open_time >= %(q_start)s AND en.open_time < %(q_end_excl)s
                       AND ta.vtigeraccountid IS NOT NULL
                       AND a.is_test_account = 0
                       AND {base_filter}
@@ -562,7 +562,7 @@ async def fsa_report_section6(request: Request, year: int = 2026, quarter: int =
                 {"type": "Other Foreign", "volume": other_vol},
             ],
         }
-        cache.set(_ck, _result)
+        cache.set(_ck, _result, ttl=3600)
         return JSONResponse(_result)
     except Exception as e4:
         return JSONResponse({"error": str(e4)}, status_code=500)

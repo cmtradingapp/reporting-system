@@ -15,9 +15,9 @@ def get(key: str):
     return None
 
 
-def set(key: str, data):
+def set(key: str, data, ttl: int = None):
     with _lock:
-        _store[key] = (data, time.time() + TTL)
+        _store[key] = (data, time.time() + (ttl if ttl is not None else TTL))
 
 
 def invalidate_all():

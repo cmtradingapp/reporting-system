@@ -215,84 +215,24 @@ async def total_traders_api(
         "AND u.department_ = 'Retention'"
     )
 
-    # ── Traders: daily + total (uses mv_retention_traders MV, assigned_to) ─
-    traders_daily_sql = f"""
-        SELECT a.day, COUNT(DISTINCT a.accountid) AS cnt
-        FROM mv_retention_traders a
-        LEFT JOIN crm_users u ON u.id = a.assigned_to
-        WHERE a.accountid IS NOT NULL AND a.accountid::text != ''
+    # ── Shared SQL fragments ──
+    _score_case = (
+        "CASE WHEN a.classification_int IS NOT NULL AND a.classification_int > 0"
+        " THEN a.classification_int"
+        " WHEN a.birth_date IS NOT NULL THEN CASE"
+        " WHEN DATE_PART('year', AGE({ref}, a.birth_date::date)) < 25 THEN 3"
+        " WHEN DATE_PART('year', AGE({ref}, a.birth_date::date)) < 30 THEN 5"
+        " WHEN DATE_PART('year', AGE({ref}, a.birth_date::date)) < 40 THEN 6"
+        " ELSE 7 END ELSE NULL END"
+    )
+    _rt_where = f"""rt.accountid IS NOT NULL AND rt.accountid::text != ''
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
           AND u.department_ = 'Retention'
-          AND a.day >= %(date_from)s
-          AND a.day <  %(date_to_excl)s
+          AND rt.day >= %(date_from)s AND rt.day < %(date_to_excl)s
           {filters_sql}
-          {role_sql}
-        GROUP BY 1
-    """
-
-    traders_total_sql = f"""
-        SELECT COUNT(DISTINCT a.accountid)
-        FROM mv_retention_traders a
-        LEFT JOIN crm_users u ON u.id = a.assigned_to
-        WHERE a.accountid IS NOT NULL AND a.accountid::text != ''
-          AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
-          AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
-          AND u.department_ = 'Retention'
-          AND a.day >= %(date_from)s
-          AND a.day <  %(date_to_excl)s
-          {filters_sql}
-          {role_sql}
-    """
-
-    # ── Depositors: daily + total (uses original_deposit_owner for dept filter) ─
-    depositors_daily_sql = f"""
-        SELECT t.confirmation_time::date AS day, COUNT(DISTINCT a.accountid) AS cnt
-        FROM transactions t
-        JOIN accounts a ON a.accountid = t.vtigeraccountid
-        LEFT JOIN crm_users u ON u.id = t.original_deposit_owner
-        WHERE t.transactionapproval = 'Approved'
-          AND (t.deleted = 0 OR t.deleted IS NULL)
-          AND t.transaction_type_name = 'Deposit'
-          AND t.vtigeraccountid IS NOT NULL
-          AND a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)
-          AND a.accountid IS NOT NULL AND a.accountid::text != ''
-          AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
-          AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
-          AND u.department_ = 'Retention'
-          AND t.confirmation_time >= %(date_from)s::date
-          AND t.confirmation_time <  %(date_to_excl)s::date
-          {filters_sql}
-          {role_sql}
-        GROUP BY 1
-    """
-
-    depositors_total_sql = f"""
-        SELECT COUNT(DISTINCT a.accountid)
-        FROM transactions t
-        JOIN accounts a ON a.accountid = t.vtigeraccountid
-        LEFT JOIN crm_users u ON u.id = t.original_deposit_owner
-        WHERE t.transactionapproval = 'Approved'
-          AND (t.deleted = 0 OR t.deleted IS NULL)
-          AND t.transaction_type_name = 'Deposit'
-          AND t.vtigeraccountid IS NOT NULL
-          AND a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)
-          AND a.accountid IS NOT NULL AND a.accountid::text != ''
-          AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
-          AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
-          AND u.department_ = 'Retention'
-          AND t.confirmation_time >= %(date_from)s::date
-          AND t.confirmation_time <  %(date_to_excl)s::date
-          {filters_sql}
-          {role_sql}
-    """
-
-    # Daily NET $ (for chart tooltip) — uses raw transactions so all filters apply
-    _net_base = """
-        FROM transactions t
-        JOIN accounts a ON a.accountid = t.vtigeraccountid
-        LEFT JOIN crm_users u ON u.id = t.original_deposit_owner
-        WHERE t.transactionapproval = 'Approved'
+          {role_sql}"""
+    _txn_where = f"""t.transactionapproval = 'Approved'
           AND (t.deleted = 0 OR t.deleted IS NULL)
           AND t.transaction_type_name IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
           AND t.vtigeraccountid IS NOT NULL
@@ -301,309 +241,169 @@ async def total_traders_api(
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
           AND u.department_ = 'Retention'
-          AND t.confirmation_time >= %(date_from)s::date
-          AND t.confirmation_time <  %(date_to_excl)s::date
-    """
-    net_daily_sql = f"""
-        SELECT t.confirmation_time::date AS day,
-               COALESCE(SUM(CASE
-                 WHEN t.transaction_type_name IN ('Deposit','Withdrawal Cancelled') THEN t.usdamount
-                 WHEN t.transaction_type_name IN ('Withdrawal','Deposit Cancelled') THEN -t.usdamount
-               END), 0)::float AS net_usd
-        {_net_base}
+          AND t.confirmation_time >= %(date_from)s
+          AND t.confirmation_time < %(date_to_excl)s
           {filters_sql}
-          {role_sql}
-        GROUP BY 1
-    """
+          {role_sql}"""
+    _net_agg = """COALESCE(SUM(CASE
+             WHEN t.transaction_type_name IN ('Deposit','Withdrawal Cancelled') THEN t.usdamount
+             WHEN t.transaction_type_name IN ('Withdrawal','Deposit Cancelled') THEN -t.usdamount
+           END), 0)::float"""
 
     is_admin = user.get("role") == "admin"
-
-    # ── Matrix queries: per-agent, per-day breakdown (role-filtered) ───────
-    matrix_agents_sql = f"""
-        SELECT u.id, COALESCE(u.office_name, 'N/A') AS office_name,
-               COALESCE(u.department, 'N/A') AS dept_name,
-               COALESCE(u.agent_name, u.full_name, 'N/A') AS agent_name
-        FROM crm_users u
-        WHERE u.department_ = 'Retention'
-          AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
-          AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
-          {role_sql}
-        ORDER BY u.office_name, u.department, u.agent_name
-    """
-    matrix_traders_sql = f"""
-        SELECT a.assigned_to AS agent_id, a.day,
-               COUNT(DISTINCT a.accountid) AS traders
-        FROM mv_retention_traders a
-        LEFT JOIN crm_users u ON u.id = a.assigned_to
-        WHERE a.accountid IS NOT NULL AND a.accountid::text != ''
-          AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
-          AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
-          AND u.department_ = 'Retention'
-          AND a.day >= %(date_from)s AND a.day < %(date_to_excl)s
-          {filters_sql}
-          {role_sql}
-        GROUP BY 1, 2
-    """
-    matrix_deps_sql = f"""
-        SELECT t.original_deposit_owner AS agent_id,
-               t.confirmation_time::date AS day,
-               COUNT(DISTINCT a.accountid) AS depositors
-        FROM transactions t
-        JOIN accounts a ON a.accountid = t.vtigeraccountid
-        LEFT JOIN crm_users u ON u.id = t.original_deposit_owner
-        WHERE t.transactionapproval = 'Approved'
-          AND (t.deleted = 0 OR t.deleted IS NULL)
-          AND t.transaction_type_name = 'Deposit'
-          AND t.vtigeraccountid IS NOT NULL
-          AND a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)
-          AND a.accountid IS NOT NULL AND a.accountid::text != ''
-          AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
-          AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
-          AND u.department_ = 'Retention'
-          AND t.confirmation_time >= %(date_from)s::date
-          AND t.confirmation_time < %(date_to_excl)s::date
-          {filters_sql}
-          {role_sql}
-        GROUP BY 1, 2
-    """
-    matrix_net_sql = f"""
-        SELECT t.original_deposit_owner AS agent_id, t.confirmation_time::date AS day,
-               COALESCE(SUM(CASE
-                 WHEN t.transaction_type_name IN ('Deposit','Withdrawal Cancelled') THEN t.usdamount
-                 WHEN t.transaction_type_name IN ('Withdrawal','Deposit Cancelled') THEN -t.usdamount
-               END), 0)::float AS net_usd
-        {_net_base}
-          {filters_sql}
-          {role_sql}
-        GROUP BY 1, 2
-    """
-    # Avg score per agent per day
-    matrix_avg_score_sql = f"""
-        SELECT rt.assigned_to AS agent_id, rt.day,
-               ROUND(AVG(
-                 CASE
-                   WHEN a.classification_int IS NOT NULL AND a.classification_int > 0
-                     THEN a.classification_int
-                   WHEN a.birth_date IS NOT NULL
-                     THEN CASE
-                       WHEN DATE_PART('year', AGE(rt.day, a.birth_date::date)) < 25 THEN 3
-                       WHEN DATE_PART('year', AGE(rt.day, a.birth_date::date)) < 30 THEN 5
-                       WHEN DATE_PART('year', AGE(rt.day, a.birth_date::date)) < 40 THEN 6
-                       ELSE 7
-                     END
-                   ELSE NULL
-                 END
-               ), 2) AS avg_score
-        FROM mv_retention_traders rt
-        JOIN accounts a ON a.accountid = rt.accountid
-        LEFT JOIN crm_users u ON u.id = rt.assigned_to
-        WHERE rt.accountid IS NOT NULL AND rt.accountid::text != ''
-          AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
-          AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
-          AND u.department_ = 'Retention'
-          AND rt.day >= %(date_from)s AND rt.day < %(date_to_excl)s
-          {filters_sql}
-          {role_sql}
-        GROUP BY 1, 2
-    """
-    matrix_avg_score_total_sql = f"""
-        SELECT rt.assigned_to AS agent_id,
-               ROUND(AVG(
-                 CASE
-                   WHEN a.classification_int IS NOT NULL AND a.classification_int > 0
-                     THEN a.classification_int
-                   WHEN a.birth_date IS NOT NULL
-                     THEN CASE
-                       WHEN DATE_PART('year', AGE(%(ref_date)s::date, a.birth_date::date)) < 25 THEN 3
-                       WHEN DATE_PART('year', AGE(%(ref_date)s::date, a.birth_date::date)) < 30 THEN 5
-                       WHEN DATE_PART('year', AGE(%(ref_date)s::date, a.birth_date::date)) < 40 THEN 6
-                       ELSE 7
-                     END
-                   ELSE NULL
-                 END
-               ), 2) AS avg_score
-        FROM mv_retention_traders rt
-        JOIN accounts a ON a.accountid = rt.accountid
-        LEFT JOIN crm_users u ON u.id = rt.assigned_to
-        WHERE rt.accountid IS NOT NULL AND rt.accountid::text != ''
-          AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
-          AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
-          AND u.department_ = 'Retention'
-          AND rt.day >= %(date_from)s AND rt.day < %(date_to_excl)s
-          {filters_sql}
-          {role_sql}
-        GROUP BY 1
-    """
-
-    # Distinct totals per agent (not sum of daily — an account active on multiple days counts once)
-    matrix_traders_total_sql = f"""
-        SELECT a.assigned_to AS agent_id,
-               COUNT(DISTINCT a.accountid) AS traders
-        FROM mv_retention_traders a
-        LEFT JOIN crm_users u ON u.id = a.assigned_to
-        WHERE a.accountid IS NOT NULL AND a.accountid::text != ''
-          AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
-          AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
-          AND u.department_ = 'Retention'
-          AND a.day >= %(date_from)s AND a.day < %(date_to_excl)s
-          {filters_sql}
-          {role_sql}
-        GROUP BY 1
-    """
-    matrix_deps_total_sql = f"""
-        SELECT t.original_deposit_owner AS agent_id,
-               COUNT(DISTINCT a.accountid) AS depositors
-        FROM transactions t
-        JOIN accounts a ON a.accountid = t.vtigeraccountid
-        LEFT JOIN crm_users u ON u.id = t.original_deposit_owner
-        WHERE t.transactionapproval = 'Approved'
-          AND (t.deleted = 0 OR t.deleted IS NULL)
-          AND t.transaction_type_name = 'Deposit'
-          AND t.vtigeraccountid IS NOT NULL
-          AND a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)
-          AND a.accountid IS NOT NULL AND a.accountid::text != ''
-          AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
-          AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
-          AND u.department_ = 'Retention'
-          AND t.confirmation_time >= %(date_from)s::date
-          AND t.confirmation_time < %(date_to_excl)s::date
-          {filters_sql}
-          {role_sql}
-        GROUP BY 1
-    """
-    # NET total per agent (sum is correct for NET, no distinct needed)
-    matrix_net_total_sql = f"""
-        SELECT t.original_deposit_owner AS agent_id,
-               COALESCE(SUM(CASE
-                 WHEN t.transaction_type_name IN ('Deposit','Withdrawal Cancelled') THEN t.usdamount
-                 WHEN t.transaction_type_name IN ('Withdrawal','Deposit Cancelled') THEN -t.usdamount
-               END), 0)::float AS net_usd
-        {_net_base}
-          {filters_sql}
-          {role_sql}
-        GROUP BY 1
-    """
-
-    # Avg Sales Client Potential per day (with age-based fallback for NULL/0)
-    avg_score_daily_sql = f"""
-        SELECT rt.day,
-               ROUND(AVG(
-                 CASE
-                   WHEN a.classification_int IS NOT NULL AND a.classification_int > 0
-                     THEN a.classification_int
-                   WHEN a.birth_date IS NOT NULL
-                     THEN CASE
-                       WHEN DATE_PART('year', AGE(rt.day, a.birth_date::date)) < 25 THEN 3
-                       WHEN DATE_PART('year', AGE(rt.day, a.birth_date::date)) < 30 THEN 5
-                       WHEN DATE_PART('year', AGE(rt.day, a.birth_date::date)) < 40 THEN 6
-                       ELSE 7
-                     END
-                   ELSE NULL
-                 END
-               ), 2) AS avg_score
-        FROM mv_retention_traders rt
-        JOIN accounts a ON a.accountid = rt.accountid
-        LEFT JOIN crm_users u ON u.id = rt.assigned_to
-        WHERE rt.accountid IS NOT NULL AND rt.accountid::text != ''
-          AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
-          AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
-          AND u.department_ = 'Retention'
-          AND rt.day >= %(date_from)s
-          AND rt.day <  %(date_to_excl)s
-          {filters_sql}
-          {role_sql}
-        GROUP BY 1
-    """
-
-    avg_score_total_sql = f"""
-        SELECT ROUND(AVG(
-                 CASE
-                   WHEN a.classification_int IS NOT NULL AND a.classification_int > 0
-                     THEN a.classification_int
-                   WHEN a.birth_date IS NOT NULL
-                     THEN CASE
-                       WHEN DATE_PART('year', AGE(%(ref_date)s::date, a.birth_date::date)) < 25 THEN 3
-                       WHEN DATE_PART('year', AGE(%(ref_date)s::date, a.birth_date::date)) < 30 THEN 5
-                       WHEN DATE_PART('year', AGE(%(ref_date)s::date, a.birth_date::date)) < 40 THEN 6
-                       ELSE 7
-                     END
-                   ELSE NULL
-                 END
-               ), 2) AS avg_score
-        FROM mv_retention_traders rt
-        JOIN accounts a ON a.accountid = rt.accountid
-        LEFT JOIN crm_users u ON u.id = rt.assigned_to
-        WHERE rt.accountid IS NOT NULL AND rt.accountid::text != ''
-          AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
-          AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
-          AND u.department_ = 'Retention'
-          AND rt.day >= %(date_from)s
-          AND rt.day <  %(date_to_excl)s
-          {filters_sql}
-          {role_sql}
-    """
 
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute(traders_daily_sql, params)
-            traders_map = {r[0].strftime("%Y-%m-%d"): int(r[1]) for r in cur.fetchall()}
+            # Q1: Traders daily + avg score daily (combined, was 2 queries)
+            cur.execute(f"""
+                SELECT rt.day, COUNT(DISTINCT rt.accountid),
+                       ROUND(AVG({_score_case.format(ref='rt.day')}), 2)
+                FROM mv_retention_traders rt
+                JOIN accounts a ON a.accountid = rt.accountid
+                LEFT JOIN crm_users u ON u.id = rt.assigned_to
+                WHERE {_rt_where}
+                GROUP BY 1
+            """, params)
+            _rows = cur.fetchall()
+            traders_map = {r[0].strftime("%Y-%m-%d"): int(r[1]) for r in _rows}
+            avg_score_map = {r[0].strftime("%Y-%m-%d"): float(r[2]) for r in _rows if r[2] is not None}
 
-            cur.execute(traders_total_sql, params)
-            traders_total = int(cur.fetchone()[0] or 0)
-
-            cur.execute(avg_score_daily_sql, params)
-            avg_score_map = {r[0].strftime("%Y-%m-%d"): float(r[1]) for r in cur.fetchall() if r[1] is not None}
-
-            cur.execute(avg_score_total_sql, params)
+            # Q2: Traders total + avg score total (combined, was 2 queries)
+            cur.execute(f"""
+                SELECT COUNT(DISTINCT rt.accountid),
+                       ROUND(AVG({_score_case.format(ref="%(ref_date)s::date")}), 2)
+                FROM mv_retention_traders rt
+                JOIN accounts a ON a.accountid = rt.accountid
+                LEFT JOIN crm_users u ON u.id = rt.assigned_to
+                WHERE {_rt_where}
+            """, params)
             row = cur.fetchone()
-            avg_score_total = float(row[0]) if row and row[0] is not None else 0.0
+            traders_total = int(row[0] or 0)
+            avg_score_total = float(row[1]) if row[1] is not None else 0.0
 
-            cur.execute(depositors_daily_sql, params)
-            deps_map = {r[0].strftime("%Y-%m-%d"): int(r[1]) for r in cur.fetchall()}
+            # Q3: Depositors daily + NET daily (combined, was 2 queries)
+            cur.execute(f"""
+                SELECT t.confirmation_time::date AS day,
+                       COUNT(DISTINCT a.accountid) FILTER (WHERE t.transaction_type_name = 'Deposit'),
+                       {_net_agg}
+                FROM transactions t
+                JOIN accounts a ON a.accountid = t.vtigeraccountid
+                LEFT JOIN crm_users u ON u.id = t.original_deposit_owner
+                WHERE {_txn_where}
+                GROUP BY 1
+            """, params)
+            _rows = cur.fetchall()
+            deps_map = {r[0].strftime("%Y-%m-%d"): int(r[1]) for r in _rows}
+            net_map = {r[0].strftime("%Y-%m-%d"): round(float(r[2]), 2) for r in _rows}
 
-            cur.execute(depositors_total_sql, params)
+            # Q4: Depositors total (COUNT DISTINCT across all days)
+            cur.execute(f"""
+                SELECT COUNT(DISTINCT a.accountid)
+                FROM transactions t
+                JOIN accounts a ON a.accountid = t.vtigeraccountid
+                LEFT JOIN crm_users u ON u.id = t.original_deposit_owner
+                WHERE t.transactionapproval = 'Approved'
+                  AND (t.deleted = 0 OR t.deleted IS NULL)
+                  AND t.transaction_type_name = 'Deposit'
+                  AND t.vtigeraccountid IS NOT NULL
+                  AND a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)
+                  AND a.accountid IS NOT NULL AND a.accountid::text != ''
+                  AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
+                  AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
+                  AND u.department_ = 'Retention'
+                  AND t.confirmation_time >= %(date_from)s
+                  AND t.confirmation_time < %(date_to_excl)s
+                  {filters_sql}
+                  {role_sql}
+            """, params)
             deps_total = int(cur.fetchone()[0] or 0)
 
-            cur.execute(net_daily_sql, params)
-            net_map = {r[0].strftime("%Y-%m-%d"): round(float(r[1]), 2) for r in cur.fetchall()}
-
-            # Matrix: per-agent per-day breakdown (role-filtered for all users)
-            cur.execute(matrix_agents_sql, params)
+            # Q5: Matrix agents (separate table — crm_users)
+            cur.execute(f"""
+                SELECT u.id, COALESCE(u.office_name, 'N/A'),
+                       COALESCE(u.department, 'N/A'),
+                       COALESCE(u.agent_name, u.full_name, 'N/A')
+                FROM crm_users u
+                WHERE u.department_ = 'Retention'
+                  AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
+                  AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
+                  {role_sql}
+                ORDER BY u.office_name, u.department, u.agent_name
+            """, params)
             agents = [{"id": r[0], "office_name": r[1], "dept_name": r[2], "agent_name": r[3]}
                       for r in cur.fetchall()]
 
-            cur.execute(matrix_traders_sql, params)
-            m_traders = {}
+            # Q6: Matrix traders + avg score per agent/day (combined, was 2 queries)
+            cur.execute(f"""
+                SELECT rt.assigned_to, rt.day, COUNT(DISTINCT rt.accountid),
+                       ROUND(AVG({_score_case.format(ref='rt.day')}), 2)
+                FROM mv_retention_traders rt
+                JOIN accounts a ON a.accountid = rt.accountid
+                LEFT JOIN crm_users u ON u.id = rt.assigned_to
+                WHERE {_rt_where}
+                GROUP BY 1, 2
+            """, params)
+            m_traders, m_avg_score = {}, {}
             for r in cur.fetchall():
-                m_traders.setdefault(int(r[0]), {})[r[1].strftime("%Y-%m-%d")] = int(r[2])
+                aid = int(r[0])
+                day_str = r[1].strftime("%Y-%m-%d")
+                m_traders.setdefault(aid, {})[day_str] = int(r[2])
+                if r[3] is not None:
+                    m_avg_score.setdefault(aid, {})[day_str] = float(r[3])
 
-            cur.execute(matrix_deps_sql, params)
-            m_deps = {}
+            # Q7: Matrix traders total + avg score total per agent (combined, was 2 queries)
+            cur.execute(f"""
+                SELECT rt.assigned_to, COUNT(DISTINCT rt.accountid),
+                       ROUND(AVG({_score_case.format(ref="%(ref_date)s::date")}), 2)
+                FROM mv_retention_traders rt
+                JOIN accounts a ON a.accountid = rt.accountid
+                LEFT JOIN crm_users u ON u.id = rt.assigned_to
+                WHERE {_rt_where}
+                GROUP BY 1
+            """, params)
+            m_traders_total, m_avg_score_total = {}, {}
             for r in cur.fetchall():
-                m_deps.setdefault(int(r[0]), {})[r[1].strftime("%Y-%m-%d")] = int(r[2])
+                aid = int(r[0])
+                m_traders_total[aid] = int(r[1])
+                if r[2] is not None:
+                    m_avg_score_total[aid] = float(r[2])
 
-            cur.execute(matrix_net_sql, params)
-            m_net = {}
+            # Q8: Matrix depositors + NET per agent/day (combined, was 2 queries)
+            cur.execute(f"""
+                SELECT t.original_deposit_owner, t.confirmation_time::date,
+                       COUNT(DISTINCT a.accountid) FILTER (WHERE t.transaction_type_name = 'Deposit'),
+                       {_net_agg}
+                FROM transactions t
+                JOIN accounts a ON a.accountid = t.vtigeraccountid
+                LEFT JOIN crm_users u ON u.id = t.original_deposit_owner
+                WHERE {_txn_where}
+                GROUP BY 1, 2
+            """, params)
+            m_deps, m_net = {}, {}
             for r in cur.fetchall():
-                m_net.setdefault(int(r[0]), {})[r[1].strftime("%Y-%m-%d")] = round(float(r[2]), 2)
+                aid = int(r[0])
+                day_str = r[1].strftime("%Y-%m-%d")
+                if r[2]:
+                    m_deps.setdefault(aid, {})[day_str] = int(r[2])
+                m_net.setdefault(aid, {})[day_str] = round(float(r[3]), 2)
 
-            cur.execute(matrix_traders_total_sql, params)
-            m_traders_total = {int(r[0]): int(r[1]) for r in cur.fetchall()}
-
-            cur.execute(matrix_deps_total_sql, params)
-            m_deps_total = {int(r[0]): int(r[1]) for r in cur.fetchall()}
-
-            cur.execute(matrix_net_total_sql, params)
-            m_net_total = {int(r[0]): round(float(r[1]), 2) for r in cur.fetchall()}
-
-            cur.execute(matrix_avg_score_sql, params)
-            m_avg_score = {}
+            # Q9: Matrix depositors total + NET total per agent (combined, was 2 queries)
+            cur.execute(f"""
+                SELECT t.original_deposit_owner,
+                       COUNT(DISTINCT a.accountid) FILTER (WHERE t.transaction_type_name = 'Deposit'),
+                       {_net_agg}
+                FROM transactions t
+                JOIN accounts a ON a.accountid = t.vtigeraccountid
+                LEFT JOIN crm_users u ON u.id = t.original_deposit_owner
+                WHERE {_txn_where}
+                GROUP BY 1
+            """, params)
+            m_deps_total, m_net_total = {}, {}
             for r in cur.fetchall():
-                m_avg_score.setdefault(int(r[0]), {})[r[1].strftime("%Y-%m-%d")] = float(r[2]) if r[2] else 0
-
-            cur.execute(matrix_avg_score_total_sql, params)
-            m_avg_score_total = {int(r[0]): float(r[1]) for r in cur.fetchall() if r[1] is not None}
+                aid = int(r[0])
+                m_deps_total[aid] = int(r[1]) if r[1] else 0
+                m_net_total[aid] = round(float(r[2]), 2)
 
             matrix_data = {
                 "agents": agents,

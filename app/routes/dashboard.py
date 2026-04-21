@@ -69,72 +69,44 @@ def _dashboard_calc(today: date_type) -> dict:
             wd_left   = wd_total - wd_passed
             safe_wdp  = wd_passed if wd_passed > 0 else 1
 
-            # Get last_mtd date (for PnL cards)
+            # Get last_mtd date (for PnL cards) — range comparison instead of EXTRACT
             cur.execute("""
                 SELECT MAX(date)::date
                 FROM dealio_daily_profits
-                WHERE EXTRACT(YEAR  FROM date) = EXTRACT(YEAR  FROM CURRENT_DATE)
-                  AND EXTRACT(MONTH FROM date) = EXTRACT(MONTH FROM CURRENT_DATE)
-            """)
+                WHERE date >= %(month_start)s AND date < %(month_start)s::date + INTERVAL '1 month'
+            """, {"month_start": month_start_str})
             last_mtd_date      = cur.fetchone()[0] or (today - timedelta(days=1))
             last_mtd_str       = last_mtd_date.strftime("%Y-%m-%d")
             last_mtd_plus1_str = (last_mtd_date + timedelta(days=1)).strftime("%Y-%m-%d")
 
             p = {"month_start": month_start_str, "today": today_str, "tomorrow": tomorrow_str}
 
-            # Q1 — Net Deposits grand total  (mv_run_rate 'all')
+            # Combined Q1-Q4: NET + FTD per dept_group (single scan of mv_run_rate)
             cur.execute("""
-                SELECT
-                    COALESCE(SUM(net_usd) FILTER (WHERE tx_date = %(today)s::date), 0) AS daily,
-                    COALESCE(SUM(net_usd), 0)                                           AS monthly
+                SELECT dept_group,
+                    COALESCE(SUM(net_usd) FILTER (WHERE tx_date = %(today)s::date), 0),
+                    COALESCE(SUM(net_usd), 0),
+                    COALESCE(SUM(ftd_count) FILTER (WHERE tx_date = %(today)s::date), 0),
+                    COALESCE(SUM(ftd_count), 0)
                 FROM mv_run_rate
-                WHERE dept_group = 'all'
+                WHERE dept_group IN ('all', 'sales', 'retention')
                   AND tx_date >= %(month_start)s AND tx_date <= %(today)s
+                GROUP BY dept_group
             """, p)
-            row = cur.fetchone()
-            nd_daily, nd_monthly = float(row[0] or 0), float(row[1] or 0)
+            _rr = {r[0]: r for r in cur.fetchall()}
+            _all = _rr.get('all', (None, 0, 0, 0, 0))
+            _sal = _rr.get('sales', (None, 0, 0, 0, 0))
+            _ret = _rr.get('retention', (None, 0, 0, 0, 0))
+            nd_daily, nd_monthly       = float(_all[1] or 0), float(_all[2] or 0)
+            nd_sales_daily, nd_sales_monthly = float(_sal[1] or 0), float(_sal[2] or 0)
+            nd_ret_daily, nd_ret_monthly     = float(_ret[1] or 0), float(_ret[2] or 0)
+            ftd_daily, ftd_monthly     = int(_all[3] or 0), int(_all[4] or 0)
 
-            # Q2 — Net Deposits – Sales  (mv_run_rate 'sales')
+            # Q5 — FTC count (separate: uses qual_date axis)
             cur.execute("""
                 SELECT
-                    COALESCE(SUM(net_usd) FILTER (WHERE tx_date = %(today)s::date), 0) AS daily,
-                    COALESCE(SUM(net_usd), 0)                                           AS monthly
-                FROM mv_run_rate
-                WHERE dept_group = 'sales'
-                  AND tx_date >= %(month_start)s AND tx_date <= %(today)s
-            """, p)
-            row = cur.fetchone()
-            nd_sales_daily, nd_sales_monthly = float(row[0] or 0), float(row[1] or 0)
-
-            # Q3 — Net Deposits – Retention  (mv_run_rate 'retention')
-            cur.execute("""
-                SELECT
-                    COALESCE(SUM(net_usd) FILTER (WHERE tx_date = %(today)s::date), 0) AS daily,
-                    COALESCE(SUM(net_usd), 0)                                           AS monthly
-                FROM mv_run_rate
-                WHERE dept_group = 'retention'
-                  AND tx_date >= %(month_start)s AND tx_date <= %(today)s
-            """, p)
-            row = cur.fetchone()
-            nd_ret_daily, nd_ret_monthly = float(row[0] or 0), float(row[1] or 0)
-
-            # Q4 — FTD count  (mv_run_rate 'all', tx_date axis)
-            cur.execute("""
-                SELECT
-                    COALESCE(SUM(ftd_count) FILTER (WHERE tx_date = %(today)s::date), 0) AS daily,
-                    COALESCE(SUM(ftd_count), 0)                                           AS monthly
-                FROM mv_run_rate
-                WHERE dept_group = 'all'
-                  AND tx_date >= %(month_start)s AND tx_date <= %(today)s
-            """, p)
-            row = cur.fetchone()
-            ftd_daily, ftd_monthly = int(row[0] or 0), int(row[1] or 0)
-
-            # Q5 — FTC count  (mv_run_rate 'all', qual_date axis)
-            cur.execute("""
-                SELECT
-                    COALESCE(SUM(ftc_count) FILTER (WHERE qual_date = %(today)s::date), 0) AS daily,
-                    COALESCE(SUM(ftc_count), 0)                                             AS monthly
+                    COALESCE(SUM(ftc_count) FILTER (WHERE qual_date = %(today)s::date), 0),
+                    COALESCE(SUM(ftc_count), 0)
                 FROM mv_run_rate
                 WHERE dept_group = 'all'
                   AND qual_date >= %(month_start)s AND qual_date <= %(today)s

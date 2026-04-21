@@ -2848,6 +2848,9 @@ _MV_SETUP_SQL = [
     """,
     "CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_std_clients_u   ON mv_std_clients (accountid)",
     "CREATE INDEX IF NOT EXISTS idx_mv_std_clients_agent      ON mv_std_clients (assigned_to, second_deposit_date) WHERE has_second_deposit = 1",
+    # mv_retention_traders indexes (MV created on server, not in this list)
+    "CREATE INDEX IF NOT EXISTS idx_mv_ret_traders_day_acct   ON mv_retention_traders (day, accountid)",
+    "CREATE INDEX IF NOT EXISTS idx_mv_ret_traders_assigned   ON mv_retention_traders (assigned_to, day)",
 ]
 
 

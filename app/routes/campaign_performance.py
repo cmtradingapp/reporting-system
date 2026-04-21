@@ -18,7 +18,7 @@ PERIOD_LABELS = {"day": "Day", "month": "Month", "year": "Year", "none": ""}
 # Base filters applied to all accounts-level queries
 _ACCT_FILTERS = (
     " AND a.accountid IS NOT NULL AND TRIM(a.accountid::text) != ''"
-    " AND a.createdtime::date >= '2024-01-01'"
+    " AND a.createdtime >= '2024-01-01'"
     " AND (a.assigned_to IS NULL OR a.assigned_to NOT IN ("
     "  SELECT id FROM crm_users"
     "  WHERE TRIM(COALESCE(agent_name, full_name, '')) ILIKE 'test%%'"
@@ -261,8 +261,8 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
         q_dt_to = datetime.strptime(q_date_to, "%Y-%m-%d").date()
         q_date_to_excl = (q_dt_to + timedelta(days=1)).strftime("%Y-%m-%d")
         qual_where = ("AND a.client_qualification_date IS NOT NULL"
-                      " AND a.client_qualification_date::date >= %(q_date_from)s"
-                      " AND a.client_qualification_date::date < %(q_date_to_excl)s")
+                      " AND a.client_qualification_date >= %(q_date_from)s"
+                      " AND a.client_qualification_date < %(q_date_to_excl)s")
         qual_params = {"q_date_from": q_date_from, "q_date_to_excl": q_date_to_excl}
         ftc_date_from    = q_date_from
         ftc_date_to_excl = q_date_to_excl
@@ -312,13 +312,16 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
                           **qual_params, **camp_filter_params}
                 cur.execute(f"""
                     SELECT
-                        COUNT(*) FILTER (WHERE a.createdtime::date = %(date_to)s)                    AS leads_today,
-                        COUNT(*) FILTER (WHERE a.createdtime::date >= %(date_from)s
-                                           AND a.createdtime::date < %(date_to_excl)s)               AS leads_mtd,
-                        COUNT(*) FILTER (WHERE a.createdtime::date = %(date_to)s AND a.birth_date IS NOT NULL) AS live_today,
+                        COUNT(*) FILTER (WHERE a.createdtime >= %(date_to)s::date
+                                           AND a.createdtime < %(date_to)s::date + INTERVAL '1 day') AS leads_today,
+                        COUNT(*) FILTER (WHERE a.createdtime >= %(date_from)s
+                                           AND a.createdtime < %(date_to_excl)s)                     AS leads_mtd,
+                        COUNT(*) FILTER (WHERE a.createdtime >= %(date_to)s::date
+                                           AND a.createdtime < %(date_to)s::date + INTERVAL '1 day'
+                                           AND a.birth_date IS NOT NULL)                             AS live_today,
                         COUNT(*) FILTER (WHERE a.birth_date IS NOT NULL
-                                           AND a.createdtime::date >= %(date_from)s
-                                           AND a.createdtime::date < %(date_to_excl)s)               AS live_mtd
+                                           AND a.createdtime >= %(date_from)s
+                                           AND a.createdtime < %(date_to_excl)s)                     AS live_mtd
                     FROM accounts a
                     {camp_join}
                     {kpi_cu_join}
@@ -359,9 +362,10 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
                 # FTC from accounts table directly — same logic as the performance table
                 cur.execute("""
                     SELECT
-                        COUNT(*) FILTER (WHERE a.client_qualification_date::date >= %(date_from)s
-                                           AND a.client_qualification_date::date < %(date_to_excl)s) AS ftc_mtd,
-                        COUNT(*) FILTER (WHERE a.client_qualification_date::date = %(date_to)s)      AS ftc_daily
+                        COUNT(*) FILTER (WHERE a.client_qualification_date >= %(date_from)s
+                                           AND a.client_qualification_date < %(date_to_excl)s) AS ftc_mtd,
+                        COUNT(*) FILTER (WHERE a.client_qualification_date >= %(date_to)s::date
+                                           AND a.client_qualification_date < %(date_to)s::date + INTERVAL '1 day') AS ftc_daily
                     FROM accounts a
                     WHERE a.client_qualification_date IS NOT NULL
                       AND a.is_test_account = 0
@@ -380,7 +384,8 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
                         COALESCE(SUM(CASE WHEN t.transaction_type_name IN ('Withdrawal','Deposit Cancelled') THEN t.usdamount ELSE 0 END), 0) AS withdrawals,
                         COALESCE(SUM(CASE WHEN t.ftd = 1 AND t.transaction_type_name = 'Deposit' THEN 1 ELSE 0 END), 0)                       AS ftd_mtd,
                         COALESCE(SUM(CASE WHEN t.ftd = 1 AND t.transaction_type_name = 'Deposit'
-                                          AND t.confirmation_time::date = %(date_to)s THEN 1 ELSE 0 END), 0)                            AS ftd_daily
+                                          AND t.confirmation_time >= %(date_to)s::date
+                                          AND t.confirmation_time < %(date_to)s::date + INTERVAL '1 day' THEN 1 ELSE 0 END), 0)   AS ftd_daily
                     FROM transactions t
                     JOIN accounts a ON a.accountid = t.vtigeraccountid
                     {camp_join}
@@ -392,8 +397,8 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
                       AND a.is_test_account = 0
                       AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
                       AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
-                      AND t.confirmation_time::date >= %(date_from)s
-                      AND t.confirmation_time::date <  %(date_to_excl)s
+                      AND t.confirmation_time >= %(date_from)s
+                      AND t.confirmation_time <  %(date_to_excl)s
                     {extra_where}
                     {camp_filter_where}
                 """, base_p)
@@ -409,9 +414,10 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
 
                 cur.execute(f"""
                     SELECT
-                        COUNT(*) FILTER (WHERE a.client_qualification_date::date >= %(ftc_date_from)s
-                                           AND a.client_qualification_date::date < %(ftc_date_to_excl)s) AS ftc_mtd,
-                        COUNT(*) FILTER (WHERE a.client_qualification_date::date = %(ftc_date_daily)s)   AS ftc_daily
+                        COUNT(*) FILTER (WHERE a.client_qualification_date >= %(ftc_date_from)s
+                                           AND a.client_qualification_date < %(ftc_date_to_excl)s) AS ftc_mtd,
+                        COUNT(*) FILTER (WHERE a.client_qualification_date >= %(ftc_date_daily)s::date
+                                           AND a.client_qualification_date < %(ftc_date_daily)s::date + INTERVAL '1 day') AS ftc_daily
                     FROM accounts a
                     {camp_join}
                     {kpi_cu_join}
@@ -586,8 +592,8 @@ def _build_filter_clauses(
 
     if q_date_from and q_date_to_excl:
         clauses.append("AND a.client_qualification_date IS NOT NULL")
-        clauses.append("AND a.client_qualification_date::date >= %(q_date_from)s")
-        clauses.append("AND a.client_qualification_date::date < %(q_date_to_excl)s")
+        clauses.append("AND a.client_qualification_date >= %(q_date_from)s")
+        clauses.append("AND a.client_qualification_date < %(q_date_to_excl)s")
         params["q_date_from"]    = q_date_from
         params["q_date_to_excl"] = q_date_to_excl
 
@@ -681,16 +687,16 @@ def _camp_table_calc(
             if has_g2: acct_sel.append(f"{g2_sql} AS g2"); acct_grp.append(str(p)); p += 1
             acct_sel += [
                 "COUNT(*) FILTER (WHERE a.createdtime IS NOT NULL"
-                " AND a.createdtime::date >= %(date_from)s"
-                " AND a.createdtime::date < %(date_to_excl)s) AS leads",
+                " AND a.createdtime >= %(date_from)s"
+                " AND a.createdtime < %(date_to_excl)s) AS leads",
                 "COUNT(*) FILTER (WHERE a.createdtime IS NOT NULL"
-                " AND a.createdtime::date >= %(date_from)s"
-                " AND a.createdtime::date < %(date_to_excl)s"
+                " AND a.createdtime >= %(date_from)s"
+                " AND a.createdtime < %(date_to_excl)s"
                 " AND a.birth_date IS NOT NULL) AS live_accounts",
                 # FTC handled in separate query (grouped by qualification date, not creation date)
             ]
             acct_date_filter = (
-                " AND a.createdtime::date >= %(date_from)s AND a.createdtime::date < %(date_to_excl)s"
+                " AND a.createdtime >= %(date_from)s AND a.createdtime < %(date_to_excl)s"
                 if has_period else ""
             )
             acct_sql = (
@@ -747,8 +753,8 @@ def _camp_table_calc(
                 "   AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'"
                 "   AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'"
                 "   AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'"
-                "   AND t.confirmation_time::date >= %(date_from)s"
-                "   AND t.confirmation_time::date < %(date_to_excl)s"
+                "   AND t.confirmation_time >= %(date_from)s"
+                "   AND t.confirmation_time < %(date_to_excl)s"
                 f"\n{txn_filter_where}"
             )
             if txn_grp:
@@ -778,8 +784,8 @@ def _camp_table_calc(
                 f"{extra_joins}"
                 " WHERE a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)"
                 " AND a.client_qualification_date IS NOT NULL"
-                " AND a.client_qualification_date::date >= %(ftc_from)s"
-                " AND a.client_qualification_date::date < %(ftc_to_excl)s"
+                " AND a.client_qualification_date >= %(ftc_from)s"
+                " AND a.client_qualification_date < %(ftc_to_excl)s"
                 + _ACCT_FILTERS +
                 f"\n{ftc_filter_where}"
             )
