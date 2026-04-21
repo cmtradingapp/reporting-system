@@ -271,31 +271,48 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
 
             _gp = {**base_params, **cls_params}
 
-            # Grand FTC — company-wide, qual_date axis
+            # ── Combined KPI aggregates (replaces 6 separate queries) ──
             cur.execute(f"""
-                SELECT COALESCE(SUM(ftc_count), 0)
+                SELECT
+                    COALESCE(SUM(CASE WHEN qual_date >= %(date_from)s AND qual_date < %(date_to_excl)s
+                                      THEN ftc_count ELSE 0 END), 0)::int,
+                    COALESCE(SUM(CASE WHEN tx_date >= %(date_from)s AND tx_date < %(date_to_excl)s
+                                      THEN ftd_count ELSE 0 END), 0)::int,
+                    COALESCE(SUM(CASE WHEN tx_date  = %(date_to)s THEN ftd_count ELSE 0 END), 0)::int,
+                    COALESCE(SUM(CASE WHEN qual_date = %(date_to)s THEN ftc_count ELSE 0 END), 0)::int,
+                    COALESCE(SUM(CASE WHEN tx_date >= %(date_from)s AND tx_date < %(date_to_excl)s
+                                      THEN net_usd ELSE 0 END), 0),
+                    COALESCE(SUM(CASE WHEN tx_date  = %(date_to)s THEN net_usd ELSE 0 END), 0)
                 FROM {_kpi_tbl}
-                WHERE qual_date >= %(date_from)s AND qual_date < %(date_to_excl)s
+                WHERE (qual_date >= %(date_from)s AND qual_date < %(date_to_excl)s)
+                   OR (tx_date  >= %(date_from)s AND tx_date  < %(date_to_excl)s)
+                   OR  tx_date  = %(date_to)s
+                   OR  qual_date = %(date_to)s
             """, _gp)
-            grand_ftc = int(cur.fetchone()[0] or 0)
-
-            # Grand NET — company-wide, tx_date axis
+            _kpi = cur.fetchone()
+            grand_ftc = int(_kpi[0])
+            grand_ftd = int(_kpi[1])
+            daily_ftd = int(_kpi[2])
+            daily_ftc = int(_kpi[3])
             if has_cls:
-                cur.execute(f"""
-                    SELECT COALESCE(SUM(net_usd), 0)
-                    FROM {_kpi_tbl}
-                    WHERE tx_date >= %(date_from)s AND tx_date < %(date_to_excl)s
-                """, _gp)
+                grand_net = float(_kpi[4])
+                daily_net = float(_kpi[5])
             else:
+                # NET from mv_run_rate (pre-aggregated by dept_group)
                 cur.execute("""
-                    SELECT COALESCE(SUM(net_usd), 0)
+                    SELECT
+                        COALESCE(SUM(CASE WHEN tx_date >= %(date_from)s AND tx_date < %(date_to_excl)s
+                                          THEN net_usd ELSE 0 END), 0),
+                        COALESCE(SUM(CASE WHEN tx_date = %(date_to)s THEN net_usd ELSE 0 END), 0)
                     FROM mv_run_rate
                     WHERE dept_group = 'all'
-                      AND tx_date >= %(date_from)s AND tx_date < %(date_to_excl)s
+                      AND ((tx_date >= %(date_from)s AND tx_date < %(date_to_excl)s) OR tx_date = %(date_to)s)
                 """, _gp)
-            grand_net = float(cur.fetchone()[0] or 0)
+                _net = cur.fetchone()
+                grand_net = float(_net[0])
+                daily_net = float(_net[1])
 
-            # Open Volume — from mv_volume_stats (test-filter already baked in)
+            # Open Volume — from mv_volume_stats
             cur.execute("""
                 SELECT COALESCE(SUM(notional_usd), 0)
                 FROM mv_volume_stats
@@ -303,7 +320,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
             """, {"date_from": date_from, "date_to": date_to})
             open_volume = float(cur.fetchone()[0] or 0)
 
-            # End Equity Zeroed — heavy query touching accounts (deadlock-prone during MV refresh)
+            # End Equity Zeroed — heavy CTE (deadlock-prone during MV refresh)
             try:
                 cur.execute("""
                     WITH latest_equity AS (
@@ -344,45 +361,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
                 print(f"[perf] End Equity Zeroed query failed (lock?): {_eez_err}")
                 end_equity_zeroed = 0.0
 
-            # Daily NET — single day
-            if has_cls:
-                cur.execute(f"""
-                    SELECT COALESCE(SUM(net_usd), 0)
-                    FROM {_kpi_tbl} WHERE tx_date = %(date_to)s
-                """, _gp)
-            else:
-                cur.execute("""
-                    SELECT COALESCE(SUM(net_usd), 0)
-                    FROM mv_run_rate
-                    WHERE dept_group = 'all' AND tx_date = %(date_to)s
-                """, _gp)
-            daily_net = float(cur.fetchone()[0] or 0)
-
-            # Grand FTD — company-wide, tx_date axis
-            cur.execute(f"""
-                SELECT COALESCE(SUM(ftd_count), 0)
-                FROM {_kpi_tbl}
-                WHERE tx_date >= %(date_from)s AND tx_date < %(date_to_excl)s
-            """, _gp)
-            grand_ftd = int(cur.fetchone()[0] or 0)
-
-            # Daily FTD — single day
-            cur.execute(f"""
-                SELECT COALESCE(SUM(ftd_count), 0)
-                FROM {_kpi_tbl}
-                WHERE tx_date = %(date_to)s
-            """, _gp)
-            daily_ftd = int(cur.fetchone()[0] or 0)
-
-            # Daily FTC — qual_date = date_to
-            cur.execute(f"""
-                SELECT COALESCE(SUM(ftc_count), 0)
-                FROM {_kpi_tbl}
-                WHERE qual_date = %(date_to)s
-            """, _gp)
-            daily_ftc = int(cur.fetchone()[0] or 0)
-
-            # New Leads + Live Accounts (mv_account_stats — always today/MTD)
+            # New Leads + Live Accounts
             cur.execute("""
                 SELECT new_leads_today, new_leads_month, new_live_today, new_live_month
                 FROM mv_account_stats
@@ -618,42 +597,51 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
 
             _gp = {**base_params, **cls_params}
 
-            # Daily net retention
-            if has_cls:
-                cur.execute(f"""
-                    SELECT COALESCE(SUM(net_usd), 0)
-                    FROM {_kpi_tbl} WHERE tx_date = %(date_to)s
-                """, _gp)
-            else:
-                cur.execute("""
-                    SELECT COALESCE(SUM(net_usd), 0)
-                    FROM mv_run_rate
-                    WHERE dept_group = 'retention' AND tx_date = %(date_to)s
-                """, _gp)
-            daily_net_retention = float(cur.fetchone()[0] or 0)
-
-            # Global KPI stats (needed for retention-only users)
+            # ── Combined KPI aggregates (replaces 9 separate queries) ──
             cur.execute(f"""
-                SELECT COALESCE(SUM(ftc_count), 0)
+                SELECT
+                    COALESCE(SUM(CASE WHEN qual_date >= %(date_from)s AND qual_date < %(date_to_excl)s
+                                      THEN ftc_count ELSE 0 END), 0)::int,
+                    COALESCE(SUM(CASE WHEN tx_date >= %(date_from)s AND tx_date < %(date_to_excl)s
+                                      THEN ftd_count ELSE 0 END), 0)::int,
+                    COALESCE(SUM(CASE WHEN tx_date  = %(date_to)s THEN ftd_count ELSE 0 END), 0)::int,
+                    COALESCE(SUM(CASE WHEN qual_date = %(date_to)s THEN ftc_count ELSE 0 END), 0)::int,
+                    COALESCE(SUM(CASE WHEN tx_date >= %(date_from)s AND tx_date < %(date_to_excl)s
+                                      THEN net_usd ELSE 0 END), 0),
+                    COALESCE(SUM(CASE WHEN tx_date  = %(date_to)s THEN net_usd ELSE 0 END), 0)
                 FROM {_kpi_tbl}
-                WHERE qual_date >= %(date_from)s AND qual_date < %(date_to_excl)s
+                WHERE (qual_date >= %(date_from)s AND qual_date < %(date_to_excl)s)
+                   OR (tx_date  >= %(date_from)s AND tx_date  < %(date_to_excl)s)
+                   OR  tx_date  = %(date_to)s
+                   OR  qual_date = %(date_to)s
             """, _gp)
-            grand_ftc = int(cur.fetchone()[0] or 0)
-
+            _kpi = cur.fetchone()
+            grand_ftc = int(_kpi[0])
+            grand_ftd = int(_kpi[1])
+            daily_ftd = int(_kpi[2])
+            daily_ftc = int(_kpi[3])
             if has_cls:
-                cur.execute(f"""
-                    SELECT COALESCE(SUM(net_usd), 0)
-                    FROM {_kpi_tbl}
-                    WHERE tx_date >= %(date_from)s AND tx_date < %(date_to_excl)s
-                """, _gp)
+                grand_net = float(_kpi[4])
+                daily_net = float(_kpi[5])
+                daily_net_retention = daily_net  # same table, no dept split
             else:
+                # NET from mv_run_rate (with dept_group split for retention daily)
                 cur.execute("""
-                    SELECT COALESCE(SUM(net_usd), 0)
+                    SELECT
+                        COALESCE(SUM(CASE WHEN dept_group = 'all' AND tx_date >= %(date_from)s AND tx_date < %(date_to_excl)s
+                                          THEN net_usd ELSE 0 END), 0),
+                        COALESCE(SUM(CASE WHEN dept_group = 'all' AND tx_date = %(date_to)s
+                                          THEN net_usd ELSE 0 END), 0),
+                        COALESCE(SUM(CASE WHEN dept_group = 'retention' AND tx_date = %(date_to)s
+                                          THEN net_usd ELSE 0 END), 0)
                     FROM mv_run_rate
-                    WHERE dept_group = 'all'
-                      AND tx_date >= %(date_from)s AND tx_date < %(date_to_excl)s
+                    WHERE dept_group IN ('all', 'retention')
+                      AND ((tx_date >= %(date_from)s AND tx_date < %(date_to_excl)s) OR tx_date = %(date_to)s)
                 """, _gp)
-            grand_net = float(cur.fetchone()[0] or 0)
+                _net = cur.fetchone()
+                grand_net = float(_net[0])
+                daily_net = float(_net[1])
+                daily_net_retention = float(_net[2])
 
             cur.execute("""
                 SELECT COALESCE(SUM(notional_usd), 0)
@@ -661,37 +649,6 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
                 WHERE open_date >= %(date_from)s AND open_date <= %(date_to)s
             """, _gp)
             open_volume = float(cur.fetchone()[0] or 0)
-
-            cur.execute(f"""
-                SELECT COALESCE(SUM(ftd_count), 0)
-                FROM {_kpi_tbl}
-                WHERE tx_date >= %(date_from)s AND tx_date < %(date_to_excl)s
-            """, _gp)
-            grand_ftd = int(cur.fetchone()[0] or 0)
-
-            cur.execute(f"""
-                SELECT COALESCE(SUM(ftd_count), 0)
-                FROM {_kpi_tbl} WHERE tx_date = %(date_to)s
-            """, _gp)
-            daily_ftd = int(cur.fetchone()[0] or 0)
-
-            cur.execute(f"""
-                SELECT COALESCE(SUM(ftc_count), 0)
-                FROM {_kpi_tbl} WHERE qual_date = %(date_to)s
-            """, _gp)
-            daily_ftc = int(cur.fetchone()[0] or 0)
-
-            if has_cls:
-                cur.execute(f"""
-                    SELECT COALESCE(SUM(net_usd), 0)
-                    FROM {_kpi_tbl} WHERE tx_date = %(date_to)s
-                """, _gp)
-            else:
-                cur.execute("""
-                    SELECT COALESCE(SUM(net_usd), 0)
-                    FROM mv_run_rate WHERE dept_group = 'all' AND tx_date = %(date_to)s
-                """, _gp)
-            daily_net = float(cur.fetchone()[0] or 0)
 
             # New Leads + Live Accounts
             cur.execute("""
@@ -706,7 +663,7 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
             else:
                 new_leads_today = new_leads_month = new_live_today = new_live_month = 0
 
-            # RDP net — separate query (transactions JOIN accounts is deadlock-prone)
+            # RDP net — separate query (fix: range comparison instead of ::date cast)
             rdp_map = {}
             try:
                 _rdp_sql = f"""
@@ -721,9 +678,9 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
                       AND (t.deleted = 0 OR t.deleted IS NULL)
                       AND a.client_qualification_date IS NOT NULL
                       AND t.transaction_type_name IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
-                      AND t.confirmation_time::date >= %(date_from)s
-                      AND t.confirmation_time::date < %(date_to_excl)s
-                      AND t.confirmation_time::date > a.client_qualification_date
+                      AND t.confirmation_time >= %(date_from)s::timestamp
+                      AND t.confirmation_time <  %(date_to_excl)s::timestamp
+                      AND t.confirmation_time >  a.client_qualification_date + INTERVAL '1 day' - INTERVAL '1 second'
                       {cls_where}
                     GROUP BY a.assigned_to
                 """
