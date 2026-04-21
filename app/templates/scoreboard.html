@@ -1086,7 +1086,7 @@
       allRows = data.rows.map(r => {
         const ftc_rr          = Math.floor(r.ftc   / safeWdPassed * workingDays);
         const ftd100_rr       = Math.floor(r.ftd100 / safeWdPassed * workingDays);
-        const pTgt            = r.target_ftc * tgtRatio;
+        const pTgt            = Math.round(r.target_ftc * tgtRatio);
         const ftc_tgt_pct     = pTgt > 0 ? Math.round(r.ftc     / pTgt * 100) : null;
         const ftc_rr_pct      = pTgt > 0 ? Math.round(ftc_rr    / pTgt * 100) : null;
         const ftd100_tgt_pct  = pTgt > 0 ? Math.round(r.ftd100  / pTgt * 100) : null;
