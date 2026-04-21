@@ -69,10 +69,20 @@ class _PooledConnection:
 
 def get_connection() -> "_PooledConnection":
     """Get a connection from the pool. Call conn.close() as normal —
-    it returns the connection to the pool instead of closing the socket."""
+    it returns the connection to the pool instead of closing the socket.
+    Retries up to 3 times with a short delay on pool exhaustion."""
+    import time
+    from psycopg2.pool import PoolError
     pool = _get_pool()
-    conn = pool.getconn()
-    return _PooledConnection(conn, pool)
+    for attempt in range(4):
+        try:
+            conn = pool.getconn()
+            return _PooledConnection(conn, pool)
+        except PoolError:
+            if attempt == 3:
+                raise
+            time.sleep(0.5 * (attempt + 1))
+    raise PoolError("connection pool exhausted")
 
 
 def ensure_table():

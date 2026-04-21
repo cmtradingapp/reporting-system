@@ -189,6 +189,7 @@ async def lifespan(app: FastAPI):
         id="accounts_sync",
         start_date=_base + timedelta(seconds=0),
         replace_existing=True,
+        max_instances=1,
     )
     scheduler.add_job(
         run_users_etl,
@@ -198,6 +199,7 @@ async def lifespan(app: FastAPI):
         id="users_sync",
         start_date=_base + timedelta(seconds=30),
         replace_existing=True,
+        max_instances=1,
     )
     scheduler.add_job(
         run_transactions_etl,
@@ -207,6 +209,7 @@ async def lifespan(app: FastAPI):
         id="transactions_sync",
         start_date=_base + timedelta(seconds=60),
         replace_existing=True,
+        max_instances=1,
     )
     scheduler.add_job(
         run_targets_etl,
@@ -215,6 +218,7 @@ async def lifespan(app: FastAPI):
         id="targets_sync",
         start_date=_base + timedelta(seconds=90),
         replace_existing=True,
+        max_instances=1,
     )
     scheduler.add_job(
         run_trading_accounts_etl,
@@ -224,6 +228,7 @@ async def lifespan(app: FastAPI):
         id="trading_accounts_sync",
         start_date=_base + timedelta(seconds=120),
         replace_existing=True,
+        max_instances=1,
     )
     scheduler.add_job(
         run_ftd100_etl,
@@ -232,6 +237,7 @@ async def lifespan(app: FastAPI):
         id="ftd100_sync",
         start_date=_base + timedelta(seconds=180),
         replace_existing=True,
+        max_instances=1,
     )
     scheduler.add_job(
         run_client_classification_etl,
@@ -240,6 +246,7 @@ async def lifespan(app: FastAPI):
         id="client_classification_sync",
         start_date=_base + timedelta(seconds=240),
         replace_existing=True,
+        max_instances=1,
     )
     scheduler.add_job(
         run_dealio_users_etl,
@@ -249,6 +256,7 @@ async def lifespan(app: FastAPI):
         id="dealio_users_sync",
         start_date=_base + timedelta(seconds=270),
         replace_existing=True,
+        max_instances=1,
     )
     scheduler.add_job(
         run_dealio_trades_mt4_etl,
@@ -258,6 +266,7 @@ async def lifespan(app: FastAPI):
         id="dealio_trades_mt4_sync",
         start_date=_base + timedelta(seconds=300),
         replace_existing=True,
+        max_instances=1,
     )
     scheduler.add_job(
         run_dealio_trades_mt5_etl,
@@ -267,6 +276,7 @@ async def lifespan(app: FastAPI):
         id="dealio_trades_mt5_sync",
         start_date=_base + timedelta(seconds=360),
         replace_existing=True,
+        max_instances=1,
     )
     scheduler.add_job(
         run_dealio_daily_profits_etl,
@@ -276,6 +286,7 @@ async def lifespan(app: FastAPI):
         id="dealio_daily_profits_sync",
         start_date=_base + timedelta(seconds=330),
         replace_existing=True,
+        max_instances=1,
     )
     scheduler.add_job(
         run_bonus_transactions_etl,
@@ -285,6 +296,7 @@ async def lifespan(app: FastAPI):
         id="bonus_transactions_sync",
         start_date=_base + timedelta(seconds=360),
         replace_existing=True,
+        max_instances=1,
     )
     scheduler.add_job(
         run_campaigns_etl,
@@ -293,6 +305,7 @@ async def lifespan(app: FastAPI):
         id="campaigns_sync",
         start_date=_base + timedelta(seconds=390),
         replace_existing=True,
+        max_instances=1,
     )
     scheduler.add_job(
         run_dealio_positions_etl,
@@ -301,6 +314,7 @@ async def lifespan(app: FastAPI):
         id="dealio_positions_sync",
         start_date=_base + timedelta(seconds=420),
         replace_existing=True,
+        max_instances=1,
     )
     scheduler.add_job(
         run_daily_equity_zeroed_snapshot,
@@ -309,6 +323,7 @@ async def lifespan(app: FastAPI):
         minute=5,
         id="daily_equity_zeroed_snapshot",
         replace_existing=True,
+        max_instances=1,
     )
     scheduler.add_job(
         warm_cache,
@@ -317,6 +332,7 @@ async def lifespan(app: FastAPI):
         id="cache_warmer",
         start_date=_base + timedelta(seconds=30),
         replace_existing=True,
+        max_instances=1,
     )
     scheduler.add_job(
         refresh_materialized_views,
