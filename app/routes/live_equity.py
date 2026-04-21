@@ -13,6 +13,123 @@ _TZ = ZoneInfo("Europe/Nicosia")
 
 router = APIRouter()
 
+
+@router.get("/api/debug-eez")
+async def debug_eez(request: Request):
+    """Temporary diagnostic for inflated EEZ values."""
+    user = await get_current_user(request)
+    if isinstance(user, RedirectResponse):
+        return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+    if user.get("role") != "admin":
+        return JSONResponse(status_code=403, content={"detail": "Admin only"})
+
+    today = datetime.now(_TZ).date()
+    yesterday = str(today - __import__('datetime').timedelta(days=1))
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            # 1. Total Start EEZ from daily_equity_zeroed for yesterday
+            cur.execute("""
+                SELECT COUNT(*), COALESCE(SUM(end_equity_zeroed), 0),
+                       MIN(end_equity_zeroed), MAX(end_equity_zeroed),
+                       AVG(end_equity_zeroed)
+                FROM daily_equity_zeroed
+                WHERE day = %s
+            """, (yesterday,))
+            r = cur.fetchone()
+            snapshot_stats = {
+                "day": yesterday,
+                "login_count": r[0],
+                "total_eez": float(r[1]),
+                "min_eez": float(r[2] or 0),
+                "max_eez": float(r[3] or 0),
+                "avg_eez": round(float(r[4] or 0), 2),
+            }
+
+            # 2. Top 20 logins by EEZ (what's inflating the total?)
+            cur.execute("""
+                SELECT dez.login, dez.end_equity_zeroed,
+                       ta.vtigeraccountid, a.is_test_account, a.funded
+                FROM daily_equity_zeroed dez
+                LEFT JOIN trading_accounts ta ON ta.login::bigint = dez.login
+                LEFT JOIN accounts a ON a.accountid = ta.vtigeraccountid
+                WHERE dez.day = %s
+                ORDER BY dez.end_equity_zeroed DESC
+                LIMIT 20
+            """, (yesterday,))
+            top_logins = [
+                {"login": r[0], "eez": float(r[1] or 0), "accountid": r[2],
+                 "is_test": r[3], "funded": r[4]}
+                for r in cur.fetchall()
+            ]
+
+            # 3. Check for duplicate logins in trading_accounts
+            cur.execute("""
+                SELECT ta.login::bigint, COUNT(*) AS cnt
+                FROM trading_accounts ta
+                WHERE (ta.deleted = 0 OR ta.deleted IS NULL)
+                  AND ta.vtigeraccountid IS NOT NULL
+                GROUP BY ta.login::bigint
+                HAVING COUNT(*) > 1
+                ORDER BY COUNT(*) DESC
+                LIMIT 20
+            """)
+            dupe_logins = [{"login": r[0], "ta_count": r[1]} for r in cur.fetchall()]
+
+            # 4. Live EEZ breakdown: compbalance vs bonus
+            cur.execute("""
+                SELECT COUNT(*), SUM(ta.equity), SUM(ta.balance)
+                FROM trading_accounts ta
+                JOIN accounts a ON a.accountid = ta.vtigeraccountid
+                WHERE ta.equity > 0
+                  AND (ta.deleted = 0 OR ta.deleted IS NULL)
+                  AND a.is_test_account = 0
+            """)
+            r = cur.fetchone()
+            live_stats = {
+                "equity_logins_count": r[0],
+                "sum_ta_equity": float(r[1] or 0),
+                "sum_ta_balance": float(r[2] or 0),
+            }
+
+            # 5. Bonus totals
+            cur.execute("""
+                SELECT COUNT(DISTINCT login), SUM(net_amount)
+                FROM bonus_transactions
+                WHERE confirmation_time::date <= %s
+            """, (str(today),))
+            r = cur.fetchone()
+            bonus_stats = {
+                "logins_with_bonus": r[0] or 0,
+                "total_cumulative_bonus": float(r[1] or 0),
+            }
+
+            # 6. Are there logins in snapshot NOT in trading_accounts?
+            cur.execute("""
+                SELECT COUNT(*)
+                FROM daily_equity_zeroed dez
+                WHERE dez.day = %s
+                  AND dez.login NOT IN (
+                      SELECT login::bigint FROM trading_accounts
+                      WHERE (deleted = 0 OR deleted IS NULL)
+                  )
+            """, (yesterday,))
+            orphan_count = cur.fetchone()[0]
+
+        return JSONResponse({
+            "snapshot_stats": snapshot_stats,
+            "top_20_logins_by_eez": top_logins,
+            "duplicate_logins_in_ta": dupe_logins,
+            "live_equity_stats": live_stats,
+            "bonus_stats": bonus_stats,
+            "orphan_snapshot_logins": orphan_count,
+        })
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+    finally:
+        conn.close()
+
+
 _RETRYABLE_ERRORS = ("conflict with recovery", "ssl syscall error", "eof detected", "timeout expired")
 
 def _with_retry(fn, *args, retries=1, delay=0):
