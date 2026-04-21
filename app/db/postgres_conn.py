@@ -2425,6 +2425,9 @@ def ensure_dealio_positions_table():
             cur.execute(
                 "CREATE INDEX IF NOT EXISTS idx_dealio_positions_login ON dealio_positions(login)"
             )
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_dealio_positions_open_time ON dealio_positions(open_time)"
+            )
         conn.commit()
     finally:
         conn.close()
