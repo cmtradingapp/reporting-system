@@ -3130,44 +3130,46 @@ def upsert_mssql_dealio_mt5trades(df: pd.DataFrame):
             {update_set},
             synced_at = NOW()
     """
-    for attempt in range(3):
-        conn = get_connection()
-        try:
-            with conn.cursor() as cur:
-                execute_values(cur, sql, rows)
-            conn.commit()
-            return
-        except Exception as e:
-            conn.rollback()
-            if "deadlock" in str(e).lower() and attempt < 2:
-                _time.sleep(5)
-                continue
-            raise
-        finally:
-            conn.close()
+    # Insert in sub-batches of 50K to reduce lock hold time
+    _BATCH = 50000
+    for batch_start in range(0, len(rows), _BATCH):
+        batch = rows[batch_start:batch_start + _BATCH]
+        for attempt in range(3):
+            conn = get_connection()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute("SET lock_timeout = 0")
+                    cur.execute("SET statement_timeout = 0")
+                    execute_values(cur, sql, batch)
+                conn.commit()
+                break
+            except Exception as e:
+                conn.rollback()
+                if ("deadlock" in str(e).lower() or "lock" in str(e).lower()) and attempt < 2:
+                    _time.sleep(5)
+                    continue
+                raise
+            finally:
+                conn.close()
 
 
 def fetch_mssql_dealio_mt5trades_stats() -> dict:
     sql = """
         SELECT
             (SELECT reltuples::bigint FROM pg_class WHERE relname = 'mssql_dealio_mt5trades') AS total_records,
-            MAX(synced_at)            AS last_synced_at,
-            COUNT(DISTINCT login)     AS unique_logins,
-            COALESCE(SUM(profit), 0)  AS total_profit,
-            COUNT(DISTINCT symbol)    AS unique_symbols
-        FROM mssql_dealio_mt5trades
+            (SELECT MAX(synced_at) FROM mssql_dealio_mt5trades) AS last_synced_at
     """
     conn = get_connection()
     try:
         with conn.cursor() as cur:
+            cur.execute("SET statement_timeout = '5s'")
             cur.execute(sql)
             row = cur.fetchone()
             return {
                 "total_records":  row[0] or 0,
                 "last_synced_at": row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else "Never",
-                "unique_logins":  row[2] or 0,
-                "total_profit":   int(row[3] or 0),
-                "unique_symbols": row[4] or 0,
             }
+    except Exception:
+        return {"total_records": 0, "last_synced_at": "Unknown"}
     finally:
         conn.close()

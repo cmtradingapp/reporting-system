@@ -396,9 +396,6 @@ async def data_sync_page(request: Request):
             "last_synced_at": mssql_dmt5_stats["last_synced_at"],
             "stat_cards": [
                 {"label": "Total Records",  "value": mssql_dmt5_stats["total_records"],  "color": "text-info",    "icon": "bi-database"},
-                {"label": "Unique Logins",  "value": mssql_dmt5_stats["unique_logins"],  "color": "text-success", "icon": "bi-person-badge"},
-                {"label": "Total Profit",   "value": mssql_dmt5_stats["total_profit"],   "color": "text-warning", "icon": "bi-currency-dollar"},
-                {"label": "Unique Symbols", "value": mssql_dmt5_stats["unique_symbols"], "color": "text-primary", "icon": "bi-graph-up"},
             ],
             "sync_log": mssql_dmt5_log,
             "healthy": mssql_dmt5_stats["total_records"] > 0,

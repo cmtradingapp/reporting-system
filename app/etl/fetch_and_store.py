@@ -967,19 +967,36 @@ def run_dealio_positions_etl() -> dict:
 
 
 def run_mssql_dealio_mt5trades_full_etl() -> dict:
-    """Full sync of report.dealio_mt5trades from MSSQL into PostgreSQL."""
+    """Full sync of report.dealio_mt5trades from MSSQL into PostgreSQL.
+    Resumes from the max ticket already in PG to avoid re-fetching."""
+    from app.db.postgres_conn import get_connection
     start = time.time()
     cutoff = datetime(1970, 1, 1)
     status = "success"
     error_msg = None
     rows = 0
     chunk_num = 0
+    # Resume from max ticket in PG
+    start_ticket = 0
     try:
-        for chunk in get_mssql_dealio_mt5trades_full():
+        conn = get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT COALESCE(MAX(ticket), 0) FROM mssql_dealio_mt5trades")
+                start_ticket = cur.fetchone()[0]
+        finally:
+            conn.close()
+        if start_ticket:
+            print(f"[mssql_dmt5] Resuming from ticket {start_ticket}")
+    except Exception:
+        pass
+    try:
+        for chunk in get_mssql_dealio_mt5trades_full(start_ticket=start_ticket):
             upsert_mssql_dealio_mt5trades(chunk)
             rows += len(chunk)
             chunk_num += 1
-            if chunk_num % 10 == 0:
+            print(f"[mssql_dmt5] Chunk {chunk_num}: {rows} new rows (ticket > {start_ticket})")
+            if chunk_num % 5 == 0:
                 elapsed = int((time.time() - start) * 1000)
                 log_sync("mssql_dealio_mt5trades", cutoff, rows, elapsed, "running", f"chunk {chunk_num}, {rows} rows so far")
     except Exception as e:
