@@ -154,6 +154,11 @@ async def ftc_date_options(request: Request):
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
+    _ck = "ftc_date_opts_v1"
+    _hit = cache.get(_ck)
+    if _hit is not None:
+        return JSONResponse(content=_hit)
+
     sql = """
         SELECT DISTINCT u.id, u.agent_name, u.office_name, u.department
         FROM crm_users u
@@ -169,7 +174,9 @@ async def ftc_date_options(request: Request):
         agents  = [{"id": r[0], "name": r[1]} for r in rows]
         offices = sorted(set(r[2] for r in rows if r[2]))
         teams   = sorted(set(r[3] for r in rows if r[3]))
-        return JSONResponse(content={"agents": agents, "offices": offices, "teams": teams})
+        result = {"agents": agents, "offices": offices, "teams": teams}
+        cache.set(_ck, result)
+        return JSONResponse(content=result)
     except Exception as e:
         return JSONResponse(status_code=500, content={"detail": str(e)})
     finally:
@@ -272,9 +279,8 @@ async def ftc_date_api(
         "    LEFT JOIN client_classification cc ON cc.accountid = a.accountid::BIGINT\n"
         + ("    " + cu_join   + "\n" if cu_join   else "")
         + ("    " + camp_join + "\n" if camp_join else "")
-        + "    WHERE a.client_qualification_date IS NOT NULL\n"
-        "      AND a.client_qualification_date::date >= '2024-01-01'\n"
-        "      AND a.client_qualification_date::date <= %(end_date)s::date\n"
+        + "    WHERE a.client_qualification_date >= '2024-01-01'\n"
+        "      AND a.client_qualification_date < (%(end_date)s::date + INTERVAL '1 day')\n"
         "      AND a.is_test_account = 0\n"
         + ("      " + age_filter if age_filter else "")
         + (("      " + filter_sql + "\n") if filter_sql else "")
@@ -286,14 +292,14 @@ async def ftc_date_api(
         "    FROM transactions t\n"
         "    WHERE t.transactionapproval = 'Approved'\n"
         "      AND (t.deleted = 0 OR t.deleted IS NULL)\n"
-        "      AND COALESCE(t.confirmation_time, t.created_time)::date >= '2024-01-01'\n"
-        "      AND COALESCE(t.confirmation_time, t.created_time)::date <= %(end_date)s::date\n"
+        "      AND t.confirmation_time >= '2024-01-01'\n"
+        "      AND t.confirmation_time < (%(end_date)s::date + INTERVAL '1 day')\n"
         "    GROUP BY t.vtigeraccountid\n"
         "),\n"
         "rdp AS (\n"
         "    SELECT DISTINCT accountid FROM mv_std_clients\n"
         "    WHERE has_second_deposit = 1\n"
-        "      AND second_deposit_date::date <= %(end_date)s::date\n"
+        "      AND second_deposit_date < (%(end_date)s::date + INTERVAL '1 day')\n"
         "),\n"
         "withdrawalers AS (\n"
         "    SELECT DISTINCT t.vtigeraccountid AS accountid\n"
@@ -302,7 +308,7 @@ async def ftc_date_api(
         "    WHERE t.transaction_type_name = 'Withdrawal'\n"
         "      AND t.transactionapproval = 'Approved'\n"
         "      AND (t.deleted = 0 OR t.deleted IS NULL)\n"
-        "      AND COALESCE(t.confirmation_time, t.created_time)::date <= %(end_date)s::date\n"
+        "      AND t.confirmation_time < (%(end_date)s::date + INTERVAL '1 day')\n"
         "      AND a.is_test_account = 0\n"
         "),\n"
         "traders AS (\n"

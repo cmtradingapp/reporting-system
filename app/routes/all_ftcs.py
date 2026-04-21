@@ -116,8 +116,8 @@ async def all_ftcs_api(request: Request, date_from: str, date_to: str):
               AND (t.deleted = 0 OR t.deleted IS NULL)
               AND t.transaction_type_name IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
               AND t.original_deposit_owner IS NOT NULL
-              AND (fi.ftd_date IS NULL OR t.confirmation_time::date >= fi.ftd_date OR t.ftd = 1)
-              AND (t.confirmation_time::date <= fa.client_qualification_date OR t.ftd = 1)
+              AND (fi.ftd_date IS NULL OR t.confirmation_time >= fi.ftd_date OR t.ftd = 1)
+              AND (t.confirmation_time < (fa.client_qualification_date + INTERVAL '1 day') OR t.ftd = 1)
             GROUP BY t.vtigeraccountid, t.original_deposit_owner
         ),
         all_account_agents AS (

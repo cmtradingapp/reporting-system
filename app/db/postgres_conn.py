@@ -181,6 +181,8 @@ def ensure_table():
         CREATE INDEX IF NOT EXISTS idx_accounts_classification_int ON accounts (classification_int);
         CREATE INDEX IF NOT EXISTS idx_accounts_createdtime        ON accounts (createdtime);
         CREATE INDEX IF NOT EXISTS idx_accounts_is_test_account    ON accounts (is_test_account);
+        CREATE INDEX IF NOT EXISTS idx_accounts_client_qual_date   ON accounts (client_qualification_date) WHERE client_qualification_date IS NOT NULL;
+        CREATE INDEX IF NOT EXISTS idx_accounts_assigned_to        ON accounts (assigned_to) WHERE assigned_to IS NOT NULL;
 
         CREATE TABLE IF NOT EXISTS sync_log (
             id            SERIAL PRIMARY KEY,
