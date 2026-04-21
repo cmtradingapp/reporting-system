@@ -353,3 +353,218 @@ async def fsa_report_section5(request: Request, year: int = 2026, quarter: int =
         return JSONResponse({"error": str(e3)}, status_code=500)
     finally:
         conn.close()
+
+
+EU_COUNTRIES = {'SE', 'DK', 'NL', 'ES', 'FI', 'NO'}
+OTHER_FOREIGN = {'CM', 'KE', 'ZM'}
+
+
+@router.get("/api/fsa-report/section6")
+async def fsa_report_section6(request: Request, year: int = 2026, quarter: int = 1):
+    user = await get_current_user(request)
+    if isinstance(user, RedirectResponse):
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    if user.get("role") != "admin" and "fsa_report" not in (user.get("allowed_pages_list") or []):
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+
+    q_start, q_end, q_end_excl = _quarter_dates(year, quarter)
+    _ck = f"fsa_s6_v1:{year}:{quarter}"
+    _hit = cache.get(_ck)
+    if _hit is not None:
+        return JSONResponse(_hit)
+
+    base_filter = """
+        a.funded = 1
+        AND a.is_test_account = 0
+        AND (a.sales_rep_id IS NULL OR a.sales_rep_id != 3303)
+    """
+
+    acct_subquery = """
+        SELECT accountid FROM accounts
+        WHERE country_iso IN %(countries)s
+          AND is_test_account = 0
+          AND (sales_rep_id IS NULL OR sales_rep_id != 3303)
+    """
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            vol_params = {"q_start": q_start, "q_end_excl": q_end_excl,
+                          "countries": FSA_COUNTRIES_FILTER}
+
+            # --- Volume per country (open + close, same as section 4) ---
+            cur.execute(f"""
+                SELECT country_iso, COALESCE(SUM(notional_usd), 0)
+                FROM (
+                    SELECT
+                        CASE WHEN a.country_iso = 'AW' THEN 'NL' ELSE a.country_iso END AS country_iso,
+                        p.notional_value AS notional_usd
+                    FROM dealio_positions p
+                    JOIN trading_accounts ta ON ta.login::bigint = p.login
+                    JOIN accounts a ON a.accountid = ta.vtigeraccountid
+                    WHERE p.open_time::date >= %(q_start)s AND p.open_time::date < %(q_end_excl)s
+                      AND ta.vtigeraccountid IS NOT NULL
+                      AND a.is_test_account = 0
+                      AND {base_filter}
+                      AND a.country_iso IN %(countries)s
+
+                    UNION ALL
+
+                    SELECT
+                        CASE WHEN a.country_iso = 'AW' THEN 'NL' ELSE a.country_iso END AS country_iso,
+                        ex.notional_value AS notional_usd
+                    FROM dealio_trades_mt5 ex
+                    JOIN dealio_trades_mt5 en ON en.position_id = ex.position_id
+                                             AND en.source_id = ex.source_id
+                                             AND en.entry = 0
+                    JOIN trading_accounts ta ON ta.login::bigint = ex.login
+                    JOIN accounts a ON a.accountid = ta.vtigeraccountid
+                    WHERE ex.entry = 1
+                      AND ex.close_time > '1971-01-01'
+                      AND en.open_time::date >= %(q_start)s AND en.open_time::date < %(q_end_excl)s
+                      AND ta.vtigeraccountid IS NOT NULL
+                      AND a.is_test_account = 0
+                      AND {base_filter}
+                      AND a.country_iso IN %(countries)s
+                ) combined
+                GROUP BY country_iso
+            """, vol_params)
+            country_volume = {}
+            for row in cur.fetchall():
+                country_volume[row[0]] = float(row[1] or 0)
+
+            # Close volume per country
+            cur.execute(f"""
+                SELECT
+                    CASE WHEN a.country_iso = 'AW' THEN 'NL' ELSE a.country_iso END AS country_iso,
+                    COALESCE(SUM(t.notional_value), 0)
+                FROM dealio_trades_mt5 t
+                JOIN trading_accounts ta ON ta.login::bigint = t.login
+                JOIN accounts a ON a.accountid = ta.vtigeraccountid
+                WHERE t.close_time >= %(q_start)s AND t.close_time < %(q_end_excl)s
+                  AND t.entry = 1
+                  AND t.close_time > '1971-01-01'
+                  AND a.is_test_account = 0
+                  AND {base_filter}
+                  AND a.country_iso IN %(countries)s
+                GROUP BY CASE WHEN a.country_iso = 'AW' THEN 'NL' ELSE a.country_iso END
+            """, vol_params)
+            for row in cur.fetchall():
+                country_volume[row[0]] = country_volume.get(row[0], 0) + float(row[1] or 0)
+
+            total_volume = sum(country_volume.values())
+
+            # --- end_net_equity (same as section 5 actual equity) ---
+            cur.execute("""
+                SELECT COALESCE(SUM(GREATEST(ddp.convertedequity, 0)), 0)
+                FROM dealio_daily_profits ddp
+                JOIN trading_accounts ta ON ta.login::bigint = ddp.login
+                JOIN accounts a ON a.accountid = ta.vtigeraccountid
+                WHERE ddp.date = (
+                    SELECT MAX(date) FROM dealio_daily_profits WHERE date <= %(q_end)s
+                )
+                  AND a.funded = 1
+                  AND a.is_test_account = 0
+                  AND (a.sales_rep_id IS NULL OR a.sales_rep_id != 3303)
+                  AND a.country_iso IN %(countries)s
+            """, {"q_end": q_end, "countries": FSA_COUNTRIES_FILTER})
+            end_net_equity = float(cur.fetchone()[0])
+
+            # --- start_net_equity (last date BEFORE quarter start) ---
+            cur.execute("""
+                SELECT COALESCE(SUM(GREATEST(ddp.convertedequity, 0)), 0)
+                FROM dealio_daily_profits ddp
+                JOIN trading_accounts ta ON ta.login::bigint = ddp.login
+                JOIN accounts a ON a.accountid = ta.vtigeraccountid
+                WHERE ddp.date = (
+                    SELECT MAX(date) FROM dealio_daily_profits WHERE date < %(q_start)s
+                )
+                  AND a.funded = 1
+                  AND a.is_test_account = 0
+                  AND (a.sales_rep_id IS NULL OR a.sales_rep_id != 3303)
+                  AND a.country_iso IN %(countries)s
+            """, {"q_start": q_start, "countries": FSA_COUNTRIES_FILTER})
+            start_net_equity = float(cur.fetchone()[0])
+
+            # --- net_usd (standard deposits - standard withdrawals) ---
+            cur.execute(f"""
+                SELECT COALESCE(SUM(
+                  CASE
+                    WHEN t.transactiontype = 'Deposit' THEN t.usdamount
+                    WHEN t.transactiontype = 'Withdrawal' THEN -t.usdamount
+                    ELSE 0
+                  END
+                ), 0)
+                FROM transactions t
+                WHERE t.transactionapproval = 'Approved'
+                  AND (t.deleted = 0 OR t.deleted IS NULL)
+                  AND t.confirmation_time >= %(q_start)s AND t.confirmation_time < %(q_end_excl)s
+                  AND (
+                    (t.transactiontype = 'Deposit'
+                     AND t.transaction_type_name IN ('Deposit', 'Withdrawal Cancelled'))
+                    OR (t.transactiontype = 'Withdrawal'
+                        AND t.transaction_type_name IN ('Withdrawal', 'Deposit Cancelled'))
+                  )
+                  AND t.vtigeraccountid IN ({acct_subquery})
+            """, {"q_start": q_start, "q_end_excl": q_end_excl,
+                  "countries": FSA_COUNTRIES_FILTER})
+            net_usd = float(cur.fetchone()[0])
+
+            # --- dep_bonuses_fees_adj (non-standard deposit transactions) ---
+            cur.execute(f"""
+                SELECT COALESCE(SUM(t.usdamount), 0)
+                FROM transactions t
+                WHERE t.transactionapproval = 'Approved'
+                  AND (t.deleted = 0 OR t.deleted IS NULL)
+                  AND t.confirmation_time >= %(q_start)s AND t.confirmation_time < %(q_end_excl)s
+                  AND (
+                    (t.transaction_type_name NOT IN ('Deposit','Withdrawal Cancelled')
+                     AND t.transactiontype = 'Deposit')
+                    OR t.transaction_type_name = 'Transfer To Account'
+                  )
+                  AND t.vtigeraccountid IN ({acct_subquery})
+            """, {"q_start": q_start, "q_end_excl": q_end_excl,
+                  "countries": FSA_COUNTRIES_FILTER})
+            dep_bonuses = float(cur.fetchone()[0])
+
+            # --- wd_bonuses_fees_adj (non-standard withdrawal transactions) ---
+            cur.execute(f"""
+                SELECT COALESCE(SUM(t.usdamount), 0)
+                FROM transactions t
+                WHERE t.transactionapproval = 'Approved'
+                  AND (t.deleted = 0 OR t.deleted IS NULL)
+                  AND t.confirmation_time >= %(q_start)s AND t.confirmation_time < %(q_end_excl)s
+                  AND (
+                    (t.transaction_type_name NOT IN ('Withdrawal','Deposit Cancelled')
+                     AND t.transactiontype = 'Withdrawal')
+                    OR t.transaction_type_name = 'Transfer From Account'
+                  )
+                  AND t.vtigeraccountid IN ({acct_subquery})
+            """, {"q_start": q_start, "q_end_excl": q_end_excl,
+                  "countries": FSA_COUNTRIES_FILTER})
+            wd_bonuses = float(cur.fetchone()[0])
+
+        # PnL equity (income generated)
+        bonuses_fees_adj = dep_bonuses - wd_bonuses
+        pnl_equity = end_net_equity - start_net_equity - net_usd - bonuses_fees_adj
+
+        # Investor type volumes
+        eu_vol = sum(country_volume.get(c, 0) for c in EU_COUNTRIES)
+        other_vol = sum(country_volume.get(c, 0) for c in OTHER_FOREIGN)
+
+        _result = {
+            "total_volume": total_volume,
+            "pnl_equity": pnl_equity,
+            "investor_types": [
+                {"type": "Resident of Seychelles", "volume": 0},
+                {"type": "European Union", "volume": eu_vol},
+                {"type": "United States of America", "volume": 0},
+                {"type": "Other Foreign", "volume": other_vol},
+            ],
+        }
+        cache.set(_ck, _result)
+        return JSONResponse(_result)
+    except Exception as e4:
+        return JSONResponse({"error": str(e4)}, status_code=500)
+    finally:
+        conn.close()

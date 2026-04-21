@@ -157,6 +157,7 @@
     <button class="section-tab active" data-sec="3">Section 3</button>
     <button class="section-tab" data-sec="4">Section 4</button>
     <button class="section-tab" data-sec="5">Section 5</button>
+    <button class="section-tab" data-sec="6">Section 6</button>
   </div>
 
   <!-- Loading / Error -->
@@ -390,6 +391,84 @@
 
   </div><!-- /section5 -->
 
+  <!-- Section 6: Transactions and Trading Statistics -->
+  <div id="section6" style="display:none;">
+
+    <!-- 6a: Trading by Financial Instrument -->
+    <div class="card-dark" style="overflow-x:auto;">
+      <h6>6(a) Trading by Financial Instrument</h6>
+      <table class="fsa-table">
+        <thead>
+          <tr>
+            <th>Financial Instrument</th>
+            <th style="text-align:right">Trading Volume</th>
+            <th style="text-align:right">Trading Value</th>
+            <th style="text-align:right">Income Generated</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="row-header">Shares</td><td style="text-align:right">0</td><td style="text-align:right">USD 0.00</td><td style="text-align:right">USD 0.00</td></tr>
+          <tr><td class="row-header">Stocks</td><td style="text-align:right">0</td><td style="text-align:right">USD 0.00</td><td style="text-align:right">USD 0.00</td></tr>
+          <tr><td class="row-header">ETF</td><td style="text-align:right">0</td><td style="text-align:right">USD 0.00</td><td style="text-align:right">USD 0.00</td></tr>
+          <tr style="background:rgba(56,139,253,0.08);">
+            <td class="row-header" style="color:#58a6ff;">CFDs</td>
+            <td style="text-align:right;font-weight:700;" id="s6-cfd-vol">—</td>
+            <td style="text-align:right;font-weight:700;" id="s6-cfd-val">—</td>
+            <td style="text-align:right;font-weight:700;" id="s6-cfd-income">—</td>
+          </tr>
+          <tr><td class="row-header">Bonds</td><td style="text-align:right">0</td><td style="text-align:right">USD 0.00</td><td style="text-align:right">USD 0.00</td></tr>
+          <tr><td class="row-header">COD</td><td style="text-align:right">0</td><td style="text-align:right">USD 0.00</td><td style="text-align:right">USD 0.00</td></tr>
+          <tr><td class="row-header">Debentures</td><td style="text-align:right">0</td><td style="text-align:right">USD 0.00</td><td style="text-align:right">USD 0.00</td></tr>
+          <tr><td class="row-header">Warrants</td><td style="text-align:right">0</td><td style="text-align:right">USD 0.00</td><td style="text-align:right">USD 0.00</td></tr>
+          <tr><td class="row-header">Options</td><td style="text-align:right">0</td><td style="text-align:right">USD 0.00</td><td style="text-align:right">USD 0.00</td></tr>
+          <tr><td class="row-header">Futures</td><td style="text-align:right">0</td><td style="text-align:right">USD 0.00</td><td style="text-align:right">USD 0.00</td></tr>
+          <tr><td class="row-header">Real Crypto Currencies (excl. CFDs)</td><td style="text-align:right">0</td><td style="text-align:right">USD 0.00</td><td style="text-align:right">USD 0.00</td></tr>
+          <tr><td class="row-header">NFTs</td><td style="text-align:right">0</td><td style="text-align:right">USD 0.00</td><td style="text-align:right">USD 0.00</td></tr>
+          <tr><td class="row-header">Others</td><td style="text-align:right">0</td><td style="text-align:right">USD 0.00</td><td style="text-align:right">USD 0.00</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 6b: Trading by Investor Type -->
+    <div class="card-dark" style="overflow-x:auto;">
+      <h6>6(b) Trading by Investor Type</h6>
+      <table class="fsa-table">
+        <thead>
+          <tr>
+            <th>Investor Type</th>
+            <th style="text-align:right">Retail Volume</th>
+            <th style="text-align:right">Institutional Volume</th>
+            <th style="text-align:right">Retail Value</th>
+            <th style="text-align:right">Institutional Value</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="row-header">Resident of Seychelles</td><td style="text-align:right" id="s6-inv-0-rvol">0</td><td style="text-align:right">0</td><td style="text-align:right" id="s6-inv-0-rval">USD 0.00</td><td style="text-align:right">USD 0.00</td></tr>
+          <tr><td class="row-header">European Union</td><td style="text-align:right" id="s6-inv-1-rvol">—</td><td style="text-align:right">0</td><td style="text-align:right" id="s6-inv-1-rval">—</td><td style="text-align:right">USD 0.00</td></tr>
+          <tr><td class="row-header">United States of America</td><td style="text-align:right" id="s6-inv-2-rvol">0</td><td style="text-align:right">0</td><td style="text-align:right" id="s6-inv-2-rval">USD 0.00</td><td style="text-align:right">USD 0.00</td></tr>
+          <tr><td class="row-header">Other Foreign</td><td style="text-align:right" id="s6-inv-3-rvol">—</td><td style="text-align:right">0</td><td style="text-align:right" id="s6-inv-3-rval">—</td><td style="text-align:right">USD 0.00</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Summary Totals -->
+    <div class="row g-3 mt-1">
+      <div class="col-md-6">
+        <div class="card-dark" style="margin-bottom:0;">
+          <h6>Total Trading Volume</h6>
+          <div style="font-size:1.3rem;font-weight:700;color:#fff;" id="s6-total-vol">—</div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card-dark" style="margin-bottom:0;">
+          <h6>Total Trading Value</h6>
+          <div style="font-size:1.3rem;font-weight:700;color:#fff;" id="s6-total-val">—</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /section6 -->
+
 </div>
 </div>
 
@@ -454,6 +533,7 @@
     document.getElementById('section3').style.display = 'none';
     document.getElementById('section4').style.display = 'none';
     document.getElementById('section5').style.display = 'none';
+    document.getElementById('section6').style.display = 'none';
   }
 
   function load(){
@@ -467,6 +547,7 @@
       if(activeSec === '3') renderSection3(cache[ck]);
       else if(activeSec === '4') renderSection4(cache[ck]);
       else if(activeSec === '5') renderSection5(cache[ck]);
+      else if(activeSec === '6') renderSection6(cache[ck]);
       return;
     }
 
@@ -474,9 +555,10 @@
     if(activeSec === '3') loadSection3(year, quarter);
     else if(activeSec === '4') loadSection4(year, quarter);
     else if(activeSec === '5') loadSection5(year, quarter);
+    else if(activeSec === '6') loadSection6(year, quarter);
 
     // Prefetch other sections in background
-    ['3','4','5'].forEach(s => {
+    ['3','4','5','6'].forEach(s => {
       if(s === activeSec) return;
       const ock = cacheKey(s, year, quarter);
       if(!cache[ock]){
@@ -631,6 +713,40 @@
         if(d.error){ throw new Error(d.error); }
         cache[cacheKey('5', year, quarter)] = d;
         renderSection5(d);
+      })
+      .catch(showError);
+  }
+
+  function renderSection6(d){
+    const usd = n => 'USD ' + Math.abs(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+    // 6a: CFDs row
+    document.getElementById('s6-cfd-vol').textContent = usd(d.total_volume);
+    document.getElementById('s6-cfd-val').textContent = usd(d.total_volume);
+    const incEl = document.getElementById('s6-cfd-income');
+    incEl.textContent = (d.pnl_equity < 0 ? '-' : '') + usd(d.pnl_equity);
+    incEl.style.color = d.pnl_equity < 0 ? '#f85149' : '#fff';
+
+    // 6b: Investor types
+    d.investor_types.forEach((it, i) => {
+      document.getElementById('s6-inv-'+i+'-rvol').textContent = it.volume ? usd(it.volume) : '0';
+      document.getElementById('s6-inv-'+i+'-rval').textContent = usd(it.volume);
+    });
+
+    // Summary totals
+    document.getElementById('s6-total-vol').textContent = usd(d.total_volume);
+    document.getElementById('s6-total-val').textContent = usd(d.total_volume);
+
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('section6').style.display = 'block';
+  }
+
+  function loadSection6(year, quarter){
+    fetch(`/api/fsa-report/section6?year=${year}&quarter=${quarter}`)
+      .then(r => r.json())
+      .then(d => {
+        if(d.error){ throw new Error(d.error); }
+        cache[cacheKey('6', year, quarter)] = d;
+        renderSection6(d);
       })
       .catch(showError);
   }
