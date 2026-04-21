@@ -27,7 +27,7 @@ def _get_pool() -> ThreadedConnectionPool:
                     password=POSTGRES_PASSWORD,
                     dbname=POSTGRES_DB,
                     connect_timeout=10,
-                    options="-c statement_timeout=90000",  # 90s max per query
+                    options="-c statement_timeout=90000 -c lock_timeout=15000",  # 90s query / 15s lock wait
                 )
     return _pool
 

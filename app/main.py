@@ -106,6 +106,12 @@ def warm_cache():
     except Exception as e:
         print(f"[warm_cache] data_sync: {e}")
 
+    # Performance page — warm admin cache so page loads are instant
+    try:
+        _warm_performance_cache(month_start, today_iso)
+    except Exception as e:
+        print(f"[warm_cache] performance: {e}")
+
 SYNC_INTERVAL_MINUTES          = int(os.getenv("SYNC_INTERVAL_MINUTES", "1"))
 TRANSACTIONS_SYNC_INTERVAL_MINUTES = int(os.getenv("TRANSACTIONS_SYNC_INTERVAL_MINUTES", "1"))
 MV_REFRESH_INTERVAL_MINUTES    = int(os.getenv("MV_REFRESH_INTERVAL_MINUTES", "5"))
@@ -347,6 +353,21 @@ async def lifespan(app: FastAPI):
     threading.Thread(target=_auto_mt5_full_sync, daemon=True).start()
     yield
     scheduler.shutdown()
+
+
+def _warm_performance_cache(date_from: str, date_to: str):
+    """Pre-warm performance API cache for admin user via local HTTP call."""
+    import urllib.request
+    from app.auth.auth import create_access_token
+    token = create_access_token(1)  # admin user id=1
+    for path in ["/api/performance", "/api/performance/retention"]:
+        url = f"http://127.0.0.1:8000{path}?date_from={date_from}&date_to={date_to}"
+        req = urllib.request.Request(url)
+        req.add_header("Cookie", f"access_token={token}")
+        try:
+            urllib.request.urlopen(req, timeout=60)
+        except Exception as e:
+            print(f"[warm_cache] {path}: {e}")
 
 
 app = FastAPI(title="Agent Performance Report", lifespan=lifespan)

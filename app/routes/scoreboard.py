@@ -208,41 +208,46 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
             """, {"date_from": date_from, "date_to": date_to})
             open_volume = float(cur.fetchone()[0] or 0)
 
-            # End Equity Zeroed — live (real-time snapshot, not suitable for MV)
-            cur.execute("""
-                WITH latest_equity AS (
-                    SELECT DISTINCT ON (login)
-                        login, convertedbalance, convertedfloatingpnl
-                    FROM dealio_daily_profits
-                    WHERE date >= date_trunc('month', %(date_to)s::date)
-                      AND date <  date_trunc('month', %(date_to)s::date) + INTERVAL '1 month'
-                    ORDER BY login, date DESC
-                ),
-                old_bonus_balance AS (
-                    SELECT login, SUM(net_amount) AS old_bonus_balance
-                    FROM bonus_transactions
-                    WHERE confirmation_time < %(date_to)s::date + INTERVAL '1 day'
-                    GROUP BY login
-                )
-                SELECT COALESCE(SUM(
-                    CASE
-                        WHEN COALESCE(d.convertedbalance, 0) + COALESCE(d.convertedfloatingpnl, 0) <= 0 THEN 0
-                        ELSE GREATEST(
-                            COALESCE(d.convertedbalance, 0) + COALESCE(d.convertedfloatingpnl, 0)
-                                - COALESCE(ob.old_bonus_balance, 0),
-                            0
-                        )
-                    END
-                ), 0)
-                FROM latest_equity d
-                JOIN trading_accounts ta  ON ta.login::bigint = d.login
-                JOIN accounts a           ON a.accountid = ta.vtigeraccountid
-                JOIN crm_users u          ON u.id = a.assigned_to
-                LEFT JOIN old_bonus_balance ob ON ob.login::bigint = d.login
-                WHERE a.is_test_account = 0
-                  AND (ta.deleted = 0 OR ta.deleted IS NULL)
-            """, {"date_to": date_to})
-            end_equity_zeroed = float(cur.fetchone()[0] or 0)
+            # End Equity Zeroed — heavy query touching accounts (deadlock-prone during MV refresh)
+            try:
+                cur.execute("""
+                    WITH latest_equity AS (
+                        SELECT DISTINCT ON (login)
+                            login, convertedbalance, convertedfloatingpnl
+                        FROM dealio_daily_profits
+                        WHERE date >= date_trunc('month', %(date_to)s::date)
+                          AND date <  date_trunc('month', %(date_to)s::date) + INTERVAL '1 month'
+                        ORDER BY login, date DESC
+                    ),
+                    old_bonus_balance AS (
+                        SELECT login, SUM(net_amount) AS old_bonus_balance
+                        FROM bonus_transactions
+                        WHERE confirmation_time < %(date_to)s::date + INTERVAL '1 day'
+                        GROUP BY login
+                    )
+                    SELECT COALESCE(SUM(
+                        CASE
+                            WHEN COALESCE(d.convertedbalance, 0) + COALESCE(d.convertedfloatingpnl, 0) <= 0 THEN 0
+                            ELSE GREATEST(
+                                COALESCE(d.convertedbalance, 0) + COALESCE(d.convertedfloatingpnl, 0)
+                                    - COALESCE(ob.old_bonus_balance, 0),
+                                0
+                            )
+                        END
+                    ), 0)
+                    FROM latest_equity d
+                    JOIN trading_accounts ta  ON ta.login::bigint = d.login
+                    JOIN accounts a           ON a.accountid = ta.vtigeraccountid
+                    JOIN crm_users u          ON u.id = a.assigned_to
+                    LEFT JOIN old_bonus_balance ob ON ob.login::bigint = d.login
+                    WHERE a.is_test_account = 0
+                      AND (ta.deleted = 0 OR ta.deleted IS NULL)
+                """, {"date_to": date_to})
+                end_equity_zeroed = float(cur.fetchone()[0] or 0)
+            except Exception as _eez_err:
+                conn.rollback()
+                print(f"[perf] End Equity Zeroed query failed (lock?): {_eez_err}")
+                end_equity_zeroed = 0.0
 
             # Daily NET — from mv_run_rate 'all', single day
             cur.execute("""
@@ -387,6 +392,7 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
 
     # ── Retention table: mv_daily_kpis replaces 2 transaction subqueries (NET,
     #    DEPOSIT).  Open volume comes from mv_volume_stats.
+    #    RDP (transactions JOIN accounts) is fetched separately to avoid deadlocks.
     sql = """
         SELECT
             COALESCE(u.office_name, 'N/A')                   AS office_name,
@@ -400,7 +406,7 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
             COALESCE(u.status, '')                             AS status,
             COALESCE(std.std_count, 0)::int                   AS std_count,
             COALESCE(trd.traders_count, 0)::int               AS traders_count,
-            COALESCE(rdp.rdp_net, 0)::float                   AS rdp_net
+            u.id                                              AS user_id
         FROM crm_users u
         LEFT JOIN ({tgt_subq}) tgt ON tgt.agent_id = u.id
         LEFT JOIN (
@@ -439,23 +445,6 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
               AND day < %(date_to_excl)s::date
             GROUP BY assigned_to
         ) trd ON trd.agent_id = u.id
-        LEFT JOIN (
-            SELECT a.assigned_to AS agent_id,
-                   SUM(CASE WHEN t.transaction_type_name IN ('Deposit', 'Withdrawal Cancelled')
-                            THEN t.usdamount ELSE 0 END)
-                   - SUM(CASE WHEN t.transaction_type_name IN ('Withdrawal', 'Deposit Cancelled')
-                              THEN t.usdamount ELSE 0 END) AS rdp_net
-            FROM transactions t
-            JOIN accounts a ON a.accountid = t.vtigeraccountid
-            WHERE t.transactionapproval = 'Approved'
-              AND (t.deleted = 0 OR t.deleted IS NULL)
-              AND a.client_qualification_date IS NOT NULL
-              AND t.transaction_type_name IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
-              AND t.confirmation_time::date >= %(date_from)s
-              AND t.confirmation_time::date < %(date_to_excl)s
-              AND t.confirmation_time::date > a.client_qualification_date
-            GROUP BY a.assigned_to
-        ) rdp ON rdp.agent_id = u.id
         WHERE (
               u.department_ = 'Retention'
               OR u.id IN (
@@ -574,6 +563,31 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
             else:
                 new_leads_today = new_leads_month = new_live_today = new_live_month = 0
 
+            # RDP net — separate query (transactions JOIN accounts is deadlock-prone)
+            rdp_map = {}
+            try:
+                cur.execute("""
+                    SELECT a.assigned_to AS agent_id,
+                           SUM(CASE WHEN t.transaction_type_name IN ('Deposit', 'Withdrawal Cancelled')
+                                    THEN t.usdamount ELSE 0 END)
+                           - SUM(CASE WHEN t.transaction_type_name IN ('Withdrawal', 'Deposit Cancelled')
+                                      THEN t.usdamount ELSE 0 END) AS rdp_net
+                    FROM transactions t
+                    JOIN accounts a ON a.accountid = t.vtigeraccountid
+                    WHERE t.transactionapproval = 'Approved'
+                      AND (t.deleted = 0 OR t.deleted IS NULL)
+                      AND a.client_qualification_date IS NOT NULL
+                      AND t.transaction_type_name IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
+                      AND t.confirmation_time::date >= %(date_from)s
+                      AND t.confirmation_time::date < %(date_to_excl)s
+                      AND t.confirmation_time::date > a.client_qualification_date
+                    GROUP BY a.assigned_to
+                """, {"date_from": date_from, "date_to_excl": date_to_exclusive})
+                rdp_map = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
+            except Exception as _rdp_err:
+                conn.rollback()
+                print(f"[perf_ret] RDP query failed (lock?): {_rdp_err}")
+
         data = [
             {
                 "office_name":     r[0],
@@ -587,7 +601,7 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
                 "status":          r[8] or '',
                 "std_count":       int(r[9] or 0),
                 "traders_count":   int(r[10] or 0),
-                "rdp_net":         round(float(r[11] or 0), 2),
+                "rdp_net":         round(rdp_map.get(int(r[11] or 0), 0.0), 2),
             }
             for r in rows
         ]
