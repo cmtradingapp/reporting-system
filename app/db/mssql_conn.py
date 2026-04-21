@@ -237,12 +237,13 @@ def get_transaction_type_names_full():
 
 def get_mssql_dealio_mt5trades_full():
     """Generator yielding all rows from report.dealio_mt5trades in chunks, paginated by ticket."""
+    _BIG_CHUNK = 500000  # larger chunks to reduce round-trips on this 17M+ row table
     last_ticket = 0
     while True:
         conn = _get_mssql_connection()
         try:
             query = f"""
-                SELECT TOP {CHUNK_SIZE}
+                SELECT TOP {_BIG_CHUNK}
                     ticket, login, symbol, digit, cmd, volume,
                     opentime        AS open_time,
                     openprice       AS open_price,
