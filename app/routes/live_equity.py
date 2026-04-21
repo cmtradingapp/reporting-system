@@ -15,8 +15,8 @@ router = APIRouter()
 
 
 @router.get("/api/debug-eez")
-async def debug_eez(request: Request):
-    """Temporary diagnostic for inflated EEZ values."""
+async def debug_eez(request: Request, login: int = None):
+    """Diagnostic for inflated EEZ values. No accounts JOIN (avoids lock timeout)."""
     user = await get_current_user(request)
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
@@ -26,104 +26,133 @@ async def debug_eez(request: Request):
     today = datetime.now(_TZ).date()
     yesterday = str(today - __import__('datetime').timedelta(days=1))
     conn = get_connection()
+    result = {}
     try:
         with conn.cursor() as cur:
-            # 1. Total Start EEZ from daily_equity_zeroed for yesterday
+            # 1. Snapshot stats for yesterday (no joins needed)
             cur.execute("""
                 SELECT COUNT(*), COALESCE(SUM(end_equity_zeroed), 0),
                        MIN(end_equity_zeroed), MAX(end_equity_zeroed),
-                       AVG(end_equity_zeroed)
-                FROM daily_equity_zeroed
-                WHERE day = %s
+                       ROUND(AVG(end_equity_zeroed)::numeric, 2)
+                FROM daily_equity_zeroed WHERE day = %s
             """, (yesterday,))
             r = cur.fetchone()
-            snapshot_stats = {
-                "day": yesterday,
-                "login_count": r[0],
-                "total_eez": float(r[1]),
-                "min_eez": float(r[2] or 0),
-                "max_eez": float(r[3] or 0),
-                "avg_eez": round(float(r[4] or 0), 2),
+            result["snapshot_stats"] = {
+                "day": yesterday, "login_count": r[0],
+                "total_eez": float(r[1]), "min_eez": float(r[2] or 0),
+                "max_eez": float(r[3] or 0), "avg_eez": float(r[4] or 0),
             }
 
-            # 2. Top 20 logins by EEZ (what's inflating the total?)
+            # 2. Top 20 logins by EEZ (NO accounts join)
             cur.execute("""
-                SELECT dez.login, dez.end_equity_zeroed,
-                       ta.vtigeraccountid, a.is_test_account, a.funded
+                SELECT dez.login, dez.end_equity_zeroed
                 FROM daily_equity_zeroed dez
-                LEFT JOIN trading_accounts ta ON ta.login::bigint = dez.login
-                LEFT JOIN accounts a ON a.accountid = ta.vtigeraccountid
                 WHERE dez.day = %s
-                ORDER BY dez.end_equity_zeroed DESC
-                LIMIT 20
+                ORDER BY dez.end_equity_zeroed DESC LIMIT 20
             """, (yesterday,))
-            top_logins = [
-                {"login": r[0], "eez": float(r[1] or 0), "accountid": r[2],
-                 "is_test": r[3], "funded": r[4]}
-                for r in cur.fetchall()
+            result["top_20_logins"] = [
+                {"login": r[0], "eez": float(r[1] or 0)} for r in cur.fetchall()
             ]
 
-            # 3. Check for duplicate logins in trading_accounts
+            # 3. Duplicate logins in trading_accounts
             cur.execute("""
-                SELECT ta.login::bigint, COUNT(*) AS cnt
-                FROM trading_accounts ta
-                WHERE (ta.deleted = 0 OR ta.deleted IS NULL)
-                  AND ta.vtigeraccountid IS NOT NULL
-                GROUP BY ta.login::bigint
-                HAVING COUNT(*) > 1
-                ORDER BY COUNT(*) DESC
-                LIMIT 20
+                SELECT login::bigint, COUNT(*) AS cnt
+                FROM trading_accounts
+                WHERE (deleted = 0 OR deleted IS NULL) AND vtigeraccountid IS NOT NULL
+                GROUP BY login::bigint HAVING COUNT(*) > 1
+                ORDER BY COUNT(*) DESC LIMIT 20
             """)
-            dupe_logins = [{"login": r[0], "ta_count": r[1]} for r in cur.fetchall()]
+            result["duplicate_logins_in_ta"] = [
+                {"login": r[0], "ta_count": r[1]} for r in cur.fetchall()
+            ]
 
-            # 4. Live EEZ breakdown: compbalance vs bonus
+            # 4. Live stats from trading_accounts only (no accounts join)
             cur.execute("""
-                SELECT COUNT(*), SUM(ta.equity), SUM(ta.balance)
-                FROM trading_accounts ta
-                JOIN accounts a ON a.accountid = ta.vtigeraccountid
-                WHERE ta.equity > 0
-                  AND (ta.deleted = 0 OR ta.deleted IS NULL)
-                  AND a.is_test_account = 0
+                SELECT COUNT(*), COALESCE(SUM(equity), 0), COALESCE(SUM(balance), 0)
+                FROM trading_accounts
+                WHERE equity > 0 AND (deleted = 0 OR deleted IS NULL)
             """)
             r = cur.fetchone()
-            live_stats = {
-                "equity_logins_count": r[0],
-                "sum_ta_equity": float(r[1] or 0),
-                "sum_ta_balance": float(r[2] or 0),
+            result["live_ta_stats"] = {
+                "equity_logins": r[0],
+                "sum_equity": float(r[1]), "sum_balance": float(r[2]),
             }
 
             # 5. Bonus totals
             cur.execute("""
-                SELECT COUNT(DISTINCT login), SUM(net_amount)
-                FROM bonus_transactions
-                WHERE confirmation_time::date <= %s
+                SELECT COUNT(DISTINCT login), COALESCE(SUM(net_amount), 0)
+                FROM bonus_transactions WHERE confirmation_time::date <= %s
             """, (str(today),))
             r = cur.fetchone()
-            bonus_stats = {
+            result["bonus_stats"] = {
                 "logins_with_bonus": r[0] or 0,
-                "total_cumulative_bonus": float(r[1] or 0),
+                "total_cumulative_bonus": float(r[1]),
             }
 
-            # 6. Are there logins in snapshot NOT in trading_accounts?
+            # 6. Specific login investigation
+            check_login = login or 141727130
             cur.execute("""
-                SELECT COUNT(*)
-                FROM daily_equity_zeroed dez
-                WHERE dez.day = %s
-                  AND dez.login NOT IN (
-                      SELECT login::bigint FROM trading_accounts
-                      WHERE (deleted = 0 OR deleted IS NULL)
-                  )
-            """, (yesterday,))
-            orphan_count = cur.fetchone()[0]
+                SELECT day, end_equity_zeroed, start_equity_zeroed
+                FROM daily_equity_zeroed
+                WHERE login = %s ORDER BY day DESC LIMIT 10
+            """, (check_login,))
+            login_snapshots = [
+                {"day": str(r[0]), "end_eez": float(r[1] or 0),
+                 "start_eez": float(r[2] or 0) if r[2] else None}
+                for r in cur.fetchall()
+            ]
 
-        return JSONResponse({
-            "snapshot_stats": snapshot_stats,
-            "top_20_logins_by_eez": top_logins,
-            "duplicate_logins_in_ta": dupe_logins,
-            "live_equity_stats": live_stats,
-            "bonus_stats": bonus_stats,
-            "orphan_snapshot_logins": orphan_count,
-        })
+            cur.execute("""
+                SELECT login, vtigeraccountid, equity, balance, deleted
+                FROM trading_accounts WHERE login::bigint = %s
+            """, (check_login,))
+            ta_rows = [
+                {"login": r[0], "accountid": r[1], "equity": float(r[2] or 0),
+                 "balance": float(r[3] or 0), "deleted": r[4]}
+                for r in cur.fetchall()
+            ]
+
+            cur.execute("""
+                SELECT date, convertedbalance, convertedfloatingpnl
+                FROM dealio_daily_profits
+                WHERE login = %s ORDER BY date DESC LIMIT 5
+            """, (check_login,))
+            ddp_rows = [
+                {"date": str(r[0]), "convertedbalance": float(r[1] or 0),
+                 "convertedfloatingpnl": float(r[2] or 0)}
+                for r in cur.fetchall()
+            ]
+
+            cur.execute("""
+                SELECT COALESCE(SUM(net_amount), 0)
+                FROM bonus_transactions
+                WHERE login = %s AND confirmation_time::date <= %s
+            """, (check_login, str(today)))
+            login_bonus = float(cur.fetchone()[0])
+
+            # Check dealio_users for compbalance
+            cur.execute("""
+                SELECT login, compbalance, compcredit, lastupdate
+                FROM dealio_users WHERE login = %s
+                ORDER BY lastupdate DESC NULLS LAST LIMIT 3
+            """, (check_login,))
+            du_rows = [
+                {"login": r[0], "compbalance": float(r[1] or 0),
+                 "compcredit": float(r[2] or 0),
+                 "lastupdate": str(r[3]) if r[3] else None}
+                for r in cur.fetchall()
+            ]
+
+            result[f"login_{check_login}"] = {
+                "snapshots_last_10_days": login_snapshots,
+                "trading_accounts": ta_rows,
+                "dealio_daily_profits_last_5": ddp_rows,
+                "cumulative_bonus": login_bonus,
+                "dealio_users": du_rows,
+                "computed_eez": "MAX(0, convertedbalance + floating - bonus)",
+            }
+
+        return JSONResponse(result)
     except Exception as e:
         return JSONResponse(status_code=500, content={"detail": str(e)})
     finally:
