@@ -1081,19 +1081,24 @@
       workingDaysPassed = data.working_days_passed;
       workingDaysLeft   = data.working_days_left;
       const safeWdPassed = workingDaysPassed > 0 ? workingDaysPassed : 1;
+      const tgtRatio = data.target_ratio ?? 1;
+      const wdRange  = data.wd_in_range ?? workingDays;
       allRows = data.rows.map(r => {
         const ftc_rr          = Math.floor(r.ftc   / safeWdPassed * workingDays);
         const ftd100_rr       = Math.floor(r.ftd100 / safeWdPassed * workingDays);
-        const ftc_tgt_pct     = r.target_ftc > 0 ? Math.round(r.ftc     / r.target_ftc * 100) : null;
-        const ftc_rr_pct      = r.target_ftc > 0 ? Math.round(ftc_rr    / r.target_ftc * 100) : null;
-        const ftd100_tgt_pct  = r.target_ftc > 0 ? Math.round(r.ftd100  / r.target_ftc * 100) : null;
-        const ftd100_rr_pct   = r.target_ftc > 0 ? Math.round(ftd100_rr / r.target_ftc * 100) : null;
-        const need_on_target   = workingDays > 0 ? r.target_ftc * workingDaysPassed / workingDays : 0;
-        const missing_to_100   = r.target_ftc - r.ftc;
+        const pTgt            = r.target_ftc * tgtRatio;
+        const ftc_tgt_pct     = pTgt > 0 ? Math.round(r.ftc     / pTgt * 100) : null;
+        const ftc_rr_pct      = pTgt > 0 ? Math.round(ftc_rr    / pTgt * 100) : null;
+        const ftd100_tgt_pct  = pTgt > 0 ? Math.round(r.ftd100  / pTgt * 100) : null;
+        const ftd100_rr_pct   = pTgt > 0 ? Math.round(ftd100_rr / pTgt * 100) : null;
+        const safeWdRange      = wdRange > 0 ? wdRange : 1;
+        const need_on_target   = wdRange > 0 ? pTgt * Math.min(workingDaysPassed, wdRange) / safeWdRange : 0;
+        const missing_to_100   = pTgt - r.ftc;
         const missing_to_100rr       = need_on_target - r.ftc;
         const missing_to_100rr_ftd100 = need_on_target - r.ftd100;
-        const per_wd           = workingDaysLeft > 0 ? missing_to_100 / workingDaysLeft : 0;
-        return { ...r, ftc_rr, ftc_tgt_pct, ftc_rr_pct, ftd100_rr, ftd100_tgt_pct, ftd100_rr_pct,
+        const wdLeftPwd        = tgtRatio < 1 ? Math.max(wdRange - workingDaysPassed, 0) : workingDaysLeft;
+        const per_wd           = wdLeftPwd > 0 ? missing_to_100 / wdLeftPwd : 0;
+        return { ...r, target_ftc: pTgt, ftc_rr, ftc_tgt_pct, ftc_rr_pct, ftd100_rr, ftd100_tgt_pct, ftd100_rr_pct,
                  net_deposits: r.net_deposits ?? 0, ftd_count: r.ftd_count ?? 0,
                  need_on_target, missing_to_100, missing_to_100rr, missing_to_100rr_ftd100, per_wd };
       });
@@ -1576,6 +1581,7 @@
   let retAllRows = [];
   let retSortState = { col: 'ret-netUsd', dir: 'desc' };
   let retWd = 0, retWdPassed = 0, retWdLeft = 0;
+  let retTgtRatio = 1, retWdRange = 0;
 
   // ── Retention formatters ───────────────────────────────────────────────
 
@@ -1627,22 +1633,28 @@
       const wd_passed = data.working_days_passed;
       const wd_left   = data.working_days_left;
       const safe_wdp  = Math.max(wd_passed, 1);
+      const tgtR      = data.target_ratio ?? 1;
+      const wdR       = data.wd_in_range ?? wd;
       retWd = wd; retWdPassed = wd_passed; retWdLeft = wd_left;
+      retTgtRatio = tgtR; retWdRange = wdR;
 
       retAllRows = data.rows.map(r => {
-        const target_net_prorated = r.target_net;
+        const pTgt                = r.target_net * tgtR;
+        const target_net_prorated = pTgt;
         const net_rr              = r.net_usd > 0 ? Math.floor(r.net_usd / safe_wdp * wd) : r.net_usd;
-        const net_rr_pct          = r.target_net > 0 ? net_rr / r.target_net : null;
-        const need_on_target      = wd > 0 ? r.target_net * (wd_passed / wd) : 0;
+        const net_rr_pct          = pTgt > 0 ? net_rr / pTgt : null;
+        const safeWdR             = wdR > 0 ? wdR : 1;
+        const need_on_target      = wdR > 0 ? pTgt * Math.min(wd_passed, wdR) / safeWdR : 0;
         const missing_100_rr      = need_on_target - r.net_usd;
-        const target_net_pct      = r.target_net > 0 ? r.net_usd / r.target_net : null;
+        const target_net_pct      = pTgt > 0 ? r.net_usd / pTgt : null;
         const vol_rr              = r.open_volume_usd > 0 ? Math.round(r.open_volume_usd / safe_wdp * wd) : r.open_volume_usd;
-        const target_vol          = r.target_net * 1650;
+        const target_vol          = pTgt * 1650;
         const target_vol_rr_pct   = target_vol > 0 ? vol_rr / target_vol : null;
-        const missing_100         = r.target_net - r.net_usd;
-        const per_wd              = wd_left > 0 ? missing_100 / wd_left : null;
+        const missing_100         = pTgt - r.net_usd;
+        const wdLeftPwd           = tgtR < 1 ? Math.max(wdR - wd_passed, 0) : wd_left;
+        const per_wd              = wdLeftPwd > 0 ? missing_100 / wdLeftPwd : null;
         return {
-          ...r,
+          ...r, target_net: pTgt,
           target_net_prorated, net_rr, net_rr_pct,
           need_on_target, missing_100_rr, target_net_pct,
           vol_rr, target_vol, target_vol_rr_pct,
@@ -1769,7 +1781,7 @@
         netRrPct:  tgtNet > 0 ? netRr  / tgtNet : null,
         netTgtPct: tgtNet > 0 ? netUsd / tgtNet : null,
         volRrPct:  tgtVol > 0 ? volRr  / tgtVol : null,
-        perWd:     wd_left > 0 ? miss100 / wd_left : null,
+        perWd:     (() => { const _wl = retTgtRatio < 1 ? Math.max(retWdRange - wd_passed, 0) : wd_left; return _wl > 0 ? miss100 / _wl : null; })(),
       });
     });
 
@@ -1853,7 +1865,7 @@
           netRrPct:  dTgtNet > 0 ? dNetRr  / dTgtNet : null,
           netTgtPct: dTgtNet > 0 ? dNetUsd / dTgtNet : null,
           volRrPct:  dTgtVol > 0 ? dVolRr  / dTgtVol : null,
-          perWd:     wd_left > 0 ? dMiss100 / wd_left : null,
+          perWd:     (() => { const _wl = retTgtRatio < 1 ? Math.max(retWdRange - wd_passed, 0) : wd_left; return _wl > 0 ? dMiss100 / _wl : null; })(),
         });
       });
 
@@ -2007,7 +2019,8 @@
       const gTgtVol     = gTargetNet * 1650;
       const gVolRrPct   = gTgtVol > 0 ? gVolRr / gTgtVol : null;
       const gMiss100Rr  = gNeedOnTarget - gNetUsd;
-      const gPerWd      = wd_left > 0 ? gMissing100 / wd_left : null;
+      const _gwl        = retTgtRatio < 1 ? Math.max(retWdRange - wd_passed, 0) : wd_left;
+      const gPerWd      = _gwl > 0 ? gMissing100 / _gwl : null;
 
       const totalTr = document.createElement('tr');
       totalTr.className = 'total-row';

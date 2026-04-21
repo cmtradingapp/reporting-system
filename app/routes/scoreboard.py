@@ -150,7 +150,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
     role_filter = get_role_filter(user)
     cls_where, cls_params, cls_suffix = _build_cls_filter(request)
     has_cls = bool(cls_where)
-    _ck = f"perf_v24:{user.get('role','')}:{date_from}:{date_to}{cls_suffix}"
+    _ck = f"perf_v25:{user.get('role','')}:{date_from}:{date_to}{cls_suffix}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -432,6 +432,12 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
         working_days_passed = count_working_days(dt_from, min(dt_to, today), holidays)
         working_days_left   = working_days - working_days_passed
 
+        # Pro-rate targets for sub-month ranges
+        month_start   = dt_from.replace(day=1)
+        wd_full_month = count_working_days(month_start, month_end, holidays)
+        wd_in_range   = count_working_days(dt_from, dt_to, holidays)
+        target_ratio  = 1.0 if dt_from.day == 1 or wd_full_month == 0 else round(wd_in_range / wd_full_month, 6)
+
         safe_wdp        = working_days_passed if working_days_passed > 0 else 1
         grand_ftc_rr    = round(grand_ftc  / safe_wdp * working_days)
         grand_ftd_rr    = round(grand_ftd  / safe_wdp * working_days)
@@ -462,6 +468,8 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
             "working_days":         working_days,
             "working_days_passed":  working_days_passed,
             "working_days_left":    working_days_left,
+            "target_ratio":         target_ratio,
+            "wd_in_range":          wd_in_range,
             "date_from":            date_from,
             "date_to":              date_to,
         }
@@ -481,7 +489,7 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
     role_filter = get_role_filter(user)
     cls_where, cls_params, cls_suffix = _build_cls_filter(request)
     has_cls = bool(cls_where)
-    _ck = f"perf_ret_v18:{user.get('role','')}:{date_from}:{date_to}{cls_suffix}"
+    _ck = f"perf_ret_v19:{user.get('role','')}:{date_from}:{date_to}{cls_suffix}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -761,6 +769,12 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
         working_days_passed = count_working_days(dt_from, min(dt_to, today), holidays)
         working_days_left   = working_days - working_days_passed
 
+        # Pro-rate targets for sub-month ranges
+        month_start   = dt_from.replace(day=1)
+        wd_full_month = count_working_days(month_start, month_end, holidays)
+        wd_in_range   = count_working_days(dt_from, dt_to, holidays)
+        target_ratio  = 1.0 if dt_from.day == 1 or wd_full_month == 0 else round(wd_in_range / wd_full_month, 6)
+
         safe_wdp       = working_days_passed if working_days_passed > 0 else 1
         grand_ftc_rr   = round(grand_ftc   / safe_wdp * working_days)
         grand_ftd_rr   = round(grand_ftd   / safe_wdp * working_days)
@@ -773,6 +787,8 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
             "working_days":            working_days,
             "working_days_passed":     working_days_passed,
             "working_days_left":       working_days_left,
+            "target_ratio":            target_ratio,
+            "wd_in_range":             wd_in_range,
             # Global KPI stats (for retention-only users who don't call /api/performance)
             "grand_ftc":               grand_ftc,
             "grand_ftc_rr":            grand_ftc_rr,
