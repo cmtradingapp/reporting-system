@@ -36,7 +36,7 @@ from app.db.postgres_conn import ensure_table, ensure_auth_table, seed_admin_use
 import threading
 import fcntl
 from app.auth.auth import hash_password
-from app.etl.fetch_and_store import run_accounts_etl, run_users_etl, run_transactions_etl, run_targets_etl, run_trading_accounts_etl, run_ftd100_etl, run_client_classification_etl, run_dealio_users_etl, run_dealio_trades_mt4_etl, run_dealio_daily_profits_etl, run_bonus_transactions_etl, run_daily_equity_zeroed_snapshot, run_campaigns_etl, run_dealio_trades_mt5_etl, run_dealio_trades_mt5_full_etl, run_dealio_positions_etl
+from app.etl.fetch_and_store import run_accounts_etl, run_users_etl, run_transactions_etl, run_targets_etl, run_trading_accounts_etl, run_ftd100_etl, run_client_classification_etl, run_dealio_users_etl, run_dealio_trades_mt4_etl, run_dealio_daily_profits_etl, run_bonus_transactions_etl, run_daily_equity_zeroed_snapshot, run_campaigns_etl, run_dealio_trades_mt5_etl, run_dealio_trades_mt5_full_etl, run_dealio_positions_etl, run_mssql_dealio_mt5trades_full_etl
 from app import cache
 import os
 from datetime import datetime, timedelta
@@ -157,6 +157,34 @@ def _auto_mt5_full_sync():
             print("[auto_mt5_full_sync] Full sync already completed — skipping.")
     except Exception as e:
         print(f"[auto_mt5_full_sync] Error: {e}")
+
+
+def _auto_mssql_dmt5_sync():
+    """On startup, auto-resume mssql_dealio_mt5trades sync if not yet completed."""
+    import time
+    time.sleep(15)
+    try:
+        from app.db.postgres_conn import get_connection
+        conn = get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT 1 FROM sync_log
+                    WHERE table_name = 'mssql_dealio_mt5trades'
+                      AND status = 'success'
+                    LIMIT 1
+                """)
+                already_done = cur.fetchone() is not None
+        finally:
+            conn.close()
+        if not already_done:
+            print("[auto_mssql_dmt5] No completed sync found — starting/resuming now.")
+            run_mssql_dealio_mt5trades_full_etl()
+            print("[auto_mssql_dmt5] Full sync completed.")
+        else:
+            print("[auto_mssql_dmt5] Full sync already completed — skipping.")
+    except Exception as e:
+        print(f"[auto_mssql_dmt5] Error: {e}")
 
 
 @asynccontextmanager
@@ -354,6 +382,7 @@ async def lifespan(app: FastAPI):
     )
     scheduler.start()
     threading.Thread(target=_auto_mt5_full_sync, daemon=True).start()
+    threading.Thread(target=_auto_mssql_dmt5_sync, daemon=True).start()
     yield
     scheduler.shutdown()
 
