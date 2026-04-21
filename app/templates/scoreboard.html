@@ -986,9 +986,16 @@
   }
 
   // ── Combined load ──────────────────────────────────────────────────────
-  function loadAll(silent = false) {
-    if (SHOW_SALES)     loadData(silent);
-    if (SHOW_RETENTION) loadRetentionData(silent);
+  async function loadAll(silent = false) {
+    // Clear KPI cards immediately for visual feedback
+    if (!silent) {
+      document.querySelectorAll('.kpi-value').forEach(el => { el.textContent = '—'; });
+    }
+    const tasks = [];
+    if (SHOW_SALES)     tasks.push(loadData(silent));
+    if (SHOW_RETENTION) tasks.push(loadRetentionData(silent));
+    await Promise.all(tasks);
+    updateStatsFromFiltered();
     try {
       const dt = document.getElementById('date-to') ? document.getElementById('date-to').value : null;
       loadLiveEquity(dt);
