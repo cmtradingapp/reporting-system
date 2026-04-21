@@ -87,16 +87,16 @@ def warm_cache():
         print(f"[warm_cache] live_eez: {e}")
 
     # KPI cards — no filters, current month
-    # Key must match camp_performance.py route: camp_perf_v9:{from}:{to}:{class}:{qfrom}:{qto}:{mkt}:{leg}:{name}:{ch}:{sub}:{aff}:{country}:{office}:{agent}:{team}:{seg}
-    _ck = f"camp_perf_v9:{month_start}:{today_iso}:None:None:None:::::::::::None"
+    # Key must match camp_performance.py route: camp_perf_v11:{from}:{to}:{class}:{qfrom}:{qto}:{mkt}:{leg}:{name}:{ch}:{sub}:{aff}:{country}:{office}:{agent}:{team}:{seg}
+    _ck = f"camp_perf_v11:{month_start}:{today_iso}:None:None:None:::::::::::None"
     try:
         cache.set(_ck, _camp_kpi_calc(month_start, today_iso))
     except Exception as e:
         print(f"[warm_cache] camp_perf: {e}")
 
     # Table — no groups, period=day, no filters (most common default view)
-    # Key must match camp_performance.py route: camp_tbl_v10:{from}:{to}:{g1}:{g2}:{period}:{mkt}:{leg}:{name}:{ch}:{sub}:{aff}:{class}:{ftc}:{qfrom}:{qto}:{country}:{office}:{agent}:{team}:{seg}
-    _ck = f"camp_tbl_v10:{month_start}:{today_iso}:none:none:day:::::::None:None:None:None::::None"
+    # Key must match camp_performance.py route: camp_tbl_v12:{from}:{to}:{g1}:{g2}:{period}:{mkt}:{leg}:{name}:{ch}:{sub}:{aff}:{class}:{ftc}:{qfrom}:{qto}:{country}:{office}:{agent}:{team}:{seg}
+    _ck = f"camp_tbl_v12:{month_start}:{today_iso}:none:none:day:::::::None:None:None:None::::None"
     try:
         cache.set(_ck, _camp_table_calc(month_start, today_iso, period="day"))
     except Exception as e:
@@ -399,6 +399,7 @@ def _warm_report_caches(date_from: str, date_to: str):
         f"/api/agent-bonuses/retention?date_from={date_from}&date_to={date_to}",
         f"/api/all-ftcs?date_from={date_from}&date_to={date_to}",
         "/api/eez-comparison",
+        f"/api/total-traders?date_from={date_from}&date_to={date_to}&ftc_groups=0+-+7+days%2C8+-+14+days%2C15+-+30+days%2C31+-+60+days%2C61+-+90+days%2C91+-+120+days%2C120%2B+days",
     ]
     for ep in endpoints:
         url = f"http://127.0.0.1:8000{ep}"

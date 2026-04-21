@@ -94,7 +94,7 @@ async def debug_eez(request: Request, login: int = None):
             # 5. Bonus totals
             cur.execute("""
                 SELECT COUNT(DISTINCT login), COALESCE(SUM(net_amount), 0)
-                FROM bonus_transactions WHERE confirmation_time::date <= %s
+                FROM bonus_transactions WHERE confirmation_time < (%s::date + INTERVAL '1 day')
             """, (str(today),))
             r = cur.fetchone()
             result["bonus_stats"] = {
@@ -139,7 +139,7 @@ async def debug_eez(request: Request, login: int = None):
             cur.execute("""
                 SELECT COALESCE(SUM(net_amount), 0)
                 FROM bonus_transactions
-                WHERE login = %s AND confirmation_time::date <= %s
+                WHERE login = %s AND confirmation_time < (%s::date + INTERVAL '1 day')
             """, (check_login, str(today)))
             login_bonus = float(cur.fetchone()[0])
 
@@ -330,7 +330,7 @@ def _historical_calc(d) -> dict:
         WITH bonus_bal AS (
             SELECT login, SUM(net_amount) AS old_bonus_balance
             FROM bonus_transactions
-            WHERE confirmation_time::date <= %(d)s
+            WHERE confirmation_time < (%(d)s::date + INTERVAL '1 day')
             GROUP BY login
         )
         SELECT COALESCE(SUM(
@@ -443,7 +443,7 @@ def _live_calc(d) -> dict:
             cur.execute("""
                 SELECT login, SUM(net_amount)
                 FROM bonus_transactions
-                WHERE confirmation_time::date <= %(d)s
+                WHERE confirmation_time < (%(d)s::date + INTERVAL '1 day')
                   AND login = ANY(%(logins)s)
                 GROUP BY login
             """, {"d": str(d), "logins": equity_logins})
@@ -472,7 +472,7 @@ def _live_calc(d) -> dict:
             cur.execute("""
                 SELECT COALESCE(SUM(net_amount), 0)
                 FROM bonus_transactions
-                WHERE confirmation_time::date = %(d)s
+                WHERE confirmation_time >= %(d)s::date AND confirmation_time < (%(d)s::date + INTERVAL '1 day')
             """, {"d": str(d)})
             today_bonuses = float(cur.fetchone()[0] or 0)
 

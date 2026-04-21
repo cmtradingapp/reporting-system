@@ -179,6 +179,8 @@ def ensure_table():
         ALTER TABLE accounts ADD COLUMN IF NOT EXISTS classification_int SMALLINT;
         ALTER TABLE accounts ADD COLUMN IF NOT EXISTS pep_sanctions SMALLINT;
         CREATE INDEX IF NOT EXISTS idx_accounts_classification_int ON accounts (classification_int);
+        CREATE INDEX IF NOT EXISTS idx_accounts_createdtime        ON accounts (createdtime);
+        CREATE INDEX IF NOT EXISTS idx_accounts_is_test_account    ON accounts (is_test_account);
 
         CREATE TABLE IF NOT EXISTS sync_log (
             id            SERIAL PRIMARY KEY,
@@ -316,6 +318,7 @@ def ensure_table():
         CREATE INDEX IF NOT EXISTS idx_transactions_vtigeraccountid ON transactions (vtigeraccountid);
         CREATE INDEX IF NOT EXISTS idx_transactions_approval        ON transactions (transactionapproval);
         CREATE INDEX IF NOT EXISTS idx_transactions_ftd             ON transactions (ftd);
+        CREATE INDEX IF NOT EXISTS idx_transactions_account_conf    ON transactions (vtigeraccountid, confirmation_time) WHERE transactionapproval = 'Approved';
 
         CREATE TABLE IF NOT EXISTS trading_accounts (
             trading_account_id                  BIGINT           PRIMARY KEY,
@@ -351,6 +354,7 @@ def ensure_table():
         CREATE INDEX IF NOT EXISTS idx_trading_accounts_vtigeraccountid ON trading_accounts (vtigeraccountid);
         CREATE INDEX IF NOT EXISTS idx_trading_accounts_assigned_to   ON trading_accounts (assigned_to);
         CREATE INDEX IF NOT EXISTS idx_trading_accounts_enable        ON trading_accounts (enable);
+        CREATE INDEX IF NOT EXISTS idx_trading_accounts_login         ON trading_accounts (login);
 
         CREATE TABLE IF NOT EXISTS targets (
             date       DATE    NOT NULL,
@@ -526,6 +530,7 @@ def ensure_table():
         CREATE INDEX IF NOT EXISTS idx_dtm5_close_time ON dealio_trades_mt5 (close_time);
         CREATE INDEX IF NOT EXISTS idx_dtm5_sync_time  ON dealio_trades_mt5 (sync_time);
         CREATE INDEX IF NOT EXISTS idx_dtm5_symbol     ON dealio_trades_mt5 (symbol);
+        CREATE INDEX IF NOT EXISTS idx_dtm5_position_source_entry ON dealio_trades_mt5 (position_id, source_id, entry);
 
         CREATE TABLE IF NOT EXISTS dealio_daily_profits (
             date                        TIMESTAMP        NOT NULL,
@@ -556,6 +561,7 @@ def ensure_table():
         );
         CREATE INDEX IF NOT EXISTS idx_ddps_login ON dealio_daily_profits (login);
         CREATE INDEX IF NOT EXISTS idx_ddps_date  ON dealio_daily_profits (date);
+        CREATE INDEX IF NOT EXISTS idx_ddps_login_date_desc ON dealio_daily_profits (login, date DESC);
 
         CREATE TABLE IF NOT EXISTS campaigns (
             crmid                       VARCHAR         PRIMARY KEY,
@@ -921,23 +927,23 @@ def upsert_bonus_transactions(df) -> int:
 
 
 def fetch_bonus_transactions_stats() -> dict:
+    sql = """
+        SELECT
+            (SELECT reltuples::bigint FROM pg_class WHERE relname = 'bonus_transactions') AS total_records,
+            (SELECT MAX(synced_at) FROM bonus_transactions) AS last_synced_at
+    """
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute("""
-                SELECT COUNT(*), MAX(synced_at), COUNT(DISTINCT login),
-                       COALESCE(SUM(net_amount), 0)
-                FROM bonus_transactions
-            """)
+            cur.execute("SET statement_timeout = '5s'")
+            cur.execute(sql)
             row = cur.fetchone()
             return {
                 "total_records":  row[0] or 0,
                 "last_synced_at": str(row[1]) if row[1] else "Never",
-                "unique_logins":  row[2] or 0,
-                "total_net_bonus": float(row[3] or 0),
             }
     except Exception:
-        return {"total_records": 0, "last_synced_at": "Never", "unique_logins": 0, "total_net_bonus": 0.0}
+        return {"total_records": 0, "last_synced_at": "Unknown"}
     finally:
         conn.close()
 
@@ -1004,8 +1010,17 @@ def get_auth_user_by_email(email: str) -> dict | None:
         conn.close()
 
 
+_auth_user_cache: dict = {}  # {user_id: (result, expires_at)}
+_AUTH_CACHE_TTL = 60  # seconds
+
+
 def get_auth_user_by_id(user_id: int) -> dict | None:
+    import time as _time
     import json as _json
+    now = _time.monotonic()
+    cached = _auth_user_cache.get(user_id)
+    if cached and cached[1] > now:
+        return cached[0]
     sql = """
         SELECT a.id, a.crm_user_id, a.email, a.full_name, a.password_hash, a.role,
                a.is_active, a.force_password_change, c.department_, a.allowed_pages
@@ -1025,7 +1040,7 @@ def get_auth_user_by_id(user_id: int) -> dict | None:
                 ap_list = _json.loads(ap_raw) if ap_raw else None
             except Exception:
                 ap_list = None
-            return {
+            result = {
                 'id': row[0], 'crm_user_id': row[1], 'email': row[2],
                 'full_name': row[3], 'password_hash': row[4], 'role': row[5],
                 'is_active': row[6], 'force_password_change': row[7],
@@ -1033,6 +1048,8 @@ def get_auth_user_by_id(user_id: int) -> dict | None:
                 'allowed_pages': ap_raw,
                 'allowed_pages_list': ap_list,
             }
+            _auth_user_cache[user_id] = (result, now + _AUTH_CACHE_TTL)
+            return result
     finally:
         conn.close()
 
@@ -1179,7 +1196,7 @@ def fetch_report_data(role_filter: dict = None) -> pd.DataFrame:
             SUM(net)  AS total_net,
             COUNT(*)  AS trading_days
         FROM agent_performance
-        WHERE DATE_TRUNC('month', report_date) = DATE_TRUNC('month', CURRENT_DATE)
+        WHERE report_date >= DATE_TRUNC('month', CURRENT_DATE) AND report_date < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'
         GROUP BY agent_id, full_name
         ORDER BY total_net DESC
     """
@@ -1201,7 +1218,7 @@ def fetch_report_data(role_filter: dict = None) -> pd.DataFrame:
                 SUM(net)  AS total_net,
                 COUNT(*)  AS trading_days
             FROM agent_performance
-            WHERE DATE_TRUNC('month', report_date) = DATE_TRUNC('month', CURRENT_DATE)
+            WHERE report_date >= DATE_TRUNC('month', CURRENT_DATE) AND report_date < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'
               AND agent_id = %s
             GROUP BY agent_id, full_name
             ORDER BY total_net DESC
@@ -1224,7 +1241,7 @@ def fetch_report_data(role_filter: dict = None) -> pd.DataFrame:
             COUNT(*)     AS trading_days
         FROM agent_performance ap
         JOIN crm_users c ON c.id::text = ap.agent_id
-        WHERE DATE_TRUNC('month', ap.report_date) = DATE_TRUNC('month', CURRENT_DATE)
+        WHERE ap.report_date >= DATE_TRUNC('month', CURRENT_DATE) AND ap.report_date < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'
           {crm_where}
         GROUP BY ap.agent_id, ap.full_name
         ORDER BY total_net DESC
@@ -1268,25 +1285,21 @@ def log_sync(table_name: str, cutoff_used, rows_affected: int, duration_ms: int,
 def fetch_accounts_stats() -> dict:
     sql = """
         SELECT
-            COUNT(*) AS total_records,
-            MAX(synced_at) AS last_synced_at,
-            COUNT(*) FILTER (WHERE funded = 1) AS funded_accounts,
-            COUNT(*) FILTER (WHERE accountstatus = 'Sales') AS sales_accounts,
-            COUNT(*) FILTER (WHERE accountstatus = 'Retention') AS retention_accounts
-        FROM accounts
+            (SELECT reltuples::bigint FROM pg_class WHERE relname = 'accounts') AS total_records,
+            (SELECT MAX(synced_at) FROM accounts) AS last_synced_at
     """
     conn = get_connection()
     try:
         with conn.cursor() as cur:
+            cur.execute("SET statement_timeout = '5s'")
             cur.execute(sql)
             row = cur.fetchone()
             return {
                 "total_records": row[0] or 0,
                 "last_synced_at": row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else "Never",
-                "funded_accounts": row[2] or 0,
-                "sales_accounts": row[3] or 0,
-                "retention_accounts": row[4] or 0,
             }
+    except Exception:
+        return {"total_records": 0, "last_synced_at": "Unknown"}
     finally:
         conn.close()
 
@@ -1343,25 +1356,21 @@ def upsert_crm_users(df: pd.DataFrame):
 def fetch_crm_users_stats() -> dict:
     sql = """
         SELECT
-            COUNT(*) AS total_records,
-            MAX(synced_at) AS last_synced_at,
-            COUNT(*) FILTER (WHERE status = 'Active') AS active_users,
-            COUNT(DISTINCT desk_id) FILTER (WHERE position = 'Agent') AS unique_desks,
-            COUNT(DISTINCT office_id) AS unique_offices
-        FROM crm_users
+            (SELECT reltuples::bigint FROM pg_class WHERE relname = 'crm_users') AS total_records,
+            (SELECT MAX(synced_at) FROM crm_users) AS last_synced_at
     """
     conn = get_connection()
     try:
         with conn.cursor() as cur:
+            cur.execute("SET statement_timeout = '5s'")
             cur.execute(sql)
             row = cur.fetchone()
             return {
                 "total_records": row[0] or 0,
                 "last_synced_at": row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else "Never",
-                "active_users": row[2] or 0,
-                "unique_desks": row[3] or 0,
-                "unique_offices": row[4] or 0,
             }
+    except Exception:
+        return {"total_records": 0, "last_synced_at": "Unknown"}
     finally:
         conn.close()
 
@@ -1395,23 +1404,21 @@ def upsert_campaigns(df: pd.DataFrame):
 def fetch_campaigns_stats() -> dict:
     sql = """
         SELECT
-            COUNT(*)                                        AS total_records,
-            MAX(synced_at)                                  AS last_synced_at,
-            COUNT(*) FILTER (WHERE active = 1)              AS active_campaigns,
-            COUNT(DISTINCT campaign_channel)                AS unique_channels
-        FROM campaigns
+            (SELECT reltuples::bigint FROM pg_class WHERE relname = 'campaigns') AS total_records,
+            (SELECT MAX(synced_at) FROM campaigns) AS last_synced_at
     """
     conn = get_connection()
     try:
         with conn.cursor() as cur:
+            cur.execute("SET statement_timeout = '5s'")
             cur.execute(sql)
             row = cur.fetchone()
             return {
                 "total_records":    row[0] or 0,
                 "last_synced_at":   row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else "Never",
-                "active_campaigns": row[2] or 0,
-                "unique_channels":  row[3] or 0,
             }
+    except Exception:
+        return {"total_records": 0, "last_synced_at": "Unknown"}
     finally:
         conn.close()
 
@@ -1736,25 +1743,21 @@ def compute_transaction_type_name(ids: list = None) -> int:
 def fetch_transactions_stats() -> dict:
     sql = """
         SELECT
-            COUNT(*)                                            AS total_records,
-            MAX(synced_at)                                      AS last_synced_at,
-            COUNT(*) FILTER (WHERE transactionapproval = 'Approved') AS approved,
-            COUNT(*) FILTER (WHERE ftd = 1)                    AS ftd_count,
-            COALESCE(SUM(usdamount), 0)                        AS total_usd
-        FROM transactions
+            (SELECT reltuples::bigint FROM pg_class WHERE relname = 'transactions') AS total_records,
+            (SELECT MAX(synced_at) FROM transactions) AS last_synced_at
     """
     conn = get_connection()
     try:
         with conn.cursor() as cur:
+            cur.execute("SET statement_timeout = '5s'")
             cur.execute(sql)
             row = cur.fetchone()
             return {
                 "total_records": row[0] or 0,
                 "last_synced_at": row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else "Never",
-                "approved": row[2] or 0,
-                "ftd_count": row[3] or 0,
-                "total_usd": int(row[4] or 0),
             }
+    except Exception:
+        return {"total_records": 0, "last_synced_at": "Unknown"}
     finally:
         conn.close()
 
@@ -1791,25 +1794,21 @@ def upsert_trading_accounts(df: pd.DataFrame):
 def fetch_trading_accounts_stats() -> dict:
     sql = """
         SELECT
-            COUNT(*)                            AS total_records,
-            MAX(synced_at)                      AS last_synced_at,
-            COUNT(DISTINCT login)               AS unique_logins,
-            COALESCE(SUM(balance), 0)           AS total_balance,
-            COALESCE(SUM(equity), 0)            AS total_equity
-        FROM trading_accounts
+            (SELECT reltuples::bigint FROM pg_class WHERE relname = 'trading_accounts') AS total_records,
+            (SELECT MAX(synced_at) FROM trading_accounts) AS last_synced_at
     """
     conn = get_connection()
     try:
         with conn.cursor() as cur:
+            cur.execute("SET statement_timeout = '5s'")
             cur.execute(sql)
             row = cur.fetchone()
             return {
                 "total_records":  row[0] or 0,
                 "last_synced_at": row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else "Never",
-                "unique_logins":  row[2] or 0,
-                "total_balance":  int(row[3] or 0),
-                "total_equity":   int(row[4] or 0),
             }
+    except Exception:
+        return {"total_records": 0, "last_synced_at": "Unknown"}
     finally:
         conn.close()
 
@@ -1837,24 +1836,18 @@ def upsert_targets(df: pd.DataFrame):
 def fetch_targets_stats() -> dict:
     sql = """
         SELECT
-            COUNT(*)                 AS total_records,
-            MAX(synced_at)           AS last_synced_at,
-            COUNT(DISTINCT agent_id) AS unique_agents,
-            COALESCE(SUM(ftc), 0)    AS total_ftc,
-            COALESCE(SUM(net), 0)    AS total_net
-        FROM targets
+            (SELECT reltuples::bigint FROM pg_class WHERE relname = 'targets') AS total_records,
+            (SELECT MAX(synced_at) FROM targets) AS last_synced_at
     """
     conn = get_connection()
     try:
         with conn.cursor() as cur:
+            cur.execute("SET statement_timeout = '5s'")
             cur.execute(sql)
             row = cur.fetchone()
             return {
                 "total_records":  row[0] or 0,
                 "last_synced_at": row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else "Never",
-                "unique_agents":  row[2] or 0,
-                "total_ftc":      int(row[3] or 0),
-                "total_net":      int(row[4] or 0),
             }
     finally:
         conn.close()
@@ -2022,25 +2015,21 @@ def truncate_and_insert_ftd100() -> int:
 def fetch_ftd100_stats() -> dict:
     sql = """
         SELECT
-            COUNT(*)                                                    AS total_records,
-            MAX(synced_at)                                              AS last_synced_at,
-            COUNT(*) FILTER (WHERE accountstatus = 'Sales')            AS sales_count,
-            COUNT(*) FILTER (WHERE accountstatus <> 'Sales')           AS retention_count,
-            COALESCE(SUM(net_deposits_current), 0)                     AS total_net_deposits
-        FROM ftd100_clients
+            (SELECT reltuples::bigint FROM pg_class WHERE relname = 'ftd100_clients') AS total_records,
+            (SELECT MAX(synced_at) FROM ftd100_clients) AS last_synced_at
     """
     conn = get_connection()
     try:
         with conn.cursor() as cur:
+            cur.execute("SET statement_timeout = '5s'")
             cur.execute(sql)
             row = cur.fetchone()
             return {
                 "total_records":      row[0] or 0,
                 "last_synced_at":     row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else "Never",
-                "sales_count":        row[2] or 0,
-                "retention_count":    row[3] or 0,
-                "total_net_deposits": int(row[4] or 0),
             }
+    except Exception:
+        return {"total_records": 0, "last_synced_at": "Unknown"}
     finally:
         conn.close()
 
@@ -2135,7 +2124,7 @@ def fetch_users_with_targets(role_filter: dict = None) -> pd.DataFrame:
                 SUM(net)  AS total_net,
                 COUNT(*)  AS trading_days
             FROM agent_performance
-            WHERE DATE_TRUNC('month', report_date) = DATE_TRUNC('month', CURRENT_DATE)
+            WHERE report_date >= DATE_TRUNC('month', CURRENT_DATE) AND report_date < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'
             GROUP BY agent_id
         ) ap ON u.id = ap.agent_id
         WHERE u.status = 'Active'
@@ -2174,7 +2163,7 @@ def fetch_users_with_targets(role_filter: dict = None) -> pd.DataFrame:
                     SUM(net)  AS total_net,
                     COUNT(*)  AS trading_days
                 FROM agent_performance
-                WHERE DATE_TRUNC('month', report_date) = DATE_TRUNC('month', CURRENT_DATE)
+                WHERE report_date >= DATE_TRUNC('month', CURRENT_DATE) AND report_date < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'
                 GROUP BY agent_id
             ) ap ON u.id = ap.agent_id
             WHERE u.status = 'Active'
@@ -2214,7 +2203,7 @@ def fetch_users_with_targets(role_filter: dict = None) -> pd.DataFrame:
                 SUM(net)  AS total_net,
                 COUNT(*)  AS trading_days
             FROM agent_performance
-            WHERE DATE_TRUNC('month', report_date) = DATE_TRUNC('month', CURRENT_DATE)
+            WHERE report_date >= DATE_TRUNC('month', CURRENT_DATE) AND report_date < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'
             GROUP BY agent_id
         ) ap ON uu.id = ap.agent_id
         WHERE uu.status = 'Active'
@@ -2270,25 +2259,21 @@ def upsert_dealio_users(df: pd.DataFrame):
 def fetch_dealio_users_stats() -> dict:
     sql = """
         SELECT
-            COUNT(*)                             AS total_records,
-            MAX(synced_at)                       AS last_synced_at,
-            COUNT(DISTINCT groupname)            AS unique_groups,
-            COUNT(DISTINCT groupcurrency)        AS unique_currencies,
-            COUNT(*) FILTER (WHERE balance > 0)  AS users_with_balance
-        FROM dealio_users
+            (SELECT reltuples::bigint FROM pg_class WHERE relname = 'dealio_users') AS total_records,
+            (SELECT MAX(synced_at) FROM dealio_users) AS last_synced_at
     """
     conn = get_connection()
     try:
         with conn.cursor() as cur:
+            cur.execute("SET statement_timeout = '5s'")
             cur.execute(sql)
             row = cur.fetchone()
             return {
                 "total_records":      row[0] or 0,
                 "last_synced_at":     row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else "Never",
-                "unique_groups":      row[2] or 0,
-                "unique_currencies":  row[3] or 0,
-                "users_with_balance": row[4] or 0,
             }
+    except Exception:
+        return {"total_records": 0, "last_synced_at": "Unknown"}
     finally:
         conn.close()
 
@@ -2478,24 +2463,20 @@ def fetch_dealio_trades_mt4_stats() -> dict:
     sql = """
         SELECT
             (SELECT reltuples::bigint FROM pg_class WHERE relname = 'dealio_trades_mt4') AS total_records,
-            MAX(synced_at)            AS last_synced_at,
-            COUNT(DISTINCT login)     AS unique_logins,
-            COALESCE(SUM(profit), 0)  AS total_profit,
-            COUNT(DISTINCT symbol)    AS unique_symbols
-        FROM dealio_trades_mt4
+            (SELECT MAX(synced_at) FROM dealio_trades_mt4) AS last_synced_at
     """
     conn = get_connection()
     try:
         with conn.cursor() as cur:
+            cur.execute("SET statement_timeout = '5s'")
             cur.execute(sql)
             row = cur.fetchone()
             return {
                 "total_records":  row[0] or 0,
                 "last_synced_at": row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else "Never",
-                "unique_logins":  row[2] or 0,
-                "total_profit":   int(row[3] or 0),
-                "unique_symbols": row[4] or 0,
             }
+    except Exception:
+        return {"total_records": 0, "last_synced_at": "Unknown"}
     finally:
         conn.close()
 
@@ -2504,24 +2485,20 @@ def fetch_dealio_trades_mt5_stats() -> dict:
     sql = """
         SELECT
             (SELECT reltuples::bigint FROM pg_class WHERE relname = 'dealio_trades_mt5') AS total_records,
-            MAX(synced_at)            AS last_synced_at,
-            COUNT(DISTINCT login)     AS unique_logins,
-            COALESCE(SUM(profit), 0)  AS total_profit,
-            COUNT(DISTINCT symbol)    AS unique_symbols
-        FROM dealio_trades_mt5
+            (SELECT MAX(synced_at) FROM dealio_trades_mt5) AS last_synced_at
     """
     conn = get_connection()
     try:
         with conn.cursor() as cur:
+            cur.execute("SET statement_timeout = '5s'")
             cur.execute(sql)
             row = cur.fetchone()
             return {
                 "total_records":  row[0] or 0,
                 "last_synced_at": row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else "Never",
-                "unique_logins":  row[2] or 0,
-                "total_profit":   int(row[3] or 0),
-                "unique_symbols": row[4] or 0,
             }
+    except Exception:
+        return {"total_records": 0, "last_synced_at": "Unknown"}
     finally:
         conn.close()
 
@@ -2619,25 +2596,21 @@ def upsert_daily_equity_zeroed(rows: list[tuple], snapshot_date: str):
 def fetch_dealio_daily_profits_stats() -> dict:
     sql = """
         SELECT
-            COUNT(*)                                  AS total_records,
-            MAX(synced_at)                            AS last_synced_at,
-            COUNT(DISTINCT login)                     AS unique_logins,
-            COALESCE(SUM(convertedclosedpnl), 0)      AS total_closed_pnl,
-            COUNT(DISTINCT date::date)                AS unique_dates
-        FROM dealio_daily_profits
+            (SELECT reltuples::bigint FROM pg_class WHERE relname = 'dealio_daily_profits') AS total_records,
+            (SELECT MAX(synced_at) FROM dealio_daily_profits) AS last_synced_at
     """
     conn = get_connection()
     try:
         with conn.cursor() as cur:
+            cur.execute("SET statement_timeout = '5s'")
             cur.execute(sql)
             row = cur.fetchone()
             return {
                 "total_records":    row[0] or 0,
                 "last_synced_at":   row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else "Never",
-                "unique_logins":    row[2] or 0,
-                "total_closed_pnl": int(row[3] or 0),
-                "unique_dates":     row[4] or 0,
             }
+    except Exception:
+        return {"total_records": 0, "last_synced_at": "Unknown"}
     finally:
         conn.close()
 
