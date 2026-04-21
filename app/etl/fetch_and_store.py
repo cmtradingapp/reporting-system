@@ -754,7 +754,6 @@ def run_daily_equity_zeroed_snapshot(snapshot_date: str = None) -> dict:
                 login, convertedbalance, convertedfloatingpnl
             FROM dealio_daily_profits
             WHERE date::date = %(d)s
-              AND ABS(COALESCE(convertedfloatingpnl, 0)) < 100000000
             ORDER BY login, date DESC
         ),
         bonus_bal AS (

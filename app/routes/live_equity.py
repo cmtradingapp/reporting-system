@@ -159,6 +159,58 @@ async def debug_eez(request: Request, login: int = None):
         conn.close()
 
 
+@router.post("/api/cleanup-corrupt-ddp")
+async def cleanup_corrupt_ddp(request: Request):
+    """One-time cleanup: delete corrupt dealio_daily_profits rows and re-snapshot."""
+    user = await get_current_user(request)
+    if isinstance(user, RedirectResponse):
+        return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+    if user.get("role") != "admin":
+        return JSONResponse(status_code=403, content={"detail": "Admin only"})
+
+    conn = get_connection()
+    result = {}
+    try:
+        with conn.cursor() as cur:
+            # 1. Find and delete corrupt rows
+            cur.execute("""
+                SELECT login, date, sourceid, convertedfloatingpnl
+                FROM dealio_daily_profits
+                WHERE ABS(COALESCE(convertedfloatingpnl, 0)) >= 100000000
+            """)
+            corrupt = [{"login": r[0], "date": str(r[1]), "sourceid": r[2],
+                        "convertedfloatingpnl": float(r[3] or 0)} for r in cur.fetchall()]
+            result["corrupt_rows_found"] = len(corrupt)
+            result["corrupt_rows"] = corrupt[:50]  # cap output
+
+            cur.execute("""
+                DELETE FROM dealio_daily_profits
+                WHERE ABS(COALESCE(convertedfloatingpnl, 0)) >= 100000000
+            """)
+            result["rows_deleted"] = cur.rowcount
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+    finally:
+        conn.close()
+
+    # 2. Re-run snapshots for last 5 days
+    from app.etl.fetch_and_store import run_daily_equity_zeroed_snapshot
+    today = datetime.now(_TZ).date()
+    snapshot_results = []
+    for i in range(1, 6):
+        d = str(today - __import__('datetime').timedelta(days=i))
+        try:
+            sr = run_daily_equity_zeroed_snapshot(d)
+            snapshot_results.append({"date": d, **sr})
+        except Exception as e:
+            snapshot_results.append({"date": d, "error": str(e)})
+    result["snapshots_refreshed"] = snapshot_results
+
+    return JSONResponse(content=result)
+
+
 _RETRYABLE_ERRORS = ("conflict with recovery", "ssl syscall error", "eof detected", "timeout expired")
 
 def _with_retry(fn, *args, retries=1, delay=0):
@@ -263,7 +315,6 @@ def _historical_calc(d) -> dict:
             FROM dealio_daily_profits
             WHERE login = ta.login::bigint
               AND date < %(d)s::date + INTERVAL '1 day'
-              AND ABS(COALESCE(convertedfloatingpnl, 0)) < 100000000
             ORDER BY date DESC
             LIMIT 1
         ) d
@@ -317,24 +368,18 @@ def _live_calc(d) -> dict:
             if not valid_logins:
                 return {"total": 0, "start_equity_zeroed": 0, "net_deposits_today": 0, "pnl_cash": 0, "is_live": True, "date": str(d)}
 
-            # Start EEZ per login (yesterday), with sanity cap from ta.equity
+            # Start EEZ per login (yesterday snapshot)
             cur.execute("""
-                SELECT dez.login, dez.end_equity_zeroed, ta.equity
-                FROM daily_equity_zeroed dez
-                JOIN trading_accounts ta ON ta.login::bigint = dez.login
-                WHERE dez.day = %(d)s::date - INTERVAL '1 day'
-                  AND dez.login = ANY(%(logins)s)
-                  AND (ta.deleted = 0 OR ta.deleted IS NULL)
+                SELECT login, end_equity_zeroed
+                FROM daily_equity_zeroed
+                WHERE day = %(d)s::date - INTERVAL '1 day'
+                  AND login = ANY(%(logins)s)
             """, {"d": str(d), "logins": valid_logins})
             start_eez_map = {}
             start_eez_total = 0.0
             for r in cur.fetchall():
                 login_id = int(r[0])
                 eez_val  = float(r[1] or 0)
-                ta_eq    = float(r[2] or 0)
-                # Sanity: cap at 10x ta.equity (catches corrupt snapshots)
-                if ta_eq > 0 and eez_val > ta_eq * 10:
-                    eez_val = ta_eq
                 start_eez_map[login_id] = eez_val
                 start_eez_total += eez_val
 
@@ -357,7 +402,6 @@ def _live_calc(d) -> dict:
             """)
             _eq_rows = cur.fetchall()
             equity_logins = [int(r[0]) for r in _eq_rows]
-            ta_equity_map = {int(r[0]): float(r[1] or 0) for r in _eq_rows}
 
             # Cumulative bonus per login up to today (for equity_logins only)
             cur.execute("""
@@ -383,7 +427,6 @@ def _live_calc(d) -> dict:
                     WHERE login = ANY(%(logins)s)
                       AND date >= (%(d)s::date - INTERVAL '1 day')
                       AND date <  %(d)s::date
-                      AND ABS(COALESCE(convertedfloatingpnl, 0)) < 100000000
                     ORDER BY login, date DESC
                 ) d
             """, {"d": str(d), "logins": equity_logins})
@@ -508,7 +551,6 @@ def _live_calc(d) -> dict:
     # compbalance = pure balance (no credit) — matches snapshot formula exactly.
     # Daily end net equity: same without bonus deduction.
     # Sanity cap: if computed EEZ > 10x ta.equity, use ta.equity instead
-    # (catches corrupt dealio floating PnL, e.g. $5B on a $300 account).
     grand_total = 0.0
     daily_end_net_equity = 0.0
     for login, balance in bal_map.items():
@@ -517,10 +559,6 @@ def _live_calc(d) -> dict:
         bonus  = max(0.0, bonus_map.get(login, 0.0))
         eez    = max(0.0, net_eq - bonus)
         neq    = max(0.0, net_eq)
-        ta_eq  = ta_equity_map.get(login, 0.0)
-        if ta_eq > 0 and eez > ta_eq * 10:
-            eez = ta_eq
-            neq = ta_eq
         grand_total          += eez
         daily_end_net_equity += neq
 
@@ -538,7 +576,6 @@ def _live_calc(d) -> dict:
                         WHERE login = ANY(%(logins)s)
                           AND date >= (%(d)s::date - INTERVAL '1 day')
                           AND date <  %(d)s::date
-                          AND ABS(COALESCE(convertedfloatingpnl, 0)) < 100000000
                         ORDER BY login, date DESC
                     ) d
                 """, {"d": str(d), "logins": open_logins})

@@ -2538,6 +2538,11 @@ def upsert_dealio_daily_profits(df: pd.DataFrame):
         "deltafloatingpnl", "converteddeltafloatingpnl",
     ]
     rows = [tuple(_clean(row.get(c)) for c in cols) for _, row in df.iterrows()]
+    # Reject rows with absurd convertedfloatingpnl (corrupt dealio data)
+    fpnl_idx = cols.index("convertedfloatingpnl")
+    rows = [r for r in rows if r[fpnl_idx] is None or abs(float(r[fpnl_idx])) < 100_000_000]
+    if not rows:
+        return
     update_cols = [c for c in cols if c not in ("date", "login", "sourceid")]
     update_set = ", ".join(f"{c} = EXCLUDED.{c}" for c in update_cols)
     col_list = ", ".join(cols)
