@@ -236,17 +236,19 @@
       .kpi-value { font-size:1.1rem; }
       .kpi-split { flex-wrap:nowrap !important; gap:6px !important; }
       .kpi-split .kpi-value { font-size:0.88rem; }
-      #kpi-daily-ftd      { order:1; }
-      #kpi-daily-net      { order:2; }
-      #kpi-ftd-ftc        { order:3; }
-      #kpi-net            { order:4; }
-      #kpi-ftd-rr         { order:5; }
-      #kpi-net-rr         { order:6; }
-      #kpi-vol            { order:7; }
-      #kpi-vol-rr         { order:8; }
-      #kpi-start-equity   { order:9; }
-      #kpi-live-equity    { order:10; }
-      #kpi-daily-pnl-cash { order:11; }
+      #kpi-daily-net      { order:1; }
+      #kpi-daily-ftd      { order:2; }
+      #kpi-net            { order:3; }
+      #kpi-ftd-ftc        { order:4; }
+      #kpi-live-equity    { order:5; }
+      #kpi-daily-pnl-cash { order:6; }
+      #kpi-net-rr         { order:7; }
+      #kpi-ftd-rr         { order:8; }
+      #kpi-vol            { order:9; }
+      #kpi-vol-rr         { order:10; }
+      #kpi-new-leads      { order:11; }
+      #kpi-new-live       { order:12; }
+      #kpi-start-equity   { display:none !important; }
       .date-input { width:120px; }
       .cnt-badge { display:none; }
       #row-count, #ret-row-count { display:none; }
@@ -910,8 +912,6 @@
     const el       = document.getElementById('stat-live-equity-zeroed');
     const badge    = document.getElementById('live-eez-badge');
     const upd      = document.getElementById('live-eez-updated');
-    const startEl  = document.getElementById('stat-start-equity-zeroed');
-    const startDt  = document.getElementById('start-eez-date');
     try {
       const url = dateTo ? `/api/live-equity-zeroed?date=${dateTo}` : '/api/live-equity-zeroed';
       const res  = await fetch(url);
@@ -954,16 +954,6 @@
         }
       }
 
-      if (startEl) {
-        if (data.start_equity_zeroed != null) {
-          const sNeg = data.start_equity_zeroed < 0;
-          const sAbs = Math.abs(data.start_equity_zeroed);
-          startEl.textContent = (sNeg ? '-$' : '$') + sAbs.toLocaleString('en-US');
-          if (startDt) startDt.textContent = 'prev day end';
-        } else {
-          startEl.textContent = '—';
-        }
-      }
 
       const dailyPnlEl = document.getElementById('stat-daily-pnl-cash');
       if (dailyPnlEl) {
