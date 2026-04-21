@@ -225,19 +225,14 @@ async def fsa_report_section4(request: Request, year: int = 2026, quarter: int =
 
                     UNION ALL
 
-                    -- Closed trades (entry=1) mapped to open_time via position_id
+                    -- Closed trades via pre-computed MV (eliminates self-join)
                     SELECT
                         CASE WHEN a.country_iso = 'AW' THEN 'NL' ELSE a.country_iso END AS country_iso,
-                        ex.notional_value AS notional_usd
-                    FROM dealio_trades_mt5 ex
-                    JOIN dealio_trades_mt5 en ON en.position_id = ex.position_id
-                                             AND en.source_id = ex.source_id
-                                             AND en.entry = 0
-                    JOIN trading_accounts ta ON ta.login::bigint = ex.login
+                        m.notional_value AS notional_usd
+                    FROM mv_mt5_resolved m
+                    JOIN trading_accounts ta ON ta.login::bigint = m.login
                     JOIN accounts a ON a.accountid = ta.vtigeraccountid
-                    WHERE ex.entry = 1
-                      AND ex.close_time > '1971-01-01'
-                      AND en.open_time >= %(q_start)s AND en.open_time < %(q_end_excl)s
+                    WHERE m.open_time >= %(q_start)s AND m.open_time < %(q_end_excl)s
                       AND ta.vtigeraccountid IS NOT NULL
                       AND a.is_test_account = 0
                       AND {base_filter}
@@ -412,16 +407,11 @@ async def fsa_report_section6(request: Request, year: int = 2026, quarter: int =
 
                     SELECT
                         CASE WHEN a.country_iso = 'AW' THEN 'NL' ELSE a.country_iso END AS country_iso,
-                        ex.notional_value AS notional_usd
-                    FROM dealio_trades_mt5 ex
-                    JOIN dealio_trades_mt5 en ON en.position_id = ex.position_id
-                                             AND en.source_id = ex.source_id
-                                             AND en.entry = 0
-                    JOIN trading_accounts ta ON ta.login::bigint = ex.login
+                        m.notional_value AS notional_usd
+                    FROM mv_mt5_resolved m
+                    JOIN trading_accounts ta ON ta.login::bigint = m.login
                     JOIN accounts a ON a.accountid = ta.vtigeraccountid
-                    WHERE ex.entry = 1
-                      AND ex.close_time > '1971-01-01'
-                      AND en.open_time >= %(q_start)s AND en.open_time < %(q_end_excl)s
+                    WHERE m.open_time >= %(q_start)s AND m.open_time < %(q_end_excl)s
                       AND ta.vtigeraccountid IS NOT NULL
                       AND a.is_test_account = 0
                       AND {base_filter}

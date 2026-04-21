@@ -309,16 +309,10 @@ async def ftc_date_api(
         "        WHERE p.notional_value > 0\n"
         "          AND p.open_time < (%(end_date)s::date + INTERVAL '1 day')\n"
         "        UNION ALL\n"
-        "        SELECT ex.login, ex.notional_value\n"
-        "        FROM dealio_trades_mt5 ex\n"
-        "        JOIN dealio_trades_mt5 en\n"
-        "            ON en.position_id = ex.position_id\n"
-        "           AND en.source_id   = ex.source_id\n"
-        "           AND en.entry       = 0\n"
-        "        WHERE ex.entry = 1\n"
-        "          AND ex.close_time > '1971-01-01'\n"
-        "          AND ex.notional_value > 0\n"
-        "          AND en.open_time < (%(end_date)s::date + INTERVAL '1 day')\n"
+        "        SELECT m.login, m.notional_value\n"
+        "        FROM mv_mt5_resolved m\n"
+        "        WHERE m.notional_value > 0\n"
+        "          AND m.open_time < (%(end_date)s::date + INTERVAL '1 day')\n"
         "    ) d\n"
         "    JOIN trading_accounts ta ON ta.login::bigint = d.login\n"
         "    WHERE ta.vtigeraccountid IS NOT NULL\n"
@@ -460,7 +454,7 @@ async def ftc_date_api(
             "rows": data, "grand_total": grand,
             "end_date": end_date, "group1": group1, "group2": group2,
         }
-        cache.set(_ck, _result)
+        cache.set(_ck, _result, ttl=3600)
         return JSONResponse(content=_result)
     except Exception as e:
         return JSONResponse(status_code=500, content={"detail": str(e)})

@@ -2854,6 +2854,22 @@ _MV_SETUP_SQL = [
     # mv_retention_traders indexes (MV created on server, not in this list)
     "CREATE INDEX IF NOT EXISTS idx_mv_ret_traders_day_acct   ON mv_retention_traders (day, accountid)",
     "CREATE INDEX IF NOT EXISTS idx_mv_ret_traders_assigned   ON mv_retention_traders (assigned_to, day)",
+    # mv_mt5_resolved — pre-computed self-join of dealio_trades_mt5 (entry=1 → entry=0)
+    # Eliminates the 17M×17M self-join in ftc_date.py and fsa_report.py
+    """CREATE MATERIALIZED VIEW IF NOT EXISTS mv_mt5_resolved AS
+    SELECT ex.login,
+           en.open_time,
+           ex.notional_value
+    FROM dealio_trades_mt5 ex
+    JOIN dealio_trades_mt5 en
+        ON en.position_id = ex.position_id
+       AND en.source_id   = ex.source_id
+       AND en.entry       = 0
+    WHERE ex.entry = 1
+      AND ex.close_time > '1971-01-01'
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_mv_mt5r_open_time ON mv_mt5_resolved (open_time)",
+    "CREATE INDEX IF NOT EXISTS idx_mv_mt5r_login ON mv_mt5_resolved (login)",
 ]
 
 
@@ -2883,6 +2899,7 @@ _MV_ORDER = [
     "mv_account_stats",   # independent — new leads + live accounts
     "mv_std_clients",     # independent — STD (second deposit after $240 running total)
     "mv_retention_traders",  # independent — total traders report (positions+trades per day/account)
+    "mv_mt5_resolved",       # independent — pre-computed MT5 self-join for ftc_date + fsa_report
 ]
 
 # Module-level status dict updated by refresh_materialized_views()
