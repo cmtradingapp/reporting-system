@@ -264,16 +264,17 @@ async def lifespan(app: FastAPI):
         replace_existing=True,
         max_instances=1,
     )
-    scheduler.add_job(
-        run_dealio_trades_mt4_etl,
-        "interval",
-        minutes=SYNC_INTERVAL_MINUTES,
-        kwargs={"hours": DEALIO_TRADES_MT4_SYNC_HOURS},
-        id="dealio_trades_mt4_sync",
-        start_date=_base + timedelta(seconds=300),
-        replace_existing=True,
-        max_instances=1,
-    )
+    # MT4 trades sync disabled — not needed
+    # scheduler.add_job(
+    #     run_dealio_trades_mt4_etl,
+    #     "interval",
+    #     minutes=SYNC_INTERVAL_MINUTES,
+    #     kwargs={"hours": DEALIO_TRADES_MT4_SYNC_HOURS},
+    #     id="dealio_trades_mt4_sync",
+    #     start_date=_base + timedelta(seconds=300),
+    #     replace_existing=True,
+    #     max_instances=1,
+    # )
     scheduler.add_job(
         run_dealio_trades_mt5_etl,
         "interval",
