@@ -156,7 +156,7 @@
   <div class="d-flex gap-2 mb-4">
     <button class="section-tab active" data-sec="3">Section 3</button>
     <button class="section-tab" data-sec="4">Section 4</button>
-    <button class="section-tab disabled" data-sec="5" disabled>Section 5</button>
+    <button class="section-tab" data-sec="5">Section 5</button>
   </div>
 
   <!-- Loading / Error -->
@@ -320,6 +320,76 @@
 
   </div><!-- /section4 -->
 
+  <!-- Section 5: Breakdown of Clients' Equity Composition -->
+  <div id="section5" style="display:none;">
+
+    <h5 class="text-light mb-3">1. Breakdown of Clients' Equity Composition</h5>
+    <p class="text-secondary mb-3">a. Provide a breakdown of the total equity held by the Securities Dealer</p>
+
+    <div class="table-scroll">
+      <table class="table table-dark table-bordered align-middle mb-0" style="min-width:600px;">
+        <thead>
+          <tr>
+            <th>Types of Clients</th>
+            <th>Total Client's Equity<br><small>(including unrealised profit/loss)</small></th>
+            <th>Actual Client's Equity</th>
+            <th>Equity Ratio</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="row-header">Natural Persons</td>
+            <td id="s5-total-equity">—</td>
+            <td id="s5-actual-equity">—</td>
+            <td id="s5-equity-ratio">—</td>
+          </tr>
+          <tr>
+            <td class="row-header">Legal Entities</td>
+            <td>USD 0.00</td>
+            <td>USD 0.00</td>
+            <td>0.00%</td>
+          </tr>
+          <tr>
+            <td class="row-header">Others</td>
+            <td></td>
+            <td></td>
+            <td>0.00%</td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr class="total-row">
+            <td class="row-header">Total</td>
+            <td id="s5-total-equity-total">—</td>
+            <td id="s5-actual-equity-total">—</td>
+            <td id="s5-equity-ratio-total">—</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <div class="row g-3 mt-3">
+      <div class="col-md-4">
+        <div class="card bg-dark border-secondary text-center p-3">
+          <div class="text-secondary small">Actual Client's Equity</div>
+          <div class="text-light fs-5 fw-bold" id="s5-card-actual">—</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card bg-dark border-secondary text-center p-3">
+          <div class="text-secondary small">Floating / Open PnL</div>
+          <div class="fs-5 fw-bold" id="s5-card-floating">—</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card bg-dark border-secondary text-center p-3">
+          <div class="text-secondary small">Total Equity (incl. P&L)</div>
+          <div class="text-light fs-5 fw-bold" id="s5-card-total">—</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /section5 -->
+
 </div>
 </div>
 
@@ -383,6 +453,7 @@
   function hideAllSections(){
     document.getElementById('section3').style.display = 'none';
     document.getElementById('section4').style.display = 'none';
+    document.getElementById('section5').style.display = 'none';
   }
 
   function load(){
@@ -395,22 +466,26 @@
     if(cache[ck]){
       if(activeSec === '3') renderSection3(cache[ck]);
       else if(activeSec === '4') renderSection4(cache[ck]);
+      else if(activeSec === '5') renderSection5(cache[ck]);
       return;
     }
 
     document.getElementById('loading').style.display = 'block';
     if(activeSec === '3') loadSection3(year, quarter);
     else if(activeSec === '4') loadSection4(year, quarter);
+    else if(activeSec === '5') loadSection5(year, quarter);
 
-    // Prefetch the other section in background
-    const otherSec = activeSec === '3' ? '4' : '3';
-    const ock = cacheKey(otherSec, year, quarter);
-    if(!cache[ock]){
-      fetch(`/api/fsa-report/section${otherSec}?year=${year}&quarter=${quarter}`)
-        .then(r => r.json())
-        .then(d => { if(!d.error) cache[ock] = d; })
-        .catch(()=>{});
-    }
+    // Prefetch other sections in background
+    ['3','4','5'].forEach(s => {
+      if(s === activeSec) return;
+      const ock = cacheKey(s, year, quarter);
+      if(!cache[ock]){
+        fetch(`/api/fsa-report/section${s}?year=${year}&quarter=${quarter}`)
+          .then(r => r.json())
+          .then(d => { if(!d.error) cache[ock] = d; })
+          .catch(()=>{});
+      }
+    });
   }
 
   function renderSection3(d){
@@ -521,6 +596,41 @@
         if(d.error){ throw new Error(d.error); }
         cache[cacheKey('4', year, quarter)] = d;
         renderSection4(d);
+      })
+      .catch(showError);
+  }
+
+  function renderSection5(d){
+    const ae = d.actual_equity;
+    const fp = d.floating_pnl;
+    const te = d.total_equity;
+    const er = d.equity_ratio;
+
+    document.getElementById('s5-total-equity').textContent = 'USD ' + te.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+    document.getElementById('s5-actual-equity').textContent = 'USD ' + ae.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+    document.getElementById('s5-equity-ratio').textContent = er.toFixed(2) + '%';
+
+    document.getElementById('s5-total-equity-total').textContent = 'USD ' + te.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+    document.getElementById('s5-actual-equity-total').textContent = 'USD ' + ae.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+    document.getElementById('s5-equity-ratio-total').textContent = er.toFixed(2) + '%';
+
+    document.getElementById('s5-card-actual').textContent = fmtUSD(ae);
+    const fpEl = document.getElementById('s5-card-floating');
+    fpEl.textContent = (fp < 0 ? '-' : '') + fmtUSD(Math.abs(fp));
+    fpEl.style.color = fp < 0 ? '#f85149' : '#3fb950';
+    document.getElementById('s5-card-total').textContent = fmtUSD(te);
+
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('section5').style.display = 'block';
+  }
+
+  function loadSection5(year, quarter){
+    fetch(`/api/fsa-report/section5?year=${year}&quarter=${quarter}`)
+      .then(r => r.json())
+      .then(d => {
+        if(d.error){ throw new Error(d.error); }
+        cache[cacheKey('5', year, quarter)] = d;
+        renderSection5(d);
       })
       .catch(showError);
   }

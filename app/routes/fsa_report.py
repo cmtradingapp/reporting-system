@@ -155,8 +155,8 @@ async def fsa_report_section3(request: Request, year: int = 2026, quarter: int =
         }
         cache.set(_ck, _result)
         return JSONResponse(_result)
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
+    except Exception as e1:
+        return JSONResponse({"error": str(e1)}, status_code=500)
     finally:
         conn.close()
 
@@ -283,7 +283,73 @@ async def fsa_report_section4(request: Request, year: int = 2026, quarter: int =
         _result = {"countries": countries}
         cache.set(_ck, _result)
         return JSONResponse(_result)
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
+    except Exception as e2:
+        return JSONResponse({"error": str(e2)}, status_code=500)
+    finally:
+        conn.close()
+
+
+@router.get("/api/fsa-report/section5")
+async def fsa_report_section5(request: Request, year: int = 2026, quarter: int = 1):
+    user = await get_current_user(request)
+    if isinstance(user, RedirectResponse):
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    if user.get("role") != "admin" and "fsa_report" not in (user.get("allowed_pages_list") or []):
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+
+    q_start, q_end, q_end_excl = _quarter_dates(year, quarter)
+    _ck = f"fsa_s5_v1:{year}:{quarter}"
+    _hit = cache.get(_ck)
+    if _hit is not None:
+        return JSONResponse(_hit)
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            # 6.1 Actual Client's Equity = SUM(GREATEST(convertedequity, 0))
+            # at last available date <= quarter end
+            cur.execute("""
+                SELECT COALESCE(SUM(GREATEST(ddp.convertedequity, 0)), 0)
+                FROM dealio_daily_profits ddp
+                JOIN trading_accounts ta ON ta.login::bigint = ddp.login
+                JOIN accounts a ON a.accountid = ta.vtigeraccountid
+                WHERE ddp.date = (
+                    SELECT MAX(date) FROM dealio_daily_profits WHERE date <= %(q_end)s
+                )
+                  AND a.funded = 1
+                  AND a.is_test_account = 0
+                  AND (a.sales_rep_id IS NULL OR a.sales_rep_id != 3303)
+                  AND a.country_iso IN %(countries)s
+            """, {"q_end": q_end, "countries": FSA_COUNTRIES_FILTER})
+            actual_equity = float(cur.fetchone()[0])
+
+            # 6.2 Floating PnL = SUM(converteddeltafloatingpnl) for all days in quarter
+            cur.execute("""
+                SELECT COALESCE(SUM(ddp.converteddeltafloatingpnl), 0)
+                FROM dealio_daily_profits ddp
+                JOIN trading_accounts ta ON ta.login::bigint = ddp.login
+                JOIN accounts a ON a.accountid = ta.vtigeraccountid
+                WHERE ddp.date >= %(q_start)s AND ddp.date < %(q_end_excl)s
+                  AND a.funded = 1
+                  AND a.is_test_account = 0
+                  AND (a.sales_rep_id IS NULL OR a.sales_rep_id != 3303)
+                  AND a.country_iso IN %(countries)s
+            """, {"q_start": q_start, "q_end_excl": q_end_excl,
+                  "countries": FSA_COUNTRIES_FILTER})
+            floating_pnl = float(cur.fetchone()[0])
+
+        total_equity = actual_equity + floating_pnl
+        equity_ratio = (actual_equity / total_equity * 100) if total_equity else 0
+
+        _result = {
+            "actual_equity": actual_equity,
+            "floating_pnl": floating_pnl,
+            "total_equity": total_equity,
+            "equity_ratio": equity_ratio,
+        }
+        cache.set(_ck, _result)
+        return JSONResponse(_result)
+    except Exception as e3:
+        return JSONResponse({"error": str(e3)}, status_code=500)
     finally:
         conn.close()
