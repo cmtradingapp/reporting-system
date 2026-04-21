@@ -3,6 +3,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from app.auth.dependencies import get_current_user
 from app.db.postgres_conn import get_connection
+from app import cache
 from datetime import date
 
 router = APIRouter()
@@ -54,6 +55,10 @@ async def fsa_report_section3(request: Request, year: int = 2026, quarter: int =
         return JSONResponse({"error": "forbidden"}, status_code=403)
 
     q_start, q_end, q_end_excl = _quarter_dates(year, quarter)
+    _ck = f"fsa_s3_v1:{year}:{quarter}"
+    _hit = cache.get(_ck)
+    if _hit is not None:
+        return JSONResponse(_hit)
 
     base_filter = """
         funded = 1
@@ -142,12 +147,14 @@ async def fsa_report_section3(request: Request, year: int = 2026, quarter: int =
                 "pep": cls_row[1] or 0,
             }
 
-        return JSONResponse({
+        _result = {
             "counts": counts,
             "clients_funds": clients_funds,
             "age_groups": age_groups,
             "classification": classification,
-        })
+        }
+        cache.set(_ck, _result)
+        return JSONResponse(_result)
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
     finally:
@@ -163,6 +170,10 @@ async def fsa_report_section4(request: Request, year: int = 2026, quarter: int =
         return JSONResponse({"error": "forbidden"}, status_code=403)
 
     q_start, q_end, q_end_excl = _quarter_dates(year, quarter)
+    _ck = f"fsa_s4_v1:{year}:{quarter}"
+    _hit = cache.get(_ck)
+    if _hit is not None:
+        return JSONResponse(_hit)
 
     base_filter = """
         a.funded = 1
@@ -269,7 +280,9 @@ async def fsa_report_section4(request: Request, year: int = 2026, quarter: int =
                 "cfds": country_volume.get(iso, 0),
             })
 
-        return JSONResponse({"countries": countries})
+        _result = {"countries": countries}
+        cache.set(_ck, _result)
+        return JSONResponse(_result)
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
     finally:

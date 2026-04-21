@@ -106,11 +106,11 @@ def warm_cache():
     except Exception as e:
         print(f"[warm_cache] data_sync: {e}")
 
-    # Performance page — warm admin cache so page loads are instant
+    # All report pages — warm admin cache so page loads are instant
     try:
-        _warm_performance_cache(month_start, today_iso)
+        _warm_report_caches(month_start, today_iso)
     except Exception as e:
-        print(f"[warm_cache] performance: {e}")
+        print(f"[warm_cache] reports: {e}")
 
 SYNC_INTERVAL_MINUTES          = int(os.getenv("SYNC_INTERVAL_MINUTES", "1"))
 TRANSACTIONS_SYNC_INTERVAL_MINUTES = int(os.getenv("TRANSACTIONS_SYNC_INTERVAL_MINUTES", "1"))
@@ -355,19 +355,27 @@ async def lifespan(app: FastAPI):
     scheduler.shutdown()
 
 
-def _warm_performance_cache(date_from: str, date_to: str):
-    """Pre-warm performance API cache for admin user via local HTTP call."""
+def _warm_report_caches(date_from: str, date_to: str):
+    """Pre-warm all report API caches for admin user via local HTTP calls."""
     import urllib.request
     from app.auth.auth import create_access_token
     token = create_access_token(1)  # admin user id=1
-    for path in ["/api/performance", "/api/performance/retention"]:
-        url = f"http://127.0.0.1:8000{path}?date_from={date_from}&date_to={date_to}"
+    endpoints = [
+        f"/api/performance?date_from={date_from}&date_to={date_to}",
+        f"/api/performance/retention?date_from={date_from}&date_to={date_to}",
+        f"/api/agent-bonuses/sales?date_from={date_from}&date_to={date_to}",
+        f"/api/agent-bonuses/retention?date_from={date_from}&date_to={date_to}",
+        f"/api/all-ftcs?date_from={date_from}&date_to={date_to}",
+        "/api/eez-comparison",
+    ]
+    for ep in endpoints:
+        url = f"http://127.0.0.1:8000{ep}"
         req = urllib.request.Request(url)
         req.add_header("Cookie", f"access_token={token}")
         try:
             urllib.request.urlopen(req, timeout=60)
         except Exception as e:
-            print(f"[warm_cache] {path}: {e}")
+            print(f"[warm_cache] {ep.split('?')[0]}: {e}")
 
 
 app = FastAPI(title="Agent Performance Report", lifespan=lifespan)

@@ -153,19 +153,23 @@ def _dashboard_calc(today: date_type) -> dict:
             row = cur.fetchone()
             ov_daily, ov_monthly = float(row[0] or 0), float(row[1] or 0)
 
-            # Q7 — Daily PnL  (live from dealio_daily_profits)
-            cur.execute("""
-                SELECT COALESCE(SUM(
-                    COALESCE(convertedclosedpnl, 0) + COALESCE(converteddeltafloatingpnl, 0)
-                ), 0)
-                FROM dealio_daily_profits d
-                JOIN trading_accounts ta ON ta.login::bigint = d.login
-                JOIN accounts a ON a.accountid = ta.vtigeraccountid
-                WHERE d.date >= %(last_mtd)s::date
-                  AND d.date <  %(last_mtd)s::date + INTERVAL '1 day'
-                  AND a.is_test_account = 0
-            """, {"last_mtd": last_mtd_str})
-            pnl_daily = round(float(cur.fetchone()[0] or 0), 2)
+            # Q7 — Daily PnL  (live from dealio_daily_profits, deadlock-prone)
+            try:
+                cur.execute("""
+                    SELECT COALESCE(SUM(
+                        COALESCE(convertedclosedpnl, 0) + COALESCE(converteddeltafloatingpnl, 0)
+                    ), 0)
+                    FROM dealio_daily_profits d
+                    JOIN trading_accounts ta ON ta.login::bigint = d.login
+                    JOIN accounts a ON a.accountid = ta.vtigeraccountid
+                    WHERE d.date >= %(last_mtd)s::date
+                      AND d.date <  %(last_mtd)s::date + INTERVAL '1 day'
+                      AND a.is_test_account = 0
+                """, {"last_mtd": last_mtd_str})
+                pnl_daily = round(float(cur.fetchone()[0] or 0), 2)
+            except Exception:
+                conn.rollback()
+                pnl_daily = 0.0
 
             # Q8 — New Leads + Live Accounts (from mv_account_stats)
             cur.execute("""

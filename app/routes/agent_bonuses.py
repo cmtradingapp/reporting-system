@@ -340,10 +340,10 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
             COALESCE(bon.ftd100_count, 0)::int                    AS ftd100_count,
             COALESCE(bon.ftd100_full_count, 0)::int               AS ftd100_full_count,
             COALESCE(bon.ftd100_half_count, 0)::int               AS ftd100_half_count,
-            COALESCE(ftc_net.net_usd, 0)::float                   AS ftc_net_usd,
             COALESCE(bon.total_sales_net, 0)::float               AS total_sales_net,
             COALESCE(bon.ftd_amount_bonus, 0)::float              AS ftd_amount_bonus_sql,
-            COALESCE(u.status, '')                                 AS status
+            COALESCE(u.status, '')                                 AS status,
+            u.id                                                   AS user_id
         FROM crm_users u
         LEFT JOIN auth_users au ON au.crm_user_id = u.id
         LEFT JOIN ({tgt_subq}) tgt ON tgt.agent_id = u.id
@@ -366,23 +366,7 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
             WHERE ftd_100_date >= %(date_from)s AND ftd_100_date < %(date_to_excl)s
             GROUP BY agent_id
         ) bon ON bon.agent_id = u.id
-        LEFT JOIN (
-            -- FTC net USD: live query — depends on (qual_date >= tx_date OR ftd=1)
-            SELECT t.original_deposit_owner AS agent_id,
-                   SUM(CASE WHEN t.transaction_type_name IN ('Deposit','Withdrawal Cancelled') THEN  t.usdamount
-                            WHEN t.transaction_type_name IN ('Withdrawal','Deposit Cancelled')  THEN -t.usdamount END)::float AS net_usd
-            FROM transactions t
-            JOIN accounts a ON a.accountid = t.vtigeraccountid
-            WHERE t.transactionapproval = 'Approved'
-              AND (t.deleted = 0 OR t.deleted IS NULL)
-              AND t.transaction_type_name IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
-              AND a.client_qualification_date IS NOT NULL
-              AND a.client_qualification_date >= %(date_from)s
-              AND a.client_qualification_date <  %(date_to_excl)s
-              AND (a.client_qualification_date >= t.confirmation_time::date OR t.ftd = 1)
-              AND a.is_test_account = 0
-            GROUP BY t.original_deposit_owner
-        ) ftc_net ON ftc_net.agent_id = u.id
+        -- ftc_net fetched separately to avoid deadlock on transactions JOIN accounts
         WHERE (
             u.department_ = 'Sales' AND u.team = 'Conversion'
             OR u.id IN (3750, 3614, 6119, 6479, 6492, 6355, 6666, 6694)
@@ -425,6 +409,30 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
             cur.execute(final_sql, final_params)
             rows = cur.fetchall()
 
+            # FTC net USD — separate query (transactions JOIN accounts is deadlock-prone)
+            ftc_net_map = {}
+            try:
+                cur.execute("""
+                    SELECT t.original_deposit_owner AS agent_id,
+                           SUM(CASE WHEN t.transaction_type_name IN ('Deposit','Withdrawal Cancelled') THEN  t.usdamount
+                                    WHEN t.transaction_type_name IN ('Withdrawal','Deposit Cancelled')  THEN -t.usdamount END)::float AS net_usd
+                    FROM transactions t
+                    JOIN accounts a ON a.accountid = t.vtigeraccountid
+                    WHERE t.transactionapproval = 'Approved'
+                      AND (t.deleted = 0 OR t.deleted IS NULL)
+                      AND t.transaction_type_name IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
+                      AND a.client_qualification_date IS NOT NULL
+                      AND a.client_qualification_date >= %(date_from)s
+                      AND a.client_qualification_date <  %(date_to_excl)s
+                      AND (a.client_qualification_date >= t.confirmation_time::date OR t.ftd = 1)
+                      AND a.is_test_account = 0
+                    GROUP BY t.original_deposit_owner
+                """, {"date_from": date_from, "date_to_excl": date_to_exclusive})
+                ftc_net_map = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
+            except Exception as _fn_err:
+                conn.rollback()
+                print(f"[bon_sales] ftc_net query failed (lock?): {_fn_err}")
+
         today               = datetime.now(_TZ).date()
         month_end           = last_day_of_month(dt_from)
         working_days        = count_working_days(dt_from, month_end, holidays)
@@ -440,10 +448,11 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
             ftd100_count         = int(r[4])
             ftd100_full_count    = int(r[5])
             ftd100_half_count    = int(r[6])
-            ftc_net_usd          = round(float(r[7]), 2)
-            total_sales_net      = round(float(r[8]), 2)
-            ftd_amount_bonus_raw = round(float(r[9]), 2)
-            status               = r[10] or ''
+            total_sales_net      = round(float(r[7]), 2)
+            ftd_amount_bonus_raw = round(float(r[8]), 2)
+            status               = r[9] or ''
+            user_id              = int(r[10] or 0)
+            ftc_net_usd          = round(ftc_net_map.get(user_id, 0.0), 2)
 
             target_ftc = max(target_ftc, 1)  # no target → treat as 1
 

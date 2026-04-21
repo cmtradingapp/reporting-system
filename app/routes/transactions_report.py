@@ -3,6 +3,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from app.auth.dependencies import get_current_user
 from app.db.postgres_conn import get_connection
+from app import cache
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -28,6 +29,11 @@ async def transactions_report_api(request: Request):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     if user.get("role") != "admin" and "transactions_report" not in (user.get("allowed_pages_list") or []):
         return JSONResponse(status_code=403, content={"detail": "Forbidden"})
+
+    _ck = "txn_report_v1"
+    _hit = cache.get(_ck)
+    if _hit is not None:
+        return JSONResponse(content=_hit)
 
     conn = get_connection()
     try:
@@ -64,4 +70,6 @@ async def transactions_report_api(request: Request):
             "confirmation_time":     r[5].isoformat() if r[5] is not None else None,
         })
 
-    return JSONResponse(content={"rows": data, "total": len(data)})
+    _result = {"rows": data, "total": len(data)}
+    cache.set(_ck, _result)
+    return JSONResponse(content=_result)
