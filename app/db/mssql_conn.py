@@ -235,6 +235,57 @@ def get_transaction_type_names_full():
         yield df
 
 
+def get_mssql_dealio_mt5trades_full():
+    """Generator yielding all rows from report.dealio_mt5trades in chunks, paginated by ticket."""
+    last_ticket = 0
+    while True:
+        conn = _get_mssql_connection()
+        try:
+            query = f"""
+                SELECT TOP {CHUNK_SIZE}
+                    ticket, login, symbol, digit, cmd, volume,
+                    opentime        AS open_time,
+                    openprice       AS open_price,
+                    closetime       AS close_time,
+                    reason, commission,
+                    agentid         AS agent_id,
+                    swap,
+                    closeprice      AS close_price,
+                    profit, tax, comment,
+                    timestamp       AS mssql_timestamp,
+                    symbolplain     AS symbol_plain,
+                    computedprofit  AS computed_profit,
+                    computedswap    AS computed_swap,
+                    computedcommission AS computed_commission,
+                    groupname       AS group_name,
+                    groupcurrency   AS group_currency,
+                    calculationcurrency AS calculation_currency,
+                    book,
+                    notionalvalue   AS notional_value,
+                    sourcename      AS source_name,
+                    sourcetype      AS source_type,
+                    sourceid        AS source_id,
+                    positionid      AS position_id,
+                    entry,
+                    volumeclosed    AS volume_closed,
+                    synctime        AS sync_time,
+                    isfinalized     AS is_finalized,
+                    spread,
+                    conversionrate  AS conversion_rate,
+                    calculationcurrencydigits AS calculation_currency_digits
+                FROM report.dealio_mt5trades
+                WHERE ticket > {last_ticket}
+                ORDER BY ticket
+            """
+            df = pd.read_sql(query, conn)
+        finally:
+            conn.close()
+        if df.empty:
+            break
+        last_ticket = int(df["ticket"].max())
+        yield df
+
+
 def get_transaction_type_names_for_ids(ids: list) -> pd.DataFrame:
     """Fetch transaction_type_name from MSSQL for specific mttransactionsids."""
     ids = [int(i) for i in ids if i is not None]

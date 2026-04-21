@@ -2,7 +2,7 @@ import time
 import pandas as pd
 from datetime import datetime, timedelta, timezone
 from app.db.mysql_conn import get_operators, get_users, get_accounts, get_accounts_full, get_accounts_by_qual_date, get_accounts_by_created_date, get_crm_users, get_crm_users_full, get_transactions, get_transactions_full, get_transactions_by_confirmation_date, get_trading_accounts, get_trading_accounts_full, get_campaigns
-from app.db.mssql_conn import get_targets, get_vtiger_users, get_client_classification, get_bonus_transactions, get_bonus_transactions_full
+from app.db.mssql_conn import get_targets, get_vtiger_users, get_client_classification, get_bonus_transactions, get_bonus_transactions_full, get_mssql_dealio_mt5trades_full
 from app.db.dealio_conn import get_dealio_users, get_dealio_users_full, get_dealio_trades_mt4, get_dealio_trades_mt4_full, get_dealio_trades_mt4_missing, get_dealio_trades_mt4_by_open_time, get_dealio_daily_profits, get_dealio_daily_profits_full, get_dealio_daily_profits_daterange, get_dealio_trades_mt5, get_dealio_trades_mt5_full, get_dealio_trades_mt5_missing, get_dealio_positions
 from app.db.postgres_conn import (
     ensure_table, delete_all_performance, insert_records,
@@ -17,6 +17,7 @@ from app.db.postgres_conn import (
     ensure_daily_equity_zeroed_table, upsert_daily_equity_zeroed,
     upsert_campaigns,
     truncate_and_insert_dealio_positions,
+    upsert_mssql_dealio_mt5trades,
 )
 from app.db.postgres_conn import get_connection as _pg_conn
 
@@ -963,3 +964,29 @@ def run_dealio_positions_etl() -> dict:
         except Exception as e:
             print(f"[run_dealio_positions_etl] mv_retention_traders refresh failed: {e}")
     return {"status": status, "rows_synced": rows}
+
+
+def run_mssql_dealio_mt5trades_full_etl() -> dict:
+    """Full sync of report.dealio_mt5trades from MSSQL into PostgreSQL."""
+    start = time.time()
+    cutoff = datetime(1970, 1, 1)
+    status = "success"
+    error_msg = None
+    rows = 0
+    chunk_num = 0
+    try:
+        for chunk in get_mssql_dealio_mt5trades_full():
+            upsert_mssql_dealio_mt5trades(chunk)
+            rows += len(chunk)
+            chunk_num += 1
+            if chunk_num % 10 == 0:
+                elapsed = int((time.time() - start) * 1000)
+                log_sync("mssql_dealio_mt5trades", cutoff, rows, elapsed, "running", f"chunk {chunk_num}, {rows} rows so far")
+    except Exception as e:
+        status = "error"
+        error_msg = str(e)
+        raise
+    finally:
+        duration_ms = int((time.time() - start) * 1000)
+        log_sync("mssql_dealio_mt5trades", cutoff, rows, duration_ms, status, error_msg)
+    return {"status": status, "rows_synced": rows, "type": "full"}

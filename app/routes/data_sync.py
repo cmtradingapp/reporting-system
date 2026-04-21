@@ -7,7 +7,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from app.auth.dependencies import get_current_user
-from app.db.postgres_conn import fetch_accounts_stats, fetch_crm_users_stats, fetch_transactions_stats, fetch_targets_stats, fetch_trading_accounts_stats, fetch_ftd100_stats, fetch_sync_log, fetch_dealio_users_stats, fetch_dealio_trades_mt4_stats, fetch_dealio_trades_mt5_stats, fetch_dealio_daily_profits_stats, fetch_bonus_transactions_stats, fetch_campaigns_stats
+from app.db.postgres_conn import fetch_accounts_stats, fetch_crm_users_stats, fetch_transactions_stats, fetch_targets_stats, fetch_trading_accounts_stats, fetch_ftd100_stats, fetch_sync_log, fetch_dealio_users_stats, fetch_dealio_trades_mt4_stats, fetch_dealio_trades_mt5_stats, fetch_dealio_daily_profits_stats, fetch_bonus_transactions_stats, fetch_campaigns_stats, fetch_mssql_dealio_mt5trades_stats
 from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 
@@ -76,6 +76,7 @@ def warm_data_sync_cache():
     _cached("ddps_stats",      fetch_dealio_daily_profits_stats)
     _cached("bonus_stats",     fetch_bonus_transactions_stats)
     _cached("campaigns_stats", fetch_campaigns_stats)
+    _cached("mssql_dmt5_stats", fetch_mssql_dealio_mt5trades_stats)
     _cached("accounts_log",    lambda: fetch_sync_log("crm_accounts",         limit=20))
     _cached("users_log",       lambda: fetch_sync_log("crm_users",            limit=20))
     _cached("tx_log",          lambda: fetch_sync_log("transactions",         limit=20))
@@ -88,6 +89,7 @@ def warm_data_sync_cache():
     _cached("ddps_log",        lambda: fetch_sync_log("dealio_daily_profits", limit=20))
     _cached("bonus_log",       lambda: fetch_sync_log("bonus_transactions",   limit=20))
     _cached("campaigns_log",   lambda: fetch_sync_log("campaigns",            limit=20))
+    _cached("mssql_dmt5_log",  lambda: fetch_sync_log("mssql_dealio_mt5trades", limit=20))
 
 
 @router.get("/data-sync", response_class=HTMLResponse)
@@ -110,6 +112,7 @@ async def data_sync_page(request: Request):
         "ddps_stats":      lambda: _cached("ddps_stats",      fetch_dealio_daily_profits_stats),
         "bonus_stats":     lambda: _cached("bonus_stats",     fetch_bonus_transactions_stats),
         "campaigns_stats": lambda: _cached("campaigns_stats", fetch_campaigns_stats),
+        "mssql_dmt5_stats": lambda: _cached("mssql_dmt5_stats", fetch_mssql_dealio_mt5trades_stats),
         "accounts_log":    lambda: _cached("accounts_log",    lambda: fetch_sync_log("crm_accounts",         limit=20)),
         "users_log":       lambda: _cached("users_log",       lambda: fetch_sync_log("crm_users",            limit=20)),
         "tx_log":          lambda: _cached("tx_log",          lambda: fetch_sync_log("transactions",         limit=20)),
@@ -122,6 +125,7 @@ async def data_sync_page(request: Request):
         "ddps_log":        lambda: _cached("ddps_log",        lambda: fetch_sync_log("dealio_daily_profits", limit=20)),
         "bonus_log":       lambda: _cached("bonus_log",       lambda: fetch_sync_log("bonus_transactions",   limit=20)),
         "campaigns_log":   lambda: _cached("campaigns_log",   lambda: fetch_sync_log("campaigns",            limit=20)),
+        "mssql_dmt5_log":  lambda: _cached("mssql_dmt5_log",  lambda: fetch_sync_log("mssql_dealio_mt5trades", limit=20)),
     }
 
     def _err_stats():
@@ -167,6 +171,8 @@ async def data_sync_page(request: Request):
     bonus_log        = results["bonus_log"]
     campaigns_stats  = results["campaigns_stats"]
     campaigns_log    = results["campaigns_log"]
+    mssql_dmt5_stats = results["mssql_dmt5_stats"]
+    mssql_dmt5_log   = results["mssql_dmt5_log"]
 
     tables = [
         {
@@ -383,6 +389,24 @@ async def data_sync_page(request: Request):
             "incremental_columns": "N/A — full refresh (no timestamp column)",
             "source": "MySQL CRM → crmdb.tracking_campaign + selection (channel/sub-channel lookups)",
             "note": "Joins to crm_accounts on crm_accounts.campaign = campaigns.crmid",
+        },
+        {
+            "key": "mssql_dealio_mt5trades",
+            "label": "mssql_dealio_mt5trades",
+            "last_synced_at": mssql_dmt5_stats["last_synced_at"],
+            "stat_cards": [
+                {"label": "Total Records",  "value": mssql_dmt5_stats["total_records"],  "color": "text-info",    "icon": "bi-database"},
+                {"label": "Unique Logins",  "value": mssql_dmt5_stats["unique_logins"],  "color": "text-success", "icon": "bi-person-badge"},
+                {"label": "Total Profit",   "value": mssql_dmt5_stats["total_profit"],   "color": "text-warning", "icon": "bi-currency-dollar"},
+                {"label": "Unique Symbols", "value": mssql_dmt5_stats["unique_symbols"], "color": "text-primary", "icon": "bi-graph-up"},
+            ],
+            "sync_log": mssql_dmt5_log,
+            "healthy": mssql_dmt5_stats["total_records"] > 0,
+            "sync_interval_hours": "N/A",
+            "lookback_hours": "All",
+            "primary_key": "(source_id, ticket)",
+            "incremental_columns": "N/A — full sync only",
+            "source": "MSSQL → report.dealio_mt5trades",
         },
     ]
 

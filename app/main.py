@@ -31,7 +31,8 @@ from app.routes.campaign_performance import router as campaign_performance_route
 from app.routes.all_ftcs import router as all_ftcs_router
 from app.routes.transactions_report import router as transactions_report_router
 from app.routes.fsa_report import router as fsa_report_router
-from app.db.postgres_conn import ensure_table, ensure_auth_table, seed_admin_user, ensure_client_classification_table, ensure_bonus_transactions_table, ensure_daily_equity_zeroed_table, ensure_materialized_views, refresh_materialized_views, backfill_classification_int, ensure_agent_dept_history_table, ensure_dealio_positions_table
+from app.routes.mssql_dealio_mt5trades_sync import router as mssql_dealio_mt5trades_sync_router
+from app.db.postgres_conn import ensure_table, ensure_auth_table, seed_admin_user, ensure_client_classification_table, ensure_bonus_transactions_table, ensure_daily_equity_zeroed_table, ensure_materialized_views, refresh_materialized_views, backfill_classification_int, ensure_agent_dept_history_table, ensure_dealio_positions_table, ensure_mssql_dealio_mt5trades_table
 import threading
 import fcntl
 from app.auth.auth import hash_password
@@ -178,6 +179,7 @@ async def lifespan(app: FastAPI):
         ensure_daily_equity_zeroed_table()
         ensure_agent_dept_history_table()
         ensure_dealio_positions_table()
+        ensure_mssql_dealio_mt5trades_table()
         ensure_materialized_views()
         seed_admin_user(hash_password('Admin123!'))
         threading.Thread(target=backfill_classification_int, daemon=True).start()
@@ -418,3 +420,4 @@ app.include_router(campaign_performance_router)
 app.include_router(all_ftcs_router)
 app.include_router(transactions_report_router)
 app.include_router(fsa_report_router)
+app.include_router(mssql_dealio_mt5trades_sync_router)
