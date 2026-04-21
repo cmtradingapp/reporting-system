@@ -54,7 +54,20 @@ async def debug_eez(request: Request, login: int = None):
                 {"login": r[0], "eez": float(r[1] or 0)} for r in cur.fetchall()
             ]
 
-            # 3. Duplicate logins in trading_accounts
+            # 3. All corrupt rows in local dealio_daily_profits
+            cur.execute("""
+                SELECT login, date, sourceid, convertedfloatingpnl, convertedbalance
+                FROM dealio_daily_profits
+                WHERE ABS(COALESCE(convertedfloatingpnl, 0)) >= 100000000
+                ORDER BY ABS(convertedfloatingpnl) DESC
+            """)
+            result["corrupt_local_rows"] = [
+                {"login": r[0], "date": str(r[1]), "sourceid": r[2],
+                 "convertedfloatingpnl": float(r[3] or 0), "convertedbalance": float(r[4] or 0)}
+                for r in cur.fetchall()
+            ]
+
+            # 4. Duplicate logins in trading_accounts
             cur.execute("""
                 SELECT login::bigint, COUNT(*) AS cnt
                 FROM trading_accounts
@@ -143,10 +156,33 @@ async def debug_eez(request: Request, login: int = None):
                 for r in cur.fetchall()
             ]
 
+            # Check REMOTE dealio for same login — is corruption at source?
+            remote_ddp = []
+            try:
+                from app.db.dealio_conn import get_dealio_connection
+                dconn = get_dealio_connection()
+                try:
+                    with dconn.cursor() as dcur:
+                        dcur.execute("""
+                            SELECT date, convertedbalance, convertedfloatingpnl, sourceid
+                            FROM dealio.daily_profits
+                            WHERE login = %s ORDER BY date DESC LIMIT 10
+                        """, (check_login,))
+                        remote_ddp = [
+                            {"date": str(r[0]), "convertedbalance": float(r[1] or 0),
+                             "convertedfloatingpnl": float(r[2] or 0), "sourceid": r[3]}
+                            for r in dcur.fetchall()
+                        ]
+                finally:
+                    dconn.close()
+            except Exception as e:
+                remote_ddp = [{"error": str(e)}]
+
             result[f"login_{check_login}"] = {
                 "snapshots_last_10_days": login_snapshots,
                 "trading_accounts": ta_rows,
-                "dealio_daily_profits_last_5": ddp_rows,
+                "dealio_daily_profits_local_last_5": ddp_rows,
+                "dealio_daily_profits_REMOTE_last_10": remote_ddp,
                 "cumulative_bonus": login_bonus,
                 "dealio_users": du_rows,
                 "computed_eez": "MAX(0, convertedbalance + floating - bonus)",
