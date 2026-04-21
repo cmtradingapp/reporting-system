@@ -25,6 +25,70 @@ def _apply_role_filter(sql: str, params: dict, role_filter: dict) -> tuple[str, 
     return sql.replace('{role_filter}', named_where), {**params, **extra}
 
 
+def _build_cls_filter(request: Request) -> tuple[str, dict, str]:
+    """Parse classification filter from query params.
+    Returns (sql_where_fragment, params, cache_suffix).
+    sql_where_fragment is '' when no filter, or 'AND (...)' when active."""
+    scp_cat = request.query_params.get("scp_cat", "").strip()
+    scp = request.query_params.get("scp", "").strip()
+    parts = []
+    params = {}
+    if scp_cat:
+        cats = [c.strip().lower() for c in scp_cat.split(",") if c.strip()]
+        cat_parts = []
+        if "high" in cats:
+            cat_parts.append("a.classification_int BETWEEN 6 AND 10")
+        if "low" in cats:
+            cat_parts.append("a.classification_int BETWEEN 1 AND 5")
+        if "none" in cats:
+            cat_parts.append("(a.classification_int IS NULL OR a.classification_int NOT BETWEEN 1 AND 10)")
+        if cat_parts:
+            parts.append("(" + " OR ".join(cat_parts) + ")")
+    if scp:
+        vals = [int(v) for v in scp.split(",") if v.strip().isdigit() and 1 <= int(v.strip()) <= 10]
+        if vals:
+            params["_cls_vals"] = tuple(vals)
+            parts.append("a.classification_int IN %(_cls_vals)s")
+    if not parts:
+        return "", {}, ""
+    return "AND " + " AND ".join(parts), params, f":{scp_cat}:{scp}"
+
+
+# SQL to create temp table mimicking mv_daily_kpis with classification filter
+_CLS_KPIS_SQL = """
+CREATE TEMP TABLE _cls_kpis ON COMMIT DROP AS
+SELECT
+    t.original_deposit_owner                                             AS agent_id,
+    t.confirmation_time::date                                            AS tx_date,
+    a.client_qualification_date::date                                    AS qual_date,
+    COALESCE(SUM(CASE
+        WHEN t.transaction_type_name IN ('Deposit', 'Withdrawal Cancelled')  THEN  t.usdamount
+        WHEN t.transaction_type_name IN ('Withdrawal', 'Deposit Cancelled')  THEN -t.usdamount
+    END), 0)                                                             AS net_usd,
+    COALESCE(SUM(CASE
+        WHEN t.transaction_type_name IN ('Deposit', 'Withdrawal Cancelled')  THEN t.usdamount
+        ELSE 0
+    END), 0)                                                             AS deposit_usd,
+    SUM(CASE WHEN t.transaction_type_name = 'Deposit' AND t.ftd = 1 THEN 1 ELSE 0 END)::int AS ftd_count,
+    COUNT(DISTINCT CASE WHEN t.transaction_type_name = 'Deposit' AND t.ftd = 1
+                        THEN t.vtigeraccountid END)::int                 AS ftc_count
+FROM transactions t
+JOIN accounts  a  ON a.accountid = t.vtigeraccountid
+WHERE t.transactionapproval = 'Approved'
+  AND (t.deleted = 0 OR t.deleted IS NULL)
+  AND t.transaction_type_name IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
+  AND t.vtigeraccountid IS NOT NULL
+  AND a.is_test_account = 0
+  {cls_where}
+  AND (
+      (a.client_qualification_date >= %(date_from)s AND a.client_qualification_date < %(date_to_excl)s)
+      OR
+      (t.confirmation_time >= %(date_from)s AND t.confirmation_time < %(date_to_excl)s)
+  )
+GROUP BY t.original_deposit_owner, t.confirmation_time::date, a.client_qualification_date::date
+"""
+
+
 def last_day_of_month(d: date_type) -> date_type:
     return d.replace(day=calendar.monthrange(d.year, d.month)[1])
 
@@ -84,7 +148,9 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"perf_v23:{user.get('role','')}:{date_from}:{date_to}"
+    cls_where, cls_params, cls_suffix = _build_cls_filter(request)
+    has_cls = bool(cls_where)
+    _ck = f"perf_v24:{user.get('role','')}:{date_from}:{date_to}{cls_suffix}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -95,10 +161,13 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
     except ValueError:
         return JSONResponse(status_code=400, content={"detail": "Invalid date format"})
 
+    _kpi_tbl = "_cls_kpis" if has_cls else "mv_daily_kpis"
+
     # ── Main sales table: Sales/Conversion agents ─────────────────────────────
     # mv_daily_kpis replaces 3 separate transactions subqueries (FTC, NET, FTD).
     # A single OR-filtered scan of mv_daily_kpis handles both the tx_date axis
     # (NET, FTD) and the qual_date axis (FTC) in one pass.
+    # When classification filter is active, a temp table _cls_kpis is used instead.
     sql = """
         SELECT
             COALESCE(u.office_name, 'N/A')              AS office_name,
@@ -124,7 +193,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
                          THEN k.net_usd  ELSE 0 END)        AS net_usd,
                 SUM(CASE WHEN k.tx_date  >= %(date_from)s AND k.tx_date  < %(date_to_excl)s
                          THEN k.ftd_count ELSE 0 END)::int  AS ftd_count
-            FROM mv_daily_kpis k
+            FROM {_kpi_tbl} k
             WHERE (k.qual_date >= %(date_from)s AND k.qual_date < %(date_to_excl)s)
                OR (k.tx_date   >= %(date_from)s AND k.tx_date   < %(date_to_excl)s)
             GROUP BY k.agent_id
@@ -136,7 +205,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
                 SUM(CASE WHEN k.tx_date  = %(date_to)s THEN k.ftd_count ELSE 0 END)::int   AS daily_ftd,
                 SUM(CASE WHEN k.qual_date = %(date_to)s THEN k.ftc_count ELSE 0 END)::int   AS daily_ftc,
                 SUM(CASE WHEN k.tx_date  = %(date_to)s THEN k.net_usd   ELSE 0 END)::float  AS daily_net
-            FROM mv_daily_kpis k
+            FROM {_kpi_tbl} k
             WHERE k.tx_date = %(date_to)s OR k.qual_date = %(date_to)s
             GROUP BY k.agent_id
         ) dk ON dk.agent_id = u.id
@@ -145,8 +214,10 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
             SELECT f.original_deposit_owner AS agent_id,
                    COUNT(DISTINCT f.accountid) AS ftd100_cnt
             FROM ftd100_clients f
+            {ftd100_cls_join}
             WHERE f.ftd_100_date >= %(date_from)s
               AND f.ftd_100_date <  %(date_to_excl)s
+              {ftd100_cls_where}
             GROUP BY f.original_deposit_owner
         ) f100 ON f100.agent_id = u.id
         WHERE u.department_ = 'Sales'
@@ -179,25 +250,49 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
                     FROM targets
                     WHERE date = DATE_TRUNC('month', %(date_from)s::date)"""
             base_params = {"date_from": date_from, "date_to_excl": date_to_exclusive, "date_to": date_to}
-            final_sql, final_params = _apply_role_filter(sql.replace('{tgt_subq}', _tgt_subq), base_params, role_filter)
+
+            # When classification filter is active, create a temp table
+            if has_cls:
+                cur.execute(
+                    _CLS_KPIS_SQL.replace("{cls_where}", cls_where),
+                    {**base_params, **cls_params},
+                )
+
+            _ftd100_join = "JOIN accounts a ON a.accountid = f.accountid" if has_cls else ""
+            _ftd100_where = cls_where if has_cls else ""
+            _prepared_sql = (sql
+                .replace("{_kpi_tbl}", _kpi_tbl)
+                .replace("{tgt_subq}", _tgt_subq)
+                .replace("{ftd100_cls_join}", _ftd100_join)
+                .replace("{ftd100_cls_where}", _ftd100_where))
+            final_sql, final_params = _apply_role_filter(_prepared_sql, {**base_params, **cls_params}, role_filter)
             cur.execute(final_sql, final_params)
             rows = cur.fetchall()
 
+            _gp = {**base_params, **cls_params}
+
             # Grand FTC — company-wide, qual_date axis
-            cur.execute("""
+            cur.execute(f"""
                 SELECT COALESCE(SUM(ftc_count), 0)
-                FROM mv_daily_kpis
+                FROM {_kpi_tbl}
                 WHERE qual_date >= %(date_from)s AND qual_date < %(date_to_excl)s
-            """, {"date_from": date_from, "date_to_excl": date_to_exclusive})
+            """, _gp)
             grand_ftc = int(cur.fetchone()[0] or 0)
 
-            # Grand NET — company-wide, tx_date axis (from mv_run_rate 'all')
-            cur.execute("""
-                SELECT COALESCE(SUM(net_usd), 0)
-                FROM mv_run_rate
-                WHERE dept_group = 'all'
-                  AND tx_date >= %(date_from)s AND tx_date < %(date_to_excl)s
-            """, {"date_from": date_from, "date_to_excl": date_to_exclusive})
+            # Grand NET — company-wide, tx_date axis
+            if has_cls:
+                cur.execute(f"""
+                    SELECT COALESCE(SUM(net_usd), 0)
+                    FROM {_kpi_tbl}
+                    WHERE tx_date >= %(date_from)s AND tx_date < %(date_to_excl)s
+                """, _gp)
+            else:
+                cur.execute("""
+                    SELECT COALESCE(SUM(net_usd), 0)
+                    FROM mv_run_rate
+                    WHERE dept_group = 'all'
+                      AND tx_date >= %(date_from)s AND tx_date < %(date_to_excl)s
+                """, _gp)
             grand_net = float(cur.fetchone()[0] or 0)
 
             # Open Volume — from mv_volume_stats (test-filter already baked in)
@@ -249,36 +344,42 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
                 print(f"[perf] End Equity Zeroed query failed (lock?): {_eez_err}")
                 end_equity_zeroed = 0.0
 
-            # Daily NET — from mv_run_rate 'all', single day
-            cur.execute("""
-                SELECT COALESCE(SUM(net_usd), 0)
-                FROM mv_run_rate
-                WHERE dept_group = 'all' AND tx_date = %(date_to)s
-            """, {"date_to": date_to})
+            # Daily NET — single day
+            if has_cls:
+                cur.execute(f"""
+                    SELECT COALESCE(SUM(net_usd), 0)
+                    FROM {_kpi_tbl} WHERE tx_date = %(date_to)s
+                """, _gp)
+            else:
+                cur.execute("""
+                    SELECT COALESCE(SUM(net_usd), 0)
+                    FROM mv_run_rate
+                    WHERE dept_group = 'all' AND tx_date = %(date_to)s
+                """, _gp)
             daily_net = float(cur.fetchone()[0] or 0)
 
             # Grand FTD — company-wide, tx_date axis
-            cur.execute("""
+            cur.execute(f"""
                 SELECT COALESCE(SUM(ftd_count), 0)
-                FROM mv_daily_kpis
+                FROM {_kpi_tbl}
                 WHERE tx_date >= %(date_from)s AND tx_date < %(date_to_excl)s
-            """, {"date_from": date_from, "date_to_excl": date_to_exclusive})
+            """, _gp)
             grand_ftd = int(cur.fetchone()[0] or 0)
 
             # Daily FTD — single day
-            cur.execute("""
+            cur.execute(f"""
                 SELECT COALESCE(SUM(ftd_count), 0)
-                FROM mv_daily_kpis
+                FROM {_kpi_tbl}
                 WHERE tx_date = %(date_to)s
-            """, {"date_to": date_to})
+            """, _gp)
             daily_ftd = int(cur.fetchone()[0] or 0)
 
             # Daily FTC — qual_date = date_to
-            cur.execute("""
+            cur.execute(f"""
                 SELECT COALESCE(SUM(ftc_count), 0)
-                FROM mv_daily_kpis
+                FROM {_kpi_tbl}
                 WHERE qual_date = %(date_to)s
-            """, {"date_to": date_to})
+            """, _gp)
             daily_ftc = int(cur.fetchone()[0] or 0)
 
             # New Leads + Live Accounts (mv_account_stats — always today/MTD)
@@ -378,7 +479,9 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"perf_ret_v17:{user.get('role','')}:{date_from}:{date_to}"
+    cls_where, cls_params, cls_suffix = _build_cls_filter(request)
+    has_cls = bool(cls_where)
+    _ck = f"perf_ret_v18:{user.get('role','')}:{date_from}:{date_to}{cls_suffix}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -389,6 +492,8 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
         last_day = last_day_of_month(dt_from).strftime("%Y-%m-%d")
     except ValueError:
         return JSONResponse(status_code=400, content={"detail": "Invalid date format"})
+
+    _kpi_tbl = "_cls_kpis" if has_cls else "mv_daily_kpis"
 
     # ── Retention table: mv_daily_kpis replaces 2 transaction subqueries (NET,
     #    DEPOSIT).  Open volume comes from mv_volume_stats.
@@ -410,11 +515,11 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
         FROM crm_users u
         LEFT JOIN ({tgt_subq}) tgt ON tgt.agent_id = u.id
         LEFT JOIN (
-            -- NET + DEPOSIT in one mv_daily_kpis scan
+            -- NET + DEPOSIT in one scan
             SELECT k.agent_id,
                    SUM(k.net_usd)     AS net_usd,
                    SUM(k.deposit_usd) AS deposit_usd
-            FROM mv_daily_kpis k
+            FROM {_kpi_tbl} k
             WHERE k.tx_date >= %(date_from)s AND k.tx_date < %(date_to_excl)s
             GROUP BY k.agent_id
         ) mv ON mv.agent_id = u.id
@@ -426,7 +531,7 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
         ) vol ON vol.agent_id = u.id
         LEFT JOIN (
             SELECT agent_id, SUM(net_usd)::float AS daily_net_usd
-            FROM mv_daily_kpis
+            FROM {_kpi_tbl}
             WHERE tx_date = %(date_to)s
             GROUP BY agent_id
         ) dk ON dk.agent_id = u.id
@@ -490,64 +595,94 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
                 "date_to":      date_to,
                 "last_day":     last_day,
             }
-            final_sql, final_params = _apply_role_filter(sql.replace('{tgt_subq}', _tgt_subq), base_params, role_filter)
+
+            # When classification filter is active, create a temp table
+            if has_cls:
+                cur.execute(
+                    _CLS_KPIS_SQL.replace("{cls_where}", cls_where),
+                    {**base_params, **cls_params},
+                )
+
+            _prepared_sql = sql.replace("{_kpi_tbl}", _kpi_tbl).replace("{tgt_subq}", _tgt_subq)
+            final_sql, final_params = _apply_role_filter(_prepared_sql, {**base_params, **cls_params}, role_filter)
             cur.execute(final_sql, final_params)
             rows = cur.fetchall()
 
-            # Daily net retention — from mv_run_rate 'retention', single day
-            cur.execute("""
-                SELECT COALESCE(SUM(net_usd), 0)
-                FROM mv_run_rate
-                WHERE dept_group = 'retention' AND tx_date = %(date_to)s
-            """, {"date_to": date_to})
+            _gp = {**base_params, **cls_params}
+
+            # Daily net retention
+            if has_cls:
+                cur.execute(f"""
+                    SELECT COALESCE(SUM(net_usd), 0)
+                    FROM {_kpi_tbl} WHERE tx_date = %(date_to)s
+                """, _gp)
+            else:
+                cur.execute("""
+                    SELECT COALESCE(SUM(net_usd), 0)
+                    FROM mv_run_rate
+                    WHERE dept_group = 'retention' AND tx_date = %(date_to)s
+                """, _gp)
             daily_net_retention = float(cur.fetchone()[0] or 0)
 
-            # Global KPI stats (same as /api/performance — needed for retention-only users)
-            cur.execute("""
+            # Global KPI stats (needed for retention-only users)
+            cur.execute(f"""
                 SELECT COALESCE(SUM(ftc_count), 0)
-                FROM mv_daily_kpis
+                FROM {_kpi_tbl}
                 WHERE qual_date >= %(date_from)s AND qual_date < %(date_to_excl)s
-            """, {"date_from": date_from, "date_to_excl": date_to_exclusive})
+            """, _gp)
             grand_ftc = int(cur.fetchone()[0] or 0)
 
-            cur.execute("""
-                SELECT COALESCE(SUM(net_usd), 0)
-                FROM mv_run_rate
-                WHERE dept_group = 'all'
-                  AND tx_date >= %(date_from)s AND tx_date < %(date_to_excl)s
-            """, {"date_from": date_from, "date_to_excl": date_to_exclusive})
+            if has_cls:
+                cur.execute(f"""
+                    SELECT COALESCE(SUM(net_usd), 0)
+                    FROM {_kpi_tbl}
+                    WHERE tx_date >= %(date_from)s AND tx_date < %(date_to_excl)s
+                """, _gp)
+            else:
+                cur.execute("""
+                    SELECT COALESCE(SUM(net_usd), 0)
+                    FROM mv_run_rate
+                    WHERE dept_group = 'all'
+                      AND tx_date >= %(date_from)s AND tx_date < %(date_to_excl)s
+                """, _gp)
             grand_net = float(cur.fetchone()[0] or 0)
 
             cur.execute("""
                 SELECT COALESCE(SUM(notional_usd), 0)
                 FROM mv_volume_stats
                 WHERE open_date >= %(date_from)s AND open_date <= %(date_to)s
-            """, {"date_from": date_from, "date_to": date_to})
+            """, _gp)
             open_volume = float(cur.fetchone()[0] or 0)
 
-            cur.execute("""
+            cur.execute(f"""
                 SELECT COALESCE(SUM(ftd_count), 0)
-                FROM mv_daily_kpis
+                FROM {_kpi_tbl}
                 WHERE tx_date >= %(date_from)s AND tx_date < %(date_to_excl)s
-            """, {"date_from": date_from, "date_to_excl": date_to_exclusive})
+            """, _gp)
             grand_ftd = int(cur.fetchone()[0] or 0)
 
-            cur.execute("""
+            cur.execute(f"""
                 SELECT COALESCE(SUM(ftd_count), 0)
-                FROM mv_daily_kpis WHERE tx_date = %(date_to)s
-            """, {"date_to": date_to})
+                FROM {_kpi_tbl} WHERE tx_date = %(date_to)s
+            """, _gp)
             daily_ftd = int(cur.fetchone()[0] or 0)
 
-            cur.execute("""
+            cur.execute(f"""
                 SELECT COALESCE(SUM(ftc_count), 0)
-                FROM mv_daily_kpis WHERE qual_date = %(date_to)s
-            """, {"date_to": date_to})
+                FROM {_kpi_tbl} WHERE qual_date = %(date_to)s
+            """, _gp)
             daily_ftc = int(cur.fetchone()[0] or 0)
 
-            cur.execute("""
-                SELECT COALESCE(SUM(net_usd), 0)
-                FROM mv_run_rate WHERE dept_group = 'all' AND tx_date = %(date_to)s
-            """, {"date_to": date_to})
+            if has_cls:
+                cur.execute(f"""
+                    SELECT COALESCE(SUM(net_usd), 0)
+                    FROM {_kpi_tbl} WHERE tx_date = %(date_to)s
+                """, _gp)
+            else:
+                cur.execute("""
+                    SELECT COALESCE(SUM(net_usd), 0)
+                    FROM mv_run_rate WHERE dept_group = 'all' AND tx_date = %(date_to)s
+                """, _gp)
             daily_net = float(cur.fetchone()[0] or 0)
 
             # New Leads + Live Accounts
@@ -566,7 +701,7 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
             # RDP net — separate query (transactions JOIN accounts is deadlock-prone)
             rdp_map = {}
             try:
-                cur.execute("""
+                _rdp_sql = f"""
                     SELECT a.assigned_to AS agent_id,
                            SUM(CASE WHEN t.transaction_type_name IN ('Deposit', 'Withdrawal Cancelled')
                                     THEN t.usdamount ELSE 0 END)
@@ -581,8 +716,10 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
                       AND t.confirmation_time::date >= %(date_from)s
                       AND t.confirmation_time::date < %(date_to_excl)s
                       AND t.confirmation_time::date > a.client_qualification_date
+                      {cls_where}
                     GROUP BY a.assigned_to
-                """, {"date_from": date_from, "date_to_excl": date_to_exclusive})
+                """
+                cur.execute(_rdp_sql, _gp)
                 rdp_map = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
             except Exception as _rdp_err:
                 conn.rollback()

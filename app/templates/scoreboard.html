@@ -63,6 +63,14 @@
     .quick-btn:hover { background-color: #2d333a; color: #c9d1d9; border-color: #484f58; }
     .quick-btn.active-quick { background: linear-gradient(135deg,#1a4731,#238636); color: #3fb950; border-color: #238636; }
 
+    .tbl-quick-btn {
+      background-color: #21262d; border: 1px solid #30363d; color: #8b949e;
+      font-size: 0.72rem; padding: 3px 10px; border-radius: 6px; cursor: pointer;
+      font-weight: 600; letter-spacing: 0.3px; transition: all 0.15s;
+    }
+    .tbl-quick-btn:hover { background-color: #2d333a; color: #c9d1d9; border-color: #484f58; }
+    .tbl-quick-btn.active-quick { background: linear-gradient(135deg,#1a4731,#238636); color: #3fb950; border-color: #238636; }
+
     /* Custom searchable select */
     .cs-wrap { position: relative; display: inline-block; }
     .cs-trigger {
@@ -261,6 +269,7 @@
       .retention-agent-row td:first-child { padding-left:26px !important; }
       h4.fw-bold { display:none; }
       .tbl-action-btn { padding:5px 7px !important; font-size:0.75rem !important; }
+      .tbl-export-btn { display:none !important; }
     }
     @media (min-width: 768px) and (max-width: 1366px) {
       body { display:block; }
@@ -398,6 +407,21 @@
         <div class="cs-dropdown" id="cs-status-drop">
           <input type="text" class="cs-search" id="cs-status-search" placeholder="Search…" autocomplete="off" />
           <div class="cs-optlist" id="cs-status-opts"></div>
+        </div>
+      </div>
+      <div class="filter-sep"></div>
+      <div class="cs-wrap">
+        <div class="cs-trigger" id="cs-scpcat-trigger">All Categories</div>
+        <div class="cs-dropdown" id="cs-scpcat-drop">
+          <input type="text" class="cs-search" id="cs-scpcat-search" placeholder="Search…" autocomplete="off" />
+          <div class="cs-optlist" id="cs-scpcat-opts"></div>
+        </div>
+      </div>
+      <div class="cs-wrap">
+        <div class="cs-trigger" id="cs-scp-trigger">All Potential</div>
+        <div class="cs-dropdown" id="cs-scp-drop">
+          <input type="text" class="cs-search" id="cs-scp-search" placeholder="Search…" autocomplete="off" />
+          <div class="cs-optlist" id="cs-scp-opts"></div>
         </div>
       </div>
     </div>
@@ -582,12 +606,16 @@
   <div>
       <div class="card p-0" style="overflow:hidden;">
         <div class="d-flex justify-content-between align-items-center px-4 py-3" style="border-bottom:1px solid #30363d;">
-          <div class="section-title">Sales</div>
+          <div class="d-flex align-items-center gap-2">
+            <div class="section-title">Sales</div>
+            <button class="tbl-quick-btn tbl-today-btn" onclick="setTableQuickDate('today')">Today</button>
+            <button class="tbl-quick-btn tbl-monthly-btn" onclick="setTableQuickDate('monthly')">Monthly</button>
+          </div>
           <div class="d-flex align-items-center gap-2 flex-wrap">
             <span class="small" style="color:#e0e0e0;" id="row-count"></span>
             <button onclick="expandAllSales()" title="Expand All" class="btn btn-sm tbl-action-btn" style="background:#21262d;border:1px solid #30363d;color:#8b949e;border-radius:6px;font-size:0.8rem;padding:4px 10px;"><i class="bi bi-arrows-expand"></i><span class="d-none d-md-inline ms-1">Expand All</span></button>
             <button onclick="collapseAllSales()" title="Collapse All" class="btn btn-sm tbl-action-btn" style="background:#21262d;border:1px solid #30363d;color:#8b949e;border-radius:6px;font-size:0.8rem;padding:4px 10px;"><i class="bi bi-arrows-collapse"></i><span class="d-none d-md-inline ms-1">Collapse All</span></button>
-            <button onclick="exportSalesExcel()" title="Export Excel" class="btn btn-sm tbl-action-btn" style="background:#1a4731;border:1px solid #238636;color:#3fb950;border-radius:6px;font-size:0.8rem;padding:4px 12px;">
+            <button onclick="exportSalesExcel()" title="Export Excel" class="btn btn-sm tbl-action-btn tbl-export-btn" style="background:#1a4731;border:1px solid #238636;color:#3fb950;border-radius:6px;font-size:0.8rem;padding:4px 12px;">
               <i class="bi bi-file-earmark-excel"></i><span class="d-none d-md-inline ms-1">Export Excel</span>
             </button>
           </div>
@@ -635,12 +663,16 @@
   <div class="mt-3">
       <div class="card p-0" style="overflow:hidden;">
         <div class="d-flex justify-content-between align-items-center px-4 py-3" style="border-bottom:1px solid #30363d;">
-          <div class="section-title" style="border-left-color:#388bfd;">Retention</div>
+          <div class="d-flex align-items-center gap-2">
+            <div class="section-title" style="border-left-color:#388bfd;">Retention</div>
+            <button class="tbl-quick-btn tbl-today-btn" onclick="setTableQuickDate('today')">Today</button>
+            <button class="tbl-quick-btn tbl-monthly-btn" onclick="setTableQuickDate('monthly')">Monthly</button>
+          </div>
           <div class="d-flex align-items-center gap-2 flex-wrap">
             <span class="small" style="color:#e0e0e0;" id="ret-row-count"></span>
             <button onclick="expandAllRetention()" title="Expand All" class="btn btn-sm tbl-action-btn" style="background:#21262d;border:1px solid #30363d;color:#8b949e;border-radius:6px;font-size:0.8rem;padding:4px 10px;"><i class="bi bi-arrows-expand"></i><span class="d-none d-md-inline ms-1">Expand All</span></button>
             <button onclick="collapseAllRetention()" title="Collapse All" class="btn btn-sm tbl-action-btn" style="background:#21262d;border:1px solid #30363d;color:#8b949e;border-radius:6px;font-size:0.8rem;padding:4px 10px;"><i class="bi bi-arrows-collapse"></i><span class="d-none d-md-inline ms-1">Collapse All</span></button>
-            <button onclick="exportRetentionExcel()" title="Export Excel" class="btn btn-sm tbl-action-btn" style="background:#0d2137;border:1px solid #1f6feb;color:#388bfd;border-radius:6px;font-size:0.8rem;padding:4px 12px;">
+            <button onclick="exportRetentionExcel()" title="Export Excel" class="btn btn-sm tbl-action-btn tbl-export-btn" style="background:#0d2137;border:1px solid #1f6feb;color:#388bfd;border-radius:6px;font-size:0.8rem;padding:4px 12px;">
               <i class="bi bi-file-earmark-excel"></i><span class="d-none d-md-inline ms-1">Export Excel</span>
             </button>
           </div>
@@ -839,6 +871,23 @@
   const csTeam   = makeCustomSelect('cs-team-trigger',  'cs-team-drop',  'cs-team-search',  'cs-team-opts',  'All Teams',   onFilterChange);
   const csAgent  = makeCustomSelect('cs-agent-trigger', 'cs-agent-drop', 'cs-agent-search', 'cs-agent-opts', 'All Agents',  onFilterChange);
   const csStatus = makeCustomSelect('cs-status-trigger','cs-status-drop','cs-status-search','cs-status-opts','All Status',  onFilterChange);
+  // Classification filters — these trigger a server reload (not client-side)
+  const csScpCat = makeCustomSelect('cs-scpcat-trigger','cs-scpcat-drop','cs-scpcat-search','cs-scpcat-opts','All Categories', () => loadAll());
+  const csScp    = makeCustomSelect('cs-scp-trigger',   'cs-scp-drop',   'cs-scp-search',   'cs-scp-opts',   'All Potential',  () => loadAll());
+  csScpCat.populate(['High Quality', 'Low Quality', 'No Segmentation']);
+  csScp.populate(['1','2','3','4','5','6','7','8','9','10']);
+
+  function getClsParams() {
+    let p = '';
+    const catVal = csScpCat.getValue();
+    if (catVal) {
+      const mapped = [...catVal].map(v => v === 'High Quality' ? 'high' : v === 'Low Quality' ? 'low' : 'none');
+      p += '&scp_cat=' + mapped.join(',');
+    }
+    const scpVal = csScp.getValue();
+    if (scpVal) p += '&scp=' + [...scpVal].join(',');
+    return p;
+  }
 
   function populateFilterDropdowns() {
     const offices = new Set(), teams = new Set(), agents = new Set();
@@ -874,6 +923,31 @@
   function dateToForMonth(year, month) {
     const isCurrentMonth = year === now.getFullYear() && month === now.getMonth() + 1;
     return isCurrentMonth ? todayStr() : lastOfMonth(year, month);
+  }
+
+  // ── Table-level Today / Monthly ───────────────────────────────────────
+  function setTableQuickDate(mode) {
+    if (mode === 'today') {
+      const t = todayStr();
+      document.getElementById('date-from').value = t;
+      document.getElementById('date-to').value   = t;
+      setQuickActive('btn-today');
+    } else {
+      document.getElementById('date-from').value = firstOfMonth(now.getFullYear(), now.getMonth() + 1);
+      document.getElementById('date-to').value   = todayStr();
+      setQuickActive(null);
+    }
+    const d = new Date(document.getElementById('date-from').value + 'T00:00:00');
+    state.year = d.getFullYear();
+    state.month = d.getMonth() + 1;
+    activateYear(state.year);
+    activateMonth(state.month);
+    document.querySelectorAll('.tbl-today-btn').forEach(b => b.classList.toggle('active-quick', mode === 'today'));
+    document.querySelectorAll('.tbl-monthly-btn').forEach(b => b.classList.toggle('active-quick', mode === 'monthly'));
+    loadAll();
+  }
+  function clearTableQuickBtns() {
+    document.querySelectorAll('.tbl-today-btn, .tbl-monthly-btn').forEach(b => b.classList.remove('active-quick'));
   }
 
   // ── Button highlight helpers ───────────────────────────────────────────
@@ -999,7 +1073,7 @@
     }
 
     try {
-      const res = await fetch(`/api/performance?date_from=${df}&date_to=${dt}`);
+      const res = await fetch(`/api/performance?date_from=${df}&date_to=${dt}${getClsParams()}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Server error');
 
@@ -1379,6 +1453,7 @@
       state.year = parseInt(btn.dataset.year);
       activateYear(state.year);
       setQuickActive(null);
+      clearTableQuickBtns();
       document.getElementById('date-from').value = firstOfMonth(state.year, state.month);
       document.getElementById('date-to').value   = dateToForMonth(state.year, state.month);
       loadAll();
@@ -1391,6 +1466,7 @@
       state.month = parseInt(btn.dataset.month);
       activateMonth(state.month);
       setQuickActive(null);
+      clearTableQuickBtns();
       document.getElementById('date-from').value = firstOfMonth(state.year, state.month);
       document.getElementById('date-to').value   = dateToForMonth(state.year, state.month);
       loadAll();
@@ -1403,6 +1479,8 @@
     document.getElementById('date-from').value = t;
     document.getElementById('date-to').value   = t;
     setQuickActive('btn-today');
+    clearTableQuickBtns();
+    document.querySelectorAll('.tbl-today-btn').forEach(b => b.classList.add('active-quick'));
     loadAll();
   });
   document.getElementById('btn-ystrd').addEventListener('click', () => {
@@ -1410,12 +1488,14 @@
     document.getElementById('date-from').value = y;
     document.getElementById('date-to').value   = y;
     setQuickActive('btn-ystrd');
+    clearTableQuickBtns();
     loadAll();
   });
 
   // ── Event: Apply button ────────────────────────────────────────────────
   document.getElementById('btn-apply').addEventListener('click', () => {
     setQuickActive(null);
+    clearTableQuickBtns();
     loadAll();
   });
 
@@ -1539,7 +1619,7 @@
     }
 
     try {
-      const res = await fetch(`/api/performance/retention?date_from=${df}&date_to=${dt}`);
+      const res = await fetch(`/api/performance/retention?date_from=${df}&date_to=${dt}${getClsParams()}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Server error');
 
@@ -2108,6 +2188,7 @@
   activateMonth(state.month);
   updateSortIcons();
   updateRetSortIcons();
+  document.querySelectorAll('.tbl-monthly-btn').forEach(b => b.classList.add('active-quick'));
   loadAll();
 
   // ── Filter bar toggle ──────────────────────────────────────────────────
