@@ -263,6 +263,7 @@ def _historical_calc(d) -> dict:
             FROM dealio_daily_profits
             WHERE login = ta.login::bigint
               AND date < %(d)s::date + INTERVAL '1 day'
+              AND ABS(COALESCE(convertedfloatingpnl, 0)) < 100000000
             ORDER BY date DESC
             LIMIT 1
         ) d
@@ -316,27 +317,26 @@ def _live_calc(d) -> dict:
             if not valid_logins:
                 return {"total": 0, "start_equity_zeroed": 0, "net_deposits_today": 0, "pnl_cash": 0, "is_live": True, "date": str(d)}
 
-            # Start EEZ per login (yesterday)
+            # Start EEZ per login (yesterday), with sanity cap from ta.equity
             cur.execute("""
-                SELECT login, end_equity_zeroed
-                FROM daily_equity_zeroed
-                WHERE day = %(d)s::date - INTERVAL '1 day'
-                  AND login = ANY(%(logins)s)
+                SELECT dez.login, dez.end_equity_zeroed, ta.equity
+                FROM daily_equity_zeroed dez
+                JOIN trading_accounts ta ON ta.login::bigint = dez.login
+                WHERE dez.day = %(d)s::date - INTERVAL '1 day'
+                  AND dez.login = ANY(%(logins)s)
+                  AND (ta.deleted = 0 OR ta.deleted IS NULL)
             """, {"d": str(d), "logins": valid_logins})
-            start_eez_map = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
-
-            # Aggregate start EEZ total (for display)
-            cur.execute("""
-                SELECT COALESCE(SUM(end_equity_zeroed), 0)
-                FROM daily_equity_zeroed
-                WHERE day = %(d)s::date - INTERVAL '1 day'
-                  AND login IN (
-                      SELECT login::bigint FROM trading_accounts
-                      WHERE vtigeraccountid IS NOT NULL
-                        AND (deleted = 0 OR deleted IS NULL)
-                  )
-            """, {"d": str(d)})
-            start_eez_total = float(cur.fetchone()[0] or 0)
+            start_eez_map = {}
+            start_eez_total = 0.0
+            for r in cur.fetchall():
+                login_id = int(r[0])
+                eez_val  = float(r[1] or 0)
+                ta_eq    = float(r[2] or 0)
+                # Sanity: cap at 10x ta.equity (catches corrupt snapshots)
+                if ta_eq > 0 and eez_val > ta_eq * 10:
+                    eez_val = ta_eq
+                start_eez_map[login_id] = eez_val
+                start_eez_total += eez_val
 
             # Net deposits today — read from MV (pre-filtered, indexed on tx_date)
             cur.execute("""
@@ -346,16 +346,18 @@ def _live_calc(d) -> dict:
             """, {"d": str(d)})
             net_deposits_today = float(cur.fetchone()[0] or 0)
 
-            # Logins with equity > 0 from live trading_accounts
+            # Logins with equity > 0 from live trading_accounts (+ equity for sanity cap)
             cur.execute("""
-                SELECT ta.login::bigint
+                SELECT ta.login::bigint, ta.equity
                 FROM trading_accounts ta
                 JOIN accounts a ON a.accountid = ta.vtigeraccountid
                 WHERE ta.equity > 0
                   AND (ta.deleted = 0 OR ta.deleted IS NULL)
                   AND a.is_test_account = 0
             """)
-            equity_logins = [int(r[0]) for r in cur.fetchall()]
+            _eq_rows = cur.fetchall()
+            equity_logins = [int(r[0]) for r in _eq_rows]
+            ta_equity_map = {int(r[0]): float(r[1] or 0) for r in _eq_rows}
 
             # Cumulative bonus per login up to today (for equity_logins only)
             cur.execute("""
@@ -368,7 +370,8 @@ def _live_calc(d) -> dict:
             bonus_map = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
 
             # Daily start net equity: MAX(0, convertedbalance + convertedfloatingpnl)
-            # from dealio_daily_profits for yesterday, same equity_logins set
+            # from dealio_daily_profits for yesterday, same equity_logins set.
+            # Sanity cap: skip rows where ABS(convertedfloatingpnl) > 100M (corrupt data).
             cur.execute("""
                 SELECT COALESCE(SUM(CASE
                     WHEN COALESCE(d.convertedbalance,0) + COALESCE(d.convertedfloatingpnl,0) <= 0 THEN 0
@@ -380,6 +383,7 @@ def _live_calc(d) -> dict:
                     WHERE login = ANY(%(logins)s)
                       AND date >= (%(d)s::date - INTERVAL '1 day')
                       AND date <  %(d)s::date
+                      AND ABS(COALESCE(convertedfloatingpnl, 0)) < 100000000
                     ORDER BY login, date DESC
                 ) d
             """, {"d": str(d), "logins": equity_logins})
@@ -503,14 +507,22 @@ def _live_calc(d) -> dict:
     # EEZ: MAX(0, compbalance + live_floating - bonus)
     # compbalance = pure balance (no credit) — matches snapshot formula exactly.
     # Daily end net equity: same without bonus deduction.
+    # Sanity cap: if computed EEZ > 10x ta.equity, use ta.equity instead
+    # (catches corrupt dealio floating PnL, e.g. $5B on a $300 account).
     grand_total = 0.0
     daily_end_net_equity = 0.0
     for login, balance in bal_map.items():
         flt    = floating_map.get(login, 0.0)
         net_eq = balance + flt
         bonus  = max(0.0, bonus_map.get(login, 0.0))
-        grand_total          += max(0.0, net_eq - bonus)
-        daily_end_net_equity += max(0.0, net_eq)
+        eez    = max(0.0, net_eq - bonus)
+        neq    = max(0.0, net_eq)
+        ta_eq  = ta_equity_map.get(login, 0.0)
+        if ta_eq > 0 and eez > ta_eq * 10:
+            eez = ta_eq
+            neq = ta_eq
+        grand_total          += eez
+        daily_end_net_equity += neq
 
     # Query eod_floating_yesterday only for currently-open logins
     eod_floating_yesterday = 0.0
@@ -526,6 +538,7 @@ def _live_calc(d) -> dict:
                         WHERE login = ANY(%(logins)s)
                           AND date >= (%(d)s::date - INTERVAL '1 day')
                           AND date <  %(d)s::date
+                          AND ABS(COALESCE(convertedfloatingpnl, 0)) < 100000000
                         ORDER BY login, date DESC
                     ) d
                 """, {"d": str(d), "logins": open_logins})

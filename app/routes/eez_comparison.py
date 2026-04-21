@@ -52,6 +52,7 @@ async def eez_comparison_api(request: Request):
                 login, convertedbalance, convertedfloatingpnl
             FROM dealio_daily_profits
             WHERE date::date <= (SELECT day FROM month_start)
+              AND ABS(COALESCE(convertedfloatingpnl, 0)) < 100000000
             ORDER BY login, date DESC
         ),
         start_bonus AS (

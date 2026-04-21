@@ -217,6 +217,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
                         FROM dealio_daily_profits
                         WHERE date >= date_trunc('month', %(date_to)s::date)
                           AND date <  date_trunc('month', %(date_to)s::date) + INTERVAL '1 month'
+                          AND ABS(COALESCE(convertedfloatingpnl, 0)) < 100000000
                         ORDER BY login, date DESC
                     ),
                     old_bonus_balance AS (
