@@ -315,7 +315,7 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"bon_sales_v19:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"bon_sales_v20:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -421,6 +421,7 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
                     WHERE t.transactionapproval = 'Approved'
                       AND (t.deleted = 0 OR t.deleted IS NULL)
                       AND t.transaction_type_name IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
+                      AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
                       AND a.client_qualification_date IS NOT NULL
                       AND a.client_qualification_date >= %(date_from)s
                       AND a.client_qualification_date <  %(date_to_excl)s
@@ -507,7 +508,7 @@ async def agent_bonuses_sales_accounts_api(request: Request, date_from: str, dat
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
     role_filter = get_role_filter(user)
-    _ck = f"bon_sales_acct_v14:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"bon_sales_acct_v15:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -574,6 +575,7 @@ async def agent_bonuses_sales_accounts_api(request: Request, date_from: str, dat
             WHERE t.transactionapproval = 'Approved'
               AND (t.deleted = 0 OR t.deleted IS NULL)
               AND t.transaction_type_name IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
+              AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
               AND a.client_qualification_date IS NOT NULL
               AND a.client_qualification_date >= %(date_from)s
               AND a.client_qualification_date <  %(date_to_excl)s
