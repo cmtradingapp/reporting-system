@@ -362,10 +362,6 @@ async def dmp_retention_api(request: Request, date_from: str, date_to: str):
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'
-          AND TRIM(COALESCE(u.department, '')) NOT ILIKE '%%Retention%%'
-          AND TRIM(COALESCE(u.department, '')) NOT ILIKE '%%Conversion%%'
-          AND TRIM(COALESCE(u.department, '')) NOT ILIKE '%%Support%%'
-          AND TRIM(COALESCE(u.department, '')) NOT ILIKE '%%General%%'
           {role_filter}
         ORDER BY u.office_name NULLS LAST, dept_name, u.agent_name
     """
@@ -459,6 +455,80 @@ async def dmp_retention_api(request: Request, date_from: str, date_to: str):
             for r in rows
         ]
 
+        # ── Global summary counts (matching Total Traders logic) ──────
+        _global_base = """
+            AND rt.accountid IS NOT NULL AND rt.accountid::text != ''
+            AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
+            AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
+            AND u.department_ = 'Retention'
+        """
+        with conn.cursor() as cur2:
+            # Monthly traders (global distinct)
+            cur2.execute(f"""
+                SELECT COUNT(DISTINCT rt.accountid)
+                FROM mv_retention_traders rt
+                JOIN accounts a ON a.accountid = rt.accountid
+                LEFT JOIN crm_users u ON u.id = rt.assigned_to
+                WHERE rt.day >= %(date_from)s::date AND rt.day < %(date_to_excl)s::date
+                  AND a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)
+                  {_global_base}
+            """, _gp)
+            _monthly_traders_global = int(cur2.fetchone()[0] or 0)
+
+            # Daily traders (global distinct)
+            cur2.execute(f"""
+                SELECT COUNT(DISTINCT rt.accountid)
+                FROM mv_retention_traders rt
+                JOIN accounts a ON a.accountid = rt.accountid
+                LEFT JOIN crm_users u ON u.id = rt.assigned_to
+                WHERE rt.day = %(date_to)s::date
+                  AND a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)
+                  {_global_base}
+            """, _gp)
+            _daily_traders_global = int(cur2.fetchone()[0] or 0)
+
+            # Monthly depositors (global distinct)
+            cur2.execute(f"""
+                SELECT COUNT(DISTINCT a.accountid)
+                FROM transactions t
+                JOIN accounts a ON a.accountid = t.vtigeraccountid
+                LEFT JOIN crm_users u ON u.id = t.original_deposit_owner
+                WHERE t.transactionapproval = 'Approved'
+                  AND (t.deleted = 0 OR t.deleted IS NULL)
+                  AND t.transaction_type_name = 'Deposit'
+                  AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
+                  AND t.vtigeraccountid IS NOT NULL
+                  AND a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)
+                  AND a.accountid IS NOT NULL AND a.accountid::text != ''
+                  AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
+                  AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
+                  AND u.department_ = 'Retention'
+                  AND t.confirmation_time >= %(date_from)s::timestamp
+                  AND t.confirmation_time < %(date_to_excl)s::timestamp
+            """, _gp)
+            _monthly_loads_global = int(cur2.fetchone()[0] or 0)
+
+            # Daily depositors (global distinct)
+            cur2.execute(f"""
+                SELECT COUNT(DISTINCT a.accountid)
+                FROM transactions t
+                JOIN accounts a ON a.accountid = t.vtigeraccountid
+                LEFT JOIN crm_users u ON u.id = t.original_deposit_owner
+                WHERE t.transactionapproval = 'Approved'
+                  AND (t.deleted = 0 OR t.deleted IS NULL)
+                  AND t.transaction_type_name = 'Deposit'
+                  AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
+                  AND t.vtigeraccountid IS NOT NULL
+                  AND a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)
+                  AND a.accountid IS NOT NULL AND a.accountid::text != ''
+                  AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
+                  AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
+                  AND u.department_ = 'Retention'
+                  AND t.confirmation_time >= %(date_to)s::timestamp
+                  AND t.confirmation_time < (%(date_to)s::date + 1)::timestamp
+            """, _gp)
+            _daily_loads_global = int(cur2.fetchone()[0] or 0)
+
         today               = datetime.now(_TZ).date()
         month_end           = last_day_of_month(dt_from)
         working_days        = count_working_days(dt_from, month_end, holidays)
@@ -477,6 +547,10 @@ async def dmp_retention_api(request: Request, date_from: str, date_to: str):
             "working_days_left":       working_days_left,
             "target_ratio":            target_ratio,
             "wd_in_range":             wd_in_range,
+            "global_monthly_traders":  _monthly_traders_global,
+            "global_daily_traders":    _daily_traders_global,
+            "global_monthly_loads":    _monthly_loads_global,
+            "global_daily_loads":      _daily_loads_global,
         }
         cache.set(_ck, _result)
         return JSONResponse(content=_result)

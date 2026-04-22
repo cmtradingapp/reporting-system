@@ -676,11 +676,13 @@
     const dFtcEl = document.getElementById('stat-daily-ftc'); if (dFtcEl) dFtcEl.textContent = dFtc.toLocaleString();
     const dNetEl = document.getElementById('stat-daily-net'); if (dNetEl) dNetEl.textContent = netFmt(dNet);
     const dNetRetEl = document.getElementById('stat-daily-net-ret'); if (dNetRetEl) dNetRetEl.textContent = netFmt(dNetRet);
-    // Traders / Loads / STD cards
-    const dTraders = fRet.reduce((s,r) => s + (r.daily_traders ?? 0), 0);
-    const mTraders = fRet.reduce((s,r) => s + (r.traders_count ?? 0), 0);
-    const dLoads   = fRet.reduce((s,r) => s + (r.daily_loads ?? 0), 0);
-    const mLoads   = fRet.reduce((s,r) => s + (r.monthly_loads ?? 0), 0);
+    // Traders / Loads / STD cards — use global distinct counts (match Total Traders)
+    // when no client-side filters are active; fall back to per-agent sums when filtered
+    const noRetFilter = !fOffice && !fTeam && !fAgent && !fStatus;
+    const dTraders = noRetFilter ? retGlobal.dailyTraders  : fRet.reduce((s,r) => s + (r.daily_traders ?? 0), 0);
+    const mTraders = noRetFilter ? retGlobal.monthlyTraders : fRet.reduce((s,r) => s + (r.traders_count ?? 0), 0);
+    const dLoads   = noRetFilter ? retGlobal.dailyLoads    : fRet.reduce((s,r) => s + (r.daily_loads ?? 0), 0);
+    const mLoads   = noRetFilter ? retGlobal.monthlyLoads  : fRet.reduce((s,r) => s + (r.monthly_loads ?? 0), 0);
     const dStd     = fRet.reduce((s,r) => s + (r.daily_std ?? 0), 0);
     const mStd     = fRet.reduce((s,r) => s + (r.std_count ?? 0), 0);
     const dtEl = document.getElementById('stat-daily-traders'); if (dtEl) dtEl.textContent = dTraders.toLocaleString();
@@ -1006,6 +1008,7 @@
   let retSortState = { col: 'ret-netUsd', dir: 'desc' };
   let retWd = 0, retWdPassed = 0, retWdLeft = 0;
   let retTgtRatio = 1, retWdRange = 0;
+  let retGlobal = { dailyTraders:0, monthlyTraders:0, dailyLoads:0, monthlyLoads:0 };
 
   async function loadRetentionData(silent=false) {
     const df = document.getElementById('date-from').value;
@@ -1027,6 +1030,12 @@
       const wdR = data.wd_in_range ?? wd;
       retWd = wd; retWdPassed = wd_passed; retWdLeft = wd_left;
       retTgtRatio = tgtR; retWdRange = wdR;
+      retGlobal = {
+        dailyTraders:  data.global_daily_traders ?? 0,
+        monthlyTraders: data.global_monthly_traders ?? 0,
+        dailyLoads:    data.global_daily_loads ?? 0,
+        monthlyLoads:  data.global_monthly_loads ?? 0,
+      };
 
       retAllRows = data.rows.map(r => {
         const pTgt = r.target_net * tgtR;
