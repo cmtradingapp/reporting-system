@@ -311,29 +311,37 @@ async def dmp_retention_api(request: Request, date_from: str, date_to: str):
             GROUP BY assigned_to
         ) std ON std.agent_id = u.id
         LEFT JOIN (
-            SELECT assigned_to AS agent_id,
-                   COUNT(DISTINCT accountid) AS traders_count,
-                   COUNT(DISTINCT CASE WHEN day = %(date_to)s::date THEN accountid END)::int AS daily_traders
-            FROM mv_retention_traders
-            WHERE day >= %(date_from)s::date
-              AND day < %(date_to_excl)s::date
-            GROUP BY assigned_to
+            SELECT rt.assigned_to AS agent_id,
+                   COUNT(DISTINCT rt.accountid) AS traders_count,
+                   COUNT(DISTINCT CASE WHEN rt.day = %(date_to)s::date THEN rt.accountid END)::int AS daily_traders
+            FROM mv_retention_traders rt
+            JOIN accounts a ON a.accountid = rt.accountid
+            WHERE rt.day >= %(date_from)s::date
+              AND rt.day < %(date_to_excl)s::date
+              AND a.is_test_account = 0
+              AND (a.is_demo = 0 OR a.is_demo IS NULL)
+              AND a.accountid IS NOT NULL AND a.accountid::text != ''
+            GROUP BY rt.assigned_to
         ) trd ON trd.agent_id = u.id
         LEFT JOIN (
-            SELECT a.assigned_to AS agent_id,
-                   COUNT(DISTINCT t.vtigeraccountid)::int AS monthly_loads,
+            SELECT t.original_deposit_owner AS agent_id,
+                   COUNT(DISTINCT a.accountid)::int AS monthly_loads,
                    COUNT(DISTINCT CASE WHEN t.confirmation_time >= %(date_to)s::timestamp
                                         AND t.confirmation_time < (%(date_to)s::date + 1)::timestamp
-                                  THEN t.vtigeraccountid END)::int AS daily_loads
+                                  THEN a.accountid END)::int AS daily_loads
             FROM transactions t
             JOIN accounts a ON a.accountid = t.vtigeraccountid
             WHERE t.transaction_type_name = 'Deposit'
               AND t.transactionapproval = 'Approved'
               AND (t.deleted = 0 OR t.deleted IS NULL)
+              AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
               AND a.is_test_account = 0
+              AND (a.is_demo = 0 OR a.is_demo IS NULL)
+              AND a.accountid IS NOT NULL AND a.accountid::text != ''
+              AND t.vtigeraccountid IS NOT NULL
               AND t.confirmation_time >= %(date_from)s::timestamp
               AND t.confirmation_time < %(date_to_excl)s::timestamp
-            GROUP BY a.assigned_to
+            GROUP BY t.original_deposit_owner
         ) loads ON loads.agent_id = u.id
         LEFT JOIN (
             SELECT assigned_to AS agent_id, COUNT(DISTINCT accountid)::int AS daily_std
