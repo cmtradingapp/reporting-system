@@ -47,6 +47,10 @@
     .cs-cb.cs-cb-on { background: #238636; border-color: #238636; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 6l3 3 5-5' stroke='white' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: center; }
     .cs-sep { height: 1px; background: #30363d; margin: 3px 0; }
 
+    .kpi-card { background-color: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 10px 14px; height: 100%; display: flex; flex-direction: column; justify-content: center; }
+    .kpi-value { font-size: 1.35rem; font-weight: 700; line-height: 1.2; }
+    .kpi-label { font-size: 0.65rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.8px; margin-top: 2px; font-weight: 600; }
+
     .filter-sep { width: 1px; height: 28px; background-color: #30363d; margin: 0 6px; }
 
     .scoreboard-table { width: 100%; border-collapse: collapse; }
@@ -118,6 +122,8 @@
       .tbl-action-btn { padding:5px 7px !important; font-size:0.75rem !important; }
       .tbl-export-btn { display:none !important; }
       .section-title { font-size:0.82rem; }
+      .kpi-card { padding:8px 6px; }
+      .kpi-value { font-size:1rem; }
       .cs-trigger { min-width:100px; font-size:0.72rem; padding:3px 20px 3px 6px; }
       .filter-sep { display:none; }
       #row-count, #ret-row-count { display:none; }
@@ -257,6 +263,21 @@
           <div class="cs-optlist" id="cs-status-opts"></div>
         </div>
       </div>
+      <div class="filter-sep"></div>
+      <div class="cs-wrap">
+        <div class="cs-trigger" id="cs-scpcat-trigger">All Categories</div>
+        <div class="cs-dropdown" id="cs-scpcat-drop">
+          <input type="text" class="cs-search" id="cs-scpcat-search" placeholder="Search…" autocomplete="off" />
+          <div class="cs-optlist" id="cs-scpcat-opts"></div>
+        </div>
+      </div>
+      <div class="cs-wrap">
+        <div class="cs-trigger" id="cs-scp-trigger">All Potential</div>
+        <div class="cs-dropdown" id="cs-scp-drop">
+          <input type="text" class="cs-search" id="cs-scp-search" placeholder="Search…" autocomplete="off" />
+          <div class="cs-optlist" id="cs-scp-opts"></div>
+        </div>
+      </div>
     </div>
 
     <div class="d-flex flex-wrap align-items-center gap-2">
@@ -274,6 +295,109 @@
     </div>
 
     </div>
+  </div>
+
+  <!-- KPI Cards -->
+  <div class="row g-2 mb-4">
+    {% if show_sales %}
+    <div class="col-6 col-md-2" id="kpi-daily-ftd">
+      <div class="kpi-card text-center">
+        <div style="display:flex;justify-content:center;align-items:center;gap:14px;">
+          <div>
+            <div class="kpi-value" style="color:#388bfd;" id="stat-daily-ftd">—</div>
+            <div class="kpi-label">Daily FTD</div>
+          </div>
+          <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
+          <div>
+            <div class="kpi-value" style="color:#388bfd;" id="stat-daily-ftc">—</div>
+            <div class="kpi-label">Daily FTC</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+    {% if show_sales %}
+    <div class="col-6 col-md-2" id="kpi-ftd-ftc">
+      <div class="kpi-card text-center">
+        <div style="display:flex;justify-content:center;align-items:center;gap:10px;">
+          <div>
+            <div class="kpi-value" style="color:#388bfd;" id="stat-total-ftd">—</div>
+            <div class="kpi-label">FTD</div>
+          </div>
+          <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
+          <div>
+            <div class="kpi-value" style="color:#388bfd;" id="stat-grand-ftc">—</div>
+            <div class="kpi-label">FTC</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-2" id="kpi-ftd-rr">
+      <div class="kpi-card text-center">
+        <div class="kpi-split" style="display:flex;justify-content:center;align-items:center;gap:14px;">
+          <div>
+            <div class="kpi-value" style="color:#d29922;" id="stat-grand-ftd-rr">—</div>
+            <div class="kpi-label">FTD RR</div>
+          </div>
+          <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
+          <div>
+            <div class="kpi-value" style="color:#d29922;" id="stat-grand-ftc-rr">—</div>
+            <div class="kpi-label">FTC RR</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+    {% set _hide_net_cards = current_user.email in ['oluwaseun.a@cmtrading.com', 'elissa.b@cmtrading.com', 'precious.ib@cmtrading.com'] %}
+    {% if not _hide_net_cards %}
+    <div class="col-6 col-md-2" id="kpi-daily-net">
+      <div class="kpi-card text-center">
+        <div class="kpi-split" style="display:flex;justify-content:center;align-items:center;gap:14px;">
+          {% if show_sales %}
+          <div>
+            <div class="kpi-value" style="color:#3fb950;" id="stat-daily-net">—</div>
+            <div class="kpi-label">Daily Net</div>
+          </div>
+          {% endif %}
+          {% if show_sales and show_retention %}
+          <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
+          {% endif %}
+          {% if show_retention %}
+          <div>
+            <div class="kpi-value" style="color:#388bfd;" id="stat-daily-net-ret">—</div>
+            <div class="kpi-label">Daily Ret Net</div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-2" id="kpi-net">
+      <div class="kpi-card text-center">
+        <div class="kpi-value" style="color:#3fb950;" id="stat-grand-net">—</div>
+        <div class="kpi-label">NET $</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-2" id="kpi-rdp-net">
+      <div class="kpi-card text-center">
+        <div class="kpi-value" id="stat-rdp-net">—</div>
+        <div class="kpi-label">RDP Net $</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-2" id="kpi-net-rr">
+      <div class="kpi-card text-center">
+        <div class="kpi-value" style="color:#d29922;" id="stat-grand-net-rr">—</div>
+        <div class="kpi-label">NET RR</div>
+      </div>
+    </div>
+    {% endif %}
+    {% if not current_user.role.startswith('sales') %}
+    <div class="col-6 col-md-2" id="kpi-vol">
+      <div class="kpi-card text-center">
+        <div class="kpi-value" style="color:#c9d1d9;" id="stat-open-volume">—</div>
+        <div class="kpi-label">Open Volume</div>
+      </div>
+    </div>
+    {% endif %}
   </div>
 
   {% if show_sales %}
@@ -392,6 +516,15 @@
 <script>
   const SHOW_SALES      = {{ 'true' if show_sales else 'false' }};
   const SHOW_RETENTION  = {{ 'true' if show_retention else 'false' }};
+  let _rdpNetRet = 0;
+  function _updateRdpNetCard() {
+    const el = document.getElementById('stat-rdp-net');
+    if (!el) return;
+    const v = _rdpNetRet;
+    const color = v >= 0 ? '#3fb950' : '#f85149';
+    el.style.color = color;
+    el.textContent = (v < 0 ? '-$' : '$') + Math.round(Math.abs(v)).toLocaleString();
+  }
 
   // ── State ──────────────────────────────────────────────────────────────
   const now = new Date();
@@ -448,14 +581,81 @@
     return { populate, getValue: () => _values.size === _allValues.length ? null : new Set(_values) };
   }
 
+  function updateStatsFromFiltered() {
+    if (!allRows.length && !retAllRows.length) return;
+    const fOffice = csOffice.getValue();
+    const fTeam   = csTeam.getValue();
+    const fAgent  = csAgent.getValue();
+    const fStatus = csStatus.getValue();
+    const safeWdp = workingDaysPassed > 0 ? workingDaysPassed : 1;
+    const fSales = allRows.filter(r => {
+      if (fOffice && !fOffice.has(r.office_name)) return false;
+      if (fTeam   && !fTeam.has(r.dept_name))     return false;
+      if (fAgent  && !fAgent.has(r.agent_name))   return false;
+      if (fStatus && !fStatus.has(r.status))      return false;
+      return true;
+    });
+    const fRet = retAllRows.filter(r => {
+      if (fOffice && !fOffice.has(r.office_name)) return false;
+      if (fTeam   && !fTeam.has(r.dept_name))     return false;
+      if (fAgent  && !fAgent.has(r.agent_name))   return false;
+      if (fStatus && !fStatus.has(r.status))      return false;
+      return true;
+    });
+    const ftc        = fSales.reduce((s,r) => s + (r.ftc          ?? 0), 0);
+    const ftd        = fSales.reduce((s,r) => s + (r.ftd_count    ?? 0), 0);
+    const net        = fSales.reduce((s,r) => s + (r.net_deposits  ?? 0), 0)
+                     + fRet.reduce((s,r)   => s + (r.net_usd       ?? 0), 0);
+    const ovol       = fRet.reduce((s,r)   => s + (r.open_volume_usd ?? 0), 0);
+    const dFtd       = fSales.reduce((s,r) => s + (r.daily_ftd    ?? 0), 0);
+    const dFtc       = fSales.reduce((s,r) => s + (r.daily_ftc    ?? 0), 0);
+    const dNetSal    = fSales.reduce((s,r) => s + (r.daily_net    ?? 0), 0);
+    const dNetRet    = fRet.reduce((s,r)   => s + (r.daily_net_usd ?? 0), 0);
+    const dNet       = dNetSal + dNetRet;
+    const netFmt = v => (v < 0 ? '-$' : '$') + Math.round(Math.abs(v)).toLocaleString();
+    const ftcEl = document.getElementById('stat-grand-ftc');
+    if (ftcEl) ftcEl.textContent = ftc.toLocaleString();
+    const ftcRrEl = document.getElementById('stat-grand-ftc-rr');
+    if (ftcRrEl) ftcRrEl.textContent = Math.round(ftc / safeWdp * workingDays).toLocaleString();
+    const ftdRrEl = document.getElementById('stat-grand-ftd-rr');
+    if (ftdRrEl) ftdRrEl.textContent = Math.round(ftd / safeWdp * workingDays).toLocaleString();
+    const ftdEl = document.getElementById('stat-total-ftd');
+    if (ftdEl) ftdEl.textContent = ftd.toLocaleString();
+    const gNetEl = document.getElementById('stat-grand-net'); if (gNetEl) gNetEl.textContent = netFmt(net);
+    const gNetRrEl = document.getElementById('stat-grand-net-rr'); if (gNetRrEl) gNetRrEl.textContent = netFmt(Math.round(net / safeWdp * workingDays));
+    const ovEl = document.getElementById('stat-open-volume'); if (ovEl) ovEl.textContent = Math.round(ovol).toLocaleString();
+    const dFtdEl = document.getElementById('stat-daily-ftd'); if (dFtdEl) dFtdEl.textContent = dFtd.toLocaleString();
+    const dFtcEl = document.getElementById('stat-daily-ftc'); if (dFtcEl) dFtcEl.textContent = dFtc.toLocaleString();
+    const dNetEl = document.getElementById('stat-daily-net'); if (dNetEl) dNetEl.textContent = netFmt(dNet);
+    const dNetRetEl = document.getElementById('stat-daily-net-ret'); if (dNetRetEl) dNetRetEl.textContent = netFmt(dNetRet);
+  }
+
   function onFilterChange() {
     if (allRows.length) renderTable();
     if (retAllRows.length) renderRetentionTable(retWd, retWdPassed, retWdLeft);
+    updateStatsFromFiltered();
   }
   const csOffice = makeCustomSelect('cs-office-trigger','cs-office-drop','cs-office-search','cs-office-opts','All Offices', onFilterChange);
   const csTeam   = makeCustomSelect('cs-team-trigger',  'cs-team-drop',  'cs-team-search',  'cs-team-opts',  'All Teams',   onFilterChange);
   const csAgent  = makeCustomSelect('cs-agent-trigger', 'cs-agent-drop', 'cs-agent-search', 'cs-agent-opts', 'All Agents',  onFilterChange);
   const csStatus = makeCustomSelect('cs-status-trigger','cs-status-drop','cs-status-search','cs-status-opts','All Status',  onFilterChange);
+  // Classification filters — trigger server reload
+  const csScpCat = makeCustomSelect('cs-scpcat-trigger','cs-scpcat-drop','cs-scpcat-search','cs-scpcat-opts','All Categories', () => loadAll());
+  const csScp    = makeCustomSelect('cs-scp-trigger',   'cs-scp-drop',   'cs-scp-search',   'cs-scp-opts',   'All Potential',  () => loadAll());
+  csScpCat.populate(['High Quality', 'Low Quality', 'No Segmentation']);
+  csScp.populate(['1','2','3','4','5','6','7','8','9','10']);
+
+  function getClsParams() {
+    let p = '';
+    const catVal = csScpCat.getValue();
+    if (catVal) {
+      const mapped = [...catVal].map(v => v === 'High Quality' ? 'high' : v === 'Low Quality' ? 'low' : 'none');
+      p += '&scp_cat=' + mapped.join(',');
+    }
+    const scpVal = csScp.getValue();
+    if (scpVal) p += '&scp=' + [...scpVal].join(',');
+    return p;
+  }
 
   function populateFilterDropdowns() {
     const offices = new Set(), teams = new Set(), agents = new Set();
@@ -539,7 +739,7 @@
       document.getElementById('error-msg').style.display = 'none';
     }
     try {
-      const res = await fetch(`/api/daily-monthly/sales?date_from=${df}&date_to=${dt}`);
+      const res = await fetch(`/api/daily-monthly/sales?date_from=${df}&date_to=${dt}${getClsParams()}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Server error');
 
@@ -569,6 +769,7 @@
       const wdLMob = document.getElementById('stat-wd-left-mob'); if (wdLMob) wdLMob.textContent = workingDaysLeft;
       populateFilterDropdowns();
       renderTable();
+      updateStatsFromFiltered();
     } catch(e) {
       if (!silent) {
         document.getElementById('error-msg').textContent = 'Error: ' + e.message;
@@ -755,7 +956,7 @@
       document.getElementById('ret-error-msg').style.display = 'none';
     }
     try {
-      const res = await fetch(`/api/daily-monthly/retention?date_from=${df}&date_to=${dt}`);
+      const res = await fetch(`/api/daily-monthly/retention?date_from=${df}&date_to=${dt}${getClsParams()}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Server error');
 
@@ -1098,6 +1299,9 @@
       totalTr.innerHTML = `<td>Total</td>` + retRowHtml(gAgg, true);
       tfoot.appendChild(totalTr);
     }
+    _rdpNetRet = gRdpNet;
+    _updateRdpNetCard();
+    updateStatsFromFiltered();
     document.getElementById('ret-row-count').textContent = `${activeRetOffices.size} offices · ${activeRetAgentCount} agents`;
   }
 
