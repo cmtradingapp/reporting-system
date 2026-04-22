@@ -493,6 +493,8 @@
                 <th class="text-center" style="min-width:80px;" data-sort="dailyPctTotal">Daily % <i class="bi sort-icon" id="sort-icon-dailyPctTotal"></i></th>
                 <th class="text-center" style="min-width:95px;" data-sort="ftdCountTotal">Monthly FTD <i class="bi sort-icon" id="sort-icon-ftdCountTotal"></i></th>
                 <th class="text-center" style="min-width:110px;" data-sort="targetTotal">Monthly Target <i class="bi sort-icon" id="sort-icon-targetTotal"></i></th>
+                <th class="text-center" style="min-width:90px;" data-sort="monthlyPctTotal">Monthly % <i class="bi sort-icon" id="sort-icon-monthlyPctTotal"></i></th>
+                <th class="text-center" style="min-width:80px;" data-sort="ftdRrTotal">FTD RR <i class="bi sort-icon" id="sort-icon-ftdRrTotal"></i></th>
                 <th class="text-center" style="min-width:105px;" data-sort="rrMonthlyPctTotal">% RR Monthly <i class="bi sort-icon" id="sort-icon-rrMonthlyPctTotal"></i></th>
                 <th class="text-center" style="min-width:120px;" data-sort="netDepositsTotal">Net Sales Monthly <i class="bi sort-icon" id="sort-icon-netDepositsTotal"></i></th>
                 <th class="text-center" style="min-width:60px;" data-sort="ftcTotal">FTC <i class="bi sort-icon" id="sort-icon-ftcTotal"></i></th>
@@ -817,11 +819,13 @@
         const pTgt = Math.round(r.target_ftc * tgtRatio);
         const daily_target = workingDays > 0 ? pTgt / workingDays : 0;
         const daily_pct = daily_target > 0 ? Math.round(r.daily_ftd / daily_target * 100) : null;
-        const rr_monthly_pct = pTgt > 0 ? Math.round((r.ftd_count / safeWdPassed * workingDays) / pTgt * 100) : null;
+        const monthly_pct = pTgt > 0 ? Math.round(r.ftd_count / pTgt * 100) : null;
+        const ftd_rr = Math.round(r.ftd_count / safeWdPassed * workingDays);
+        const rr_monthly_pct = pTgt > 0 ? Math.round(ftd_rr / pTgt * 100) : null;
         const ftc_rr = Math.floor(r.ftc / safeWdPassed * workingDays);
         const ftc_rr_pct = pTgt > 0 ? Math.round(ftc_rr / pTgt * 100) : null;
         return {
-          ...r, target_ftc: pTgt, daily_target, daily_pct, rr_monthly_pct,
+          ...r, target_ftc: pTgt, daily_target, daily_pct, monthly_pct, ftd_rr, rr_monthly_pct,
           ftc_rr, ftc_rr_pct,
           net_deposits: r.net_deposits ?? 0, ftd_count: r.ftd_count ?? 0,
         };
@@ -886,10 +890,13 @@
       get dailyPctTotal() { return this.dailyTargetTotal > 0 ? Math.round(this.dailyFtdTotal / this.dailyTargetTotal * 100) : null; },
       ftdCountTotal: agents.reduce((s,a) => s + (a.ftd_count??0), 0),
       targetTotal: agents.reduce((s,a) => s + (a.target_ftc??0), 0),
-      get rrMonthlyPctTotal() {
+      get monthlyPctTotal() { return this.targetTotal > 0 ? Math.round(this.ftdCountTotal / this.targetTotal * 100) : null; },
+      get ftdRrTotal() {
         const safeWdp = workingDaysPassed > 0 ? workingDaysPassed : 1;
-        const projected = this.ftdCountTotal / safeWdp * workingDays;
-        return this.targetTotal > 0 ? Math.round(projected / this.targetTotal * 100) : null;
+        return Math.round(this.ftdCountTotal / safeWdp * workingDays);
+      },
+      get rrMonthlyPctTotal() {
+        return this.targetTotal > 0 ? Math.round(this.ftdRrTotal / this.targetTotal * 100) : null;
       },
       netDepositsTotal: agents.reduce((s,a) => s + (a.net_deposits??0), 0),
       ftcTotal: agents.reduce((s,a) => s + (a.ftc??0), 0),
@@ -901,7 +908,7 @@
       return sortState.dir === 'desc' ? bv - av : av - bv;
     });
 
-    let gDailyFtd=0, gDailyTarget=0, gFtdCount=0, gTarget=0, gNet=0, gFtc=0, gFtcRr=0;
+    let gDailyFtd=0, gDailyTarget=0, gFtdCount=0, gTarget=0, gNet=0, gFtc=0, gFtcRr=0, gFtdRr=0;
     offices.forEach((office, oi) => {
       gDailyFtd += office.dailyFtdTotal;
       gDailyTarget += office.dailyTargetTotal;
@@ -910,6 +917,7 @@
       gNet += office.netDepositsTotal;
       gFtc += office.ftcTotal;
       gFtcRr += office.ftcRrTotal;
+      gFtdRr += office.ftdRrTotal;
       const officeId = 'office-' + oi;
       const offTr = document.createElement('tr');
       offTr.className = 'office-row';
@@ -922,6 +930,8 @@
         <td class="text-center">${pctHtml(office.dailyPctTotal, true)}</td>
         <td class="text-center">${wCountHtml(office.ftdCountTotal, true)}</td>
         <td class="text-center">${wCountHtml(office.targetTotal, true)}</td>
+        <td class="text-center">${pctHtml(office.monthlyPctTotal, true)}</td>
+        <td class="text-center">${wCountHtml(office.ftdRrTotal, true)}</td>
         <td class="text-center">${pctHtml(office.rrMonthlyPctTotal, true)}</td>
         <td class="text-center">${blueHtml(office.netDepositsTotal, true)}</td>
         <td class="text-center">${wCountHtml(office.ftcTotal, true)}</td>
@@ -933,6 +943,7 @@
       const agentColMap = {
         name:'agent_name', dailyFtdTotal:'daily_ftd', dailyTargetTotal:'daily_target',
         dailyPctTotal:'daily_pct', ftdCountTotal:'ftd_count', targetTotal:'target_ftc',
+        monthlyPctTotal:'monthly_pct', ftdRrTotal:'ftd_rr',
         rrMonthlyPctTotal:'rr_monthly_pct', netDepositsTotal:'net_deposits',
         ftcTotal:'ftc', ftcRrTotal:'ftc_rr', ftcRrPctTotal:'ftc_rr_pct',
       };
@@ -953,6 +964,8 @@
           <td class="text-center">${pctHtml(r.daily_pct)}</td>
           <td class="text-center">${wCountHtml(r.ftd_count)}</td>
           <td class="text-center">${wCountHtml(r.target_ftc)}</td>
+          <td class="text-center">${pctHtml(r.monthly_pct)}</td>
+          <td class="text-center">${wCountHtml(r.ftd_rr)}</td>
           <td class="text-center">${pctHtml(r.rr_monthly_pct)}</td>
           <td class="text-center">${blueHtml(r.net_deposits)}</td>
           <td class="text-center">${wCountHtml(r.ftc)}</td>
@@ -975,11 +988,12 @@
     });
 
     if (offices.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="11" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No data for this period</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="13" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No data for this period</td></tr>';
     } else {
       const safeWdp = workingDaysPassed > 0 ? workingDaysPassed : 1;
       const gDailyPct = gDailyTarget > 0 ? Math.round(gDailyFtd / gDailyTarget * 100) : null;
-      const gRrMonthly = gTarget > 0 ? Math.round((gFtdCount / safeWdp * workingDays) / gTarget * 100) : null;
+      const gMonthlyPct = gTarget > 0 ? Math.round(gFtdCount / gTarget * 100) : null;
+      const gRrMonthly = gTarget > 0 ? Math.round(gFtdRr / gTarget * 100) : null;
       const gFtcRrPct = gTarget > 0 ? Math.round(gFtcRr / gTarget * 100) : null;
       const totalTr = document.createElement('tr');
       totalTr.className = 'total-row';
@@ -990,6 +1004,8 @@
         <td class="text-center">${pctHtml(gDailyPct, true)}</td>
         <td class="text-center">${wCountHtml(gFtdCount, true)}</td>
         <td class="text-center">${wCountHtml(gTarget, true)}</td>
+        <td class="text-center">${pctHtml(gMonthlyPct, true)}</td>
+        <td class="text-center">${wCountHtml(gFtdRr, true)}</td>
         <td class="text-center">${pctHtml(gRrMonthly, true)}</td>
         <td class="text-center">${blueHtml(gNet, true)}</td>
         <td class="text-center">${wCountHtml(gFtc, true)}</td>
@@ -1414,8 +1430,8 @@
   function exportSalesExcel() {
     if (!allRows.length) return;
     const filtered = allRows.filter(r => r.ftc > 0 || r.target_ftc > 0 || r.net_deposits !== 0 || r.ftd_count > 0 || r.daily_ftd > 0);
-    const headers = ['Office','Agent','Daily FTD','Daily Target','Daily %','Monthly FTD','Monthly Target','% RR Monthly','Net Sales Monthly','FTC','FTC RR','FTC RR%'];
-    const rows = filtered.map(r => [r.office_name, r.agent_name, r.daily_ftd, Math.round(r.daily_target), r.daily_pct??'', r.ftd_count, r.target_ftc, r.rr_monthly_pct??'', Math.round(r.net_deposits*100)/100, r.ftc, r.ftc_rr, r.ftc_rr_pct??'']);
+    const headers = ['Office','Agent','Daily FTD','Daily Target','Daily %','Monthly FTD','Monthly Target','Monthly %','FTD RR','% RR Monthly','Net Sales Monthly','FTC','FTC RR','FTC RR%'];
+    const rows = filtered.map(r => [r.office_name, r.agent_name, r.daily_ftd, Math.round(r.daily_target), r.daily_pct??'', r.ftd_count, r.target_ftc, r.monthly_pct??'', r.ftd_rr, r.rr_monthly_pct??'', Math.round(r.net_deposits*100)/100, r.ftc, r.ftc_rr, r.ftc_rr_pct??'']);
     const df = document.getElementById('date-from').value, dt = document.getElementById('date-to').value;
     const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
     const wb = XLSX.utils.book_new();
