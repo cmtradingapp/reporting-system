@@ -348,8 +348,85 @@
     </div>
     {% endif %}
   </div>
+  <!-- Row 2: Live EEZ | Daily PnL Cash -->
+  <div class="row g-2 mb-2">
+    <div class="col-6">
+      <div class="kpi-card text-center">
+        <div class="kpi-value" style="color:#58a6ff;" id="stat-live-eez">—</div>
+        <div class="kpi-label">
+          <span id="live-eez-badge" style="display:none;background:#1a4731;color:#3fb950;border:1px solid #238636;border-radius:4px;padding:1px 5px;font-size:0.55rem;letter-spacing:0.04em;margin-right:3px;vertical-align:middle;">LIVE</span>
+          Live EEZ
+          <span id="live-eez-updated" style="display:block;font-size:0.55rem;color:#484f58;font-weight:400;text-transform:none;letter-spacing:0;margin-top:1px;"></span>
+        </div>
+      </div>
+    </div>
+    {% if not _hide_net_cards %}
+    <div class="col-6">
+      <div class="kpi-card text-center">
+        <div class="kpi-value" id="stat-daily-pnl-cash">—</div>
+        <div class="kpi-label">Daily PnL Cash</div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+  <!-- Row 3: FTD/FTC | NET $ -->
+  <div class="row g-2 mb-2">
+    {% if show_sales %}
+    <div class="col-6">
+      <div class="kpi-card text-center">
+        <div style="display:flex;justify-content:center;align-items:center;gap:10px;">
+          <div>
+            <div class="kpi-value" style="color:#388bfd;" id="stat-total-ftd">—</div>
+            <div class="kpi-label">FTD</div>
+          </div>
+          <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
+          <div>
+            <div class="kpi-value" style="color:#388bfd;" id="stat-grand-ftc">—</div>
+            <div class="kpi-label">FTC</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+    {% if not _hide_net_cards %}
+    <div class="col-6">
+      <div class="kpi-card text-center">
+        <div class="kpi-value" style="color:#3fb950;" id="stat-grand-net">—</div>
+        <div class="kpi-label">NET $</div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+  <!-- Row 4: FTD RR/FTC RR | NET RR -->
+  <div class="row g-2 mb-2">
+    {% if show_sales %}
+    <div class="col-6">
+      <div class="kpi-card text-center">
+        <div style="display:flex;justify-content:center;align-items:center;gap:14px;">
+          <div>
+            <div class="kpi-value" style="color:#d29922;" id="stat-grand-ftd-rr">—</div>
+            <div class="kpi-label">FTD RR</div>
+          </div>
+          <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
+          <div>
+            <div class="kpi-value" style="color:#d29922;" id="stat-grand-ftc-rr">—</div>
+            <div class="kpi-label">FTC RR</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+    {% if not _hide_net_cards %}
+    <div class="col-6">
+      <div class="kpi-card text-center">
+        <div class="kpi-value" style="color:#d29922;" id="stat-grand-net-rr">—</div>
+        <div class="kpi-label">NET RR</div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
   {% if show_retention %}
-  <!-- Row 2: Daily Loads/Monthly Loads | Daily STD/Monthly STD -->
+  <!-- Row 5: Daily Loads/Monthly Loads | Daily STD/Monthly STD -->
   <div class="row g-2 mb-2">
     <div class="col-6">
       <div class="kpi-card text-center">
@@ -382,8 +459,8 @@
       </div>
     </div>
   </div>
-  <!-- Row 3: Daily Traders/Monthly Traders -->
-  <div class="row g-2 mb-2">
+  <!-- Row 6: Daily Traders/Monthly Traders | Open Volume -->
+  <div class="row g-2 mb-4">
     <div class="col-6">
       <div class="kpi-card text-center">
         <div style="display:flex;justify-content:center;align-items:center;gap:14px;">
@@ -399,62 +476,6 @@
         </div>
       </div>
     </div>
-  </div>
-  {% endif %}
-  <!-- Row 4: FTD/FTC | FTD RR/FTC RR -->
-  <div class="row g-2 mb-2">
-    {% if show_sales %}
-    <div class="col-6">
-      <div class="kpi-card text-center">
-        <div style="display:flex;justify-content:center;align-items:center;gap:10px;">
-          <div>
-            <div class="kpi-value" style="color:#388bfd;" id="stat-total-ftd">—</div>
-            <div class="kpi-label">FTD</div>
-          </div>
-          <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
-          <div>
-            <div class="kpi-value" style="color:#388bfd;" id="stat-grand-ftc">—</div>
-            <div class="kpi-label">FTC</div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="col-6">
-      <div class="kpi-card text-center">
-        <div style="display:flex;justify-content:center;align-items:center;gap:14px;">
-          <div>
-            <div class="kpi-value" style="color:#d29922;" id="stat-grand-ftd-rr">—</div>
-            <div class="kpi-label">FTD RR</div>
-          </div>
-          <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
-          <div>
-            <div class="kpi-value" style="color:#d29922;" id="stat-grand-ftc-rr">—</div>
-            <div class="kpi-label">FTC RR</div>
-          </div>
-        </div>
-      </div>
-    </div>
-    {% endif %}
-  </div>
-  <!-- Row 5: NET $ | NET RR -->
-  <div class="row g-2 mb-2">
-    {% if not _hide_net_cards %}
-    <div class="col-6">
-      <div class="kpi-card text-center">
-        <div class="kpi-value" style="color:#3fb950;" id="stat-grand-net">—</div>
-        <div class="kpi-label">NET $</div>
-      </div>
-    </div>
-    <div class="col-6">
-      <div class="kpi-card text-center">
-        <div class="kpi-value" style="color:#d29922;" id="stat-grand-net-rr">—</div>
-        <div class="kpi-label">NET RR</div>
-      </div>
-    </div>
-    {% endif %}
-  </div>
-  <!-- Row 6: Open Volume -->
-  <div class="row g-2 mb-4">
     {% if not current_user.role.startswith('sales') %}
     <div class="col-6">
       <div class="kpi-card text-center">
@@ -464,6 +485,7 @@
     </div>
     {% endif %}
   </div>
+  {% endif %}
 
   {% if show_sales %}
   <!-- Sales Table -->
@@ -793,10 +815,42 @@
   function setQuickActive(id) { ['btn-today','btn-ystrd'].forEach(i => document.getElementById(i).classList.toggle('active-quick', i===id)); }
 
   // ── Combined load ─────────────────────────────────────────────────────
+  async function loadLiveEquity() {
+    const el = document.getElementById('stat-live-eez');
+    const badge = document.getElementById('live-eez-badge');
+    const upd = document.getElementById('live-eez-updated');
+    const pnlEl = document.getElementById('stat-daily-pnl-cash');
+    if (!el) return;
+    try {
+      const dt = document.getElementById('date-to').value;
+      const url = dt ? '/api/live-equity-zeroed?date=' + dt : '/api/live-equity-zeroed';
+      const res = await fetch(url);
+      if (res.status === 503) { el.textContent = '—'; if (badge) { badge.style.display = ''; badge.textContent = 'UNAVAILABLE'; badge.style.background = '#6e7681'; badge.style.color = '#c9d1d9'; badge.style.borderColor = '#6e7681'; } return; }
+      const data = await res.json();
+      const neg = data.total < 0;
+      el.textContent = (neg ? '-$' : '$') + Math.abs(data.total).toLocaleString('en-US');
+      if (badge) {
+        if (data.is_stale) { badge.style.display = ''; badge.textContent = 'STALE'; badge.style.background = '#d29922'; badge.style.color = '#fff'; badge.style.borderColor = '#d29922'; }
+        else if (data.is_live) { badge.style.display = ''; badge.textContent = 'LIVE'; badge.style.background = '#1a4731'; badge.style.color = '#3fb950'; badge.style.borderColor = '#238636'; }
+        else { badge.style.display = 'none'; }
+      }
+      if (upd && data.computed_at) {
+        const t = new Date(data.computed_at).toLocaleTimeString();
+        upd.textContent = (data.is_stale ? 'last live at ' : 'as of ') + t;
+      }
+      if (pnlEl && data.daily_pnl_cash != null) {
+        const dNeg = data.daily_pnl_cash < 0;
+        pnlEl.textContent = (dNeg ? '-$' : '$') + Math.abs(data.daily_pnl_cash).toLocaleString('en-US');
+        pnlEl.style.color = dNeg ? '#f85149' : '#3fb950';
+      }
+    } catch(e) { el.textContent = '—'; }
+  }
+
   async function loadAll(silent=false) {
     const tasks = [];
     if (SHOW_SALES)     tasks.push(loadData(silent));
     if (SHOW_RETENTION) tasks.push(loadRetentionData(silent));
+    tasks.push(loadLiveEquity());
     await Promise.all(tasks);
   }
 
