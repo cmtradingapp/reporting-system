@@ -113,11 +113,13 @@
       .mob-topbar { display:flex; align-items:center; justify-content:center; position:fixed; top:0; left:0; right:0; height:48px; background:#161b22; border-bottom:1px solid #30363d; z-index:150; }
       .mob-topbar-title { font-size:0.92rem; font-weight:700; color:#e0e0e0; padding:0 44px; }
       .main-content { margin-left:0 !important; padding-top:48px; }
-      .table-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+      .table-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; will-change:transform; }
       .date-input { width:120px; }
+      .scoreboard-table { table-layout:fixed; }
       .scoreboard-table th, .scoreboard-table td { padding-left:7px !important; padding-right:7px !important; }
-      .scoreboard-table th:first-child { white-space:normal; font-size:0.68rem; min-width:0; }
-      .scoreboard-table th { font-size:0.68rem; }
+      .scoreboard-table th:first-child { white-space:normal; font-size:0.68rem; min-width:110px; width:110px; }
+      .scoreboard-table th { font-size:0.68rem; min-width:70px; width:70px; }
+      .scoreboard-table td { font-size:0.78rem; }
       .agent-row td:first-child { padding-left:18px !important; }
       .retention-agent-row td:first-child { padding-left:26px !important; }
       h4.fw-bold { display:none; }
@@ -130,6 +132,7 @@
       .filter-sep { display:none; }
       #row-count, #ret-row-count { display:none; }
       .row-icon { display:none; }
+      .office-row, .dept-row, .agent-row, .retention-agent-row { content-visibility:auto; contain-intrinsic-size:auto 40px; }
     }
     @media (min-width: 768px) and (max-width: 1366px) {
       body { display:block; }
@@ -139,8 +142,9 @@
       .mob-topbar { display:flex; align-items:center; justify-content:center; position:fixed; top:0; left:0; right:0; height:48px; background:#161b22; border-bottom:1px solid #30363d; z-index:150; }
       .mob-topbar-title { font-size:0.95rem; font-weight:700; color:#e0e0e0; padding:0 44px; }
       .main-content { margin-left:0 !important; padding-top:48px; }
-      .table-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+      .table-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; will-change:transform; }
       .cs-trigger { min-width:110px; font-size:0.76rem; }
+      .office-row, .dept-row, .agent-row, .retention-agent-row { content-visibility:auto; contain-intrinsic-size:auto 40px; }
     }
   </style>
 </head>
@@ -299,12 +303,12 @@
     </div>
   </div>
 
-  <!-- KPI Cards – Row 1: Daily metrics -->
+  <!-- KPI Cards -->
   {% set _hide_net_cards = current_user.email in ['oluwaseun.a@cmtrading.com', 'elissa.b@cmtrading.com', 'precious.ib@cmtrading.com'] %}
-  <div class="row g-2 mb-2 kpi-row-5">
+  <!-- Row 1: Daily FTD/FTC | Daily Net/Ret Net -->
+  <div class="row g-2 mb-2">
     {% if show_sales %}
-    <!-- 1. Daily FTD / Daily FTC -->
-    <div class="col-6 kpi-col-5">
+    <div class="col-6">
       <div class="kpi-card text-center">
         <div style="display:flex;justify-content:center;align-items:center;gap:14px;">
           <div>
@@ -321,8 +325,7 @@
     </div>
     {% endif %}
     {% if not _hide_net_cards %}
-    <!-- 2. Daily Net / Daily Ret Net -->
-    <div class="col-6 kpi-col-5">
+    <div class="col-6">
       <div class="kpi-card text-center">
         <div style="display:flex;justify-content:center;align-items:center;gap:14px;">
           {% if show_sales %}
@@ -344,9 +347,11 @@
       </div>
     </div>
     {% endif %}
-    {% if show_retention %}
-    <!-- 3. Daily Loads / Monthly Loads -->
-    <div class="col-6 kpi-col-5">
+  </div>
+  {% if show_retention %}
+  <!-- Row 2: Daily Loads/Monthly Loads | Daily STD/Monthly STD -->
+  <div class="row g-2 mb-2">
+    <div class="col-6">
       <div class="kpi-card text-center">
         <div style="display:flex;justify-content:center;align-items:center;gap:14px;">
           <div>
@@ -361,8 +366,7 @@
         </div>
       </div>
     </div>
-    <!-- 4. Daily STD / Monthly STD -->
-    <div class="col-6 kpi-col-5">
+    <div class="col-6">
       <div class="kpi-card text-center">
         <div style="display:flex;justify-content:center;align-items:center;gap:14px;">
           <div>
@@ -377,8 +381,10 @@
         </div>
       </div>
     </div>
-    <!-- 5. Daily Traders / Monthly Traders -->
-    <div class="col-6 kpi-col-5">
+  </div>
+  <!-- Row 3: Daily Traders/Monthly Traders -->
+  <div class="row g-2 mb-2">
+    <div class="col-6">
       <div class="kpi-card text-center">
         <div style="display:flex;justify-content:center;align-items:center;gap:14px;">
           <div>
@@ -393,13 +399,12 @@
         </div>
       </div>
     </div>
-    {% endif %}
   </div>
-  <!-- KPI Cards – Row 2: Monthly / totals -->
-  <div class="row g-2 mb-4 kpi-row-5">
+  {% endif %}
+  <!-- Row 4: FTD/FTC | FTD RR/FTC RR -->
+  <div class="row g-2 mb-2">
     {% if show_sales %}
-    <!-- 6. FTD / FTC -->
-    <div class="col-6 kpi-col-5">
+    <div class="col-6">
       <div class="kpi-card text-center">
         <div style="display:flex;justify-content:center;align-items:center;gap:10px;">
           <div>
@@ -414,8 +419,7 @@
         </div>
       </div>
     </div>
-    <!-- 7. FTD RR / FTC RR -->
-    <div class="col-6 kpi-col-5">
+    <div class="col-6">
       <div class="kpi-card text-center">
         <div style="display:flex;justify-content:center;align-items:center;gap:14px;">
           <div>
@@ -431,25 +435,28 @@
       </div>
     </div>
     {% endif %}
+  </div>
+  <!-- Row 5: NET $ | NET RR -->
+  <div class="row g-2 mb-2">
     {% if not _hide_net_cards %}
-    <!-- 8. NET $ -->
-    <div class="col-6 kpi-col-5">
+    <div class="col-6">
       <div class="kpi-card text-center">
         <div class="kpi-value" style="color:#3fb950;" id="stat-grand-net">—</div>
         <div class="kpi-label">NET $</div>
       </div>
     </div>
-    <!-- 9. NET RR -->
-    <div class="col-6 kpi-col-5">
+    <div class="col-6">
       <div class="kpi-card text-center">
         <div class="kpi-value" style="color:#d29922;" id="stat-grand-net-rr">—</div>
         <div class="kpi-label">NET RR</div>
       </div>
     </div>
     {% endif %}
+  </div>
+  <!-- Row 6: Open Volume -->
+  <div class="row g-2 mb-4">
     {% if not current_user.role.startswith('sales') %}
-    <!-- 10. Open Volume -->
-    <div class="col-6 kpi-col-5">
+    <div class="col-6">
       <div class="kpi-card text-center">
         <div class="kpi-value" style="color:#c9d1d9;" id="stat-open-volume">—</div>
         <div class="kpi-label">Open Volume</div>
@@ -878,6 +885,7 @@
         expandedOfficeNames.add(tr.dataset.officeName);
     });
     tbody.innerHTML = '';
+    const frag = document.createDocumentFragment();
 
     const officeMap = new Map();
     filtered.forEach(r => {
@@ -947,7 +955,7 @@
         <td class="text-center">${pctHtml(office.ftcRrPctTotal, true)}</td>
         <td class="text-center">${office.avgScpTotal != null ? '<strong>'+office.avgScpTotal.toFixed(1)+'</strong>' : '—'}</td>
       `;
-      tbody.appendChild(offTr);
+      frag.appendChild(offTr);
 
       const agentColMap = {
         name:'agent_name', dailyFtdTotal:'daily_ftd', dailyTargetTotal:'daily_target',
@@ -982,12 +990,12 @@
           <td class="text-center">${pctHtml(r.ftc_rr_pct)}</td>
           <td class="text-center">${r.avg_scp != null ? r.avg_scp.toFixed(1) : '—'}</td>
         `;
-        tbody.appendChild(tr);
+        frag.appendChild(tr);
       });
 
       if (expandedOfficeNames.has(office.name)) {
         offTr.querySelector('.chevron').classList.add('open');
-        tbody.querySelectorAll(`tr[data-parent-office="${officeId}"]`).forEach(r => r.style.display = '');
+        frag.querySelectorAll(`tr[data-parent-office="${officeId}"]`).forEach(r => r.style.display = '');
       }
       offTr.addEventListener('click', () => {
         const chevron = offTr.querySelector('.chevron');
@@ -1027,8 +1035,9 @@
         <td class="text-center">${pctHtml(gFtcRrPct, true)}</td>
         <td class="text-center">${gAvgScp != null ? '<strong>'+gAvgScp.toFixed(1)+'</strong>' : '—'}</td>
       `;
-      tbody.appendChild(totalTr);
+      frag.appendChild(totalTr);
     }
+    tbody.appendChild(frag);
     document.getElementById('row-count').textContent = `${activeOffices.size} offices · ${activeAgentCount} agents`;
   }
 
@@ -1170,6 +1179,7 @@
     });
     tbody.innerHTML = '';
     tfoot.innerHTML = '';
+    const retFrag = document.createDocumentFragment();
 
     const officeMap = new Map();
     filtered.forEach(r => {
@@ -1300,7 +1310,7 @@
       offTr.dataset.officeId = officeId;
       offTr.dataset.officeName = office.officeName;
       offTr.innerHTML = `<td><span class="chevron">&#9654;</span><i class="bi bi-building row-icon me-2" style="color:#484f58;font-size:0.75rem;"></i><strong>${escHtml(office.officeName)}</strong></td>` + retRowHtml(office, true);
-      tbody.appendChild(offTr);
+      retFrag.appendChild(offTr);
 
       const deptArr = [];
       office.deptMap.forEach((agents, deptName) => {
@@ -1318,7 +1328,7 @@
         deptTr.dataset.deptName = dept.deptName;
         deptTr.style.display = 'none';
         deptTr.innerHTML = `<td><span class="chevron">&#9654;</span><i class="bi bi-diagram-3 row-icon me-2" style="color:#484f58;font-size:0.72rem;"></i>${escHtml(dept.deptName)}</td>` + retRowHtml(dept, false);
-        tbody.appendChild(deptTr);
+        retFrag.appendChild(deptTr);
 
         const retAgentColMap = {
           'ret-name':'agent_name', 'ret-dailyNet':'daily_net_usd', 'ret-dailyTarget':'daily_target',
@@ -1342,7 +1352,7 @@
           agTr.dataset.parentDept = deptId;
           agTr.style.display = 'none';
           agTr.innerHTML = `<td>${escHtml(r.agent_name)}</td>` + retAgentRowHtml(r);
-          tbody.appendChild(agTr);
+          retFrag.appendChild(agTr);
         });
 
         deptTr.addEventListener('click', e => {
@@ -1357,11 +1367,11 @@
       if (retExpandState.has(office.officeName)) {
         offTr.querySelector('.chevron').classList.add('open');
         const expandedDepts = retExpandState.get(office.officeName);
-        tbody.querySelectorAll(`tr.dept-row[data-parent-office="${officeId}"]`).forEach(deptTr => {
+        retFrag.querySelectorAll(`tr.dept-row[data-parent-office="${officeId}"]`).forEach(deptTr => {
           deptTr.style.display = '';
           if (expandedDepts.has(deptTr.dataset.deptName)) {
             deptTr.querySelector('.chevron').classList.add('open');
-            tbody.querySelectorAll(`tr[data-parent-dept="${deptTr.dataset.deptId}"]`).forEach(r => r.style.display = '');
+            retFrag.querySelectorAll(`tr[data-parent-dept="${deptTr.dataset.deptId}"]`).forEach(r => r.style.display = '');
           }
         });
       }
@@ -1385,6 +1395,8 @@
         }
       });
     });
+
+    tbody.appendChild(retFrag);
 
     if (filtered.length === 0) {
       tbody.innerHTML = '<tr><td colspan="22" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No data for this period</td></tr>';
