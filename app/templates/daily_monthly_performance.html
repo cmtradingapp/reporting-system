@@ -1109,8 +1109,8 @@
       return true;
     });
 
-    // Count active agents only
-    const activeFiltered = filtered.filter(r => r.status === 'Active');
+    // Count active agents only, exclude General office
+    const activeFiltered = filtered.filter(r => r.status === 'Active' && r.office_name !== 'General');
     const activeRetOffices = new Set(activeFiltered.map(r => r.office_name));
     const activeRetAgentCount = activeFiltered.length;
 
