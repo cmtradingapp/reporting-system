@@ -249,10 +249,10 @@ async def dmp_retention_api(request: Request, date_from: str, date_to: str):
             COALESCE(std.std_count, 0)::int                   AS std_count,
             COALESCE(trd.traders_count, 0)::int               AS traders_count,
             u.id                                              AS user_id,
-            COALESCE(dt_traders.daily_traders, 0)::int        AS daily_traders,
-            COALESCE(dt_loads.daily_loads, 0)::int            AS daily_loads,
+            COALESCE(trd.daily_traders, 0)::int               AS daily_traders,
+            COALESCE(loads.daily_loads, 0)::int               AS daily_loads,
             COALESCE(dt_std.daily_std, 0)::int                AS daily_std,
-            COALESCE(mt_loads.monthly_loads, 0)::int          AS monthly_loads
+            COALESCE(loads.monthly_loads, 0)::int             AS monthly_loads
         FROM crm_users u
         LEFT JOIN ({tgt_subq}) tgt ON tgt.agent_id = u.id
         LEFT JOIN (
@@ -284,39 +284,20 @@ async def dmp_retention_api(request: Request, date_from: str, date_to: str):
             GROUP BY assigned_to
         ) std ON std.agent_id = u.id
         LEFT JOIN (
-            SELECT assigned_to AS agent_id, COUNT(DISTINCT accountid) AS traders_count
+            SELECT assigned_to AS agent_id,
+                   COUNT(DISTINCT accountid) AS traders_count,
+                   COUNT(DISTINCT CASE WHEN day = %(date_to)s::date THEN accountid END)::int AS daily_traders
             FROM mv_retention_traders
             WHERE day >= %(date_from)s::date
               AND day < %(date_to_excl)s::date
             GROUP BY assigned_to
         ) trd ON trd.agent_id = u.id
         LEFT JOIN (
-            SELECT assigned_to AS agent_id, COUNT(DISTINCT accountid)::int AS daily_traders
-            FROM mv_retention_traders
-            WHERE day = %(date_to)s::date
-            GROUP BY assigned_to
-        ) dt_traders ON dt_traders.agent_id = u.id
-        LEFT JOIN (
-            SELECT a.assigned_to AS agent_id, COUNT(DISTINCT t.vtigeraccountid)::int AS daily_loads
-            FROM transactions t
-            JOIN accounts a ON a.accountid = t.vtigeraccountid
-            WHERE t.transaction_type_name = 'Deposit'
-              AND t.transactionapproval = 'Approved'
-              AND (t.deleted = 0 OR t.deleted IS NULL)
-              AND a.is_test_account = 0
-              AND t.confirmation_time >= %(date_to)s::timestamp
-              AND t.confirmation_time < (%(date_to)s::date + 1)::timestamp
-            GROUP BY a.assigned_to
-        ) dt_loads ON dt_loads.agent_id = u.id
-        LEFT JOIN (
-            SELECT assigned_to AS agent_id, COUNT(DISTINCT accountid)::int AS daily_std
-            FROM mv_std_clients
-            WHERE has_second_deposit = 1
-              AND second_deposit_date::date = %(date_to)s::date
-            GROUP BY assigned_to
-        ) dt_std ON dt_std.agent_id = u.id
-        LEFT JOIN (
-            SELECT a.assigned_to AS agent_id, COUNT(DISTINCT t.vtigeraccountid)::int AS monthly_loads
+            SELECT a.assigned_to AS agent_id,
+                   COUNT(DISTINCT t.vtigeraccountid)::int AS monthly_loads,
+                   COUNT(DISTINCT CASE WHEN t.confirmation_time >= %(date_to)s::timestamp
+                                        AND t.confirmation_time < (%(date_to)s::date + 1)::timestamp
+                                  THEN t.vtigeraccountid END)::int AS daily_loads
             FROM transactions t
             JOIN accounts a ON a.accountid = t.vtigeraccountid
             WHERE t.transaction_type_name = 'Deposit'
@@ -326,7 +307,14 @@ async def dmp_retention_api(request: Request, date_from: str, date_to: str):
               AND t.confirmation_time >= %(date_from)s::timestamp
               AND t.confirmation_time < %(date_to_excl)s::timestamp
             GROUP BY a.assigned_to
-        ) mt_loads ON mt_loads.agent_id = u.id
+        ) loads ON loads.agent_id = u.id
+        LEFT JOIN (
+            SELECT assigned_to AS agent_id, COUNT(DISTINCT accountid)::int AS daily_std
+            FROM mv_std_clients
+            WHERE has_second_deposit = 1
+              AND second_deposit_date::date = %(date_to)s::date
+            GROUP BY assigned_to
+        ) dt_std ON dt_std.agent_id = u.id
         WHERE (
               u.department_ = 'Retention'
               OR u.id IN (

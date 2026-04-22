@@ -402,6 +402,8 @@ def _warm_report_caches(date_from: str, date_to: str):
         "/api/eez-comparison",
         f"/api/total-traders?date_from={date_from}&date_to={date_to}&ftc_groups=0+-+7+days%2C8+-+14+days%2C15+-+30+days%2C31+-+60+days%2C61+-+90+days%2C91+-+120+days%2C120%2B+days",
         f"/api/ftc-date?end_date={date_to}",
+        f"/api/daily-monthly/sales?date_from={date_from}&date_to={date_to}",
+        f"/api/daily-monthly/retention?date_from={date_from}&date_to={date_to}",
     ]
     for ep in endpoints:
         url = f"http://127.0.0.1:8000{ep}"
