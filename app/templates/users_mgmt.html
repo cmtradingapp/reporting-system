@@ -83,6 +83,9 @@
     {% if _ap is none or 'performance' in _ap %}
     <a href="/performance" class="sidebar-link"><i class="bi bi-trophy"></i>Performance Report</a>
     {% endif %}
+    {% if current_user.role == 'admin' or (_ap is not none and 'daily_monthly' in _ap) %}
+    <a href="/daily-monthly" class="sidebar-link"><i class="bi bi-calendar-day"></i>Daily/Monthly Performance</a>
+    {% endif %}
     {% if (_ap is none and current_user.role in ('admin', 'marketing', 'general')) or (_ap is not none and 'marketing' in _ap) %}
     <a href="/campaign-performance" class="sidebar-link"><i class="bi bi-graph-up-arrow"></i>Marketing Performance</a>
     {% endif %}
@@ -265,6 +268,7 @@
             <label style="cursor:pointer;font-size:0.85rem;"><input type="checkbox" id="add-ap-holidays" class="me-1">Holidays</label>
             <label style="cursor:pointer;font-size:0.85rem;"><input type="checkbox" id="add-ap-transactions_report" class="me-1">Transactions Report</label>
             <label style="cursor:pointer;font-size:0.85rem;"><input type="checkbox" id="add-ap-data_sync" class="me-1">Data Sync</label>
+            <label style="cursor:pointer;font-size:0.85rem;"><input type="checkbox" id="add-ap-daily_monthly" class="me-1">Daily/Monthly Performance</label>
           </div>
         </div>
         <div class="text-secondary" style="font-size:0.8rem;">Default password: <code>Welcome1!</code> (user must change on first login)</div>
@@ -347,6 +351,7 @@
             <label style="cursor:pointer;font-size:0.85rem;"><input type="checkbox" id="edit-ap-holidays" class="me-1">Holidays</label>
             <label style="cursor:pointer;font-size:0.85rem;"><input type="checkbox" id="edit-ap-transactions_report" class="me-1">Transactions Report</label>
             <label style="cursor:pointer;font-size:0.85rem;"><input type="checkbox" id="edit-ap-data_sync" class="me-1">Data Sync</label>
+            <label style="cursor:pointer;font-size:0.85rem;"><input type="checkbox" id="edit-ap-daily_monthly" class="me-1">Daily/Monthly Performance</label>
           </div>
         </div>
       </div>
@@ -433,7 +438,7 @@
   setupCrmSearch('add-crm-search', 'add-crm-results', 'add-crm-user-id', 'add-crm-selected');
   setupCrmSearch('edit-crm-search', 'edit-crm-results', 'edit-crm-user-id', 'edit-crm-selected');
 
-  const _AP_KEYS = ['performance', 'marketing', 'agent_bonuses', 'dashboard', 'ftc_date', 'total_traders', 'all_ftcs', 'fsa_report', 'holidays', 'transactions_report', 'data_sync'];
+  const _AP_KEYS = ['performance', 'marketing', 'agent_bonuses', 'dashboard', 'ftc_date', 'total_traders', 'all_ftcs', 'fsa_report', 'holidays', 'transactions_report', 'data_sync', 'daily_monthly'];
   function getCheckedPages(prefix) {
     const checked = _AP_KEYS.filter(p => document.getElementById(`${prefix}-ap-${p}`).checked);
     return checked.length > 0 ? checked : null;

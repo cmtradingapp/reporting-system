@@ -149,6 +149,9 @@
     {% if (_ap is none and current_user.role != 'marketing') or (_ap is not none and 'performance' in _ap) %}
     <a href="/performance" class="sidebar-link"><i class="bi bi-trophy"></i>Performance Report</a>
     {% endif %}
+    {% if current_user.role == 'admin' or (_ap is not none and 'daily_monthly' in _ap) %}
+    <a href="/daily-monthly" class="sidebar-link"><i class="bi bi-calendar-day"></i>Daily/Monthly Performance</a>
+    {% endif %}
     <a href="/campaign-performance" class="sidebar-link active"><i class="bi bi-graph-up-arrow"></i>Marketing Performance</a>
     {% if (_ap is none and current_user.role != 'marketing') or (_ap is not none and 'agent_bonuses' in _ap) %}
     <a href="/agent-bonuses" class="sidebar-link"><i class="bi bi-cash-stack"></i>Agent Bonuses</a>

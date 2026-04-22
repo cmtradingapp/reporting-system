@@ -32,6 +32,7 @@ from app.routes.all_ftcs import router as all_ftcs_router
 from app.routes.transactions_report import router as transactions_report_router
 from app.routes.fsa_report import router as fsa_report_router
 from app.routes.mssql_dealio_mt5trades_sync import router as mssql_dealio_mt5trades_sync_router
+from app.routes.daily_monthly_performance import router as dmp_router
 from app.db.postgres_conn import ensure_table, ensure_auth_table, seed_admin_user, ensure_client_classification_table, ensure_bonus_transactions_table, ensure_daily_equity_zeroed_table, ensure_materialized_views, refresh_materialized_views, backfill_classification_int, ensure_agent_dept_history_table, ensure_dealio_positions_table, ensure_mssql_dealio_mt5trades_table
 import threading
 import fcntl
@@ -452,3 +453,4 @@ app.include_router(all_ftcs_router)
 app.include_router(transactions_report_router)
 app.include_router(fsa_report_router)
 app.include_router(mssql_dealio_mt5trades_sync_router)
+app.include_router(dmp_router)

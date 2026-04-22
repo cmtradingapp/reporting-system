@@ -1,0 +1,1312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Daily/Monthly Performance</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet"/>
+  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+  <style>
+    body { background-color: #0f1117; color: #e0e0e0; font-family: 'Segoe UI', sans-serif; display: flex; min-height: 100vh; }
+    .sidebar { width: 220px; min-height: 100vh; background-color: #161b22; border-right: 1px solid #30363d; display: flex; flex-direction: column; position: fixed; top: 0; left: 0; bottom: 0; z-index: 100; }
+    .sidebar-brand { padding: 20px 20px 16px; border-bottom: 1px solid #30363d; font-weight: 700; font-size: 1rem; color: #e0e0e0; }
+    .sidebar-nav { padding: 12px 0; flex: 1; overflow-y: auto; }
+    .sidebar-link { display: flex; align-items: center; gap: 10px; padding: 10px 20px; color: #8b949e; text-decoration: none; font-size: 0.9rem; transition: background 0.15s, color 0.15s; border-left: 3px solid transparent; }
+    .sidebar-link:hover { background-color: #21262d; color: #e0e0e0; }
+    .sidebar-link.active { color: #3fb950; border-left-color: #3fb950; background-color: rgba(63,185,80,0.08); }
+    .main-content { margin-left: 220px; flex: 1; min-width: 0; }
+    .card { background-color: #161b22; border: 1px solid #30363d; border-radius: 12px; }
+
+    .period-btn { background-color: #21262d; border: 1px solid #30363d; color: #8b949e; font-size: 0.82rem; padding: 5px 12px; border-radius: 6px; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+    .period-btn:hover { background-color: #2d333a; color: #c9d1d9; border-color: #484f58; }
+    .period-btn.active { background-color: rgba(35,134,54,0.25); border-color: #238636; color: #3fb950; font-weight: 600; }
+
+    .date-input { background-color: #21262d; border: 1px solid #30363d; color: #e0e0e0; border-radius: 6px; padding: 5px 10px; font-size: 0.82rem; width: 140px; }
+    .date-input:focus { outline: none; border-color: #238636; box-shadow: 0 0 0 2px rgba(35,134,54,0.2); }
+    .date-input::-webkit-calendar-picker-indicator { filter: invert(0.7); cursor: pointer; }
+
+    .quick-btn { background-color: #21262d; border: 1px solid #30363d; color: #8b949e; font-size: 0.78rem; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-weight: 600; letter-spacing: 0.5px; transition: all 0.15s; }
+    .quick-btn:hover { background-color: #2d333a; color: #c9d1d9; border-color: #484f58; }
+    .quick-btn.active-quick { background: linear-gradient(135deg,#1a4731,#238636); color: #3fb950; border-color: #238636; }
+
+    .cs-wrap { position: relative; display: inline-block; }
+    .cs-trigger { background-color: #21262d; border: 1px solid #30363d; color: #e0e0e0; border-radius: 6px; padding: 4px 24px 4px 10px; font-size: 0.82rem; min-width: 130px; cursor: pointer; user-select: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23484f58'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-sizing: border-box; }
+    .cs-trigger:hover { border-color: #484f58; }
+    .cs-trigger.cs-has-value { border-color: #238636; color: #3fb950; }
+    .cs-dropdown { display: none; position: absolute; top: calc(100% + 3px); left: 0; z-index: 1000; background: #21262d; border: 1px solid #30363d; border-radius: 6px; min-width: 200px; max-width: 280px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+    .cs-dropdown.open { display: block; }
+    .cs-search { width: 100%; box-sizing: border-box; padding: 6px 8px; font-size: 0.8rem; background: #161b22; border: none; border-bottom: 1px solid #30363d; color: #e0e0e0; outline: none; border-radius: 6px 6px 0 0; }
+    .cs-search::placeholder { color: #484f58; }
+    .cs-optlist { max-height: 220px; overflow-y: auto; padding: 3px 0; }
+    .cs-option { padding: 5px 10px; font-size: 0.82rem; color: #c9d1d9; cursor: pointer; display: flex; align-items: center; gap: 7px; user-select: none; }
+    .cs-option:hover { background: #30363d; }
+    .cs-option-all { color: #8b949e; }
+    .cs-cb { width: 13px; height: 13px; border: 1.5px solid #484f58; border-radius: 3px; flex-shrink: 0; display: inline-block; }
+    .cs-cb.cs-cb-on { background: #238636; border-color: #238636; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 6l3 3 5-5' stroke='white' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: center; }
+    .cs-sep { height: 1px; background: #30363d; margin: 3px 0; }
+
+    .filter-sep { width: 1px; height: 28px; background-color: #30363d; margin: 0 6px; }
+
+    .scoreboard-table { width: 100%; border-collapse: collapse; }
+    .scoreboard-table th { background-color: #21262d; color: #8b949e; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; padding: 10px 14px; border-bottom: 1px solid #30363d; white-space: nowrap; text-align: center; }
+    .scoreboard-table th[data-sort] { cursor: pointer; user-select: none; }
+    .scoreboard-table th[data-sort]:hover { color: #c9d1d9; }
+    .scoreboard-table th[data-sort].sort-active { color: #388bfd; }
+    .sort-icon { margin-left: 4px; font-size: 0.7rem; opacity: 0.4; }
+    th[data-sort].sort-active .sort-icon { opacity: 1; }
+    .scoreboard-table td { padding: 9px 14px; border-bottom: 1px solid #21262d; font-size: 0.88rem; vertical-align: middle; text-align: center; color: #e0e0e0; }
+    .scoreboard-table th:first-child, .scoreboard-table td:first-child { text-align: left; }
+    .scoreboard-table tr.agent-row:hover td { background-color: #1c2128; }
+
+    .office-row td { background-color: #12171f; color: #c9d1d9; font-weight: 700; letter-spacing: 0.5px; padding: 9px 14px; border-top: 1px solid #30363d; border-bottom: 1px solid #21262d; cursor: pointer; user-select: none; }
+    .office-row td:first-child { font-size: 0.8rem; white-space: nowrap; }
+    .office-row:hover td { background-color: #161b22; }
+    .office-total { font-weight: 700; color: #c9d1d9; }
+    .chevron { transition: transform 0.2s; display: inline-block; color: #484f58; font-size: 0.7rem; margin-right: 8px; }
+    .chevron.open { transform: rotate(90deg); }
+
+    .dept-row td { background-color: #161b22; color: #c9d1d9; font-weight: 600; padding: 7px 14px; border-bottom: 1px solid #21262d; cursor: pointer; user-select: none; }
+    .dept-row td:first-child { font-size: 0.78rem; padding-left: 28px; }
+    .dept-row:hover td { background-color: #1c2128; }
+
+    .agent-row td { padding: 8px 14px; border-bottom: 1px solid #1a1f27; }
+    .agent-row td:first-child { color: #e0e0e0; font-size: 0.88rem; white-space: nowrap; padding-left: 36px; }
+
+    .retention-agent-row td { padding: 8px 14px; border-bottom: 1px solid #1a1f27; }
+    .retention-agent-row td:first-child { color: #e0e0e0; font-size: 0.88rem; white-space: nowrap; padding-left: 52px; }
+
+    .total-row td { background-color: #1c2128; border-top: 2px solid #30363d; padding: 11px 14px; font-weight: 700; color: #c9d1d9; font-size: 0.9rem; }
+
+    .section-title { font-size: 1rem; font-weight: 600; color: #c9d1d9; border-left: 3px solid #238636; padding-left: 10px; }
+    .sidebar-user { padding: 14px 20px; border-top: 1px solid #30363d; }
+
+    #filter-toggle { cursor: pointer; padding: 10px 16px; user-select: none; border-radius: 12px; }
+    #filter-toggle:hover { background: rgba(255,255,255,0.03); }
+    #filter-body { border-top: 1px solid #30363d; padding: 12px 16px 14px; }
+
+    .scoreboard-table th:first-child { position: sticky; left: 0; z-index: 3; background-color: #21262d; }
+    .scoreboard-table td:first-child { position: sticky; left: 0; z-index: 2; background-color: #0f1117; }
+    .scoreboard-table .office-row td:first-child { background-color: #12171f; }
+    .scoreboard-table .dept-row td:first-child { background-color: #161b22; }
+    .scoreboard-table .total-row td:first-child { background-color: #1c2128; }
+    .scoreboard-table tr.agent-row:hover td:first-child { background-color: #1c2128; }
+    .scoreboard-table .office-row:hover td:first-child { background-color: #161b22; }
+    .scoreboard-table .dept-row:hover td:first-child { background-color: #1c2128; }
+
+    .sidebar-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:99; }
+    .sidebar-overlay.show { display:block; }
+    .sidebar-toggle { display:none; position:fixed; top:8px; left:10px; z-index:300; background:transparent; border:none; color:#e0e0e0; border-radius:8px; padding:7px 10px; cursor:pointer; font-size:1.2rem; line-height:1; }
+    .mob-topbar { display:none; }
+    @media (max-width: 767px) {
+      body { display:block; }
+      .sidebar-toggle { display:block; }
+      .sidebar { transform:translateX(-240px); transition:transform 0.25s ease; }
+      .sidebar.open { transform:translateX(0); box-shadow:4px 0 20px rgba(0,0,0,0.6); }
+      .mob-topbar { display:flex; align-items:center; justify-content:center; position:fixed; top:0; left:0; right:0; height:48px; background:#161b22; border-bottom:1px solid #30363d; z-index:150; }
+      .mob-topbar-title { font-size:0.92rem; font-weight:700; color:#e0e0e0; padding:0 44px; }
+      .main-content { margin-left:0 !important; padding-top:48px; }
+      .table-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+      .date-input { width:120px; }
+      .scoreboard-table th, .scoreboard-table td { padding-left:7px !important; padding-right:7px !important; }
+      .scoreboard-table th:first-child { white-space:normal; font-size:0.68rem; min-width:0; }
+      .scoreboard-table th { font-size:0.68rem; }
+      .agent-row td:first-child { padding-left:18px !important; }
+      .retention-agent-row td:first-child { padding-left:26px !important; }
+      h4.fw-bold { display:none; }
+      .tbl-action-btn { padding:5px 7px !important; font-size:0.75rem !important; }
+      .tbl-export-btn { display:none !important; }
+      .section-title { font-size:0.82rem; }
+      .cs-trigger { min-width:100px; font-size:0.72rem; padding:3px 20px 3px 6px; }
+      .filter-sep { display:none; }
+      #row-count, #ret-row-count { display:none; }
+      .row-icon { display:none; }
+    }
+    @media (min-width: 768px) and (max-width: 1366px) {
+      body { display:block; }
+      .sidebar-toggle { display:block; }
+      .sidebar { transform:translateX(-240px); transition:transform 0.25s ease; }
+      .sidebar.open { transform:translateX(0); box-shadow:4px 0 20px rgba(0,0,0,0.6); }
+      .mob-topbar { display:flex; align-items:center; justify-content:center; position:fixed; top:0; left:0; right:0; height:48px; background:#161b22; border-bottom:1px solid #30363d; z-index:150; }
+      .mob-topbar-title { font-size:0.95rem; font-weight:700; color:#e0e0e0; padding:0 44px; }
+      .main-content { margin-left:0 !important; padding-top:48px; }
+      .table-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+      .cs-trigger { min-width:110px; font-size:0.76rem; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="mob-topbar"><span class="mob-topbar-title">Daily/Monthly Performance</span></div>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+<button class="sidebar-toggle" id="sidebar-toggle"><i class="bi bi-list"></i></button>
+<div class="sidebar">
+  <div class="sidebar-brand">
+    <i class="bi bi-bar-chart-fill text-success me-2"></i>Reporting System
+  </div>
+  <nav class="sidebar-nav">
+    {% set _ap = current_user.allowed_pages_list %}
+    {% if _ap is none or 'performance' in _ap %}
+    <a href="/performance" class="sidebar-link"><i class="bi bi-trophy"></i>Performance Report</a>
+    {% endif %}
+    {% if current_user.role == 'admin' or (_ap is not none and 'daily_monthly' in _ap) %}
+    <a href="/daily-monthly" class="sidebar-link active"><i class="bi bi-calendar-day"></i>Daily/Monthly Performance</a>
+    {% endif %}
+    {% if (_ap is none and current_user.role in ('admin', 'marketing', 'general')) or (_ap is not none and 'marketing' in _ap) %}
+    <a href="/campaign-performance" class="sidebar-link"><i class="bi bi-graph-up-arrow"></i>Marketing Performance</a>
+    {% endif %}
+    {% if _ap is none or 'agent_bonuses' in _ap %}
+    <a href="/agent-bonuses" class="sidebar-link"><i class="bi bi-cash-stack"></i>Agent Bonuses</a>
+    {% endif %}
+    {% if (_ap is none and current_user.role in ('admin', 'general')) or (_ap is not none and 'dashboard' in _ap) %}
+    <a href="/dashboard" class="sidebar-link"><i class="bi bi-speedometer2"></i>Dashboard</a>
+    {% endif %}
+    {% if current_user.role == 'admin' or (_ap is not none and 'ftc_date' in _ap) %}
+    <a href="/ftc-date" class="sidebar-link"><i class="bi bi-calendar2-check"></i>FTC Date</a>
+    {% endif %}
+    {% if current_user.role == 'admin' or (_ap is not none and 'total_traders' in _ap) %}
+    <a href="/total-traders" class="sidebar-link"><i class="bi bi-activity"></i>Total Traders</a>
+    {% endif %}
+    {% if current_user.role == 'admin' or (_ap is not none and 'fsa_report' in _ap) %}
+    <a href="/fsa-report" class="sidebar-link"><i class="bi bi-file-earmark-text"></i>FSA Report</a>
+    {% endif %}
+    {% if current_user.role == 'admin' or (_ap is not none and 'data_sync' in _ap) %}
+    <a href="/data-sync" class="sidebar-link"><i class="bi bi-database"></i>Data Sync</a>
+    {% endif %}
+    {% if current_user.role == 'admin' or (_ap is not none and 'holidays' in _ap) %}
+    <a href="/holidays" class="sidebar-link"><i class="bi bi-calendar-x"></i>Holidays</a>
+    {% endif %}
+    {% if (_ap is none and current_user.role not in ('marketing', 'agent')) or (_ap is not none and 'all_ftcs' in _ap) %}
+    <a href="/all-ftcs" class="sidebar-link"><i class="bi bi-people"></i>All FTCs</a>
+    {% endif %}
+    {% if current_user.role == 'admin' or (_ap is not none and 'transactions_report' in _ap) %}
+    <a href="/transactions-report" class="sidebar-link"><i class="bi bi-receipt"></i>Transactions Report</a>
+    {% endif %}
+  </nav>
+  <div class="sidebar-user">
+    <div style="font-size:0.68rem;color:#8b949e;margin-bottom:2px;">Signed in as</div>
+    <div style="font-weight:600;font-size:0.82rem;color:#e0e0e0;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ current_user.full_name }}</div>
+    <div style="font-size:0.7rem;color:#3fb950;margin-bottom:8px;">{{ current_user.role | replace('_', ' ') | title }}</div>
+    <div style="display:flex;gap:12px;align-items:center;">
+      {% if current_user.role == 'admin' %}<a href="/admin/users" style="color:#8b949e;text-decoration:none;font-size:1.05rem;" title="Admin Users"><i class="bi bi-people-fill"></i></a>{% endif %}
+      <a href="/logout" style="color:#f85149;text-decoration:none;font-size:1.05rem;" title="Logout"><i class="bi bi-box-arrow-right"></i></a>
+    </div>
+  </div>
+</div>
+
+<div class="main-content">
+<div class="container-fluid px-4 py-4">
+
+  <div class="mb-1 d-none d-md-flex align-items-baseline gap-3">
+    <h4 class="fw-bold text-white mb-0">Daily/Monthly Performance</h4>
+    <span style="font-size:0.73rem;color:#8b949e;white-space:nowrap;"><span id="stat-wd">—</span> work days &middot; <span id="stat-wd-left">—</span> left</span>
+  </div>
+  <div id="sync-bar" style="font-size:0.73rem;color:#8b949e;margin-bottom:14px;display:flex;align-items:center;gap:12px;"><i class="bi bi-arrow-repeat me-1"></i>Last sync: <span id="sync-bar-val">—</span><span class="d-md-none" style="white-space:nowrap;"><span id="stat-wd-mob">—</span> work days &middot; <span id="stat-wd-left-mob">—</span> left</span></div>
+
+  <!-- Filter Bar -->
+  <div class="card mb-4">
+    <div class="d-flex align-items-center justify-content-between" id="filter-toggle">
+      <span style="font-size:0.8rem;color:#8b949e;font-weight:600;"><i class="bi bi-sliders me-2" style="color:#388bfd;"></i>Filters</span>
+      <i class="bi bi-chevron-up" id="filter-chevron" style="color:#8b949e;font-size:0.8rem;transition:transform 0.2s;"></i>
+    </div>
+    <div id="filter-body">
+
+    <div class="d-flex flex-wrap align-items-center gap-1 mb-3">
+      <button class="period-btn year-btn" data-year="2024">2024</button>
+      <button class="period-btn year-btn" data-year="2025">2025</button>
+      <button class="period-btn year-btn" data-year="2026">2026</button>
+      <div class="filter-sep"></div>
+      <button class="period-btn month-btn" data-month="1">Jan</button>
+      <button class="period-btn month-btn" data-month="2">Feb</button>
+      <button class="period-btn month-btn" data-month="3">Mar</button>
+      <button class="period-btn month-btn" data-month="4">Apr</button>
+      <button class="period-btn month-btn" data-month="5">May</button>
+      <button class="period-btn month-btn" data-month="6">Jun</button>
+      <button class="period-btn month-btn" data-month="7">Jul</button>
+      <button class="period-btn month-btn" data-month="8">Aug</button>
+      <button class="period-btn month-btn" data-month="9">Sep</button>
+      <button class="period-btn month-btn" data-month="10">Oct</button>
+      <button class="period-btn month-btn" data-month="11">Nov</button>
+      <button class="period-btn month-btn" data-month="12">Dec</button>
+      <div class="cs-wrap" style="margin-left:auto;">
+        <div class="cs-trigger" id="cs-office-trigger">All Offices</div>
+        <div class="cs-dropdown" id="cs-office-drop">
+          <input type="text" class="cs-search" id="cs-office-search" placeholder="Search…" autocomplete="off" />
+          <div class="cs-optlist" id="cs-office-opts"></div>
+        </div>
+      </div>
+      <div class="cs-wrap">
+        <div class="cs-trigger" id="cs-team-trigger">All Teams</div>
+        <div class="cs-dropdown" id="cs-team-drop">
+          <input type="text" class="cs-search" id="cs-team-search" placeholder="Search…" autocomplete="off" />
+          <div class="cs-optlist" id="cs-team-opts"></div>
+        </div>
+      </div>
+      <div class="cs-wrap">
+        <div class="cs-trigger" id="cs-agent-trigger">All Agents</div>
+        <div class="cs-dropdown" id="cs-agent-drop">
+          <input type="text" class="cs-search" id="cs-agent-search" placeholder="Search…" autocomplete="off" />
+          <div class="cs-optlist" id="cs-agent-opts"></div>
+        </div>
+      </div>
+      <div class="cs-wrap">
+        <div class="cs-trigger" id="cs-status-trigger">All Status</div>
+        <div class="cs-dropdown" id="cs-status-drop">
+          <input type="text" class="cs-search" id="cs-status-search" placeholder="Search…" autocomplete="off" />
+          <div class="cs-optlist" id="cs-status-opts"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="d-flex flex-wrap align-items-center gap-2">
+      <span class="text-muted small">From</span>
+      <input type="date" id="date-from" class="date-input" />
+      <span class="text-muted small">To</span>
+      <input type="date" id="date-to" class="date-input" />
+      <div class="filter-sep"></div>
+      <button class="quick-btn" id="btn-today">TODAY</button>
+      <button class="quick-btn" id="btn-ystrd">YSTRD</button>
+      <div class="filter-sep"></div>
+      <button class="btn btn-sm text-white px-3" style="background:linear-gradient(135deg,#238636,#2ea043);border:none;border-radius:6px;" id="btn-apply">
+        <i class="bi bi-arrow-clockwise me-1"></i>Apply
+      </button>
+    </div>
+
+    </div>
+  </div>
+
+  {% if show_sales %}
+  <!-- Sales Table -->
+  <div>
+      <div class="card p-0" style="overflow:hidden;">
+        <div class="d-flex justify-content-between align-items-center px-4 py-3" style="border-bottom:1px solid #30363d;">
+          <div class="d-flex align-items-center gap-2">
+            <div class="section-title">Sales</div>
+          </div>
+          <div class="d-flex align-items-center gap-2 flex-wrap">
+            <span class="small" style="color:#e0e0e0;" id="row-count"></span>
+            <button onclick="expandAllSales()" title="Expand All" class="btn btn-sm tbl-action-btn" style="background:#21262d;border:1px solid #30363d;color:#8b949e;border-radius:6px;font-size:0.8rem;padding:4px 10px;"><i class="bi bi-arrows-expand"></i><span class="d-none d-md-inline ms-1">Expand All</span></button>
+            <button onclick="collapseAllSales()" title="Collapse All" class="btn btn-sm tbl-action-btn" style="background:#21262d;border:1px solid #30363d;color:#8b949e;border-radius:6px;font-size:0.8rem;padding:4px 10px;"><i class="bi bi-arrows-collapse"></i><span class="d-none d-md-inline ms-1">Collapse All</span></button>
+            <button onclick="exportSalesExcel()" title="Export Excel" class="btn btn-sm tbl-action-btn tbl-export-btn" style="background:#1a4731;border:1px solid #238636;color:#3fb950;border-radius:6px;font-size:0.8rem;padding:4px 12px;">
+              <i class="bi bi-file-earmark-excel"></i><span class="d-none d-md-inline ms-1">Export Excel</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="loading" style="display:none;text-align:center;padding:60px;color:#8b949e;">
+          <div class="spinner-border text-success mb-3" style="width:2rem;height:2rem;"></div>
+          <div class="small">Loading...</div>
+        </div>
+
+        <div id="error-msg" style="display:none;" class="text-danger text-center p-4 small"></div>
+
+        <div id="table-wrapper" class="table-scroll" style="overflow-x:auto;">
+          <table class="scoreboard-table" id="scoreboard-table">
+            <thead>
+              <tr>
+                <th data-sort="name" style="cursor:pointer;user-select:none;">Office / Agent <i class="bi sort-icon bi-arrow-down-up" id="sort-icon-name"></i></th>
+                <th class="text-center" style="min-width:80px;" data-sort="dailyFtdTotal">Daily FTD <i class="bi sort-icon" id="sort-icon-dailyFtdTotal"></i></th>
+                <th class="text-center" style="min-width:90px;" data-sort="dailyTargetTotal">Daily Target <i class="bi sort-icon" id="sort-icon-dailyTargetTotal"></i></th>
+                <th class="text-center" style="min-width:80px;" data-sort="dailyPctTotal">Daily % <i class="bi sort-icon" id="sort-icon-dailyPctTotal"></i></th>
+                <th class="text-center" style="min-width:95px;" data-sort="ftdCountTotal">Monthly FTD <i class="bi sort-icon" id="sort-icon-ftdCountTotal"></i></th>
+                <th class="text-center" style="min-width:110px;" data-sort="targetTotal">Monthly Target <i class="bi sort-icon" id="sort-icon-targetTotal"></i></th>
+                <th class="text-center" style="min-width:105px;" data-sort="rrMonthlyPctTotal">% RR Monthly <i class="bi sort-icon" id="sort-icon-rrMonthlyPctTotal"></i></th>
+                <th class="text-center" style="min-width:120px;" data-sort="netDepositsTotal">Net Sales Monthly <i class="bi sort-icon" id="sort-icon-netDepositsTotal"></i></th>
+                <th class="text-center" style="min-width:60px;" data-sort="ftcTotal">FTC <i class="bi sort-icon" id="sort-icon-ftcTotal"></i></th>
+                <th class="text-center" style="min-width:80px;" data-sort="ftcRrTotal">FTC RR <i class="bi sort-icon" id="sort-icon-ftcRrTotal"></i></th>
+                <th class="text-center" style="min-width:80px;" data-sort="ftcRrPctTotal">FTC RR% <i class="bi sort-icon" id="sort-icon-ftcRrPctTotal"></i></th>
+              </tr>
+            </thead>
+            <tbody id="table-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
+  {% if show_retention %}
+  <!-- Retention Table -->
+  <div class="mt-3">
+      <div class="card p-0" style="overflow:hidden;">
+        <div class="d-flex justify-content-between align-items-center px-4 py-3" style="border-bottom:1px solid #30363d;">
+          <div class="d-flex align-items-center gap-2">
+            <div class="section-title" style="border-left-color:#388bfd;">Retention</div>
+          </div>
+          <div class="d-flex align-items-center gap-2 flex-wrap">
+            <span class="small" style="color:#e0e0e0;" id="ret-row-count"></span>
+            <button onclick="expandAllRetention()" title="Expand All" class="btn btn-sm tbl-action-btn" style="background:#21262d;border:1px solid #30363d;color:#8b949e;border-radius:6px;font-size:0.8rem;padding:4px 10px;"><i class="bi bi-arrows-expand"></i><span class="d-none d-md-inline ms-1">Expand All</span></button>
+            <button onclick="collapseAllRetention()" title="Collapse All" class="btn btn-sm tbl-action-btn" style="background:#21262d;border:1px solid #30363d;color:#8b949e;border-radius:6px;font-size:0.8rem;padding:4px 10px;"><i class="bi bi-arrows-collapse"></i><span class="d-none d-md-inline ms-1">Collapse All</span></button>
+            <button onclick="exportRetentionExcel()" title="Export Excel" class="btn btn-sm tbl-action-btn tbl-export-btn" style="background:#0d2137;border:1px solid #1f6feb;color:#388bfd;border-radius:6px;font-size:0.8rem;padding:4px 12px;">
+              <i class="bi bi-file-earmark-excel"></i><span class="d-none d-md-inline ms-1">Export Excel</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="ret-loading" style="display:none;text-align:center;padding:60px;color:#8b949e;">
+          <div class="spinner-border mb-3" style="color:#388bfd;width:2rem;height:2rem;"></div>
+          <div class="small">Loading...</div>
+        </div>
+
+        <div id="ret-error-msg" style="display:none;" class="text-danger text-center p-4 small"></div>
+
+        <div id="ret-table-wrapper" class="table-scroll" style="overflow-x:auto;">
+          <table class="scoreboard-table" id="retention-table">
+            <thead>
+              <tr>
+                <th data-sort="ret-name" style="cursor:pointer;user-select:none;">Office / Dept / Agent <i class="bi sort-icon bi-arrow-down-up" id="ret-sort-icon-name"></i></th>
+                <th class="text-center" style="min-width:90px;"  data-sort="ret-dailyNet">Daily Net <i class="bi sort-icon" id="ret-sort-icon-dailyNet"></i></th>
+                <th class="text-center" style="min-width:100px;" data-sort="ret-dailyTarget">Daily Target <i class="bi sort-icon" id="ret-sort-icon-dailyTarget"></i></th>
+                <th class="text-center" style="min-width:80px;"  data-sort="ret-dailyPct">Daily % <i class="bi sort-icon" id="ret-sort-icon-dailyPct"></i></th>
+                <th class="text-center" style="min-width:100px;" data-sort="ret-dailyTraders">Daily Traders <i class="bi sort-icon" id="ret-sort-icon-dailyTraders"></i></th>
+                <th class="text-center" style="min-width:90px;"  data-sort="ret-dailyLoads">Daily Loads <i class="bi sort-icon" id="ret-sort-icon-dailyLoads"></i></th>
+                <th class="text-center" style="min-width:80px;"  data-sort="ret-dailyStd">Daily STD <i class="bi sort-icon" id="ret-sort-icon-dailyStd"></i></th>
+                <th class="text-center" style="min-width:100px;" data-sort="ret-netUsd">Monthly Net <i class="bi sort-icon" id="ret-sort-icon-netUsd"></i></th>
+                <th class="text-center" style="min-width:120px;" data-sort="ret-targetNet">Monthly Net Target <i class="bi sort-icon" id="ret-sort-icon-targetNet"></i></th>
+                <th class="text-center" style="min-width:80px;"  data-sort="ret-netRrPct">RR% <i class="bi sort-icon" id="ret-sort-icon-netRrPct"></i></th>
+                <th class="text-center" style="min-width:110px;" data-sort="ret-tradersCount">Monthly Traders <i class="bi sort-icon" id="ret-sort-icon-tradersCount"></i></th>
+                <th class="text-center" style="min-width:100px;" data-sort="ret-monthlyLoads">Monthly Loads <i class="bi sort-icon" id="ret-sort-icon-monthlyLoads"></i></th>
+                <th class="text-center" style="min-width:95px;"  data-sort="ret-stdCount">Monthly STD <i class="bi sort-icon" id="ret-sort-icon-stdCount"></i></th>
+                <th class="text-center" style="min-width:130px;" data-sort="ret-miss100Rr">Missing to 100% RR <i class="bi sort-icon" id="ret-sort-icon-miss100Rr"></i></th>
+                <th class="text-center" style="min-width:100px;" data-sort="ret-depUsd">Deposit $ <i class="bi sort-icon" id="ret-sort-icon-depUsd"></i></th>
+                <th class="text-center" style="min-width:90px;"  data-sort="ret-netRr">NET RR <i class="bi sort-icon" id="ret-sort-icon-netRr"></i></th>
+                <th class="text-center" style="min-width:105px;" data-sort="ret-netTgtPct">Target NET % <i class="bi sort-icon" id="ret-sort-icon-netTgtPct"></i></th>
+                <th class="text-center" style="min-width:160px;" data-sort="ret-needOnTgt">Need to be on Target <i class="bi sort-icon" id="ret-sort-icon-needOnTgt"></i></th>
+                <th class="text-center" style="min-width:140px;" data-sort="ret-miss100">Missing to Reach 100% <i class="bi sort-icon" id="ret-sort-icon-miss100"></i></th>
+                <th class="text-center" style="min-width:120px;" data-sort="ret-perWd">Per Working Day <i class="bi sort-icon" id="ret-sort-icon-perWd"></i></th>
+                <th class="text-center" style="min-width:110px;" data-sort="ret-openVol">Open Volume <i class="bi sort-icon" id="ret-sort-icon-openVol"></i></th>
+                <th class="text-center" style="min-width:110px;" data-sort="ret-rdpNet">RDP Net $ <i class="bi sort-icon" id="ret-sort-icon-rdpNet"></i></th>
+              </tr>
+            </thead>
+            <tbody id="retention-tbody"></tbody>
+            <tfoot id="retention-tfoot"></tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
+</div>
+</div>
+
+<script>
+  const SHOW_SALES      = {{ 'true' if show_sales else 'false' }};
+  const SHOW_RETENTION  = {{ 'true' if show_retention else 'false' }};
+
+  // ── State ──────────────────────────────────────────────────────────────
+  const now = new Date();
+  let state = { year: now.getFullYear(), month: now.getMonth() + 1 };
+  let allRows = [];
+  let sortState = { col: 'ftcTotal', dir: 'desc' };
+  let workingDays = 0, workingDaysPassed = 0, workingDaysLeft = 0;
+
+  // ── Custom searchable select ─────────────────────────────────────────
+  function makeCustomSelect(triggerId, dropId, searchId, optsId, allLabel, onChange) {
+    let _values = new Set(), _allValues = [];
+    const trigger = document.getElementById(triggerId);
+    const drop = document.getElementById(dropId);
+    const search = document.getElementById(searchId);
+    const optList = document.getElementById(optsId);
+    trigger.addEventListener('click', e => {
+      e.stopPropagation();
+      const wasOpen = drop.classList.contains('open');
+      document.querySelectorAll('.cs-dropdown.open').forEach(d => d.classList.remove('open'));
+      if (!wasOpen) { drop.classList.add('open'); search.value = ''; _render(''); search.focus(); }
+    });
+    search.addEventListener('input', () => _render(search.value));
+    search.addEventListener('click', e => e.stopPropagation());
+    drop.addEventListener('click', e => e.stopPropagation());
+    function _updateTrigger() {
+      const n = _values.size, t = _allValues.length;
+      if (n === 0 || n === t) { trigger.textContent = allLabel; trigger.classList.remove('cs-has-value'); }
+      else if (n === 1) { trigger.textContent = [..._values][0]; trigger.classList.add('cs-has-value'); }
+      else { trigger.textContent = n + ' selected'; trigger.classList.add('cs-has-value'); }
+    }
+    function _render(q) {
+      q = (q || '').trim().toLowerCase();
+      const filtered = q ? _allValues.filter(v => v.toLowerCase().includes(q)) : _allValues;
+      optList.innerHTML = '';
+      const allOn = _values.size === _allValues.length;
+      const allEl = document.createElement('div');
+      allEl.className = 'cs-option cs-option-all';
+      allEl.innerHTML = '<span class="cs-cb' + (allOn ? ' cs-cb-on' : '') + '"></span><span>' + allLabel + '</span>';
+      allEl.addEventListener('click', e => { e.stopPropagation(); _values = new Set(_allValues); _updateTrigger(); _render(search.value); onChange(); });
+      optList.appendChild(allEl);
+      if (filtered.length) {
+        const sep = document.createElement('div'); sep.className = 'cs-sep'; optList.appendChild(sep);
+        filtered.forEach(v => {
+          const el = document.createElement('div');
+          el.className = 'cs-option';
+          const on = _values.has(v);
+          el.innerHTML = '<span class="cs-cb' + (on ? ' cs-cb-on' : '') + '"></span><span>' + v.replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</span>';
+          el.addEventListener('click', e => { e.stopPropagation(); if (_values.has(v)) _values.delete(v); else _values.add(v); _updateTrigger(); _render(search.value); onChange(); });
+          optList.appendChild(el);
+        });
+      }
+    }
+    function populate(values) { _allValues = values; _values = new Set(values); _updateTrigger(); }
+    return { populate, getValue: () => _values.size === _allValues.length ? null : new Set(_values) };
+  }
+
+  function onFilterChange() {
+    if (allRows.length) renderTable();
+    if (retAllRows.length) renderRetentionTable(retWd, retWdPassed, retWdLeft);
+  }
+  const csOffice = makeCustomSelect('cs-office-trigger','cs-office-drop','cs-office-search','cs-office-opts','All Offices', onFilterChange);
+  const csTeam   = makeCustomSelect('cs-team-trigger',  'cs-team-drop',  'cs-team-search',  'cs-team-opts',  'All Teams',   onFilterChange);
+  const csAgent  = makeCustomSelect('cs-agent-trigger', 'cs-agent-drop', 'cs-agent-search', 'cs-agent-opts', 'All Agents',  onFilterChange);
+  const csStatus = makeCustomSelect('cs-status-trigger','cs-status-drop','cs-status-search','cs-status-opts','All Status',  onFilterChange);
+
+  function populateFilterDropdowns() {
+    const offices = new Set(), teams = new Set(), agents = new Set();
+    const statuses = new Set(['Active', 'Inactive']);
+    [...allRows, ...retAllRows].forEach(r => {
+      if (r.office_name) offices.add(r.office_name);
+      if (r.dept_name)   teams.add(r.dept_name);
+      if (r.agent_name)  agents.add(r.agent_name);
+      if (r.status)      statuses.add(r.status);
+    });
+    csOffice.populate([...offices].sort());
+    csTeam.populate([...teams].sort());
+    csAgent.populate([...agents].sort());
+    csStatus.populate([...statuses].sort());
+  }
+
+  // ── Helpers ────────────────────────────────────────────────────────────
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function todayStr() { return `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`; }
+  function yesterdayStr() { const d = new Date(now); d.setDate(d.getDate()-1); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+  function firstOfMonth(y, m) { return `${y}-${pad(m)}-01`; }
+  function lastOfMonth(y, m) { const d = new Date(y, m, 0); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+  function dateToForMonth(y, m) { return (y===now.getFullYear()&&m===now.getMonth()+1) ? todayStr() : lastOfMonth(y,m); }
+  function escHtml(str) { return String(str??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  function netHtml(val, bold=false) {
+    if (val===null||val===undefined) return '<span style="color:#484f58;">—</span>';
+    const color = val>=0 ? '#3fb950' : '#f85149', fw = bold?'700':'600';
+    return `<span style="color:${color};font-weight:${fw};">${(val<0?'-':'')+'$'+Math.round(Math.abs(val)).toLocaleString('en-US')}</span>`;
+  }
+  function blueHtml(val, bold=false) {
+    if (val===null||val===undefined) return '<span style="color:#484f58;">—</span>';
+    const fw = bold?'700':'600';
+    return `<span style="color:#388bfd;font-weight:${fw};">${(val<0?'-':'')+'$'+Math.round(Math.abs(val)).toLocaleString('en-US')}</span>`;
+  }
+  function wDollarHtml(val, bold=false) {
+    if (val===null||val===undefined) return '<span style="color:#484f58;">—</span>';
+    const fw = bold?'700':'600';
+    return `<span style="color:#e0e0e0;font-weight:${fw};">${(val<0?'-':'')+'$'+Math.round(Math.abs(val)).toLocaleString('en-US')}</span>`;
+  }
+  function wCountHtml(val, bold=false) {
+    if (val===null||val===undefined) return '<span style="color:#484f58;">—</span>';
+    const fw = bold?'700':'600';
+    return `<span style="color:#e0e0e0;font-weight:${fw};">${Math.round(val).toLocaleString()}</span>`;
+  }
+  function pctHtml(pct, bold=false) {
+    if (pct===null||pct===undefined) return '<span style="color:#484f58;">—</span>';
+    const color = pct>=85?'#3fb950':pct>=65?'#d29922':'#f85149', fw=bold?'700':'600';
+    return `<span style="color:${color};font-weight:${fw};">${pct}%</span>`;
+  }
+  function retPctHtml(pct, bold=false) {
+    if (pct===null||pct===undefined) return '<span style="color:#484f58;">—</span>';
+    const p = Math.round(pct*100);
+    const color = p>=85?'#3fb950':p>=65?'#d29922':'#f85149', fw=bold?'700':'600';
+    return `<span style="color:${color};font-weight:${fw};">${p}%</span>`;
+  }
+
+  // ── Button highlight helpers ──────────────────────────────────────────
+  function activateYear(y) { document.querySelectorAll('.year-btn').forEach(b => b.classList.toggle('active', parseInt(b.dataset.year)===y)); }
+  function activateMonth(m) { document.querySelectorAll('.month-btn').forEach(b => b.classList.toggle('active', parseInt(b.dataset.month)===m)); }
+  function setQuickActive(id) { ['btn-today','btn-ystrd'].forEach(i => document.getElementById(i).classList.toggle('active-quick', i===id)); }
+
+  // ── Combined load ─────────────────────────────────────────────────────
+  async function loadAll(silent=false) {
+    const tasks = [];
+    if (SHOW_SALES)     tasks.push(loadData(silent));
+    if (SHOW_RETENTION) tasks.push(loadRetentionData(silent));
+    await Promise.all(tasks);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // SALES
+  // ═══════════════════════════════════════════════════════════════════════
+  async function loadData(silent=false) {
+    const df = document.getElementById('date-from').value;
+    const dt = document.getElementById('date-to').value;
+    if (!df || !dt) return;
+    if (!silent) {
+      document.getElementById('loading').style.display = 'block';
+      document.getElementById('table-wrapper').style.display = 'none';
+      document.getElementById('error-msg').style.display = 'none';
+    }
+    try {
+      const res = await fetch(`/api/daily-monthly/sales?date_from=${df}&date_to=${dt}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Server error');
+
+      workingDays = data.working_days;
+      workingDaysPassed = data.working_days_passed;
+      workingDaysLeft = data.working_days_left;
+      const safeWdPassed = workingDaysPassed > 0 ? workingDaysPassed : 1;
+      const tgtRatio = data.target_ratio ?? 1;
+      const wdRange = data.wd_in_range ?? workingDays;
+
+      allRows = data.rows.map(r => {
+        const pTgt = Math.round(r.target_ftc * tgtRatio);
+        const daily_target = workingDays > 0 ? pTgt / workingDays : 0;
+        const daily_pct = daily_target > 0 ? Math.round(r.daily_ftd / daily_target * 100) : null;
+        const rr_monthly_pct = pTgt > 0 ? Math.round((r.ftd_count / safeWdPassed * workingDays) / pTgt * 100) : null;
+        const ftc_rr = Math.floor(r.ftc / safeWdPassed * workingDays);
+        const ftc_rr_pct = pTgt > 0 ? Math.round(ftc_rr / pTgt * 100) : null;
+        return {
+          ...r, target_ftc: pTgt, daily_target, daily_pct, rr_monthly_pct,
+          ftc_rr, ftc_rr_pct,
+          net_deposits: r.net_deposits ?? 0, ftd_count: r.ftd_count ?? 0,
+        };
+      });
+      document.getElementById('stat-wd').textContent = workingDays;
+      document.getElementById('stat-wd-left').textContent = workingDaysLeft;
+      const wdMob = document.getElementById('stat-wd-mob'); if (wdMob) wdMob.textContent = workingDays;
+      const wdLMob = document.getElementById('stat-wd-left-mob'); if (wdLMob) wdLMob.textContent = workingDaysLeft;
+      populateFilterDropdowns();
+      renderTable();
+    } catch(e) {
+      if (!silent) {
+        document.getElementById('error-msg').textContent = 'Error: ' + e.message;
+        document.getElementById('error-msg').style.display = 'block';
+      }
+    } finally {
+      if (!silent) {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('table-wrapper').style.display = '';
+      }
+    }
+  }
+
+  function renderTable() {
+    const fOffice = csOffice.getValue();
+    const fTeam = csTeam.getValue();
+    const fAgent = csAgent.getValue();
+    const fStatus = csStatus.getValue();
+    const filtered = allRows.filter(r => {
+      if (!(r.ftc > 0 || r.target_ftc > 0 || r.net_deposits !== 0 || r.ftd_count > 0 || r.daily_ftd > 0)) return false;
+      if (fOffice && !fOffice.has(r.office_name)) return false;
+      if (fTeam && !fTeam.has(r.dept_name)) return false;
+      if (fAgent && !fAgent.has(r.agent_name)) return false;
+      if (fStatus && !fStatus.has(r.status)) return false;
+      return true;
+    });
+
+    // Count active agents only
+    const activeFiltered = filtered.filter(r => r.status === 'Active');
+    const activeOffices = new Set(activeFiltered.map(r => r.office_name));
+    const activeAgentCount = activeFiltered.length;
+
+    const tbody = document.getElementById('table-body');
+    const expandedOfficeNames = new Set();
+    tbody.querySelectorAll('tr.office-row').forEach(tr => {
+      if (tr.querySelector('.chevron')?.classList.contains('open'))
+        expandedOfficeNames.add(tr.dataset.officeName);
+    });
+    tbody.innerHTML = '';
+
+    const officeMap = new Map();
+    filtered.forEach(r => {
+      if (!officeMap.has(r.office_name)) officeMap.set(r.office_name, []);
+      officeMap.get(r.office_name).push(r);
+    });
+
+    const offices = [...officeMap.entries()].map(([name, agents]) => ({
+      name, agents,
+      dailyFtdTotal: agents.reduce((s,a) => s + (a.daily_ftd??0), 0),
+      dailyTargetTotal: agents.reduce((s,a) => s + (a.daily_target??0), 0),
+      get dailyPctTotal() { return this.dailyTargetTotal > 0 ? Math.round(this.dailyFtdTotal / this.dailyTargetTotal * 100) : null; },
+      ftdCountTotal: agents.reduce((s,a) => s + (a.ftd_count??0), 0),
+      targetTotal: agents.reduce((s,a) => s + (a.target_ftc??0), 0),
+      get rrMonthlyPctTotal() {
+        const safeWdp = workingDaysPassed > 0 ? workingDaysPassed : 1;
+        const projected = this.ftdCountTotal / safeWdp * workingDays;
+        return this.targetTotal > 0 ? Math.round(projected / this.targetTotal * 100) : null;
+      },
+      netDepositsTotal: agents.reduce((s,a) => s + (a.net_deposits??0), 0),
+      ftcTotal: agents.reduce((s,a) => s + (a.ftc??0), 0),
+      ftcRrTotal: agents.reduce((s,a) => s + (a.ftc_rr??0), 0),
+      get ftcRrPctTotal() { return this.targetTotal > 0 ? Math.round(this.ftcRrTotal / this.targetTotal * 100) : null; },
+    })).sort((a,b) => {
+      if (sortState.col === 'name') return sortState.dir === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
+      const av = a[sortState.col] ?? 0, bv = b[sortState.col] ?? 0;
+      return sortState.dir === 'desc' ? bv - av : av - bv;
+    });
+
+    let gDailyFtd=0, gDailyTarget=0, gFtdCount=0, gTarget=0, gNet=0, gFtc=0, gFtcRr=0;
+    offices.forEach((office, oi) => {
+      gDailyFtd += office.dailyFtdTotal;
+      gDailyTarget += office.dailyTargetTotal;
+      gFtdCount += office.ftdCountTotal;
+      gTarget += office.targetTotal;
+      gNet += office.netDepositsTotal;
+      gFtc += office.ftcTotal;
+      gFtcRr += office.ftcRrTotal;
+      const officeId = 'office-' + oi;
+      const offTr = document.createElement('tr');
+      offTr.className = 'office-row';
+      offTr.dataset.officeId = officeId;
+      offTr.dataset.officeName = office.name;
+      offTr.innerHTML = `
+        <td><span class="chevron">&#9654;</span><i class="bi bi-building row-icon me-2" style="color:#484f58;font-size:0.75rem;"></i><strong>${escHtml(office.name)}</strong></td>
+        <td class="text-center">${wCountHtml(office.dailyFtdTotal, true)}</td>
+        <td class="text-center">${wCountHtml(Math.round(office.dailyTargetTotal), true)}</td>
+        <td class="text-center">${pctHtml(office.dailyPctTotal, true)}</td>
+        <td class="text-center">${wCountHtml(office.ftdCountTotal, true)}</td>
+        <td class="text-center">${wCountHtml(office.targetTotal, true)}</td>
+        <td class="text-center">${pctHtml(office.rrMonthlyPctTotal, true)}</td>
+        <td class="text-center">${blueHtml(office.netDepositsTotal, true)}</td>
+        <td class="text-center">${wCountHtml(office.ftcTotal, true)}</td>
+        <td class="text-center">${wCountHtml(office.ftcRrTotal, true)}</td>
+        <td class="text-center">${pctHtml(office.ftcRrPctTotal, true)}</td>
+      `;
+      tbody.appendChild(offTr);
+
+      const agentColMap = {
+        name:'agent_name', dailyFtdTotal:'daily_ftd', dailyTargetTotal:'daily_target',
+        dailyPctTotal:'daily_pct', ftdCountTotal:'ftd_count', targetTotal:'target_ftc',
+        rrMonthlyPctTotal:'rr_monthly_pct', netDepositsTotal:'net_deposits',
+        ftcTotal:'ftc', ftcRrTotal:'ftc_rr', ftcRrPctTotal:'ftc_rr_pct',
+      };
+      const sortedAgents = [...office.agents].sort((a,b) => {
+        if (sortState.col === 'name') return sortState.dir==='asc'?(a.agent_name||'').localeCompare(b.agent_name||''):(b.agent_name||'').localeCompare(a.agent_name||'');
+        const key = agentColMap[sortState.col] || 'ftc';
+        return sortState.dir==='desc' ? (b[key]??0)-(a[key]??0) : (a[key]??0)-(b[key]??0);
+      });
+      sortedAgents.forEach(r => {
+        const tr = document.createElement('tr');
+        tr.className = 'agent-row';
+        tr.dataset.parentOffice = officeId;
+        tr.style.display = 'none';
+        tr.innerHTML = `
+          <td>${escHtml(r.agent_name)}</td>
+          <td class="text-center">${wCountHtml(r.daily_ftd)}</td>
+          <td class="text-center">${wCountHtml(Math.round(r.daily_target))}</td>
+          <td class="text-center">${pctHtml(r.daily_pct)}</td>
+          <td class="text-center">${wCountHtml(r.ftd_count)}</td>
+          <td class="text-center">${wCountHtml(r.target_ftc)}</td>
+          <td class="text-center">${pctHtml(r.rr_monthly_pct)}</td>
+          <td class="text-center">${blueHtml(r.net_deposits)}</td>
+          <td class="text-center">${wCountHtml(r.ftc)}</td>
+          <td class="text-center">${wCountHtml(r.ftc_rr)}</td>
+          <td class="text-center">${pctHtml(r.ftc_rr_pct)}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      if (expandedOfficeNames.has(office.name)) {
+        offTr.querySelector('.chevron').classList.add('open');
+        tbody.querySelectorAll(`tr[data-parent-office="${officeId}"]`).forEach(r => r.style.display = '');
+      }
+      offTr.addEventListener('click', () => {
+        const chevron = offTr.querySelector('.chevron');
+        const isOpen = chevron.classList.contains('open');
+        chevron.classList.toggle('open', !isOpen);
+        tbody.querySelectorAll(`tr[data-parent-office="${officeId}"]`).forEach(r => r.style.display = isOpen ? 'none' : '');
+      });
+    });
+
+    if (offices.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="11" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No data for this period</td></tr>';
+    } else {
+      const safeWdp = workingDaysPassed > 0 ? workingDaysPassed : 1;
+      const gDailyPct = gDailyTarget > 0 ? Math.round(gDailyFtd / gDailyTarget * 100) : null;
+      const gRrMonthly = gTarget > 0 ? Math.round((gFtdCount / safeWdp * workingDays) / gTarget * 100) : null;
+      const gFtcRrPct = gTarget > 0 ? Math.round(gFtcRr / gTarget * 100) : null;
+      const totalTr = document.createElement('tr');
+      totalTr.className = 'total-row';
+      totalTr.innerHTML = `
+        <td>Total</td>
+        <td class="text-center">${wCountHtml(gDailyFtd, true)}</td>
+        <td class="text-center">${wCountHtml(Math.round(gDailyTarget), true)}</td>
+        <td class="text-center">${pctHtml(gDailyPct, true)}</td>
+        <td class="text-center">${wCountHtml(gFtdCount, true)}</td>
+        <td class="text-center">${wCountHtml(gTarget, true)}</td>
+        <td class="text-center">${pctHtml(gRrMonthly, true)}</td>
+        <td class="text-center">${blueHtml(gNet, true)}</td>
+        <td class="text-center">${wCountHtml(gFtc, true)}</td>
+        <td class="text-center">${wCountHtml(gFtcRr, true)}</td>
+        <td class="text-center">${pctHtml(gFtcRrPct, true)}</td>
+      `;
+      tbody.appendChild(totalTr);
+    }
+    document.getElementById('row-count').textContent = `${activeOffices.size} offices · ${activeAgentCount} agents`;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // RETENTION
+  // ═══════════════════════════════════════════════════════════════════════
+  let retAllRows = [];
+  let retSortState = { col: 'ret-netUsd', dir: 'desc' };
+  let retWd = 0, retWdPassed = 0, retWdLeft = 0;
+  let retTgtRatio = 1, retWdRange = 0;
+
+  async function loadRetentionData(silent=false) {
+    const df = document.getElementById('date-from').value;
+    const dt = document.getElementById('date-to').value;
+    if (!df || !dt) return;
+    if (!silent) {
+      document.getElementById('ret-loading').style.display = 'block';
+      document.getElementById('ret-table-wrapper').style.display = 'none';
+      document.getElementById('ret-error-msg').style.display = 'none';
+    }
+    try {
+      const res = await fetch(`/api/daily-monthly/retention?date_from=${df}&date_to=${dt}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Server error');
+
+      const wd = data.working_days, wd_passed = data.working_days_passed, wd_left = data.working_days_left;
+      const safe_wdp = Math.max(wd_passed, 1);
+      const tgtR = data.target_ratio ?? 1;
+      const wdR = data.wd_in_range ?? wd;
+      retWd = wd; retWdPassed = wd_passed; retWdLeft = wd_left;
+      retTgtRatio = tgtR; retWdRange = wdR;
+
+      retAllRows = data.rows.map(r => {
+        const pTgt = r.target_net * tgtR;
+        const daily_target = wd > 0 ? pTgt / wd : 0;
+        const daily_pct = daily_target > 0 ? r.daily_net_usd / daily_target : null;
+        const net_rr = r.net_usd > 0 ? Math.floor(r.net_usd / safe_wdp * wd) : r.net_usd;
+        const net_rr_pct = pTgt > 0 ? net_rr / pTgt : null;
+        const safeWdR = wdR > 0 ? wdR : 1;
+        const need_on_target = wdR > 0 ? pTgt * Math.min(wd_passed, wdR) / safeWdR : 0;
+        const missing_100_rr = need_on_target - r.net_usd;
+        const target_net_pct = pTgt > 0 ? r.net_usd / pTgt : null;
+        const missing_100 = pTgt - r.net_usd;
+        const wdLeftPwd = tgtR < 1 ? Math.max(wdR - wd_passed, 0) : wd_left;
+        const per_wd = wdLeftPwd > 0 ? missing_100 / wdLeftPwd : null;
+        return {
+          ...r, target_net: pTgt, daily_target, daily_pct,
+          net_rr, net_rr_pct, need_on_target, missing_100_rr,
+          target_net_pct, missing_100, per_wd,
+        };
+      });
+
+      if (!SHOW_SALES) {
+        const wdEl = document.getElementById('stat-wd'); if (wdEl) wdEl.textContent = wd;
+        const wdLEl = document.getElementById('stat-wd-left'); if (wdLEl) wdLEl.textContent = wd_left;
+      }
+      populateFilterDropdowns();
+      renderRetentionTable(wd, wd_passed, wd_left);
+    } catch(e) {
+      if (!silent) {
+        document.getElementById('ret-error-msg').textContent = 'Error: ' + e.message;
+        document.getElementById('ret-error-msg').style.display = 'block';
+      }
+    } finally {
+      if (!silent) {
+        document.getElementById('ret-loading').style.display = 'none';
+        document.getElementById('ret-table-wrapper').style.display = '';
+      }
+    }
+  }
+
+  function retSortVal(o) {
+    const m = {
+      'ret-dailyNet': o.dailyNet ?? 0,
+      'ret-dailyTarget': o.dailyTarget ?? 0,
+      'ret-dailyPct': o.dailyPct ?? -1e9,
+      'ret-dailyTraders': o.dailyTraders ?? 0,
+      'ret-dailyLoads': o.dailyLoads ?? 0,
+      'ret-dailyStd': o.dailyStd ?? 0,
+      'ret-netUsd': o.netUsd ?? 0,
+      'ret-targetNet': o.tgtNet ?? 0,
+      'ret-netRrPct': o.netRrPct ?? -1e9,
+      'ret-tradersCount': o.tradersCount ?? 0,
+      'ret-monthlyLoads': o.monthlyLoads ?? 0,
+      'ret-stdCount': o.stdCount ?? 0,
+      'ret-miss100Rr': o.miss100Rr ?? 0,
+      'ret-depUsd': o.depUsd ?? 0,
+      'ret-netRr': o.netRr ?? 0,
+      'ret-netTgtPct': o.netTgtPct ?? -1e9,
+      'ret-needOnTgt': o.needOnTgt ?? 0,
+      'ret-miss100': o.miss100 ?? 0,
+      'ret-perWd': o.perWd ?? 1e9,
+      'ret-openVol': o.openVol ?? 0,
+      'ret-rdpNet': o.rdpNet ?? 0,
+    };
+    return m[retSortState.col] ?? 0;
+  }
+
+  function renderRetentionTable(wd, wd_passed, wd_left) {
+    const safe_wdp = Math.max(wd_passed, 1);
+    const fOffice = csOffice.getValue();
+    const fTeam = csTeam.getValue();
+    const fAgent = csAgent.getValue();
+    const fStatus = csStatus.getValue();
+    const filtered = retAllRows.filter(r => {
+      if (!(r.target_net > 0 || r.net_usd !== 0 || r.deposit_usd > 0 || r.open_volume_usd > 0)) return false;
+      if (fOffice && !fOffice.has(r.office_name)) return false;
+      if (fTeam && !fTeam.has(r.dept_name)) return false;
+      if (fAgent && !fAgent.has(r.agent_name)) return false;
+      if (fStatus && !fStatus.has(r.status)) return false;
+      return true;
+    });
+
+    // Count active agents only
+    const activeFiltered = filtered.filter(r => r.status === 'Active');
+    const activeRetOffices = new Set(activeFiltered.map(r => r.office_name));
+    const activeRetAgentCount = activeFiltered.length;
+
+    const tbody = document.getElementById('retention-tbody');
+    const tfoot = document.getElementById('retention-tfoot');
+    const retExpandState = new Map();
+    tbody.querySelectorAll('tr.office-row').forEach(offTr => {
+      if (offTr.querySelector('.chevron')?.classList.contains('open')) {
+        const expandedDepts = new Set();
+        tbody.querySelectorAll(`tr.dept-row[data-parent-office="${offTr.dataset.officeId}"]`).forEach(deptTr => {
+          if (deptTr.querySelector('.chevron')?.classList.contains('open'))
+            expandedDepts.add(deptTr.dataset.deptName);
+        });
+        retExpandState.set(offTr.dataset.officeName, expandedDepts);
+      }
+    });
+    tbody.innerHTML = '';
+    tfoot.innerHTML = '';
+
+    const officeMap = new Map();
+    filtered.forEach(r => {
+      if (!officeMap.has(r.office_name)) officeMap.set(r.office_name, new Map());
+      const deptMap = officeMap.get(r.office_name);
+      if (!deptMap.has(r.dept_name)) deptMap.set(r.dept_name, []);
+      deptMap.get(r.dept_name).push(r);
+    });
+
+    function buildAgg(agents) {
+      const tgtNet = agents.reduce((s,a) => s + a.target_net, 0);
+      const netUsd = agents.reduce((s,a) => s + a.net_usd, 0);
+      const depUsd = agents.reduce((s,a) => s + a.deposit_usd, 0);
+      const stdCount = agents.reduce((s,a) => s + (a.std_count??0), 0);
+      const tradersCount = agents.reduce((s,a) => s + (a.traders_count??0), 0);
+      const openVol = agents.reduce((s,a) => s + a.open_volume_usd, 0);
+      const netRr = agents.reduce((s,a) => s + (a.net_rr??0), 0);
+      const needOnTgt = agents.reduce((s,a) => s + a.need_on_target, 0);
+      const miss100 = agents.reduce((s,a) => s + a.missing_100, 0);
+      const miss100Rr = agents.reduce((s,a) => s + a.missing_100_rr, 0);
+      const rdpNet = agents.reduce((s,a) => s + (a.rdp_net??0), 0);
+      const dailyNet = agents.reduce((s,a) => s + (a.daily_net_usd??0), 0);
+      const dailyTarget = agents.reduce((s,a) => s + (a.daily_target??0), 0);
+      const dailyTraders = agents.reduce((s,a) => s + (a.daily_traders??0), 0);
+      const dailyLoads = agents.reduce((s,a) => s + (a.daily_loads??0), 0);
+      const dailyStd = agents.reduce((s,a) => s + (a.daily_std??0), 0);
+      const monthlyLoads = agents.reduce((s,a) => s + (a.monthly_loads??0), 0);
+      const _wl = retTgtRatio < 1 ? Math.max(retWdRange - wd_passed, 0) : wd_left;
+      return {
+        tgtNet, netUsd, depUsd, stdCount, tradersCount, openVol, netRr, needOnTgt, miss100, miss100Rr, rdpNet,
+        dailyNet, dailyTarget, dailyTraders, dailyLoads, dailyStd, monthlyLoads,
+        dailyPct: dailyTarget > 0 ? dailyNet / dailyTarget : null,
+        netRrPct: tgtNet > 0 ? netRr / tgtNet : null,
+        netTgtPct: tgtNet > 0 ? netUsd / tgtNet : null,
+        perWd: _wl > 0 ? miss100 / _wl : null,
+      };
+    }
+
+    const officeArr = [];
+    officeMap.forEach((deptMap, officeName) => {
+      const allAgents = [];
+      deptMap.forEach(agents => allAgents.push(...agents));
+      officeArr.push({ officeName, deptMap, ...buildAgg(allAgents) });
+    });
+
+    officeArr.sort((a,b) => {
+      if (retSortState.col === 'ret-name') return retSortState.dir==='asc' ? a.officeName.localeCompare(b.officeName) : b.officeName.localeCompare(a.officeName);
+      const av = retSortVal(a), bv = retSortVal(b);
+      return retSortState.dir === 'desc' ? bv - av : av - bv;
+    });
+
+    let gTgtNet=0, gNetUsd=0, gDepUsd=0, gStdCount=0, gTradersCount=0, gOpenVol=0, gNetRr=0, gNeedOnTgt=0, gMiss100=0, gRdpNet=0;
+    let gDailyNet=0, gDailyTarget=0, gDailyTraders=0, gDailyLoads=0, gDailyStd=0, gMonthlyLoads=0;
+    let totalAgents = 0;
+
+    function retRowHtml(o, bold) {
+      return `
+        <td class="text-center">${netHtml(o.dailyNet, bold)}</td>
+        <td class="text-center">${wDollarHtml(Math.round(o.dailyTarget), bold)}</td>
+        <td class="text-center">${retPctHtml(o.dailyPct, bold)}</td>
+        <td class="text-center">${wCountHtml(o.dailyTraders, bold)}</td>
+        <td class="text-center">${wCountHtml(o.dailyLoads, bold)}</td>
+        <td class="text-center">${wCountHtml(o.dailyStd, bold)}</td>
+        <td class="text-center">${blueHtml(o.netUsd, bold)}</td>
+        <td class="text-center">${blueHtml(o.tgtNet, bold)}</td>
+        <td class="text-center">${retPctHtml(o.netRrPct, bold)}</td>
+        <td class="text-center">${wCountHtml(o.tradersCount, bold)}</td>
+        <td class="text-center">${wCountHtml(o.monthlyLoads, bold)}</td>
+        <td class="text-center">${wCountHtml(o.stdCount, bold)}</td>
+        <td class="text-center">${wDollarHtml(o.miss100Rr, bold)}</td>
+        <td class="text-center">${wDollarHtml(o.depUsd, bold)}</td>
+        <td class="text-center">${wDollarHtml(o.netRr, bold)}</td>
+        <td class="text-center">${retPctHtml(o.netTgtPct, bold)}</td>
+        <td class="text-center">${wDollarHtml(o.needOnTgt, bold)}</td>
+        <td class="text-center">${wDollarHtml(o.miss100, bold)}</td>
+        <td class="text-center">${wDollarHtml(o.perWd, bold)}</td>
+        <td class="text-center">${wDollarHtml(o.openVol, bold)}</td>
+        <td class="text-center">${netHtml(o.rdpNet, bold)}</td>
+      `;
+    }
+
+    function retAgentRowHtml(r) {
+      return `
+        <td class="text-center">${netHtml(r.daily_net_usd)}</td>
+        <td class="text-center">${wDollarHtml(Math.round(r.daily_target))}</td>
+        <td class="text-center">${retPctHtml(r.daily_pct)}</td>
+        <td class="text-center">${wCountHtml(r.daily_traders)}</td>
+        <td class="text-center">${wCountHtml(r.daily_loads)}</td>
+        <td class="text-center">${wCountHtml(r.daily_std)}</td>
+        <td class="text-center">${blueHtml(r.net_usd)}</td>
+        <td class="text-center">${blueHtml(r.target_net)}</td>
+        <td class="text-center">${retPctHtml(r.net_rr_pct)}</td>
+        <td class="text-center">${wCountHtml(r.traders_count)}</td>
+        <td class="text-center">${wCountHtml(r.monthly_loads)}</td>
+        <td class="text-center">${wCountHtml(r.std_count)}</td>
+        <td class="text-center">${wDollarHtml(r.missing_100_rr)}</td>
+        <td class="text-center">${wDollarHtml(r.deposit_usd)}</td>
+        <td class="text-center">${wDollarHtml(r.net_rr)}</td>
+        <td class="text-center">${retPctHtml(r.target_net_pct)}</td>
+        <td class="text-center">${wDollarHtml(r.need_on_target)}</td>
+        <td class="text-center">${wDollarHtml(r.missing_100)}</td>
+        <td class="text-center">${wDollarHtml(r.per_wd)}</td>
+        <td class="text-center">${wDollarHtml(r.open_volume_usd)}</td>
+        <td class="text-center">${netHtml(r.rdp_net)}</td>
+      `;
+    }
+
+    officeArr.forEach((office, officeIndex) => {
+      const officeId = 'ret-office-' + officeIndex;
+      gTgtNet += office.tgtNet; gNetUsd += office.netUsd; gDepUsd += office.depUsd;
+      gStdCount += office.stdCount; gTradersCount += office.tradersCount;
+      gOpenVol += office.openVol; gNetRr += office.netRr;
+      gNeedOnTgt += office.needOnTgt; gMiss100 += office.miss100; gRdpNet += office.rdpNet;
+      gDailyNet += office.dailyNet; gDailyTarget += office.dailyTarget;
+      gDailyTraders += office.dailyTraders; gDailyLoads += office.dailyLoads;
+      gDailyStd += office.dailyStd; gMonthlyLoads += office.monthlyLoads;
+
+      const offTr = document.createElement('tr');
+      offTr.className = 'office-row';
+      offTr.dataset.officeId = officeId;
+      offTr.dataset.officeName = office.officeName;
+      offTr.innerHTML = `<td><span class="chevron">&#9654;</span><i class="bi bi-building row-icon me-2" style="color:#484f58;font-size:0.75rem;"></i><strong>${escHtml(office.officeName)}</strong></td>` + retRowHtml(office, true);
+      tbody.appendChild(offTr);
+
+      const deptArr = [];
+      office.deptMap.forEach((agents, deptName) => {
+        deptArr.push({ deptName, agents, ...buildAgg(agents) });
+      });
+      deptArr.sort((a,b) => { const av=retSortVal(a), bv=retSortVal(b); return retSortState.dir==='desc'?bv-av:av-bv; });
+
+      deptArr.forEach((dept, deptIndex) => {
+        totalAgents += dept.agents.length;
+        const deptId = officeId + '-dept-' + deptIndex;
+        const deptTr = document.createElement('tr');
+        deptTr.className = 'dept-row';
+        deptTr.dataset.parentOffice = officeId;
+        deptTr.dataset.deptId = deptId;
+        deptTr.dataset.deptName = dept.deptName;
+        deptTr.style.display = 'none';
+        deptTr.innerHTML = `<td><span class="chevron">&#9654;</span><i class="bi bi-diagram-3 row-icon me-2" style="color:#484f58;font-size:0.72rem;"></i>${escHtml(dept.deptName)}</td>` + retRowHtml(dept, false);
+        tbody.appendChild(deptTr);
+
+        const retAgentColMap = {
+          'ret-name':'agent_name', 'ret-dailyNet':'daily_net_usd', 'ret-dailyTarget':'daily_target',
+          'ret-dailyPct':'daily_pct', 'ret-dailyTraders':'daily_traders', 'ret-dailyLoads':'daily_loads',
+          'ret-dailyStd':'daily_std', 'ret-netUsd':'net_usd', 'ret-targetNet':'target_net',
+          'ret-netRrPct':'net_rr_pct', 'ret-tradersCount':'traders_count', 'ret-monthlyLoads':'monthly_loads',
+          'ret-stdCount':'std_count', 'ret-miss100Rr':'missing_100_rr', 'ret-depUsd':'deposit_usd',
+          'ret-netRr':'net_rr', 'ret-netTgtPct':'target_net_pct', 'ret-needOnTgt':'need_on_target',
+          'ret-miss100':'missing_100', 'ret-perWd':'per_wd', 'ret-openVol':'open_volume_usd', 'ret-rdpNet':'rdp_net',
+        };
+        const sortedAgents = [...dept.agents].sort((a,b) => {
+          if (retSortState.col==='ret-name') return retSortState.dir==='asc'?(a.agent_name||'').localeCompare(b.agent_name||''):(b.agent_name||'').localeCompare(a.agent_name||'');
+          const key = retAgentColMap[retSortState.col] || 'net_usd';
+          return retSortState.dir==='desc' ? (b[key]??0)-(a[key]??0) : (a[key]??0)-(b[key]??0);
+        });
+
+        sortedAgents.forEach(r => {
+          const agTr = document.createElement('tr');
+          agTr.className = 'agent-row retention-agent-row';
+          agTr.dataset.parentOffice = officeId;
+          agTr.dataset.parentDept = deptId;
+          agTr.style.display = 'none';
+          agTr.innerHTML = `<td>${escHtml(r.agent_name)}</td>` + retAgentRowHtml(r);
+          tbody.appendChild(agTr);
+        });
+
+        deptTr.addEventListener('click', e => {
+          e.stopPropagation();
+          const chevron = deptTr.querySelector('.chevron');
+          const isOpen = chevron.classList.contains('open');
+          chevron.classList.toggle('open', !isOpen);
+          tbody.querySelectorAll(`tr[data-parent-dept="${deptId}"]`).forEach(r => r.style.display = isOpen ? 'none' : '');
+        });
+      });
+
+      if (retExpandState.has(office.officeName)) {
+        offTr.querySelector('.chevron').classList.add('open');
+        const expandedDepts = retExpandState.get(office.officeName);
+        tbody.querySelectorAll(`tr.dept-row[data-parent-office="${officeId}"]`).forEach(deptTr => {
+          deptTr.style.display = '';
+          if (expandedDepts.has(deptTr.dataset.deptName)) {
+            deptTr.querySelector('.chevron').classList.add('open');
+            tbody.querySelectorAll(`tr[data-parent-dept="${deptTr.dataset.deptId}"]`).forEach(r => r.style.display = '');
+          }
+        });
+      }
+
+      offTr.addEventListener('click', () => {
+        const chevron = offTr.querySelector('.chevron');
+        const isOpen = chevron.classList.contains('open');
+        if (!isOpen) {
+          tbody.querySelectorAll(`tr.dept-row[data-parent-office="${officeId}"]`).forEach(r => r.style.display = '');
+          chevron.classList.add('open');
+        } else {
+          tbody.querySelectorAll(`tr[data-parent-office="${officeId}"]`).forEach(r => {
+            r.style.display = 'none';
+            if (r.classList.contains('dept-row')) {
+              r.querySelector('.chevron')?.classList.remove('open');
+              const dId = r.dataset.deptId;
+              if (dId) tbody.querySelectorAll(`tr[data-parent-dept="${dId}"]`).forEach(ar => ar.style.display = 'none');
+            }
+          });
+          chevron.classList.remove('open');
+        }
+      });
+    });
+
+    if (filtered.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="22" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No data for this period</td></tr>';
+    } else {
+      const _gwl = retTgtRatio < 1 ? Math.max(retWdRange - wd_passed, 0) : wd_left;
+      const gAgg = {
+        dailyNet: gDailyNet, dailyTarget: gDailyTarget,
+        dailyPct: gDailyTarget > 0 ? gDailyNet / gDailyTarget : null,
+        dailyTraders: gDailyTraders, dailyLoads: gDailyLoads, dailyStd: gDailyStd,
+        netUsd: gNetUsd, tgtNet: gTgtNet,
+        netRrPct: gTgtNet > 0 ? gNetRr / gTgtNet : null,
+        tradersCount: gTradersCount, monthlyLoads: gMonthlyLoads, stdCount: gStdCount,
+        miss100Rr: gNeedOnTgt - gNetUsd,
+        depUsd: gDepUsd, netRr: gNetRr,
+        netTgtPct: gTgtNet > 0 ? gNetUsd / gTgtNet : null,
+        needOnTgt: gNeedOnTgt, miss100: gMiss100,
+        perWd: _gwl > 0 ? gMiss100 / _gwl : null,
+        openVol: gOpenVol, rdpNet: gRdpNet,
+      };
+      const totalTr = document.createElement('tr');
+      totalTr.className = 'total-row';
+      totalTr.innerHTML = `<td>Total</td>` + retRowHtml(gAgg, true);
+      tfoot.appendChild(totalTr);
+    }
+    document.getElementById('ret-row-count').textContent = `${activeRetOffices.size} offices · ${activeRetAgentCount} agents`;
+  }
+
+  // ── Expand / Collapse ─────────────────────────────────────────────────
+  function expandAllSales() {
+    const tbody = document.getElementById('table-body');
+    tbody.querySelectorAll('tr.office-row').forEach(offTr => {
+      offTr.querySelector('.chevron').classList.add('open');
+      tbody.querySelectorAll(`tr[data-parent-office="${offTr.dataset.officeId}"]`).forEach(r => r.style.display = '');
+    });
+  }
+  function collapseAllSales() {
+    const tbody = document.getElementById('table-body');
+    tbody.querySelectorAll('tr.office-row').forEach(offTr => {
+      offTr.querySelector('.chevron').classList.remove('open');
+      tbody.querySelectorAll(`tr[data-parent-office="${offTr.dataset.officeId}"]`).forEach(r => r.style.display = 'none');
+    });
+  }
+  function expandAllRetention() {
+    const tbody = document.getElementById('retention-tbody');
+    tbody.querySelectorAll('tr.office-row').forEach(offTr => {
+      offTr.querySelector('.chevron').classList.add('open');
+      tbody.querySelectorAll(`tr.dept-row[data-parent-office="${offTr.dataset.officeId}"]`).forEach(deptTr => {
+        deptTr.style.display = '';
+        deptTr.querySelector('.chevron')?.classList.add('open');
+        tbody.querySelectorAll(`tr[data-parent-dept="${deptTr.dataset.deptId}"]`).forEach(r => r.style.display = '');
+      });
+    });
+  }
+  function collapseAllRetention() {
+    const tbody = document.getElementById('retention-tbody');
+    tbody.querySelectorAll('tr.office-row').forEach(offTr => {
+      offTr.querySelector('.chevron').classList.remove('open');
+      tbody.querySelectorAll(`tr[data-parent-office="${offTr.dataset.officeId}"]`).forEach(r => {
+        r.style.display = 'none';
+        if (r.classList.contains('dept-row')) r.querySelector('.chevron')?.classList.remove('open');
+      });
+    });
+  }
+
+  // ── Export Excel ──────────────────────────────────────────────────────
+  function exportSalesExcel() {
+    if (!allRows.length) return;
+    const filtered = allRows.filter(r => r.ftc > 0 || r.target_ftc > 0 || r.net_deposits !== 0 || r.ftd_count > 0 || r.daily_ftd > 0);
+    const headers = ['Office','Agent','Daily FTD','Daily Target','Daily %','Monthly FTD','Monthly Target','% RR Monthly','Net Sales Monthly','FTC','FTC RR','FTC RR%'];
+    const rows = filtered.map(r => [r.office_name, r.agent_name, r.daily_ftd, Math.round(r.daily_target), r.daily_pct??'', r.ftd_count, r.target_ftc, r.rr_monthly_pct??'', Math.round(r.net_deposits*100)/100, r.ftc, r.ftc_rr, r.ftc_rr_pct??'']);
+    const df = document.getElementById('date-from').value, dt = document.getElementById('date-to').value;
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Sales');
+    XLSX.writeFile(wb, `DMP_Sales_${df}_${dt}.xlsx`);
+  }
+  function exportRetentionExcel() {
+    if (!retAllRows.length) return;
+    const filtered = retAllRows.filter(r => r.target_net > 0 || r.net_usd !== 0 || r.deposit_usd > 0 || r.open_volume_usd > 0);
+    const pct = v => (v !== null && v !== undefined) ? Math.round(v * 100) : '';
+    const r2 = v => (v !== null && v !== undefined) ? Math.round(v * 100) / 100 : 0;
+    const headers = ['Office','Dept','Agent','Daily Net','Daily Target','Daily %','Daily Traders','Daily Loads','Daily STD','Monthly Net','Monthly Net Target','RR%','Monthly Traders','Monthly Loads','Monthly STD','Missing to 100% RR','Deposit $','NET RR','Target NET %','Need to be on Target','Missing to Reach 100%','Per Working Day','Open Volume','RDP Net $'];
+    const rows = filtered.map(r => [r.office_name, r.dept_name, r.agent_name, r2(r.daily_net_usd), Math.round(r.daily_target), pct(r.daily_pct), r.daily_traders, r.daily_loads, r.daily_std, r2(r.net_usd), r2(r.target_net), pct(r.net_rr_pct), r.traders_count, r.monthly_loads, r.std_count, r2(r.missing_100_rr), r2(r.deposit_usd), r2(r.net_rr), pct(r.target_net_pct), r2(r.need_on_target), r2(r.missing_100), r.per_wd!=null?r2(r.per_wd):'', r2(r.open_volume_usd), r2(r.rdp_net??0)]);
+    const df = document.getElementById('date-from').value, dt = document.getElementById('date-to').value;
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Retention');
+    XLSX.writeFile(wb, `DMP_Retention_${df}_${dt}.xlsx`);
+  }
+
+  // ── Sort icons ────────────────────────────────────────────────────────
+  function updateSortIcons() {
+    document.querySelectorAll('#scoreboard-table th[data-sort]').forEach(th => {
+      const col = th.dataset.sort;
+      const icon = document.getElementById('sort-icon-' + col);
+      th.classList.toggle('sort-active', col === sortState.col);
+      if (icon) icon.className = 'bi sort-icon ' + (col !== sortState.col ? 'bi-arrow-down-up' : sortState.dir === 'desc' ? 'bi-sort-down' : 'bi-sort-up');
+    });
+  }
+  function updateRetSortIcons() {
+    document.querySelectorAll('#retention-table th[data-sort]').forEach(th => {
+      const col = th.dataset.sort;
+      const key = col.replace('ret-', '');
+      const icon = document.getElementById('ret-sort-icon-' + key);
+      th.classList.toggle('sort-active', col === retSortState.col);
+      if (icon) icon.className = 'bi sort-icon ' + (col !== retSortState.col ? 'bi-arrow-down-up' : retSortState.dir === 'desc' ? 'bi-sort-down' : 'bi-sort-up');
+    });
+  }
+
+  // ── Events ────────────────────────────────────────────────────────────
+  document.querySelectorAll('#scoreboard-table th[data-sort]').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.sort;
+      if (sortState.col === col) sortState.dir = sortState.dir === 'desc' ? 'asc' : 'desc';
+      else { sortState.col = col; sortState.dir = col === 'name' ? 'asc' : 'desc'; }
+      updateSortIcons();
+      if (allRows.length) renderTable();
+    });
+  });
+  document.querySelectorAll('#retention-table th[data-sort]').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.sort;
+      if (retSortState.col === col) retSortState.dir = retSortState.dir === 'desc' ? 'asc' : 'desc';
+      else { retSortState.col = col; retSortState.dir = col === 'ret-name' ? 'asc' : 'desc'; }
+      updateRetSortIcons();
+      if (retAllRows.length) renderRetentionTable(retWd, retWdPassed, retWdLeft);
+    });
+  });
+
+  document.querySelectorAll('.year-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.year = parseInt(btn.dataset.year);
+      activateYear(state.year); setQuickActive(null);
+      document.getElementById('date-from').value = firstOfMonth(state.year, state.month);
+      document.getElementById('date-to').value = dateToForMonth(state.year, state.month);
+      loadAll();
+    });
+  });
+  document.querySelectorAll('.month-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.month = parseInt(btn.dataset.month);
+      activateMonth(state.month); setQuickActive(null);
+      document.getElementById('date-from').value = firstOfMonth(state.year, state.month);
+      document.getElementById('date-to').value = dateToForMonth(state.year, state.month);
+      loadAll();
+    });
+  });
+  document.getElementById('btn-today').addEventListener('click', () => {
+    const t = todayStr();
+    document.getElementById('date-from').value = t;
+    document.getElementById('date-to').value = t;
+    setQuickActive('btn-today');
+    loadAll();
+  });
+  document.getElementById('btn-ystrd').addEventListener('click', () => {
+    const y = yesterdayStr();
+    document.getElementById('date-from').value = y;
+    document.getElementById('date-to').value = y;
+    setQuickActive('btn-ystrd');
+    loadAll();
+  });
+  document.getElementById('btn-apply').addEventListener('click', () => { setQuickActive(null); loadAll(); });
+  document.getElementById('date-from').addEventListener('change', () => {
+    const val = document.getElementById('date-from').value;
+    if (val) { const d = new Date(val+'T00:00:00'); state.year = d.getFullYear(); state.month = d.getMonth()+1; activateYear(state.year); activateMonth(state.month); }
+  });
+
+  document.addEventListener('click', () => document.querySelectorAll('.cs-dropdown.open').forEach(d => d.classList.remove('open')));
+
+  // ── Init ──────────────────────────────────────────────────────────────
+  document.getElementById('date-from').value = firstOfMonth(state.year, state.month);
+  document.getElementById('date-to').value = todayStr();
+  activateYear(state.year);
+  activateMonth(state.month);
+  updateSortIcons();
+  updateRetSortIcons();
+  loadAll();
+
+  // ── Filter bar toggle ────────────────────────────────────────────────
+  (function(){
+    const FKEY = 'dmp_filter_open';
+    const fbody = document.getElementById('filter-body');
+    const fchev = document.getElementById('filter-chevron');
+    const isTablet = window.innerWidth >= 768 && window.innerWidth <= 1024;
+    if (isTablet || localStorage.getItem(FKEY) !== '1') { fbody.style.display = 'none'; fchev.style.transform = 'rotate(180deg)'; }
+    document.getElementById('filter-toggle').addEventListener('click', function() {
+      const open = fbody.style.display !== 'none';
+      fbody.style.display = open ? 'none' : '';
+      fchev.style.transform = open ? 'rotate(180deg)' : '';
+      localStorage.setItem(FKEY, open ? '0' : '1');
+    });
+  })();
+
+  // Mobile sidebar toggle
+  (function(){
+    var toggle = document.getElementById('sidebar-toggle');
+    var sb = document.querySelector('.sidebar');
+    var overlay = document.getElementById('sidebar-overlay');
+    if (!toggle) return;
+    toggle.addEventListener('click', function(){ sb.classList.toggle('open'); overlay.classList.toggle('show'); });
+    overlay.addEventListener('click', function(){ sb.classList.remove('open'); overlay.classList.remove('show'); });
+  })();
+
+  // ── Last sync bar ────────────────────────────────────────────────────
+  function fmtRelTime(iso) {
+    if (!iso) return '—';
+    const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+    if (diff < 1) return 'just now';
+    if (diff < 60) return diff + ' min ago';
+    const h = Math.floor(diff / 60), m = diff % 60;
+    return h + 'h ' + (m > 0 ? m + 'm ' : '') + 'ago';
+  }
+  async function updateSyncBar() {
+    try {
+      const res = await fetch('/api/last-sync');
+      if (!res.ok) return;
+      const d = await res.json();
+      let latest = null;
+      ['transactions', 'ftd100'].forEach(t => { if (d[t]) { const ts = new Date(d[t]); if (!latest || ts > latest) latest = ts; } });
+      const el = document.getElementById('sync-bar-val');
+      if (el) el.textContent = latest ? fmtRelTime(latest.toISOString()) : '—';
+    } catch(e) {}
+  }
+  updateSyncBar();
+  setInterval(function() {
+    if (document.visibilityState !== 'visible') return;
+    const today = new Date().toISOString().split('T')[0];
+    const dt = document.getElementById('date-to').value;
+    updateSyncBar();
+    if (dt === today) loadAll(true);
+  }, 60000);
+</script>
+
+<script src="https://instant.page/5.2.0/instantpage.min.js" type="module"></script>
+</body>
+</html>
