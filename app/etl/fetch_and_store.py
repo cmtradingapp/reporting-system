@@ -966,17 +966,45 @@ def run_dealio_positions_etl() -> dict:
     return {"status": status, "rows_synced": rows}
 
 
+_MSSQL_DMT5_LOCK_ID = 777555111  # advisory lock id for mt5trades sync
+
 def run_mssql_dealio_mt5trades_full_etl() -> dict:
     """Full sync of report.dealio_mt5trades from MSSQL into PostgreSQL.
-    Resumes from the max ticket already in PG to avoid re-fetching."""
+    Resumes from the max ticket already in PG to avoid re-fetching.
+    Uses PG advisory lock to prevent concurrent runs."""
     from app.db.postgres_conn import get_connection
+    # Acquire advisory lock (non-blocking) to prevent concurrent syncs
+    lock_conn = get_connection()
+    try:
+        with lock_conn.cursor() as cur:
+            cur.execute("SELECT pg_try_advisory_lock(%s)", (_MSSQL_DMT5_LOCK_ID,))
+            got_lock = cur.fetchone()[0]
+        lock_conn.commit()
+    except Exception:
+        lock_conn.close()
+        raise
+    if not got_lock:
+        lock_conn.close()
+        print("[mssql_dmt5] Another sync is already running — skipping.")
+        return {"status": "skipped", "rows_synced": 0, "type": "full"}
+    try:
+        return _run_mssql_dmt5_inner(get_connection)
+    finally:
+        try:
+            with lock_conn.cursor() as cur:
+                cur.execute("SELECT pg_advisory_unlock(%s)", (_MSSQL_DMT5_LOCK_ID,))
+            lock_conn.commit()
+        finally:
+            lock_conn.close()
+
+
+def _run_mssql_dmt5_inner(get_connection) -> dict:
     start = time.time()
     cutoff = datetime(1970, 1, 1)
     status = "success"
     error_msg = None
     rows = 0
     chunk_num = 0
-    # Resume from max ticket in PG
     start_ticket = 0
     try:
         conn = get_connection()
