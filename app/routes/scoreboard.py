@@ -79,6 +79,7 @@ WHERE t.transactionapproval = 'Approved'
   AND t.transaction_type_name IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
   AND t.vtigeraccountid IS NOT NULL
   AND a.is_test_account = 0
+  AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%bonus%'
   {cls_where}
   AND (
       (a.client_qualification_date >= %(date_from)s AND a.client_qualification_date < %(date_to_excl)s)
@@ -150,7 +151,7 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
     role_filter = get_role_filter(user)
     cls_where, cls_params, cls_suffix = _build_cls_filter(request)
     has_cls = bool(cls_where)
-    _ck = f"perf_v25:{user.get('role','')}:{date_from}:{date_to}{cls_suffix}"
+    _ck = f"perf_v26:{user.get('role','')}:{date_from}:{date_to}{cls_suffix}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -468,7 +469,7 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
     role_filter = get_role_filter(user)
     cls_where, cls_params, cls_suffix = _build_cls_filter(request)
     has_cls = bool(cls_where)
-    _ck = f"perf_ret_v19:{user.get('role','')}:{date_from}:{date_to}{cls_suffix}"
+    _ck = f"perf_ret_v20:{user.get('role','')}:{date_from}:{date_to}{cls_suffix}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -678,6 +679,7 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
                       AND (t.deleted = 0 OR t.deleted IS NULL)
                       AND a.client_qualification_date IS NOT NULL
                       AND t.transaction_type_name IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')
+                      AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
                       AND t.confirmation_time >= %(date_from)s::timestamp
                       AND t.confirmation_time <  %(date_to_excl)s::timestamp
                       AND t.confirmation_time >  a.client_qualification_date + INTERVAL '1 day' - INTERVAL '1 second'

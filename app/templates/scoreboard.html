@@ -2236,15 +2236,15 @@
   }
   function applyMobileColOrder() {
     if (window.innerWidth >= 768) return;
-    // Sales: move FTC (index 4) → pos 1, then FTC RR % (now at index 10 after first move) → pos 2
+    // Sales: move FTD (index 2) → pos 1, then FTC RR % (now at index 10 after first move) → pos 2
     const st = document.getElementById('scoreboard-table');
     if (st && !st.dataset.mobReordered) {
-      _moveCol(st.querySelector('thead tr'), 4, 1);
+      _moveCol(st.querySelector('thead tr'), 2, 1);
       _moveCol(st.querySelector('thead tr'), 10, 2);
       st.dataset.mobReordered = '1';
     }
     if (st) Array.from(st.querySelectorAll('tbody tr, tfoot tr')).forEach(r => {
-      if (r.children.length > 10) { _moveCol(r, 4, 1); _moveCol(r, 10, 2); }
+      if (r.children.length > 10) { _moveCol(r, 2, 1); _moveCol(r, 10, 2); }
     });
     // Retention: move NET $ (index 7) → pos 1, then NET RR % (now at index 3) → pos 2
     const rt = document.getElementById('retention-table');

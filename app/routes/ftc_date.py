@@ -226,7 +226,7 @@ async def ftc_date_api(
     ftc_groups_set  = set(ftc_groups_list)
     apply_group_filter = bool(ftc_groups_set) and ftc_groups_set != _ALL_FTC_GROUPS
 
-    _ck = f"ftc_v8:{end_date}:{group1}:{group2}:{agent_id}:{office}:{team}:{classification}:{ftc_groups}"
+    _ck = f"ftc_v9:{end_date}:{group1}:{group2}:{agent_id}:{office}:{team}:{classification}:{ftc_groups}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -292,6 +292,7 @@ async def ftc_date_api(
         "    FROM transactions t\n"
         "    WHERE t.transactionapproval = 'Approved'\n"
         "      AND (t.deleted = 0 OR t.deleted IS NULL)\n"
+        "      AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'\n"
         "      AND t.confirmation_time >= '2024-01-01'\n"
         "      AND t.confirmation_time < (%(end_date)s::date + INTERVAL '1 day')\n"
         "    GROUP BY t.vtigeraccountid\n"

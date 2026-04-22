@@ -42,7 +42,7 @@ async def all_ftcs_api(request: Request, date_from: str, date_to: str):
         return JSONResponse(status_code=403, content={"detail": "Forbidden"})
 
     role_filter = get_role_filter(user)
-    _ck = f"all_ftcs_v12:{user.get('role','')}:{date_from}:{date_to}"
+    _ck = f"all_ftcs_v13:{user.get('role','')}:{date_from}:{date_to}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -115,6 +115,7 @@ async def all_ftcs_api(request: Request, date_from: str, date_to: str):
             WHERE t.transactionapproval = 'Approved'
               AND (t.deleted = 0 OR t.deleted IS NULL)
               AND t.transaction_type_name IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
+              AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
               AND t.original_deposit_owner IS NOT NULL
               AND (fi.ftd_date IS NULL OR t.confirmation_time >= fi.ftd_date OR t.ftd = 1)
               AND (t.confirmation_time < (fa.client_qualification_date + INTERVAL '1 day') OR t.ftd = 1)

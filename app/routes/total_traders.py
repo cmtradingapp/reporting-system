@@ -184,7 +184,7 @@ async def total_traders_api(
 
     def _ck_part(v): return ",".join(sorted(v)) if v else ""
     _user_role = user.get("role", "")
-    _ck = (f"total_traders_v8:{date_from}:{end_date}:{_ck_part(f_office)}:{_ck_part(f_team)}"
+    _ck = (f"total_traders_v9:{date_from}:{end_date}:{_ck_part(f_office)}:{_ck_part(f_team)}"
            f":{f_classification}:{ftc_groups}:{_user_role}")
     _hit = cache.get(_ck)
     if _hit is not None:
@@ -235,6 +235,7 @@ async def total_traders_api(
     _txn_where = f"""t.transactionapproval = 'Approved'
           AND (t.deleted = 0 OR t.deleted IS NULL)
           AND t.transaction_type_name IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
+          AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
           AND t.vtigeraccountid IS NOT NULL
           AND a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)
           AND a.accountid IS NOT NULL AND a.accountid::text != ''
@@ -306,6 +307,7 @@ async def total_traders_api(
                 WHERE t.transactionapproval = 'Approved'
                   AND (t.deleted = 0 OR t.deleted IS NULL)
                   AND t.transaction_type_name = 'Deposit'
+                  AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
                   AND t.vtigeraccountid IS NOT NULL
                   AND a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)
                   AND a.accountid IS NOT NULL AND a.accountid::text != ''

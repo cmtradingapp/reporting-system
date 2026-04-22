@@ -395,6 +395,7 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
                       AND t.transaction_type_name IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
                       AND t.vtigeraccountid IS NOT NULL
                       AND a.is_test_account = 0
+                      AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
                       AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
                       AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
                       AND t.confirmation_time >= %(date_from)s
@@ -486,7 +487,7 @@ async def campaign_performance_api(
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
     def _ck_part(v): return ','.join(sorted(v)) if v else ''
-    _ck = (f"camp_perf_v11:{date_from}:{date_to}:{f_classification}:{q_date_from}:{q_date_to}"
+    _ck = (f"camp_perf_v12:{date_from}:{date_to}:{f_classification}:{q_date_from}:{q_date_to}"
            f":{_ck_part(f_mkt_group)}:{_ck_part(f_legacy_id)}:{_ck_part(f_campaign_name)}"
            f":{_ck_part(f_channel)}:{_ck_part(f_sub_channel)}:{_ck_part(f_affiliate)}"
            f":{_ck_part(f_country)}:{_ck_part(f_office)}:{_ck_part(f_agent)}:{_ck_part(f_team)}"
@@ -747,6 +748,7 @@ def _camp_table_calc(
                 " WHERE t.transactionapproval = 'Approved'"
                 "   AND (t.deleted = 0 OR t.deleted IS NULL)"
                 "   AND t.transaction_type_name IN ('Deposit', 'Withdrawal Cancelled', 'Withdrawal', 'Deposit Cancelled')"
+                "   AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'"
                 "   AND t.vtigeraccountid IS NOT NULL"
                 "   AND a.is_test_account = 0"
                 + _TXN_ACCT_FILTERS +
@@ -994,7 +996,7 @@ async def campaign_performance_table_api(
         return JSONResponse(status_code=400, content={"detail": "Invalid period"})
 
     def _ck_part(v): return ','.join(sorted(v)) if v else ''
-    _ck = (f"camp_tbl_v12:{date_from}:{date_to}:{group1}:{group2}:{period}"
+    _ck = (f"camp_tbl_v13:{date_from}:{date_to}:{group1}:{group2}:{period}"
            f":{_ck_part(f_mkt_group)}:{_ck_part(f_legacy_id)}:{_ck_part(f_campaign_name)}:{_ck_part(f_channel)}"
            f":{_ck_part(f_sub_channel)}:{_ck_part(f_affiliate)}:{f_classification}:{ftc_groups}"
            f":{q_date_from}:{q_date_to}:{_ck_part(f_country)}:{_ck_part(f_office)}:{_ck_part(f_agent)}:{_ck_part(f_team)}"
