@@ -469,7 +469,7 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
     role_filter = get_role_filter(user)
     cls_where, cls_params, cls_suffix = _build_cls_filter(request)
     has_cls = bool(cls_where)
-    _ck = f"perf_ret_v20:{user.get('role','')}:{date_from}:{date_to}{cls_suffix}"
+    _ck = f"perf_ret_v21:{user.get('role','')}:{date_from}:{date_to}{cls_suffix}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -532,11 +532,15 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
             GROUP BY assigned_to
         ) std ON std.agent_id = u.id
         LEFT JOIN (
-            SELECT assigned_to AS agent_id, COUNT(DISTINCT accountid) AS traders_count
-            FROM mv_retention_traders
-            WHERE day >= %(date_from)s::date
-              AND day < %(date_to_excl)s::date
-            GROUP BY assigned_to
+            SELECT rt.assigned_to AS agent_id, COUNT(DISTINCT rt.accountid) AS traders_count
+            FROM mv_retention_traders rt
+            JOIN accounts a ON a.accountid = rt.accountid
+            WHERE rt.day >= %(date_from)s::date
+              AND rt.day < %(date_to_excl)s::date
+              AND a.is_test_account = 0
+              AND (a.is_demo = 0 OR a.is_demo IS NULL)
+              AND a.accountid IS NOT NULL AND a.accountid::text != ''
+            GROUP BY rt.assigned_to
         ) trd ON trd.agent_id = u.id
         WHERE (
               u.department_ = 'Retention'
@@ -550,10 +554,6 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'
-          AND TRIM(COALESCE(u.department, '')) NOT ILIKE '%%Retention%%'
-          AND TRIM(COALESCE(u.department, '')) NOT ILIKE '%%Conversion%%'
-          AND TRIM(COALESCE(u.department, '')) NOT ILIKE '%%Support%%'
-          AND TRIM(COALESCE(u.department, '')) NOT ILIKE '%%General%%'
           {role_filter}
         ORDER BY u.office_name NULLS LAST, dept_name, u.agent_name
     """
