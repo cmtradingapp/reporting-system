@@ -51,6 +51,8 @@
     .kpi-value { font-size: 1.35rem; font-weight: 700; line-height: 1.2; }
     .kpi-label { font-size: 0.65rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.8px; margin-top: 2px; font-weight: 600; }
 
+    @media (min-width: 768px) { .kpi-col-5 { flex: 0 0 20%; max-width: 20%; } }
+
     .filter-sep { width: 1px; height: 28px; background-color: #30363d; margin: 0 6px; }
 
     .scoreboard-table { width: 100%; border-collapse: collapse; }
@@ -297,10 +299,12 @@
     </div>
   </div>
 
-  <!-- KPI Cards -->
-  <div class="row g-2 mb-4">
+  <!-- KPI Cards – Row 1: Daily metrics -->
+  {% set _hide_net_cards = current_user.email in ['oluwaseun.a@cmtrading.com', 'elissa.b@cmtrading.com', 'precious.ib@cmtrading.com'] %}
+  <div class="row g-2 mb-2 kpi-row-5">
     {% if show_sales %}
-    <div class="col-6 col-md-2" id="kpi-daily-ftd">
+    <!-- 1. Daily FTD / Daily FTC -->
+    <div class="col-6 kpi-col-5">
       <div class="kpi-card text-center">
         <div style="display:flex;justify-content:center;align-items:center;gap:14px;">
           <div>
@@ -316,43 +320,11 @@
       </div>
     </div>
     {% endif %}
-    {% if show_sales %}
-    <div class="col-6 col-md-2" id="kpi-ftd-ftc">
-      <div class="kpi-card text-center">
-        <div style="display:flex;justify-content:center;align-items:center;gap:10px;">
-          <div>
-            <div class="kpi-value" style="color:#388bfd;" id="stat-total-ftd">—</div>
-            <div class="kpi-label">FTD</div>
-          </div>
-          <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
-          <div>
-            <div class="kpi-value" style="color:#388bfd;" id="stat-grand-ftc">—</div>
-            <div class="kpi-label">FTC</div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="col-6 col-md-2" id="kpi-ftd-rr">
-      <div class="kpi-card text-center">
-        <div class="kpi-split" style="display:flex;justify-content:center;align-items:center;gap:14px;">
-          <div>
-            <div class="kpi-value" style="color:#d29922;" id="stat-grand-ftd-rr">—</div>
-            <div class="kpi-label">FTD RR</div>
-          </div>
-          <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
-          <div>
-            <div class="kpi-value" style="color:#d29922;" id="stat-grand-ftc-rr">—</div>
-            <div class="kpi-label">FTC RR</div>
-          </div>
-        </div>
-      </div>
-    </div>
-    {% endif %}
-    {% set _hide_net_cards = current_user.email in ['oluwaseun.a@cmtrading.com', 'elissa.b@cmtrading.com', 'precious.ib@cmtrading.com'] %}
     {% if not _hide_net_cards %}
-    <div class="col-6 col-md-2" id="kpi-daily-net">
+    <!-- 2. Daily Net / Daily Ret Net -->
+    <div class="col-6 kpi-col-5">
       <div class="kpi-card text-center">
-        <div class="kpi-split" style="display:flex;justify-content:center;align-items:center;gap:14px;">
+        <div style="display:flex;justify-content:center;align-items:center;gap:14px;">
           {% if show_sales %}
           <div>
             <div class="kpi-value" style="color:#3fb950;" id="stat-daily-net">—</div>
@@ -371,50 +343,10 @@
         </div>
       </div>
     </div>
-    <div class="col-6 col-md-2" id="kpi-net">
-      <div class="kpi-card text-center">
-        <div class="kpi-value" style="color:#3fb950;" id="stat-grand-net">—</div>
-        <div class="kpi-label">NET $</div>
-      </div>
-    </div>
-    <div class="col-6 col-md-2" id="kpi-rdp-net">
-      <div class="kpi-card text-center">
-        <div class="kpi-value" id="stat-rdp-net">—</div>
-        <div class="kpi-label">RDP Net $</div>
-      </div>
-    </div>
-    <div class="col-6 col-md-2" id="kpi-net-rr">
-      <div class="kpi-card text-center">
-        <div class="kpi-value" style="color:#d29922;" id="stat-grand-net-rr">—</div>
-        <div class="kpi-label">NET RR</div>
-      </div>
-    </div>
-    {% endif %}
-    {% if not current_user.role.startswith('sales') %}
-    <div class="col-6 col-md-2" id="kpi-vol">
-      <div class="kpi-card text-center">
-        <div class="kpi-value" style="color:#c9d1d9;" id="stat-open-volume">—</div>
-        <div class="kpi-label">Open Volume</div>
-      </div>
-    </div>
     {% endif %}
     {% if show_retention %}
-    <div class="col-6 col-md-2">
-      <div class="kpi-card text-center">
-        <div style="display:flex;justify-content:center;align-items:center;gap:14px;">
-          <div>
-            <div class="kpi-value" style="color:#a371f7;" id="stat-daily-traders">—</div>
-            <div class="kpi-label">Daily Traders</div>
-          </div>
-          <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
-          <div>
-            <div class="kpi-value" style="color:#a371f7;" id="stat-monthly-traders">—</div>
-            <div class="kpi-label">Monthly Traders</div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="col-6 col-md-2">
+    <!-- 3. Daily Loads / Monthly Loads -->
+    <div class="col-6 kpi-col-5">
       <div class="kpi-card text-center">
         <div style="display:flex;justify-content:center;align-items:center;gap:14px;">
           <div>
@@ -429,7 +361,8 @@
         </div>
       </div>
     </div>
-    <div class="col-6 col-md-2">
+    <!-- 4. Daily STD / Monthly STD -->
+    <div class="col-6 kpi-col-5">
       <div class="kpi-card text-center">
         <div style="display:flex;justify-content:center;align-items:center;gap:14px;">
           <div>
@@ -442,6 +375,84 @@
             <div class="kpi-label">Monthly STD</div>
           </div>
         </div>
+      </div>
+    </div>
+    <!-- 5. Daily Traders / Monthly Traders -->
+    <div class="col-6 kpi-col-5">
+      <div class="kpi-card text-center">
+        <div style="display:flex;justify-content:center;align-items:center;gap:14px;">
+          <div>
+            <div class="kpi-value" style="color:#a371f7;" id="stat-daily-traders">—</div>
+            <div class="kpi-label">Daily Traders</div>
+          </div>
+          <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
+          <div>
+            <div class="kpi-value" style="color:#a371f7;" id="stat-monthly-traders">—</div>
+            <div class="kpi-label">Monthly Traders</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+  <!-- KPI Cards – Row 2: Monthly / totals -->
+  <div class="row g-2 mb-4 kpi-row-5">
+    {% if show_sales %}
+    <!-- 6. FTD / FTC -->
+    <div class="col-6 kpi-col-5">
+      <div class="kpi-card text-center">
+        <div style="display:flex;justify-content:center;align-items:center;gap:10px;">
+          <div>
+            <div class="kpi-value" style="color:#388bfd;" id="stat-total-ftd">—</div>
+            <div class="kpi-label">FTD</div>
+          </div>
+          <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
+          <div>
+            <div class="kpi-value" style="color:#388bfd;" id="stat-grand-ftc">—</div>
+            <div class="kpi-label">FTC</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- 7. FTD RR / FTC RR -->
+    <div class="col-6 kpi-col-5">
+      <div class="kpi-card text-center">
+        <div style="display:flex;justify-content:center;align-items:center;gap:14px;">
+          <div>
+            <div class="kpi-value" style="color:#d29922;" id="stat-grand-ftd-rr">—</div>
+            <div class="kpi-label">FTD RR</div>
+          </div>
+          <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
+          <div>
+            <div class="kpi-value" style="color:#d29922;" id="stat-grand-ftc-rr">—</div>
+            <div class="kpi-label">FTC RR</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+    {% if not _hide_net_cards %}
+    <!-- 8. NET $ -->
+    <div class="col-6 kpi-col-5">
+      <div class="kpi-card text-center">
+        <div class="kpi-value" style="color:#3fb950;" id="stat-grand-net">—</div>
+        <div class="kpi-label">NET $</div>
+      </div>
+    </div>
+    <!-- 9. NET RR -->
+    <div class="col-6 kpi-col-5">
+      <div class="kpi-card text-center">
+        <div class="kpi-value" style="color:#d29922;" id="stat-grand-net-rr">—</div>
+        <div class="kpi-label">NET RR</div>
+      </div>
+    </div>
+    {% endif %}
+    {% if not current_user.role.startswith('sales') %}
+    <!-- 10. Open Volume -->
+    <div class="col-6 kpi-col-5">
+      <div class="kpi-card text-center">
+        <div class="kpi-value" style="color:#c9d1d9;" id="stat-open-volume">—</div>
+        <div class="kpi-label">Open Volume</div>
       </div>
     </div>
     {% endif %}
@@ -563,16 +574,6 @@
 <script>
   const SHOW_SALES      = {{ 'true' if show_sales else 'false' }};
   const SHOW_RETENTION  = {{ 'true' if show_retention else 'false' }};
-  let _rdpNetRet = 0;
-  function _updateRdpNetCard() {
-    const el = document.getElementById('stat-rdp-net');
-    if (!el) return;
-    const v = _rdpNetRet;
-    const color = v >= 0 ? '#3fb950' : '#f85149';
-    el.style.color = color;
-    el.textContent = (v < 0 ? '-$' : '$') + Math.round(Math.abs(v)).toLocaleString();
-  }
-
   // ── State ──────────────────────────────────────────────────────────────
   const now = new Date();
   let state = { year: now.getFullYear(), month: now.getMonth() + 1 };
@@ -1359,8 +1360,6 @@
       totalTr.innerHTML = `<td>Total</td>` + retRowHtml(gAgg, true);
       tfoot.appendChild(totalTr);
     }
-    _rdpNetRet = gRdpNet;
-    _updateRdpNetCard();
     updateStatsFromFiltered();
     document.getElementById('ret-row-count').textContent = `${activeRetOffices.size} offices · ${activeRetAgentCount} agents`;
   }
