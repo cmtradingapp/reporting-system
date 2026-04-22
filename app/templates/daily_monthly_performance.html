@@ -303,19 +303,18 @@
     </div>
   </div>
 
-  <!-- KPI Cards -->
+  <!-- KPI Cards — 6 per row on desktop, 2 per row on mobile -->
   {% set _hide_net_cards = current_user.email in ['oluwaseun.a@cmtrading.com', 'elissa.b@cmtrading.com', 'precious.ib@cmtrading.com'] %}
-  <!-- Row 1: Daily FTD/FTC | Daily Net/Ret Net -->
   <div class="row g-2 mb-2">
     {% if show_sales %}
-    <div class="col-6">
+    <div class="col-6 col-md-2">
       <div class="kpi-card text-center">
-        <div style="display:flex;justify-content:center;align-items:center;gap:14px;">
+        <div style="display:flex;justify-content:center;align-items:center;gap:10px;">
           <div>
             <div class="kpi-value" style="color:#388bfd;" id="stat-daily-ftd">—</div>
             <div class="kpi-label">Daily FTD</div>
           </div>
-          <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
+          <div style="color:#484f58;font-size:1.2rem;line-height:1;">/</div>
           <div>
             <div class="kpi-value" style="color:#388bfd;" id="stat-daily-ftc">—</div>
             <div class="kpi-label">Daily FTC</div>
@@ -325,9 +324,9 @@
     </div>
     {% endif %}
     {% if not _hide_net_cards %}
-    <div class="col-6">
+    <div class="col-6 col-md-2">
       <div class="kpi-card text-center">
-        <div style="display:flex;justify-content:center;align-items:center;gap:14px;">
+        <div style="display:flex;justify-content:center;align-items:center;gap:10px;">
           {% if show_sales %}
           <div>
             <div class="kpi-value" style="color:#3fb950;" id="stat-daily-net">—</div>
@@ -335,7 +334,7 @@
           </div>
           {% endif %}
           {% if show_sales and show_retention %}
-          <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
+          <div style="color:#484f58;font-size:1.2rem;line-height:1;">/</div>
           {% endif %}
           {% if show_retention %}
           <div>
@@ -347,10 +346,7 @@
       </div>
     </div>
     {% endif %}
-  </div>
-  <!-- Row 2: Live EEZ | Daily PnL Cash -->
-  <div class="row g-2 mb-2">
-    <div class="col-6">
+    <div class="col-6 col-md-2">
       <div class="kpi-card text-center">
         <div class="kpi-value" style="color:#58a6ff;" id="stat-live-eez">—</div>
         <div class="kpi-label">
@@ -361,25 +357,22 @@
       </div>
     </div>
     {% if not _hide_net_cards %}
-    <div class="col-6">
+    <div class="col-6 col-md-2">
       <div class="kpi-card text-center">
         <div class="kpi-value" id="stat-daily-pnl-cash">—</div>
         <div class="kpi-label">Daily PnL Cash</div>
       </div>
     </div>
     {% endif %}
-  </div>
-  <!-- Row 3: FTD/FTC | NET $ -->
-  <div class="row g-2 mb-2">
     {% if show_sales %}
-    <div class="col-6">
+    <div class="col-6 col-md-2">
       <div class="kpi-card text-center">
         <div style="display:flex;justify-content:center;align-items:center;gap:10px;">
           <div>
             <div class="kpi-value" style="color:#388bfd;" id="stat-total-ftd">—</div>
             <div class="kpi-label">FTD</div>
           </div>
-          <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
+          <div style="color:#484f58;font-size:1.2rem;line-height:1;">/</div>
           <div>
             <div class="kpi-value" style="color:#388bfd;" id="stat-grand-ftc">—</div>
             <div class="kpi-label">FTC</div>
@@ -389,7 +382,7 @@
     </div>
     {% endif %}
     {% if not _hide_net_cards %}
-    <div class="col-6">
+    <div class="col-6 col-md-2">
       <div class="kpi-card text-center">
         <div class="kpi-value" style="color:#3fb950;" id="stat-grand-net">—</div>
         <div class="kpi-label">NET $</div>
@@ -397,17 +390,16 @@
     </div>
     {% endif %}
   </div>
-  <!-- Row 4: FTD RR/FTC RR | NET RR -->
-  <div class="row g-2 mb-2">
+  <div class="row g-2 mb-4">
     {% if show_sales %}
-    <div class="col-6">
+    <div class="col-6 col-md-2">
       <div class="kpi-card text-center">
-        <div style="display:flex;justify-content:center;align-items:center;gap:14px;">
+        <div style="display:flex;justify-content:center;align-items:center;gap:10px;">
           <div>
             <div class="kpi-value" style="color:#d29922;" id="stat-grand-ftd-rr">—</div>
             <div class="kpi-label">FTD RR</div>
           </div>
-          <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
+          <div style="color:#484f58;font-size:1.2rem;line-height:1;">/</div>
           <div>
             <div class="kpi-value" style="color:#d29922;" id="stat-grand-ftc-rr">—</div>
             <div class="kpi-label">FTC RR</div>
@@ -417,25 +409,22 @@
     </div>
     {% endif %}
     {% if not _hide_net_cards %}
-    <div class="col-6">
+    <div class="col-6 col-md-2">
       <div class="kpi-card text-center">
         <div class="kpi-value" style="color:#d29922;" id="stat-grand-net-rr">—</div>
         <div class="kpi-label">NET RR</div>
       </div>
     </div>
     {% endif %}
-  </div>
-  {% if show_retention %}
-  <!-- Row 5: Daily Loads/Monthly Loads | Daily STD/Monthly STD -->
-  <div class="row g-2 mb-2">
-    <div class="col-6">
+    {% if show_retention %}
+    <div class="col-6 col-md-2">
       <div class="kpi-card text-center">
-        <div style="display:flex;justify-content:center;align-items:center;gap:14px;">
+        <div style="display:flex;justify-content:center;align-items:center;gap:10px;">
           <div>
             <div class="kpi-value" style="color:#f78166;" id="stat-daily-loads">—</div>
             <div class="kpi-label">Daily Loads</div>
           </div>
-          <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
+          <div style="color:#484f58;font-size:1.2rem;line-height:1;">/</div>
           <div>
             <div class="kpi-value" style="color:#f78166;" id="stat-monthly-loads">—</div>
             <div class="kpi-label">Monthly Loads</div>
@@ -443,14 +432,14 @@
         </div>
       </div>
     </div>
-    <div class="col-6">
+    <div class="col-6 col-md-2">
       <div class="kpi-card text-center">
-        <div style="display:flex;justify-content:center;align-items:center;gap:14px;">
+        <div style="display:flex;justify-content:center;align-items:center;gap:10px;">
           <div>
             <div class="kpi-value" style="color:#58a6ff;" id="stat-daily-std">—</div>
             <div class="kpi-label">Daily STD</div>
           </div>
-          <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
+          <div style="color:#484f58;font-size:1.2rem;line-height:1;">/</div>
           <div>
             <div class="kpi-value" style="color:#58a6ff;" id="stat-monthly-std">—</div>
             <div class="kpi-label">Monthly STD</div>
@@ -458,17 +447,14 @@
         </div>
       </div>
     </div>
-  </div>
-  <!-- Row 6: Daily Traders/Monthly Traders | Open Volume -->
-  <div class="row g-2 mb-4">
-    <div class="col-6">
+    <div class="col-6 col-md-2">
       <div class="kpi-card text-center">
-        <div style="display:flex;justify-content:center;align-items:center;gap:14px;">
+        <div style="display:flex;justify-content:center;align-items:center;gap:10px;">
           <div>
             <div class="kpi-value" style="color:#a371f7;" id="stat-daily-traders">—</div>
             <div class="kpi-label">Daily Traders</div>
           </div>
-          <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
+          <div style="color:#484f58;font-size:1.2rem;line-height:1;">/</div>
           <div>
             <div class="kpi-value" style="color:#a371f7;" id="stat-monthly-traders">—</div>
             <div class="kpi-label">Monthly Traders</div>
@@ -476,8 +462,9 @@
         </div>
       </div>
     </div>
+    {% endif %}
     {% if not current_user.role.startswith('sales') %}
-    <div class="col-6">
+    <div class="col-6 col-md-2">
       <div class="kpi-card text-center">
         <div class="kpi-value" style="color:#c9d1d9;" id="stat-open-volume">—</div>
         <div class="kpi-label">Open Volume</div>
@@ -485,7 +472,6 @@
     </div>
     {% endif %}
   </div>
-  {% endif %}
 
   {% if show_sales %}
   <!-- Sales Table -->
