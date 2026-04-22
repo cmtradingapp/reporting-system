@@ -398,6 +398,53 @@
       </div>
     </div>
     {% endif %}
+    {% if show_retention %}
+    <div class="col-6 col-md-2">
+      <div class="kpi-card text-center">
+        <div style="display:flex;justify-content:center;align-items:center;gap:14px;">
+          <div>
+            <div class="kpi-value" style="color:#a371f7;" id="stat-daily-traders">—</div>
+            <div class="kpi-label">Daily Traders</div>
+          </div>
+          <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
+          <div>
+            <div class="kpi-value" style="color:#a371f7;" id="stat-monthly-traders">—</div>
+            <div class="kpi-label">Monthly Traders</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-2">
+      <div class="kpi-card text-center">
+        <div style="display:flex;justify-content:center;align-items:center;gap:14px;">
+          <div>
+            <div class="kpi-value" style="color:#f78166;" id="stat-daily-loads">—</div>
+            <div class="kpi-label">Daily Loads</div>
+          </div>
+          <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
+          <div>
+            <div class="kpi-value" style="color:#f78166;" id="stat-monthly-loads">—</div>
+            <div class="kpi-label">Monthly Loads</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-2">
+      <div class="kpi-card text-center">
+        <div style="display:flex;justify-content:center;align-items:center;gap:14px;">
+          <div>
+            <div class="kpi-value" style="color:#58a6ff;" id="stat-daily-std">—</div>
+            <div class="kpi-label">Daily STD</div>
+          </div>
+          <div style="color:#484f58;font-size:1.4rem;line-height:1;margin-bottom:2px;">/</div>
+          <div>
+            <div class="kpi-value" style="color:#58a6ff;" id="stat-monthly-std">—</div>
+            <div class="kpi-label">Monthly STD</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
   </div>
 
   {% if show_sales %}
@@ -628,6 +675,19 @@
     const dFtcEl = document.getElementById('stat-daily-ftc'); if (dFtcEl) dFtcEl.textContent = dFtc.toLocaleString();
     const dNetEl = document.getElementById('stat-daily-net'); if (dNetEl) dNetEl.textContent = netFmt(dNet);
     const dNetRetEl = document.getElementById('stat-daily-net-ret'); if (dNetRetEl) dNetRetEl.textContent = netFmt(dNetRet);
+    // Traders / Loads / STD cards
+    const dTraders = fRet.reduce((s,r) => s + (r.daily_traders ?? 0), 0);
+    const mTraders = fRet.reduce((s,r) => s + (r.traders_count ?? 0), 0);
+    const dLoads   = fRet.reduce((s,r) => s + (r.daily_loads ?? 0), 0);
+    const mLoads   = fRet.reduce((s,r) => s + (r.monthly_loads ?? 0), 0);
+    const dStd     = fRet.reduce((s,r) => s + (r.daily_std ?? 0), 0);
+    const mStd     = fRet.reduce((s,r) => s + (r.std_count ?? 0), 0);
+    const dtEl = document.getElementById('stat-daily-traders'); if (dtEl) dtEl.textContent = dTraders.toLocaleString();
+    const mtEl = document.getElementById('stat-monthly-traders'); if (mtEl) mtEl.textContent = mTraders.toLocaleString();
+    const dlEl = document.getElementById('stat-daily-loads'); if (dlEl) dlEl.textContent = dLoads.toLocaleString();
+    const mlEl = document.getElementById('stat-monthly-loads'); if (mlEl) mlEl.textContent = mLoads.toLocaleString();
+    const dsEl = document.getElementById('stat-daily-std'); if (dsEl) dsEl.textContent = dStd.toLocaleString();
+    const msEl = document.getElementById('stat-monthly-std'); if (msEl) msEl.textContent = mStd.toLocaleString();
   }
 
   function onFilterChange() {
