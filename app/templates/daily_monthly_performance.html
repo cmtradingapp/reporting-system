@@ -500,6 +500,7 @@
                 <th class="text-center" style="min-width:60px;" data-sort="ftcTotal">FTC <i class="bi sort-icon" id="sort-icon-ftcTotal"></i></th>
                 <th class="text-center" style="min-width:80px;" data-sort="ftcRrTotal">FTC RR <i class="bi sort-icon" id="sort-icon-ftcRrTotal"></i></th>
                 <th class="text-center" style="min-width:80px;" data-sort="ftcRrPctTotal">FTC RR% <i class="bi sort-icon" id="sort-icon-ftcRrPctTotal"></i></th>
+                <th class="text-center" style="min-width:90px;" data-sort="avgScpTotal">Avg SCP <i class="bi sort-icon" id="sort-icon-avgScpTotal"></i></th>
               </tr>
             </thead>
             <tbody id="table-body"></tbody>
@@ -902,6 +903,12 @@
       ftcTotal: agents.reduce((s,a) => s + (a.ftc??0), 0),
       ftcRrTotal: agents.reduce((s,a) => s + (a.ftc_rr??0), 0),
       get ftcRrPctTotal() { return this.targetTotal > 0 ? Math.round(this.ftcRrTotal / this.targetTotal * 100) : null; },
+      get avgScpTotal() {
+        const withScp = agents.filter(a => a.avg_scp != null && a.ftd_count > 0);
+        if (!withScp.length) return null;
+        const totalFtd = withScp.reduce((s,a) => s + a.ftd_count, 0);
+        return totalFtd > 0 ? Math.round(withScp.reduce((s,a) => s + a.avg_scp * a.ftd_count, 0) / totalFtd * 10) / 10 : null;
+      },
     })).sort((a,b) => {
       if (sortState.col === 'name') return sortState.dir === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
       const av = a[sortState.col] ?? 0, bv = b[sortState.col] ?? 0;
@@ -937,6 +944,7 @@
         <td class="text-center">${wCountHtml(office.ftcTotal, true)}</td>
         <td class="text-center">${wCountHtml(office.ftcRrTotal, true)}</td>
         <td class="text-center">${pctHtml(office.ftcRrPctTotal, true)}</td>
+        <td class="text-center">${office.avgScpTotal != null ? '<strong>'+office.avgScpTotal.toFixed(1)+'</strong>' : '—'}</td>
       `;
       tbody.appendChild(offTr);
 
@@ -945,7 +953,7 @@
         dailyPctTotal:'daily_pct', ftdCountTotal:'ftd_count', targetTotal:'target_ftc',
         monthlyPctTotal:'monthly_pct', ftdRrTotal:'ftd_rr',
         rrMonthlyPctTotal:'rr_monthly_pct', netDepositsTotal:'net_deposits',
-        ftcTotal:'ftc', ftcRrTotal:'ftc_rr', ftcRrPctTotal:'ftc_rr_pct',
+        ftcTotal:'ftc', ftcRrTotal:'ftc_rr', ftcRrPctTotal:'ftc_rr_pct', avgScpTotal:'avg_scp',
       };
       const sortedAgents = [...office.agents].sort((a,b) => {
         if (sortState.col === 'name') return sortState.dir==='asc'?(a.agent_name||'').localeCompare(b.agent_name||''):(b.agent_name||'').localeCompare(a.agent_name||'');
@@ -971,6 +979,7 @@
           <td class="text-center">${wCountHtml(r.ftc)}</td>
           <td class="text-center">${wCountHtml(r.ftc_rr)}</td>
           <td class="text-center">${pctHtml(r.ftc_rr_pct)}</td>
+          <td class="text-center">${r.avg_scp != null ? r.avg_scp.toFixed(1) : '—'}</td>
         `;
         tbody.appendChild(tr);
       });
@@ -988,13 +997,17 @@
     });
 
     if (offices.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="13" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No data for this period</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="14" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No data for this period</td></tr>';
     } else {
       const safeWdp = workingDaysPassed > 0 ? workingDaysPassed : 1;
       const gDailyPct = gDailyTarget > 0 ? Math.round(gDailyFtd / gDailyTarget * 100) : null;
       const gMonthlyPct = gTarget > 0 ? Math.round(gFtdCount / gTarget * 100) : null;
       const gRrMonthly = gTarget > 0 ? Math.round(gFtdRr / gTarget * 100) : null;
       const gFtcRrPct = gTarget > 0 ? Math.round(gFtcRr / gTarget * 100) : null;
+      // Grand avg SCP (weighted by FTD count)
+      const allWithScp = allRows.filter(a => a.avg_scp != null && a.ftd_count > 0);
+      const gScpFtd = allWithScp.reduce((s,a) => s + a.ftd_count, 0);
+      const gAvgScp = gScpFtd > 0 ? Math.round(allWithScp.reduce((s,a) => s + a.avg_scp * a.ftd_count, 0) / gScpFtd * 10) / 10 : null;
       const totalTr = document.createElement('tr');
       totalTr.className = 'total-row';
       totalTr.innerHTML = `
@@ -1011,6 +1024,7 @@
         <td class="text-center">${wCountHtml(gFtc, true)}</td>
         <td class="text-center">${wCountHtml(gFtcRr, true)}</td>
         <td class="text-center">${pctHtml(gFtcRrPct, true)}</td>
+        <td class="text-center">${gAvgScp != null ? '<strong>'+gAvgScp.toFixed(1)+'</strong>' : '—'}</td>
       `;
       tbody.appendChild(totalTr);
     }
@@ -1430,8 +1444,8 @@
   function exportSalesExcel() {
     if (!allRows.length) return;
     const filtered = allRows.filter(r => r.ftc > 0 || r.target_ftc > 0 || r.net_deposits !== 0 || r.ftd_count > 0 || r.daily_ftd > 0);
-    const headers = ['Office','Agent','Daily FTD','Daily Target','Daily %','Monthly FTD','Monthly Target','Monthly %','FTD RR','% RR Monthly','Net Sales Monthly','FTC','FTC RR','FTC RR%'];
-    const rows = filtered.map(r => [r.office_name, r.agent_name, r.daily_ftd, Math.round(r.daily_target), r.daily_pct??'', r.ftd_count, r.target_ftc, r.monthly_pct??'', r.ftd_rr, r.rr_monthly_pct??'', Math.round(r.net_deposits*100)/100, r.ftc, r.ftc_rr, r.ftc_rr_pct??'']);
+    const headers = ['Office','Agent','Daily FTD','Daily Target','Daily %','Monthly FTD','Monthly Target','Monthly %','FTD RR','% RR Monthly','Net Sales Monthly','FTC','FTC RR','FTC RR%','Avg SCP'];
+    const rows = filtered.map(r => [r.office_name, r.agent_name, r.daily_ftd, Math.round(r.daily_target), r.daily_pct??'', r.ftd_count, r.target_ftc, r.monthly_pct??'', r.ftd_rr, r.rr_monthly_pct??'', Math.round(r.net_deposits*100)/100, r.ftc, r.ftc_rr, r.ftc_rr_pct??'', r.avg_scp??'']);
     const df = document.getElementById('date-from').value, dt = document.getElementById('date-to').value;
     const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
     const wb = XLSX.utils.book_new();

@@ -56,7 +56,7 @@ async def dmp_sales_api(request: Request, date_from: str, date_to: str):
     role_filter = get_role_filter(user)
     cls_where, cls_params, cls_suffix = _build_cls_filter(request)
     has_cls = bool(cls_where)
-    _ck = f"dmp_sales_v1:{user.get('role','')}:{date_from}:{date_to}{cls_suffix}"
+    _ck = f"dmp_sales_v2:{user.get('role','')}:{date_from}:{date_to}{cls_suffix}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -82,7 +82,8 @@ async def dmp_sales_api(request: Request, date_from: str, date_to: str):
             COALESCE(dk.daily_ftd, 0)::int               AS daily_ftd,
             COALESCE(dk.daily_ftc, 0)::int               AS daily_ftc,
             COALESCE(dk.daily_net, 0)::float             AS daily_net,
-            COALESCE(u.status, '')                        AS status
+            COALESCE(u.status, '')                        AS status,
+            scp.avg_scp                                   AS avg_scp
         FROM crm_users u
         LEFT JOIN (
             SELECT
@@ -119,6 +120,38 @@ async def dmp_sales_api(request: Request, date_from: str, date_to: str):
               {ftd100_cls_where}
             GROUP BY f.original_deposit_owner
         ) f100 ON f100.agent_id = u.id
+        LEFT JOIN (
+            SELECT sub.agent_id,
+                   ROUND(AVG(sub.score)::numeric, 1) AS avg_scp
+            FROM (
+                SELECT t.original_deposit_owner AS agent_id,
+                       t.vtigeraccountid AS accountid,
+                       CASE
+                         WHEN a.classification_int IS NOT NULL AND a.classification_int > 0
+                           THEN a.classification_int
+                         WHEN a.birth_date IS NOT NULL THEN CASE
+                           WHEN DATE_PART('year', AGE(CURRENT_DATE, a.birth_date::date)) BETWEEN 25 AND 29 THEN 4
+                           WHEN DATE_PART('year', AGE(CURRENT_DATE, a.birth_date::date)) BETWEEN 30 AND 34 THEN 5
+                           WHEN DATE_PART('year', AGE(CURRENT_DATE, a.birth_date::date)) BETWEEN 35 AND 44 THEN 6
+                           WHEN DATE_PART('year', AGE(CURRENT_DATE, a.birth_date::date)) >= 45 THEN 7
+                           ELSE NULL END
+                         ELSE NULL END AS score
+                FROM transactions t
+                JOIN accounts a ON a.accountid = t.vtigeraccountid
+                WHERE t.transactionapproval = 'Approved'
+                  AND (t.deleted = 0 OR t.deleted IS NULL)
+                  AND t.transaction_type_name = 'Deposit'
+                  AND t.ftd = 1
+                  AND t.vtigeraccountid IS NOT NULL
+                  AND a.is_test_account = 0
+                  AND t.confirmation_time >= %(date_from)s::timestamp
+                  AND t.confirmation_time <  %(date_to_excl)s::timestamp
+                GROUP BY t.original_deposit_owner, t.vtigeraccountid,
+                         a.classification_int, a.birth_date
+            ) sub
+            WHERE sub.score IS NOT NULL
+            GROUP BY sub.agent_id
+        ) scp ON scp.agent_id = u.id
         WHERE u.department_ = 'Sales'
           AND u.team = 'Conversion'
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
@@ -180,6 +213,7 @@ async def dmp_sales_api(request: Request, date_from: str, date_to: str):
                 "daily_ftc":    int(r[9] or 0),
                 "daily_net":    round(float(r[10] or 0), 2),
                 "status":       r[11] or '',
+                "avg_scp":      round(float(r[12]), 1) if r[12] is not None else None,
             }
             for r in rows
         ]
@@ -220,6 +254,7 @@ async def dmp_sales_api(request: Request, date_from: str, date_to: str):
                     "daily_ftc":    0,
                     "daily_net":    0,
                     "status":       "Active",
+                    "avg_scp":      None,
                 })
 
         _result = {
