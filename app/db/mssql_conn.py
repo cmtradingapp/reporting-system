@@ -5,7 +5,7 @@ from app.config import MSSQL_HOST, MSSQL_PORT, MSSQL_USER, MSSQL_PASSWORD, MSSQL
 CHUNK_SIZE = 50000
 
 
-def _get_mssql_connection():
+def _get_mssql_connection(timeout=300):
     return pymssql.connect(
         server=MSSQL_HOST,
         port=str(MSSQL_PORT),
@@ -14,6 +14,8 @@ def _get_mssql_connection():
         database=MSSQL_DB,
         tds_version="7.4",
         conn_properties="",
+        login_timeout=30,
+        timeout=timeout,
     )
 
 
@@ -240,7 +242,7 @@ def get_mssql_dealio_mt5trades_full(start_ticket: int = 0):
     _BIG_CHUNK = 500000  # larger chunks to reduce round-trips on this 17M+ row table
     last_ticket = start_ticket
     while True:
-        conn = _get_mssql_connection()
+        conn = _get_mssql_connection(timeout=600)
         try:
             query = f"""
                 SELECT TOP {_BIG_CHUNK}
