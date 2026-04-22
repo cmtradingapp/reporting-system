@@ -195,6 +195,33 @@ async def dmp_sales_api(request: Request, date_from: str, date_to: str):
         wd_in_range   = count_working_days(dt_from, dt_to, holidays)
         target_ratio  = 1.0 if dt_from.day == 1 or wd_full_month == 0 else round(wd_in_range / wd_full_month, 6)
 
+        # ── Unassigned Sales Target ────────────────────────────────
+        with conn.cursor() as cur2:
+            cur2.execute(
+                "SELECT sales_ftc FROM company_targets WHERE month = DATE_TRUNC('month', %s::date)",
+                (date_from,),
+            )
+            ct_row = cur2.fetchone()
+        if ct_row and ct_row[0]:
+            company_ftc = float(ct_row[0])
+            agent_raw_sum = sum(r["target_ftc"] for r in data)
+            gap = company_ftc - agent_raw_sum
+            if gap > 0:
+                data.append({
+                    "office_name":  "Unassigned Sales Target",
+                    "agent_name":   "Unassigned Sales Target",
+                    "department":   "Sales",
+                    "ftc":          0,
+                    "target_ftc":   round(gap),
+                    "ftd100":       0,
+                    "net_deposits": 0,
+                    "ftd_count":    0,
+                    "daily_ftd":    0,
+                    "daily_ftc":    0,
+                    "daily_net":    0,
+                    "status":       "Active",
+                })
+
         _result = {
             "rows":                 data,
             "working_days":         working_days,

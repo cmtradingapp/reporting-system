@@ -369,6 +369,12 @@ def ensure_table():
         CREATE INDEX IF NOT EXISTS idx_targets_date     ON targets (date);
         CREATE INDEX IF NOT EXISTS idx_targets_agent_id ON targets (agent_id);
 
+        CREATE TABLE IF NOT EXISTS company_targets (
+            month          DATE         NOT NULL PRIMARY KEY,
+            sales_ftc      NUMERIC(20,2),
+            retention_net_target  NUMERIC(20,2)
+        );
+
         CREATE TABLE IF NOT EXISTS ftd100_clients (
             accountid                   BIGINT          PRIMARY KEY,
             accountstatus               VARCHAR(20),
@@ -989,6 +995,25 @@ def seed_admin_user(password_hash: str):
     try:
         with conn.cursor() as cur:
             cur.execute(sql, ('admin@cmtrading.com', 'Administrator', password_hash, 'admin'))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def seed_company_targets():
+    """Insert initial company-level monthly targets (idempotent)."""
+    sql = """
+        INSERT INTO company_targets (month, sales_ftc, retention_net_target) VALUES
+        ('2026-01-01', 1500, 3316754),
+        ('2026-02-01', 1575, 4095000),
+        ('2026-03-01', 1654, 4299750),
+        ('2026-04-01', 1736, 4514738)
+        ON CONFLICT (month) DO NOTHING
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql)
         conn.commit()
     finally:
         conn.close()
