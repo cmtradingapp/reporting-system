@@ -283,7 +283,7 @@ async def dmp_retention_api(request: Request, date_from: str, date_to: str):
     role_filter = get_role_filter(user)
     cls_where, cls_params, cls_suffix = _build_cls_filter(request)
     has_cls = bool(cls_where)
-    _ck = f"dmp_ret_v1:{user.get('role','')}:{date_from}:{date_to}{cls_suffix}"
+    _ck = f"dmp_ret_v2:{user.get('role','')}:{date_from}:{date_to}{cls_suffix}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -314,7 +314,8 @@ async def dmp_retention_api(request: Request, date_from: str, date_to: str):
             COALESCE(trd.daily_traders, 0)::int               AS daily_traders,
             COALESCE(loads.daily_loads, 0)::int               AS daily_loads,
             COALESCE(dt_std.daily_std, 0)::int                AS daily_std,
-            COALESCE(loads.monthly_loads, 0)::int             AS monthly_loads
+            COALESCE(loads.monthly_loads, 0)::int             AS monthly_loads,
+            lscp.avg_scp                                      AS avg_scp
         FROM crm_users u
         LEFT JOIN ({tgt_subq}) tgt ON tgt.agent_id = u.id
         LEFT JOIN (
@@ -385,6 +386,40 @@ async def dmp_retention_api(request: Request, date_from: str, date_to: str):
               AND second_deposit_date::date = %(date_to)s::date
             GROUP BY assigned_to
         ) dt_std ON dt_std.agent_id = u.id
+        LEFT JOIN (
+            SELECT sub.agent_id,
+                   ROUND(AVG(sub.score)::numeric, 1) AS avg_scp
+            FROM (
+                SELECT t.original_deposit_owner AS agent_id,
+                       a.accountid,
+                       CASE
+                         WHEN a.classification_int IS NOT NULL AND a.classification_int > 0
+                           THEN a.classification_int
+                         WHEN a.birth_date IS NOT NULL THEN CASE
+                           WHEN DATE_PART('year', AGE(CURRENT_DATE, a.birth_date::date)) BETWEEN 25 AND 29 THEN 4
+                           WHEN DATE_PART('year', AGE(CURRENT_DATE, a.birth_date::date)) BETWEEN 30 AND 34 THEN 5
+                           WHEN DATE_PART('year', AGE(CURRENT_DATE, a.birth_date::date)) BETWEEN 35 AND 44 THEN 6
+                           WHEN DATE_PART('year', AGE(CURRENT_DATE, a.birth_date::date)) >= 45 THEN 7
+                           ELSE NULL END
+                         ELSE NULL END AS score
+                FROM transactions t
+                JOIN accounts a ON a.accountid = t.vtigeraccountid
+                WHERE t.transaction_type_name = 'Deposit'
+                  AND t.transactionapproval = 'Approved'
+                  AND (t.deleted = 0 OR t.deleted IS NULL)
+                  AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%%%bonus%%%%'
+                  AND a.is_test_account = 0
+                  AND (a.is_demo = 0 OR a.is_demo IS NULL)
+                  AND a.accountid IS NOT NULL AND a.accountid::text != ''
+                  AND t.vtigeraccountid IS NOT NULL
+                  AND t.confirmation_time >= %(date_from)s::timestamp
+                  AND t.confirmation_time <  %(date_to_excl)s::timestamp
+                GROUP BY t.original_deposit_owner, a.accountid,
+                         a.classification_int, a.birth_date
+            ) sub
+            WHERE sub.score IS NOT NULL
+            GROUP BY sub.agent_id
+        ) lscp ON lscp.agent_id = u.id
         WHERE (
               u.department_ = 'Retention'
               OR u.id IN (
@@ -486,6 +521,7 @@ async def dmp_retention_api(request: Request, date_from: str, date_to: str):
                 "daily_loads":     int(r[13] or 0),
                 "daily_std":       int(r[14] or 0),
                 "monthly_loads":   int(r[15] or 0),
+                "avg_scp":         round(float(r[16]), 1) if r[16] is not None else None,
             }
             for r in rows
         ]
