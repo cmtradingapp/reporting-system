@@ -701,7 +701,7 @@ def _camp_table_calc(
     g2_sql = VALID_GROUPS.get(group2, "")
 
     # Determine which extra JOINs are needed
-    groups_needing_cu = {"office_name", "agent_name"}
+    groups_needing_cu = {"office_name", "agent_name", "agent_team"}
     groups_needing_cc = set()
     needs_cu_join_for_group = group1 in groups_needing_cu or group2 in groups_needing_cu
     needs_cc_join_for_group = group1 in groups_needing_cc or group2 in groups_needing_cc
