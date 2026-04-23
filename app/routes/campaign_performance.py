@@ -450,6 +450,70 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
             row = cur.fetchone()
             traders_count = int(row[0] or 0) if row else 0
 
+            _scp_case = (
+                "CASE WHEN a.classification_int IS NOT NULL AND a.classification_int > 0"
+                " THEN a.classification_int"
+                " WHEN a.birth_date IS NOT NULL THEN CASE"
+                " WHEN DATE_PART('year', AGE(CURRENT_DATE, a.birth_date::date)) BETWEEN 25 AND 29 THEN 4"
+                " WHEN DATE_PART('year', AGE(CURRENT_DATE, a.birth_date::date)) BETWEEN 30 AND 34 THEN 5"
+                " WHEN DATE_PART('year', AGE(CURRENT_DATE, a.birth_date::date)) BETWEEN 35 AND 44 THEN 6"
+                " WHEN DATE_PART('year', AGE(CURRENT_DATE, a.birth_date::date)) >= 45 THEN 7"
+                " ELSE NULL END ELSE NULL END"
+            )
+            scp_p = {"date_from": date_from, "date_to_excl": date_to_exclusive, **camp_filter_params}
+
+            # Live AVG SCP — avg SCP of live accounts (birth_date not null) created in period
+            live_avg_scp = None
+            try:
+                cur.execute(f"""
+                    SELECT ROUND(AVG(sub.score)::numeric, 1)
+                    FROM (
+                        SELECT DISTINCT a.accountid,
+                               {_scp_case} AS score
+                        FROM accounts a
+                        {camp_join}
+                        WHERE a.birth_date IS NOT NULL
+                          AND a.createdtime >= %(date_from)s
+                          AND a.createdtime < %(date_to_excl)s
+                          AND a.is_test_account = 0
+                          AND (a.is_demo = 0 OR a.is_demo IS NULL)
+                        {_ACCT_FILTERS}
+                        {camp_filter_where}
+                    ) sub WHERE sub.score IS NOT NULL
+                """, scp_p)
+                row = cur.fetchone()
+                live_avg_scp = round(float(row[0]), 1) if row and row[0] is not None else None
+            except Exception:
+                conn.rollback()
+
+            # FTD AVG SCP — avg SCP of FTD clients in period
+            ftd_avg_scp = None
+            try:
+                cur.execute(f"""
+                    SELECT ROUND(AVG(sub.score)::numeric, 1)
+                    FROM (
+                        SELECT DISTINCT a.accountid,
+                               {_scp_case} AS score
+                        FROM transactions t
+                        JOIN accounts a ON a.accountid = t.vtigeraccountid
+                        {camp_join}
+                        WHERE t.ftd = 1
+                          AND t.transaction_type_name = 'Deposit'
+                          AND t.transactionapproval = 'Approved'
+                          AND (t.deleted = 0 OR t.deleted IS NULL)
+                          AND t.confirmation_time >= %(date_from)s
+                          AND t.confirmation_time <  %(date_to_excl)s
+                          AND a.is_test_account = 0
+                          AND (a.is_demo = 0 OR a.is_demo IS NULL)
+                        {_TXN_ACCT_FILTERS}
+                        {camp_filter_where}
+                    ) sub WHERE sub.score IS NOT NULL
+                """, scp_p)
+                row = cur.fetchone()
+                ftd_avg_scp = round(float(row[0]), 1) if row and row[0] is not None else None
+            except Exception:
+                conn.rollback()
+
         return {
             "leads":         {"daily": leads_today, "mtd": leads_mtd},
             "live_accounts": {"daily": live_today,  "mtd": live_mtd},
@@ -459,6 +523,8 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
             "withdrawals":   round(withdrawals_total, 2),
             "net_deposits":  round(net_total, 2),
             "traders_count": traders_count,
+            "live_avg_scp":  live_avg_scp,
+            "ftd_avg_scp":   ftd_avg_scp,
             "date_from":     date_from,
             "date_to":       date_to,
         }

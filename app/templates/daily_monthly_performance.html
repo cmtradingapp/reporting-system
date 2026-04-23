@@ -560,6 +560,7 @@
                 <th class="text-center" style="min-width:100px;" data-sort="ret-dailyTarget">Daily Target <i class="bi sort-icon" id="ret-sort-icon-dailyTarget"></i></th>
                 <th class="text-center" style="min-width:80px;"  data-sort="ret-dailyPct">Daily % <i class="bi sort-icon" id="ret-sort-icon-dailyPct"></i></th>
                 <th class="text-center" style="min-width:100px;" data-sort="ret-dailyTraders">Daily Traders <i class="bi sort-icon" id="ret-sort-icon-dailyTraders"></i></th>
+                <th class="text-center" style="min-width:90px;"  data-sort="ret-dailyAvgScp">Daily Avg SCP <i class="bi sort-icon" id="ret-sort-icon-dailyAvgScp"></i></th>
                 <th class="text-center" style="min-width:90px;"  data-sort="ret-dailyLoads">Daily Loads <i class="bi sort-icon" id="ret-sort-icon-dailyLoads"></i></th>
                 <th class="text-center" style="min-width:80px;"  data-sort="ret-dailyStd">Daily STD <i class="bi sort-icon" id="ret-sort-icon-dailyStd"></i></th>
                 <th class="text-center" style="min-width:100px;" data-sort="ret-netUsd">Monthly Net <i class="bi sort-icon" id="ret-sort-icon-netUsd"></i></th>
@@ -567,9 +568,9 @@
                 <th class="text-center" style="min-width:90px;"  data-sort="ret-monthlyPct">Monthly % <i class="bi sort-icon" id="ret-sort-icon-monthlyPct"></i></th>
                 <th class="text-center" style="min-width:80px;"  data-sort="ret-netRrPct">RR% <i class="bi sort-icon" id="ret-sort-icon-netRrPct"></i></th>
                 <th class="text-center" style="min-width:110px;" data-sort="ret-tradersCount">Monthly Traders <i class="bi sort-icon" id="ret-sort-icon-tradersCount"></i></th>
+                <th class="text-center" style="min-width:90px;"  data-sort="ret-monthlyAvgScp">Monthly Avg SCP <i class="bi sort-icon" id="ret-sort-icon-monthlyAvgScp"></i></th>
                 <th class="text-center" style="min-width:100px;" data-sort="ret-monthlyLoads">Monthly Loads <i class="bi sort-icon" id="ret-sort-icon-monthlyLoads"></i></th>
                 <th class="text-center" style="min-width:95px;"  data-sort="ret-stdCount">Monthly STD <i class="bi sort-icon" id="ret-sort-icon-stdCount"></i></th>
-                <th class="text-center" style="min-width:90px;" data-sort="ret-avgScp">Avg SCP <i class="bi sort-icon" id="ret-sort-icon-avgScp"></i></th>
                 <th class="text-center" style="min-width:130px;" data-sort="ret-miss100Rr">Missing to 100% RR <i class="bi sort-icon" id="ret-sort-icon-miss100Rr"></i></th>
                 <th class="text-center" style="min-width:100px;" data-sort="ret-depUsd">Deposit $ <i class="bi sort-icon" id="ret-sort-icon-depUsd"></i></th>
                 <th class="text-center" style="min-width:90px;"  data-sort="ret-netRr">NET RR <i class="bi sort-icon" id="ret-sort-icon-netRr"></i></th>
@@ -1176,6 +1177,7 @@
       'ret-dailyTarget': o.dailyTarget ?? 0,
       'ret-dailyPct': o.dailyPct ?? -1e9,
       'ret-dailyTraders': o.dailyTraders ?? 0,
+      'ret-dailyAvgScp': o.dailyAvgScp ?? -1e9,
       'ret-dailyLoads': o.dailyLoads ?? 0,
       'ret-dailyStd': o.dailyStd ?? 0,
       'ret-netUsd': o.netUsd ?? 0,
@@ -1183,9 +1185,9 @@
       'ret-monthlyPct': o.netTgtPct ?? -1e9,
       'ret-netRrPct': o.netRrPct ?? -1e9,
       'ret-tradersCount': o.tradersCount ?? 0,
+      'ret-monthlyAvgScp': o.monthlyAvgScp ?? -1e9,
       'ret-monthlyLoads': o.monthlyLoads ?? 0,
       'ret-stdCount': o.stdCount ?? 0,
-      'ret-avgScp': o.avgScp ?? -1e9,
       'ret-miss100Rr': o.miss100Rr ?? 0,
       'ret-depUsd': o.depUsd ?? 0,
       'ret-netRr': o.netRr ?? 0,
@@ -1269,11 +1271,17 @@
         netRrPct: tgtNet > 0 ? netRr / tgtNet : null,
         netTgtPct: tgtNet > 0 ? netUsd / tgtNet : null,
         perWd: _wl > 0 ? miss100 / _wl : null,
-        get avgScp() {
-          const w = agents.filter(a => a.avg_scp != null && a.monthly_loads > 0);
+        get dailyAvgScp() {
+          const w = agents.filter(a => a.daily_avg_scp != null && a.daily_traders > 0);
           if (!w.length) return null;
-          const tl = w.reduce((s,a) => s + a.monthly_loads, 0);
-          return tl > 0 ? Math.round(w.reduce((s,a) => s + a.avg_scp * a.monthly_loads, 0) / tl * 10) / 10 : null;
+          const td = w.reduce((s,a) => s + a.daily_traders, 0);
+          return td > 0 ? Math.round(w.reduce((s,a) => s + a.daily_avg_scp * a.daily_traders, 0) / td * 10) / 10 : null;
+        },
+        get monthlyAvgScp() {
+          const w = agents.filter(a => a.monthly_avg_scp != null && a.traders_count > 0);
+          if (!w.length) return null;
+          const tm = w.reduce((s,a) => s + a.traders_count, 0);
+          return tm > 0 ? Math.round(w.reduce((s,a) => s + a.monthly_avg_scp * a.traders_count, 0) / tm * 10) / 10 : null;
         },
       };
     }
@@ -1301,6 +1309,7 @@
         <td class="text-center">${wDollarHtml(Math.round(o.dailyTarget), bold)}</td>
         <td class="text-center">${retPctHtml(o.dailyPct, bold)}</td>
         <td class="text-center">${wCountHtml(o.dailyTraders, bold)}</td>
+        <td class="text-center">${o.dailyAvgScp != null ? (bold?'<strong>':'')+o.dailyAvgScp.toFixed(1)+(bold?'</strong>':'') : '—'}</td>
         <td class="text-center">${wCountHtml(o.dailyLoads, bold)}</td>
         <td class="text-center">${wCountHtml(o.dailyStd, bold)}</td>
         <td class="text-center">${blueHtml(o.netUsd, bold)}</td>
@@ -1308,9 +1317,9 @@
         <td class="text-center">${retPctHtml(o.netTgtPct, bold)}</td>
         <td class="text-center">${retPctHtml(o.netRrPct, bold)}</td>
         <td class="text-center">${wCountHtml(o.tradersCount, bold)}</td>
+        <td class="text-center">${o.monthlyAvgScp != null ? (bold?'<strong>':'')+o.monthlyAvgScp.toFixed(1)+(bold?'</strong>':'') : '—'}</td>
         <td class="text-center">${wCountHtml(o.monthlyLoads, bold)}</td>
         <td class="text-center">${wCountHtml(o.stdCount, bold)}</td>
-        <td class="text-center">${o.avgScp != null ? (bold?'<strong>':'')+o.avgScp.toFixed(1)+(bold?'</strong>':'') : '—'}</td>
         <td class="text-center">${wDollarHtml(o.miss100Rr, bold)}</td>
         <td class="text-center">${wDollarHtml(o.depUsd, bold)}</td>
         <td class="text-center">${wDollarHtml(o.netRr, bold)}</td>
@@ -1328,6 +1337,7 @@
         <td class="text-center">${wDollarHtml(Math.round(r.daily_target))}</td>
         <td class="text-center">${retPctHtml(r.daily_pct)}</td>
         <td class="text-center">${wCountHtml(r.daily_traders)}</td>
+        <td class="text-center">${r.daily_avg_scp != null ? r.daily_avg_scp.toFixed(1) : '—'}</td>
         <td class="text-center">${wCountHtml(r.daily_loads)}</td>
         <td class="text-center">${wCountHtml(r.daily_std)}</td>
         <td class="text-center">${blueHtml(r.net_usd)}</td>
@@ -1335,9 +1345,9 @@
         <td class="text-center">${retPctHtml(r.target_net_pct)}</td>
         <td class="text-center">${retPctHtml(r.net_rr_pct)}</td>
         <td class="text-center">${wCountHtml(r.traders_count)}</td>
+        <td class="text-center">${r.monthly_avg_scp != null ? r.monthly_avg_scp.toFixed(1) : '—'}</td>
         <td class="text-center">${wCountHtml(r.monthly_loads)}</td>
         <td class="text-center">${wCountHtml(r.std_count)}</td>
-        <td class="text-center">${r.avg_scp != null ? r.avg_scp.toFixed(1) : '—'}</td>
         <td class="text-center">${wDollarHtml(r.missing_100_rr)}</td>
         <td class="text-center">${wDollarHtml(r.deposit_usd)}</td>
         <td class="text-center">${wDollarHtml(r.net_rr)}</td>
@@ -1389,7 +1399,8 @@
           'ret-dailyPct':'daily_pct', 'ret-dailyTraders':'daily_traders', 'ret-dailyLoads':'daily_loads',
           'ret-dailyStd':'daily_std', 'ret-netUsd':'net_usd', 'ret-targetNet':'target_net',
           'ret-netRrPct':'net_rr_pct', 'ret-tradersCount':'traders_count', 'ret-monthlyLoads':'monthly_loads',
-          'ret-stdCount':'std_count', 'ret-avgScp':'avg_scp', 'ret-miss100Rr':'missing_100_rr', 'ret-depUsd':'deposit_usd',
+          'ret-dailyAvgScp':'daily_avg_scp', 'ret-monthlyAvgScp':'monthly_avg_scp',
+          'ret-stdCount':'std_count', 'ret-miss100Rr':'missing_100_rr', 'ret-depUsd':'deposit_usd',
           'ret-monthlyPct':'target_net_pct', 'ret-netRr':'net_rr', 'ret-needOnTgt':'need_on_target',
           'ret-miss100':'missing_100', 'ret-perWd':'per_wd', 'ret-openVol':'open_volume_usd', 'ret-rdpNet':'rdp_net',
         };
@@ -1453,7 +1464,7 @@
     tbody.appendChild(retFrag);
 
     if (filtered.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="22" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No data for this period</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="23" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No data for this period</td></tr>';
     } else {
       const _gwl = retTgtRatio < 1 ? Math.max(retWdRange - wd_passed, 0) : wd_left;
       const gAgg = {
@@ -1469,11 +1480,17 @@
         needOnTgt: gNeedOnTgt, miss100: gMiss100,
         perWd: _gwl > 0 ? gMiss100 / _gwl : null,
         openVol: gOpenVol, rdpNet: gRdpNet,
-        get avgScp() {
-          const w = retAllRows.filter(a => a.avg_scp != null && a.monthly_loads > 0);
+        get dailyAvgScp() {
+          const w = retAllRows.filter(a => a.daily_avg_scp != null && a.daily_traders > 0);
           if (!w.length) return null;
-          const tl = w.reduce((s,a) => s + a.monthly_loads, 0);
-          return tl > 0 ? Math.round(w.reduce((s,a) => s + a.avg_scp * a.monthly_loads, 0) / tl * 10) / 10 : null;
+          const td = w.reduce((s,a) => s + a.daily_traders, 0);
+          return td > 0 ? Math.round(w.reduce((s,a) => s + a.daily_avg_scp * a.daily_traders, 0) / td * 10) / 10 : null;
+        },
+        get monthlyAvgScp() {
+          const w = retAllRows.filter(a => a.monthly_avg_scp != null && a.traders_count > 0);
+          if (!w.length) return null;
+          const tm = w.reduce((s,a) => s + a.traders_count, 0);
+          return tm > 0 ? Math.round(w.reduce((s,a) => s + a.monthly_avg_scp * a.traders_count, 0) / tm * 10) / 10 : null;
         },
       };
       const totalTr = document.createElement('tr');
@@ -1539,8 +1556,8 @@
     const filtered = retAllRows.filter(r => r.target_net > 0 || r.net_usd !== 0 || r.deposit_usd > 0 || r.open_volume_usd > 0);
     const pct = v => (v !== null && v !== undefined) ? Math.round(v * 100) : '';
     const r2 = v => (v !== null && v !== undefined) ? Math.round(v * 100) / 100 : 0;
-    const headers = ['Office','Dept','Agent','Daily Net','Daily Target','Daily %','Daily Traders','Daily Loads','Daily STD','Monthly Net','Monthly Net Target','Monthly %','RR%','Monthly Traders','Monthly Loads','Monthly STD','Avg SCP','Missing to 100% RR','Deposit $','NET RR','Need to be on Target','Missing to Reach 100%','Per Working Day','Open Volume','RDP Net $'];
-    const rows = filtered.map(r => [r.office_name, r.dept_name, r.agent_name, r2(r.daily_net_usd), Math.round(r.daily_target), pct(r.daily_pct), r.daily_traders, r.daily_loads, r.daily_std, r2(r.net_usd), r2(r.target_net), pct(r.target_net_pct), pct(r.net_rr_pct), r.traders_count, r.monthly_loads, r.std_count, r.avg_scp??'', r2(r.missing_100_rr), r2(r.deposit_usd), r2(r.net_rr), r2(r.need_on_target), r2(r.missing_100), r.per_wd!=null?r2(r.per_wd):'', r2(r.open_volume_usd), r2(r.rdp_net??0)]);
+    const headers = ['Office','Dept','Agent','Daily Net','Daily Target','Daily %','Daily Traders','Daily Avg SCP','Daily Loads','Daily STD','Monthly Net','Monthly Net Target','Monthly %','RR%','Monthly Traders','Monthly Avg SCP','Monthly Loads','Monthly STD','Missing to 100% RR','Deposit $','NET RR','Need to be on Target','Missing to Reach 100%','Per Working Day','Open Volume','RDP Net $'];
+    const rows = filtered.map(r => [r.office_name, r.dept_name, r.agent_name, r2(r.daily_net_usd), Math.round(r.daily_target), pct(r.daily_pct), r.daily_traders, r.daily_avg_scp??'', r.daily_loads, r.daily_std, r2(r.net_usd), r2(r.target_net), pct(r.target_net_pct), pct(r.net_rr_pct), r.traders_count, r.monthly_avg_scp??'', r.monthly_loads, r.std_count, r2(r.missing_100_rr), r2(r.deposit_usd), r2(r.net_rr), r2(r.need_on_target), r2(r.missing_100), r.per_wd!=null?r2(r.per_wd):'', r2(r.open_volume_usd), r2(r.rdp_net??0)]);
     const df = document.getElementById('date-from').value, dt = document.getElementById('date-to').value;
     const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
     const wb = XLSX.utils.book_new();

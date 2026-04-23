@@ -517,6 +517,18 @@
         <div class="kpi-label">No. of Traders</div>
       </div>
     </div>
+    <div class="col">
+      <div class="kpi-card text-center">
+        <div class="kpi-value" style="color:#f78166;" id="stat-live-avg-scp">—</div>
+        <div class="kpi-label">Live Avg SCP</div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="kpi-card text-center">
+        <div class="kpi-value" style="color:#388bfd;" id="stat-ftd-avg-scp">—</div>
+        <div class="kpi-label">FTD Avg SCP</div>
+      </div>
+    </div>
   </div>
 
   <!-- Loading / Error (KPI) -->
@@ -683,6 +695,8 @@
       netEl.style.color = v >= 0 ? '#3fb950' : '#f85149';
     }
     s('stat-traders', (data.traders_count ?? 0).toLocaleString('en-US'));
+    s('stat-live-avg-scp', data.live_avg_scp != null ? data.live_avg_scp.toFixed(1) : '—');
+    s('stat-ftd-avg-scp',  data.ftd_avg_scp  != null ? data.ftd_avg_scp.toFixed(1)  : '—');
   }
 
   // ── Table state ──────────────────────────────────────────────────────────
