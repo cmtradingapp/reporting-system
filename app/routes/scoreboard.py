@@ -136,11 +136,10 @@ async def scoreboard_page(request: Request):
         show_sales = not role.startswith("retention_")
         show_retention = not role.startswith("sales_")
 
-    # CRO view: admin@cmtrading.com sees both; sales/retention non-admin users see their own
-    _cro_email = "admin@cmtrading.com"
-    _is_cro_admin = user.get("email", "") == _cro_email
-    show_cro_sales     = _is_cro_admin or (show_sales     and role != "admin")
-    show_cro_retention = _is_cro_admin or (show_retention and role != "admin")
+    # CRO view: admin@cmtrading.com sees both; sales_all sees sales CRO; retention_all sees retention CRO
+    _is_cro_admin = user.get("email", "") == "admin@cmtrading.com"
+    show_cro_sales     = _is_cro_admin or role == "sales_all"
+    show_cro_retention = _is_cro_admin or role == "retention_all"
 
     return templates.TemplateResponse("scoreboard.html", {
         "request": request,
