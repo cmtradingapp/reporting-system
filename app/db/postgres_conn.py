@@ -2927,8 +2927,61 @@ _MV_ORDER = [
     "mv_mt5_resolved",       # independent — pre-computed MT5 self-join for ftc_date + fsa_report
 ]
 
-# Module-level status dict updated by refresh_materialized_views()
+# Module-level status dict — kept for backward compat but no longer the source of truth.
+# The authoritative last_refresh is stored in mv_refresh_log (PostgreSQL) so all workers share it.
 _mv_refresh_status: dict = {mv: {"last_refresh": None, "last_error": None} for mv in _MV_ORDER}
+
+
+def ensure_mv_refresh_log() -> None:
+    """Create mv_refresh_log table if it doesn't exist."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS mv_refresh_log (
+                    mv_name     TEXT PRIMARY KEY,
+                    last_refresh TIMESTAMPTZ,
+                    last_error  TEXT
+                )
+            """)
+        conn.commit()
+    except Exception:
+        conn.rollback()
+    finally:
+        conn.close()
+
+
+def _pg_update_mv_refresh(mv: str, ts: str, error: str | None) -> None:
+    """Persist MV refresh timestamp to PostgreSQL (shared across all workers)."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO mv_refresh_log (mv_name, last_refresh, last_error)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (mv_name) DO UPDATE
+                    SET last_refresh = EXCLUDED.last_refresh,
+                        last_error   = EXCLUDED.last_error
+            """, (mv, ts, error))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+    finally:
+        conn.close()
+
+
+def _pg_read_mv_refresh() -> dict:
+    """Read MV refresh timestamps from PostgreSQL (shared across all workers)."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT mv_name, last_refresh, last_error FROM mv_refresh_log")
+            return {r[0]: {"last_refresh": r[1].isoformat() if r[1] else None, "last_error": r[2]}
+                    for r in cur.fetchall()}
+    except Exception:
+        return {}
+    finally:
+        conn.close()
 
 
 def refresh_single_mv(mv_name: str) -> None:
@@ -3008,11 +3061,15 @@ def refresh_materialized_views() -> None:
                     with conn.cursor() as cur:
                         cur.execute(f"REFRESH MATERIALIZED VIEW {mv}")
                     conn.commit()
-                _mv_refresh_status[mv]["last_refresh"] = datetime.now(timezone.utc).isoformat()
+                ts = datetime.now(timezone.utc).isoformat()
+                _mv_refresh_status[mv]["last_refresh"] = ts
                 _mv_refresh_status[mv]["last_error"]   = None
+                _pg_update_mv_refresh(mv, ts, None)
             except Exception as e:
                 conn.rollback()
-                _mv_refresh_status[mv]["last_error"] = str(e)
+                err = str(e)
+                _mv_refresh_status[mv]["last_error"] = err
+                _pg_update_mv_refresh(mv, _mv_refresh_status[mv].get("last_refresh"), err)
                 print(f"[refresh_materialized_views] {mv}: {e}")
             finally:
                 conn.close()
@@ -3044,10 +3101,14 @@ def get_mv_status() -> list:
     finally:
         conn.close()
 
+    # Read authoritative timestamps from PG (shared across all workers)
+    pg_status = _pg_read_mv_refresh()
+
     now = datetime.now(timezone.utc)
     result = []
     for mv in _MV_ORDER:
-        status = _mv_refresh_status[mv]
+        # PG is source of truth; fall back to in-memory if PG has no entry yet
+        status = pg_status.get(mv) or _mv_refresh_status[mv]
         last_refresh = status["last_refresh"]
         age_seconds = None
         if last_refresh:

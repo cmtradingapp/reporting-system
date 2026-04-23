@@ -33,7 +33,7 @@ from app.routes.transactions_report import router as transactions_report_router
 from app.routes.fsa_report import router as fsa_report_router
 from app.routes.mssql_dealio_mt5trades_sync import router as mssql_dealio_mt5trades_sync_router
 from app.routes.daily_monthly_performance import router as dmp_router
-from app.db.postgres_conn import ensure_table, ensure_auth_table, seed_admin_user, seed_company_targets, ensure_client_classification_table, ensure_bonus_transactions_table, ensure_daily_equity_zeroed_table, ensure_materialized_views, refresh_materialized_views, backfill_classification_int, ensure_agent_dept_history_table, ensure_dealio_positions_table, ensure_mssql_dealio_mt5trades_table
+from app.db.postgres_conn import ensure_table, ensure_auth_table, seed_admin_user, seed_company_targets, ensure_client_classification_table, ensure_bonus_transactions_table, ensure_daily_equity_zeroed_table, ensure_materialized_views, refresh_materialized_views, backfill_classification_int, ensure_agent_dept_history_table, ensure_dealio_positions_table, ensure_mssql_dealio_mt5trades_table, ensure_mv_refresh_log
 import threading
 import fcntl
 from app.auth.auth import hash_password
@@ -209,6 +209,7 @@ async def lifespan(app: FastAPI):
         ensure_agent_dept_history_table()
         ensure_dealio_positions_table()
         ensure_mssql_dealio_mt5trades_table()
+        ensure_mv_refresh_log()
         ensure_materialized_views()
         seed_admin_user(hash_password('Admin123!'))
         seed_company_targets()
