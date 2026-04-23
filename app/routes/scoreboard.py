@@ -121,6 +121,9 @@ async def scoreboard_page(request: Request):
     if role == "marketing" and ap is None:
         return RedirectResponse(url="/campaign-performance", status_code=302)
     if ap is not None and "performance" not in ap:
+        # Prefer daily_monthly as first fallback (renamed to "Performance")
+        if "daily_monthly" in ap:
+            return RedirectResponse(url="/daily-monthly", status_code=302)
         _page_urls = {"agent_bonuses": "/agent-bonuses", "marketing": "/campaign-performance",
                        "dashboard": "/dashboard", "total_traders": "/total-traders",
                        "performance": "/performance", "data_sync": "/data-sync"}
