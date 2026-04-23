@@ -2561,7 +2561,7 @@
       `;
       frag.appendChild(offTr);
 
-      [...off.agents].sort(sortFn).forEach(r => {
+      [...off.agents].filter(r => r.daily_ftd>0||r.ftd_count>0||(r.net_deposits??0)!==0||r.ftc>0||r.target_ftc>0).sort(sortFn).forEach(r => {
         agentCount++;
         const agTr = document.createElement('tr');
         agTr.className = 'agent-row';
@@ -2782,7 +2782,7 @@
       frag.appendChild(offTr);
 
       off.dMap.forEach((ags) => {
-        ags.forEach(r => {
+        ags.filter(r => (r.daily_net_usd??0)!==0||(r.net_usd??0)!==0||r.traders_count>0||r.daily_traders>0||r.deposit_usd>0).forEach(r => {
           agentCount++;
           const agTr = document.createElement('tr');
           agTr.className = 'agent-row retention-agent-row';
