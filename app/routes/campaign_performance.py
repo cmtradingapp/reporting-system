@@ -770,10 +770,10 @@ def _camp_table_calc(
                 " AND a.createdtime >= %(date_from)s"
                 " AND a.createdtime < %(date_to_excl)s"
                 " AND a.birth_date IS NOT NULL) AS live_accounts",
-                f"ROUND((AVG({_scp_case_tbl})"
+                f"ROUND(AVG({_scp_case_tbl})"
                 " FILTER (WHERE a.birth_date IS NOT NULL"
                 " AND a.createdtime >= %(date_from)s"
-                " AND a.createdtime < %(date_to_excl)s)), 1) AS live_avg_scp",
+                " AND a.createdtime < %(date_to_excl)s), 1) AS live_avg_scp",
                 # FTC handled in separate query (grouped by qualification date, not creation date)
             ]
             acct_date_filter = (
@@ -817,7 +817,7 @@ def _camp_table_calc(
                 " THEN t.usdamount ELSE 0 END), 0) AS deposits",
                 "COALESCE(SUM(CASE WHEN t.transaction_type_name IN ('Withdrawal', 'Deposit Cancelled')"
                 " THEN t.usdamount ELSE 0 END), 0) AS withdrawals",
-                f"ROUND((AVG({_scp_case_tbl}))"
+                f"ROUND(AVG({_scp_case_tbl})"
                 " FILTER (WHERE t.ftd = 1 AND t.transaction_type_name = 'Deposit'), 1) AS ftd_avg_scp",
             ]
             txn_sql = (
