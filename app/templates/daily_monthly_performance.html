@@ -601,7 +601,7 @@
   const now = new Date();
   let state = { year: now.getFullYear(), month: now.getMonth() + 1 };
   let allRows = [];
-  let sortState = { col: 'ftcTotal', dir: 'desc' };
+  let sortState = { col: 'dailyFtdTotal', dir: 'desc' };
   let workingDays = 0, workingDaysPassed = 0, workingDaysLeft = 0;
 
   // ── Custom searchable select ─────────────────────────────────────────
@@ -1129,7 +1129,7 @@
   // RETENTION
   // ═══════════════════════════════════════════════════════════════════════
   let retAllRows = [];
-  let retSortState = { col: 'ret-netUsd', dir: 'desc' };
+  let retSortState = { col: 'ret-dailyNet', dir: 'desc' };
   let retWd = 0, retWdPassed = 0, retWdLeft = 0;
   let retTgtRatio = 1, retWdRange = 0;
   let retGlobal = { dailyTraders:0, monthlyTraders:0, dailyLoads:0, monthlyLoads:0 };
