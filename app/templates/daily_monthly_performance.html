@@ -130,7 +130,7 @@
       .kpi-value { font-size:1rem; }
       .cs-trigger { min-width:100px; font-size:0.72rem; padding:3px 20px 3px 6px; }
       .filter-sep { display:none; }
-      #row-count, #ret-row-count { display:none; }
+      #row-count, #ret-row-count { font-size:0.72rem; }
       .row-icon { display:none; }
       .office-row, .dept-row, .agent-row, .retention-agent-row { content-visibility:auto; contain-intrinsic-size:auto 40px; }
     }
@@ -934,7 +934,8 @@
     });
 
     // Count active agents only
-    const activeFiltered = filtered.filter(r => r.status === 'Active');
+    const _salExcl = new Set(['General', 'Unassigned Sales Target']);
+    const activeFiltered = filtered.filter(r => r.status === 'Active' && !_salExcl.has(r.office_name));
     const activeOffices = new Set(activeFiltered.map(r => r.office_name));
     const activeAgentCount = activeFiltered.length;
 

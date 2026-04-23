@@ -259,7 +259,7 @@
       #kpi-rdp-net        { order:13; }
       .date-input { width:120px; }
       .cnt-badge { display:none; }
-      #row-count, #ret-row-count { display:none; }
+      #row-count, #ret-row-count { font-size:0.72rem; }
       .row-icon { display:none; }
       /* Fit 3 columns on screen: let header wrap so column width = cell content width */
       .scoreboard-table th, .scoreboard-table td { padding-left:7px !important; padding-right:7px !important; }
@@ -1503,7 +1503,10 @@
       tbody.appendChild(totalTr);
     }
 
-    document.getElementById('row-count').textContent = `${offices.length} offices · ${agentCount} agents`;
+    const _salesExcl = new Set(['General', 'Unassigned Sales Target']);
+    const _salesActOff = offices.filter(o => !_salesExcl.has(o.name) && o.agents.some(a => a.status === 'Active'));
+    const _salesActAg  = _salesActOff.reduce((s,o) => s + o.agents.filter(a => a.status === 'Active').length, 0);
+    document.getElementById('row-count').textContent = `${_salesActOff.length} offices · ${_salesActAg} agents`;
     applyMobileColOrder();
   }
 
@@ -2169,7 +2172,11 @@
 
     _rdpNetRet = gRdpNet;
     _updateRdpNetCard();
-    document.getElementById('ret-row-count').textContent = `${totalOffices} offices · ${totalAgents} agents`;
+    const _retExcl = new Set(['General']);
+    const _retActOff = officeArr.filter(o => !_retExcl.has(o.officeName));
+    let _retActAg = 0;
+    _retActOff.forEach(o => { o.deptMap.forEach(ags => { _retActAg += ags.filter(a => a.status === 'Active').length; }); });
+    document.getElementById('ret-row-count').textContent = `${_retActOff.length} offices · ${_retActAg} agents`;
     applyMobileColOrder();
   }
 
