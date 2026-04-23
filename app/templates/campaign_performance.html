@@ -68,6 +68,10 @@
     #perf-table thead tr { position: sticky; top: 0; z-index: 2; }
     #perf-table tfoot tr { position: sticky; bottom: 0; z-index: 2; }
     #perf-table tfoot td { background-color: #21262d; color: #e0e0e0; }
+    #perf-table th.col-frozen, #perf-table td.col-frozen { position: sticky; left: 0; z-index: 1; background-color: #161b22; }
+    #perf-table thead th.col-frozen { z-index: 3; background-color: #21262d; }
+    #perf-table tfoot td.col-frozen { z-index: 1; background-color: #21262d; }
+    #perf-table tbody tr:hover td.col-frozen { background-color: #1c2128; }
 
     /* Spinner */
     #loading { display: none; text-align: center; padding: 60px; color: #8b949e; }
@@ -352,7 +356,7 @@
           <optgroup label="Campaign">
             <option value="marketing_group">Marketing Group</option>
             <option value="campaign_name">Campaign Name</option>
-            <option value="campaign_legacy_id">Campaign Legacy ID</option>
+            <option value="campaign_legacy_id" selected>Campaign Legacy ID</option>
             <option value="campaign_channel">Campaign Channel</option>
             <option value="campaign_sub_channel">Campaign Sub-channel</option>
             <option value="original_affiliate">Original Affiliate</option>
@@ -556,7 +560,7 @@
       <div class="tbl-scroll">
         <table class="table table-sm mb-0" id="perf-table">
           <thead id="tbl-thead"><tr>
-            <th onclick="tblSort('g1')" style="min-width:160px;" id="th-group">
+            <th onclick="tblSort('g1')" class="col-frozen" style="min-width:160px;" id="th-group">
               Group <i class="bi bi-arrow-down-up" style="font-size:0.65rem;" id="si-g1"></i>
             </th>
             <th onclick="tblSort('leads')" class="text-end">Leads <i class="bi bi-arrow-down-up" style="font-size:0.65rem;" id="si-leads"></i></th>
@@ -705,7 +709,7 @@
   let tblSortDir = -1;
   let tblExpanded = {};
 
-  const TBL_SORT_KEYS = ['g1','leads','live_accounts','live_avg_scp','ftd','ftd_avg_scp','ftc','deposits','withdrawals','net_deposits','traders'];
+  const TBL_SORT_KEYS = ['g1','leads','live_accounts','live_avg_scp','ftd','ftd_avg_scp','ftc','cr_lead_to_live','cr_live_to_ftd','deposits','withdrawals','net_deposits','traders','ltv','ltv_traders'];
 
   function tblSort(key) {
     if (tblSortKey === key) tblSortDir *= -1;
@@ -836,10 +840,10 @@
   // ── Rebuild thead with period/group columns ───────────────────────────────
   function rebuildThead(g1Label, g2Label, perLabel, hasG1, hasG2, hasPer) {
     let html = '<tr>';
-    if (hasG1) html += `<th onclick="tblSort('g1')" style="min-width:140px;cursor:pointer;">${escHtml(g1Label)} <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>`;
+    if (hasG1) html += `<th onclick="tblSort('g1')" class="col-frozen" style="min-width:140px;cursor:pointer;">${escHtml(g1Label)} <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>`;
     if (hasG2) html += `<th onclick="tblSort('g2')" style="min-width:120px;cursor:pointer;">${escHtml(g2Label)} <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>`;
     if (hasPer) html += `<th onclick="tblSort('period')" style="min-width:110px;cursor:pointer;">${escHtml(perLabel)} <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>`;
-    if (!hasG1 && !hasPer) html += `<th style="min-width:160px;">Group</th>`;
+    if (!hasG1 && !hasPer) html += `<th class="col-frozen" style="min-width:160px;">Group</th>`;
     html += `
       <th class="text-center" onclick="tblSort('leads')" style="cursor:pointer;">Leads <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
       <th class="text-center" onclick="tblSort('live_accounts')" style="cursor:pointer;">Live Accs <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
@@ -849,14 +853,12 @@
       <th class="text-center" onclick="tblSort('ftc')" style="cursor:pointer;">FTC <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
       <th class="text-center" onclick="tblSort('cr_lead_to_live')" style="cursor:pointer;white-space:nowrap;">CR% Lead→Live <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
       <th class="text-center" onclick="tblSort('cr_live_to_ftd')" style="cursor:pointer;white-space:nowrap;">CR% Live→FTD <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
-      <th class="text-center" onclick="tblSort('cr_lead_to_ftc')" style="cursor:pointer;white-space:nowrap;">CR% Lead→FTC <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
-      <th class="text-center" onclick="tblSort('cr_live_to_ftc')" style="cursor:pointer;white-space:nowrap;">CR% Live→FTC <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
-      <th class="text-center" onclick="tblSort('cr_ftd_to_ftc')" style="cursor:pointer;white-space:nowrap;">CR% FTD→FTC <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
       <th class="text-center" onclick="tblSort('deposits')" style="cursor:pointer;">Deposits <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
       <th class="text-center" onclick="tblSort('withdrawals')" style="cursor:pointer;">Withdrawals <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
       <th class="text-center" onclick="tblSort('net_deposits')" style="cursor:pointer;">Net Dep <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
       <th class="text-center" onclick="tblSort('traders')" style="cursor:pointer;">Traders <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
       <th class="text-center" onclick="tblSort('ltv')" style="cursor:pointer;">LTV <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+      <th class="text-center" onclick="tblSort('ltv_traders')" style="cursor:pointer;">LTV Traders <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
     </tr>`;
     document.getElementById('tbl-thead').innerHTML = html;
   }
@@ -886,30 +888,28 @@
       <td class="text-center" style="${style}">${fmtN(r.ftc)}</td>
       <td class="text-center" style="${style}">${fmtCr(r.cr_lead_to_live)}</td>
       <td class="text-center" style="${style}">${fmtCr(r.cr_live_to_ftd)}</td>
-      <td class="text-center" style="${style}">${fmtCr(r.cr_lead_to_ftc)}</td>
-      <td class="text-center" style="${style}">${fmtCr(r.cr_live_to_ftc)}</td>
-      <td class="text-center" style="${style}">${fmtCr(r.cr_ftd_to_ftc)}</td>
       <td class="text-center" style="color:#3fb950;${style}">${fmtMoney(r.deposits)}</td>
       <td class="text-center" style="color:#f85149;${style}">${fmtMoney(r.withdrawals)}</td>
       <td class="text-center" style="color:${net >= 0 ? '#3fb950' : '#f85149'};${style}">${fmtMoney(net)}</td>
       <td class="text-center" style="${style}">${fmtN(r.traders)}</td>
       <td class="text-center" style="${style}">${fmtMoney(r.ltv ?? 0)}</td>
+      <td class="text-center" style="${style}">${fmtMoney(r.ltv_traders ?? 0)}</td>
     `;
   }
 
   function renderFlatRow(r, ctx) {
     let cells = '';
-    if (ctx.hasG1) cells += `<td><span style="color:#c9d1d9;">${escHtml(r.g1)}</span></td>`;
+    if (ctx.hasG1) cells += `<td class="col-frozen"><span style="color:#c9d1d9;">${escHtml(r.g1)}</span></td>`;
     if (ctx.hasG2) cells += `<td><span style="color:#8b949e;">${escHtml(r.g2)}</span></td>`;
     if (ctx.hasPer) cells += `<td><span style="color:#d29922;">${escHtml(fmtPeriod(r.period, ctx.period))}</span></td>`;
-    if (!ctx.hasG1 && !ctx.hasPer) cells += `<td>—</td>`;
+    if (!ctx.hasG1 && !ctx.hasPer) cells += `<td class="col-frozen">—</td>`;
     return `<tr>${cells}${metricCells(r, false)}</tr>`;
   }
 
   function renderParentRow(g, expanded, ctx) {
     const icon = expanded ? 'bi-chevron-down' : 'bi-chevron-right';
     return `<tr style="background:rgba(63,185,80,0.02);">
-      <td>
+      <td class="col-frozen">
         <button class="expand-toggle" data-g1="${escAttr(g.g1)}"
           style="background:none;border:none;color:#8b949e;padding:0 6px 0 0;font-size:0.8rem;vertical-align:middle;">
           <i class="bi ${icon}"></i>
@@ -923,7 +923,7 @@
   }
 
   function renderChildRow(r, ctx) {
-    let cells = `<td style="padding-left:32px;"><span style="color:#8b949e;">${escHtml(r.g2)}</span></td>`;
+    let cells = `<td class="col-frozen" style="padding-left:32px;"><span style="color:#8b949e;">${escHtml(r.g2)}</span></td>`;
     if (ctx.hasPer) cells += `<td><span style="color:#d29922;">${escHtml(fmtPeriod(r.period, ctx.period))}</span></td>`;
     return `<tr style="background:rgba(0,0,0,0.15);">${cells}${metricCells(r, false)}</tr>`;
   }
@@ -931,7 +931,7 @@
   function renderTotalsRow(totals, colsBefore) {
     document.getElementById('tbl-tfoot').innerHTML =
       `<tr style="border-top:2px solid #30363d;">
-        <td colspan="${colsBefore}"><strong style="color:#e0e0e0;">Total</strong></td>
+        <td class="col-frozen" colspan="${colsBefore}"><strong style="color:#e0e0e0;">Total</strong></td>
         ${metricCells(totals, true)}
       </tr>`;
   }
@@ -998,7 +998,7 @@
       const key = r.g1 ?? '(Unassigned)';
       if (!g1Map[key]) {
         g1Map[key] = {g1: r.g1, leads: 0, live_accounts: 0, ftd: 0, ftc: 0,
-                      deposits: 0, withdrawals: 0, net_deposits: 0, traders: 0, ltv: 0, children: []};
+                      deposits: 0, withdrawals: 0, net_deposits: 0, traders: 0, ltv: 0, ltv_traders: 0, children: []};
       }
       const agg = g1Map[key];
       agg.leads += r.leads; agg.live_accounts += r.live_accounts;
@@ -1007,7 +1007,8 @@
       agg.withdrawals  += r.withdrawals;
       agg.net_deposits += r.net_deposits;
       agg.traders      += r.traders;
-      agg.ltv = agg.ftc > 0 ? Math.round(agg.net_deposits / agg.ftc * 100) / 100 : 0;
+      agg.ltv          = agg.ftc     > 0 ? Math.round(agg.net_deposits / agg.ftc     * 100) / 100 : 0;
+      agg.ltv_traders  = agg.traders > 0 ? Math.round(agg.net_deposits / agg.traders * 100) / 100 : 0;
       agg.children.push(r);
     });
 
@@ -1062,7 +1063,7 @@
     if (hasG1) headers.push(g1Label);
     if (hasG2) headers.push(g2Label);
     if (hasPer) headers.push(perLabel);
-    headers.push('Leads','Live Accounts','Live Avg SCP','FTD','FTD Avg SCP','FTC','CR% Lead→Live','CR% Live→FTD','CR% Lead→FTC','CR% Live→FTC','CR% FTD→FTC','Deposits','Withdrawals','Net Deposits','Traders','LTV');
+    headers.push('Leads','Live Accounts','Live Avg SCP','FTD','FTD Avg SCP','FTC','CR% Lead→Live','CR% Live→FTD','Deposits','Withdrawals','Net Deposits','Traders','LTV','LTV Traders');
 
     const esc = v => '"' + String(v ?? '').replace(/"/g,'""') + '"';
     const lines = [headers.join(',')];
@@ -1073,8 +1074,8 @@
       if (hasG2) cols.push(esc(r.g2));
       if (hasPer) cols.push(esc(fmtPeriod(r.period, per)));
       cols.push(r.leads, r.live_accounts, r.live_avg_scp ?? '', r.ftd, r.ftd_avg_scp ?? '', r.ftc,
-                r.cr_lead_to_live, r.cr_live_to_ftd, r.cr_lead_to_ftc, r.cr_live_to_ftc, r.cr_ftd_to_ftc,
-                r.deposits, r.withdrawals, r.net_deposits, r.traders);
+                r.cr_lead_to_live, r.cr_live_to_ftd,
+                r.deposits, r.withdrawals, r.net_deposits, r.traders, r.ltv ?? 0, r.ltv_traders ?? 0);
       lines.push(cols.join(','));
     });
 
@@ -1082,7 +1083,9 @@
     const totCols = [];
     if (hasG1) totCols.push('"Total"');
     if (hasG2) totCols.push('""');
-    totCols.push(t.leads, t.live_accounts, t.live_avg_scp ?? '', t.ftd, t.ftd_avg_scp ?? '', t.ftc, t.deposits, t.withdrawals, t.net_deposits, t.traders);
+    totCols.push(t.leads, t.live_accounts, t.live_avg_scp ?? '', t.ftd, t.ftd_avg_scp ?? '', t.ftc,
+                 t.cr_lead_to_live, t.cr_live_to_ftd,
+                 t.deposits, t.withdrawals, t.net_deposits, t.traders, t.ltv ?? 0, t.ltv_traders ?? 0);
     lines.push(totCols.join(','));
 
     const df = document.getElementById('date-from').value;

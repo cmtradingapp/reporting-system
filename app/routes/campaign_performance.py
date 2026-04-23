@@ -1005,10 +1005,8 @@ def _camp_table_calc(
         def _add_cr(row):
             row["cr_lead_to_live"] = _cr(row["live_accounts"], row["leads"])
             row["cr_live_to_ftd"]  = _cr(row["ftd"],           row["live_accounts"])
-            row["cr_lead_to_ftc"]  = _cr(row["ftc"],           row["leads"])
-            row["cr_live_to_ftc"]  = _cr(row["ftc"],           row["live_accounts"])
-            row["cr_ftd_to_ftc"]   = _cr(row["ftc"],           row["ftd"])
-            row["ltv"]             = round(row["net_deposits"] / row["ftc"], 2) if row["ftc"] else 0.0
+            row["ltv"]             = round(row["net_deposits"] / row["ftc"], 2)     if row["ftc"]     else 0.0
+            row["ltv_traders"]     = round(row["net_deposits"] / row["traders"], 2) if row["traders"] else 0.0
             return row
 
         for row in merged.values():
