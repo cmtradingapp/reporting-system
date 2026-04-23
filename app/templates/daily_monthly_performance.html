@@ -671,16 +671,19 @@
       if (fStatus && !fStatus.has(r.status))      return false;
       return true;
     });
-    const ftc        = fSales.reduce((s,r) => s + (r.ftc          ?? 0), 0);
-    const ftd        = fSales.reduce((s,r) => s + (r.ftd_count    ?? 0), 0);
-    const net        = fSales.reduce((s,r) => s + (r.net_deposits  ?? 0), 0)
-                     + fRet.reduce((s,r)   => s + (r.net_usd       ?? 0), 0);
+    const noSalFilter = !fOffice && !fTeam && !fAgent && !fStatus;
+    const ftc        = noSalFilter ? globalStats.monthlyFtc : fSales.reduce((s,r) => s + (r.ftc       ?? 0), 0);
+    const ftd        = noSalFilter ? globalStats.monthlyFtd : fSales.reduce((s,r) => s + (r.ftd_count ?? 0), 0);
+    const net        = noSalFilter
+                     ? globalStats.monthlyNet
+                     : fSales.reduce((s,r) => s + (r.net_deposits ?? 0), 0)
+                     + fRet.reduce((s,r)   => s + (r.net_usd      ?? 0), 0);
     const ovol       = fRet.reduce((s,r)   => s + (r.open_volume_usd ?? 0), 0);
-    const dFtd       = fSales.reduce((s,r) => s + (r.daily_ftd    ?? 0), 0);
-    const dFtc       = fSales.reduce((s,r) => s + (r.daily_ftc    ?? 0), 0);
-    const dNetSal    = fSales.reduce((s,r) => s + (r.daily_net    ?? 0), 0);
-    const dNetRet    = fRet.reduce((s,r)   => s + (r.daily_net_usd ?? 0), 0);
-    const dNet       = dNetSal + dNetRet;
+    const dFtd       = noSalFilter ? globalStats.dailyFtd  : fSales.reduce((s,r) => s + (r.daily_ftd  ?? 0), 0);
+    const dFtc       = noSalFilter ? globalStats.dailyFtc  : fSales.reduce((s,r) => s + (r.daily_ftc  ?? 0), 0);
+    const dNetSal    = noSalFilter ? globalStats.dailyNet   : fSales.reduce((s,r) => s + (r.daily_net  ?? 0), 0);
+    const dNetRet    = fRet.reduce((s,r) => s + (r.daily_net_usd ?? 0), 0);
+    const dNet       = noSalFilter ? globalStats.dailyNet   : dNetSal + dNetRet;
     const netFmt = v => (v < 0 ? '-$' : '$') + Math.round(Math.abs(v)).toLocaleString();
     const ftcEl = document.getElementById('stat-grand-ftc');
     if (ftcEl) ftcEl.textContent = ftc.toLocaleString();
@@ -885,6 +888,14 @@
       document.getElementById('stat-wd-left').textContent = workingDaysLeft;
       const wdMob = document.getElementById('stat-wd-mob'); if (wdMob) wdMob.textContent = workingDays;
       const wdLMob = document.getElementById('stat-wd-left-mob'); if (wdLMob) wdLMob.textContent = workingDaysLeft;
+      globalStats = {
+        dailyFtd:    data.global_daily_ftd    ?? 0,
+        monthlyFtd:  data.global_monthly_ftd  ?? 0,
+        dailyFtc:    data.global_daily_ftc    ?? 0,
+        monthlyFtc:  data.global_monthly_ftc  ?? 0,
+        dailyNet:    data.global_daily_net    ?? 0,
+        monthlyNet:  data.global_monthly_net  ?? 0,
+      };
       populateFilterDropdowns();
       renderTable();
       updateStatsFromFiltered();
@@ -1104,6 +1115,7 @@
   let retWd = 0, retWdPassed = 0, retWdLeft = 0;
   let retTgtRatio = 1, retWdRange = 0;
   let retGlobal = { dailyTraders:0, monthlyTraders:0, dailyLoads:0, monthlyLoads:0 };
+  let globalStats = { dailyFtd:0, monthlyFtd:0, dailyFtc:0, monthlyFtc:0, dailyNet:0, monthlyNet:0 };
 
   async function loadRetentionData(silent=false) {
     const df = document.getElementById('date-from').value;

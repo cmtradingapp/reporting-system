@@ -291,6 +291,32 @@ async def dmp_sales_api(request: Request, date_from: str, date_to: str):
                     "avg_scp":      None,
                 })
 
+        # ── Global totals (all agents, all departments — for KPI cards) ──
+        g_daily_ftd = g_monthly_ftd = g_daily_ftc = g_monthly_ftc = 0
+        g_daily_net = g_monthly_net = 0.0
+        try:
+            with conn.cursor() as cur_g:
+                cur_g.execute("""
+                    SELECT
+                        COALESCE(SUM(CASE WHEN k.tx_date = %(date_to)s  THEN k.ftd_count ELSE 0 END), 0)::int,
+                        COALESCE(SUM(CASE WHEN k.tx_date >= %(date_from)s AND k.tx_date < %(date_to_excl)s THEN k.ftd_count ELSE 0 END), 0)::int,
+                        COALESCE(SUM(CASE WHEN k.qual_date = %(date_to)s THEN k.ftc_count ELSE 0 END), 0)::int,
+                        COALESCE(SUM(CASE WHEN k.qual_date >= %(date_from)s AND k.qual_date < %(date_to_excl)s THEN k.ftc_count ELSE 0 END), 0)::int,
+                        COALESCE(SUM(CASE WHEN k.tx_date = %(date_to)s  THEN k.net_usd ELSE 0 END), 0)::float,
+                        COALESCE(SUM(CASE WHEN k.tx_date >= %(date_from)s AND k.tx_date < %(date_to_excl)s THEN k.net_usd ELSE 0 END), 0)::float
+                    FROM mv_daily_kpis k
+                    LEFT JOIN crm_users u ON u.id = k.agent_id
+                    WHERE TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
+                      AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
+                      AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'
+                """, {"date_from": date_from, "date_to_excl": date_to_exclusive, "date_to": date_to})
+                gr = cur_g.fetchone()
+                if gr:
+                    g_daily_ftd, g_monthly_ftd, g_daily_ftc, g_monthly_ftc = int(gr[0]), int(gr[1]), int(gr[2]), int(gr[3])
+                    g_daily_net, g_monthly_net = round(float(gr[4]), 2), round(float(gr[5]), 2)
+        except Exception as _ge:
+            print(f"[dmp_sales] global totals query failed: {_ge}")
+
         _result = {
             "rows":                 data,
             "working_days":         working_days,
@@ -300,6 +326,12 @@ async def dmp_sales_api(request: Request, date_from: str, date_to: str):
             "wd_in_range":          wd_in_range,
             "date_from":            date_from,
             "date_to":              date_to,
+            "global_daily_ftd":     g_daily_ftd,
+            "global_monthly_ftd":   g_monthly_ftd,
+            "global_daily_ftc":     g_daily_ftc,
+            "global_monthly_ftc":   g_monthly_ftc,
+            "global_daily_net":     g_daily_net,
+            "global_monthly_net":   g_monthly_net,
         }
         cache.set(_ck, _result)
         return JSONResponse(content=_result)
