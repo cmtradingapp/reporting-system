@@ -83,7 +83,8 @@ async def dmp_sales_api(request: Request, date_from: str, date_to: str):
             COALESCE(dk.daily_ftc, 0)::int               AS daily_ftc,
             COALESCE(dk.daily_net, 0)::float             AS daily_net,
             COALESCE(u.status, '')                        AS status,
-            scp.avg_scp                                   AS avg_scp
+            scp.avg_scp                                   AS avg_scp,
+            daily_scp.daily_avg_scp                       AS daily_avg_scp
         FROM crm_users u
         LEFT JOIN (
             SELECT
@@ -152,6 +153,38 @@ async def dmp_sales_api(request: Request, date_from: str, date_to: str):
             WHERE sub.score IS NOT NULL
             GROUP BY sub.agent_id
         ) scp ON scp.agent_id = u.id
+        LEFT JOIN (
+            SELECT sub.agent_id,
+                   ROUND(AVG(sub.score)::numeric, 1) AS daily_avg_scp
+            FROM (
+                SELECT t.original_deposit_owner AS agent_id,
+                       t.vtigeraccountid AS accountid,
+                       CASE
+                         WHEN a.classification_int IS NOT NULL AND a.classification_int > 0
+                           THEN a.classification_int
+                         WHEN a.birth_date IS NOT NULL THEN CASE
+                           WHEN DATE_PART('year', AGE(CURRENT_DATE, a.birth_date::date)) BETWEEN 25 AND 29 THEN 4
+                           WHEN DATE_PART('year', AGE(CURRENT_DATE, a.birth_date::date)) BETWEEN 30 AND 34 THEN 5
+                           WHEN DATE_PART('year', AGE(CURRENT_DATE, a.birth_date::date)) BETWEEN 35 AND 44 THEN 6
+                           WHEN DATE_PART('year', AGE(CURRENT_DATE, a.birth_date::date)) >= 45 THEN 7
+                           ELSE NULL END
+                         ELSE NULL END AS score
+                FROM transactions t
+                JOIN accounts a ON a.accountid = t.vtigeraccountid
+                WHERE t.transactionapproval = 'Approved'
+                  AND (t.deleted = 0 OR t.deleted IS NULL)
+                  AND t.transaction_type_name = 'Deposit'
+                  AND t.ftd = 1
+                  AND t.vtigeraccountid IS NOT NULL
+                  AND a.is_test_account = 0
+                  AND t.confirmation_time >= %(date_to)s::timestamp
+                  AND t.confirmation_time <  (%(date_to)s::date + 1)::timestamp
+                GROUP BY t.original_deposit_owner, t.vtigeraccountid,
+                         a.classification_int, a.birth_date
+            ) sub
+            WHERE sub.score IS NOT NULL
+            GROUP BY sub.agent_id
+        ) daily_scp ON daily_scp.agent_id = u.id
         WHERE u.department_ = 'Sales'
           AND u.team = 'Conversion'
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
@@ -213,7 +246,8 @@ async def dmp_sales_api(request: Request, date_from: str, date_to: str):
                 "daily_ftc":    int(r[9] or 0),
                 "daily_net":    round(float(r[10] or 0), 2),
                 "status":       r[11] or '',
-                "avg_scp":      round(float(r[12]), 1) if r[12] is not None else None,
+                "avg_scp":       round(float(r[12]), 1) if r[12] is not None else None,
+                "daily_avg_scp": round(float(r[13]), 1) if r[13] is not None else None,
             }
             for r in rows
         ]
