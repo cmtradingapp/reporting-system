@@ -2478,7 +2478,8 @@
       ftc:               agents.reduce((s,a)=>s+(a.ftc??0),0),
     })).sort(sortFn);
 
-    offices.forEach((off, oi) => {
+    const activeOffices = offices.filter(o => o.daily_ftd > 0 || o.ftd_count > 0 || o.net_deposits !== 0 || o.ftc > 0);
+    activeOffices.forEach((off, oi) => {
       gFtd+=off.daily_ftd; gFtdAmt+=off.daily_ftd_amount; gMonthlyFtd+=off.ftd_count;
       gMonthlyFtdAmt+=off.monthly_ftd_amount; gNet+=off.net_deposits; gFtc+=off.ftc;
       offCount++;
@@ -2618,7 +2619,8 @@
       };
     }).sort((a,b) => sortVal(a) - sortVal(b));
 
-    offList.forEach((off, oi) => {
+    const activeOffList = offList.filter(o => o.daily_net_usd !== 0 || o.net_usd !== 0 || o.traders_count > 0 || o.deposit_usd > 0);
+    activeOffList.forEach((off, oi) => {
       gDNet+=off.daily_net_usd; gNet+=off.net_usd; gDTraders+=off.daily_traders;
       gTraders+=off.traders_count; gDep+=off.deposit_usd; gRdp+=off.rdp_net;
       offCount++;
