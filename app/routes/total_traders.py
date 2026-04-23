@@ -220,10 +220,11 @@ async def total_traders_api(
         "CASE WHEN a.classification_int IS NOT NULL AND a.classification_int > 0"
         " THEN a.classification_int"
         " WHEN a.birth_date IS NOT NULL THEN CASE"
-        " WHEN DATE_PART('year', AGE({ref}, a.birth_date::date)) < 25 THEN 3"
-        " WHEN DATE_PART('year', AGE({ref}, a.birth_date::date)) < 30 THEN 5"
-        " WHEN DATE_PART('year', AGE({ref}, a.birth_date::date)) < 40 THEN 6"
-        " ELSE 7 END ELSE NULL END"
+        " WHEN DATE_PART('year', AGE({ref}, a.birth_date::date)) BETWEEN 25 AND 29 THEN 4"
+        " WHEN DATE_PART('year', AGE({ref}, a.birth_date::date)) BETWEEN 30 AND 34 THEN 5"
+        " WHEN DATE_PART('year', AGE({ref}, a.birth_date::date)) BETWEEN 35 AND 44 THEN 6"
+        " WHEN DATE_PART('year', AGE({ref}, a.birth_date::date)) >= 45 THEN 7"
+        " ELSE NULL END ELSE NULL END"
     )
     _rt_where = f"""rt.accountid IS NOT NULL AND rt.accountid::text != ''
           AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
