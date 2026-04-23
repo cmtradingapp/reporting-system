@@ -923,7 +923,8 @@
   }
 
   function renderChildRow(r, ctx) {
-    let cells = `<td class="col-frozen" style="padding-left:32px;"><span style="color:#8b949e;">${escHtml(r.g2)}</span></td>`;
+    let cells = `<td class="col-frozen"></td>`;
+    cells += `<td style="padding-left:20px;"><span style="color:#8b949e;">${escHtml(r.g2)}</span></td>`;
     if (ctx.hasPer) cells += `<td><span style="color:#d29922;">${escHtml(fmtPeriod(r.period, ctx.period))}</span></td>`;
     return `<tr style="background:rgba(0,0,0,0.15);">${cells}${metricCells(r, false)}</tr>`;
   }
