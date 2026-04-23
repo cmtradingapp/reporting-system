@@ -79,7 +79,9 @@ async def dmp_sales_api(request: Request, date_from: str, date_to: str):
             COALESCE(f100.ftd100_cnt, 0)                 AS ftd100,
             COALESCE(mv.net_usd, 0)::float               AS net_deposits,
             COALESCE(mv.ftd_count, 0)::int               AS ftd_count,
+            COALESCE(mv.ftd_usd, 0)::float               AS monthly_ftd_amount,
             COALESCE(dk.daily_ftd, 0)::int               AS daily_ftd,
+            COALESCE(dk.daily_ftd_amount, 0)::float      AS daily_ftd_amount,
             COALESCE(dk.daily_ftc, 0)::int               AS daily_ftc,
             COALESCE(dk.daily_net, 0)::float             AS daily_net,
             COALESCE(u.status, '')                        AS status,
@@ -94,7 +96,9 @@ async def dmp_sales_api(request: Request, date_from: str, date_to: str):
                 SUM(CASE WHEN k.tx_date  >= %(date_from)s AND k.tx_date  < %(date_to_excl)s
                          THEN k.net_usd  ELSE 0 END)        AS net_usd,
                 SUM(CASE WHEN k.tx_date  >= %(date_from)s AND k.tx_date  < %(date_to_excl)s
-                         THEN k.ftd_count ELSE 0 END)::int  AS ftd_count
+                         THEN k.ftd_count ELSE 0 END)::int  AS ftd_count,
+                SUM(CASE WHEN k.tx_date  >= %(date_from)s AND k.tx_date  < %(date_to_excl)s
+                         THEN k.ftd_usd ELSE 0 END)         AS ftd_usd
             FROM {_kpi_tbl} k
             WHERE (k.qual_date >= %(date_from)s AND k.qual_date < %(date_to_excl)s)
                OR (k.tx_date   >= %(date_from)s AND k.tx_date   < %(date_to_excl)s)
@@ -104,6 +108,7 @@ async def dmp_sales_api(request: Request, date_from: str, date_to: str):
             SELECT
                 k.agent_id,
                 SUM(CASE WHEN k.tx_date  = %(date_to)s THEN k.ftd_count ELSE 0 END)::int   AS daily_ftd,
+                SUM(CASE WHEN k.tx_date  = %(date_to)s THEN k.ftd_usd   ELSE 0 END)::float AS daily_ftd_amount,
                 SUM(CASE WHEN k.qual_date = %(date_to)s THEN k.ftc_count ELSE 0 END)::int   AS daily_ftc,
                 SUM(CASE WHEN k.tx_date  = %(date_to)s THEN k.net_usd   ELSE 0 END)::float  AS daily_net
             FROM {_kpi_tbl} k
@@ -240,14 +245,16 @@ async def dmp_sales_api(request: Request, date_from: str, date_to: str):
                 "ftc":          r[3],
                 "target_ftc":   r[4],
                 "ftd100":       r[5],
-                "net_deposits": round(r[6], 2),
-                "ftd_count":    r[7],
-                "daily_ftd":    int(r[8] or 0),
-                "daily_ftc":    int(r[9] or 0),
-                "daily_net":    round(float(r[10] or 0), 2),
-                "status":       r[11] or '',
-                "avg_scp":       round(float(r[12]), 1) if r[12] is not None else None,
-                "daily_avg_scp": round(float(r[13]), 1) if r[13] is not None else None,
+                "net_deposits":        round(r[6], 2),
+                "ftd_count":           r[7],
+                "monthly_ftd_amount":  round(float(r[8] or 0), 2),
+                "daily_ftd":           int(r[9] or 0),
+                "daily_ftd_amount":    round(float(r[10] or 0), 2),
+                "daily_ftc":           int(r[11] or 0),
+                "daily_net":           round(float(r[12] or 0), 2),
+                "status":              r[13] or '',
+                "avg_scp":             round(float(r[14]), 1) if r[14] is not None else None,
+                "daily_avg_scp":       round(float(r[15]), 1) if r[15] is not None else None,
             }
             for r in rows
         ]

@@ -2671,7 +2671,9 @@ _MV_SETUP_SQL = [
         END), 0)                                                             AS withdrawal_usd,
         SUM(CASE WHEN t.transaction_type_name = 'Deposit' AND t.ftd = 1 THEN 1 ELSE 0 END)::int AS ftd_count,
         COUNT(DISTINCT CASE WHEN t.transaction_type_name = 'Deposit' AND t.ftd = 1
-                            THEN t.vtigeraccountid END)::int                 AS ftc_count
+                            THEN t.vtigeraccountid END)::int                 AS ftc_count,
+        COALESCE(SUM(CASE WHEN t.transaction_type_name = 'Deposit' AND t.ftd = 1
+                          THEN t.usdamount ELSE 0 END), 0)                   AS ftd_usd
     FROM transactions t
     JOIN accounts  a  ON a.accountid = t.vtigeraccountid
     LEFT JOIN crm_users u ON u.id   = t.original_deposit_owner
