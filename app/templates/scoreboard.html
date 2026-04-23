@@ -2530,7 +2530,7 @@
 
     const scp1 = v => v!=null?'<strong>'+v.toFixed(1)+'</strong>':'—';
     const scp0 = v => v!=null?v.toFixed(1):'—';
-    const activeOffices = offices.filter(o => o.dailyFtd>0||o.ftdCount>0||o.net!==0||o.ftc>0);
+    const activeOffices = offices.filter(o => o.dailyFtd>0||o.ftdCount>0||o.net!==0||o.ftc>0||o.tgt>0);
     activeOffices.forEach((off, oi) => {
       gDFtd+=off.dailyFtd; gDFtdAmt+=off.dailyFtdAmt; gDTgt+=off.dailyTgt;
       gFtd+=off.ftdCount; gTgt+=off.tgt; gFtdAmt+=off.ftdAmt;
