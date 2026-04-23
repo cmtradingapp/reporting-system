@@ -705,7 +705,7 @@
   let tblSortDir = -1;
   let tblExpanded = {};
 
-  const TBL_SORT_KEYS = ['g1','leads','live_accounts','ftd','ftc','deposits','withdrawals','net_deposits','traders'];
+  const TBL_SORT_KEYS = ['g1','leads','live_accounts','live_avg_scp','ftd','ftd_avg_scp','ftc','deposits','withdrawals','net_deposits','traders'];
 
   function tblSort(key) {
     if (tblSortKey === key) tblSortDir *= -1;
@@ -843,7 +843,9 @@
     html += `
       <th class="text-center" onclick="tblSort('leads')" style="cursor:pointer;">Leads <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
       <th class="text-center" onclick="tblSort('live_accounts')" style="cursor:pointer;">Live Accs <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+      <th class="text-center" onclick="tblSort('live_avg_scp')" style="cursor:pointer;">Live Avg SCP <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
       <th class="text-center" onclick="tblSort('ftd')" style="cursor:pointer;">FTD <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+      <th class="text-center" onclick="tblSort('ftd_avg_scp')" style="cursor:pointer;">FTD Avg SCP <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
       <th class="text-center" onclick="tblSort('ftc')" style="cursor:pointer;">FTC <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
       <th class="text-center" onclick="tblSort('cr_lead_to_live')" style="cursor:pointer;white-space:nowrap;">CR% Lead→Live <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
       <th class="text-center" onclick="tblSort('cr_live_to_ftd')" style="cursor:pointer;white-space:nowrap;">CR% Live→FTD <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
@@ -866,6 +868,11 @@
     return `<span style="color:${color};">${v.toFixed(2)}%</span>`;
   }
 
+  function fmtScp(v) {
+    if (v == null) return '<span style="color:#484f58;">—</span>';
+    return `<span>${v.toFixed(1)}</span>`;
+  }
+
   function metricCells(r, isTotal) {
     const net = r.net_deposits ?? 0;
     const style = isTotal ? 'font-weight:600;' : '';
@@ -873,7 +880,9 @@
     return `
       <td class="text-center" style="${style}">${fmtN(r.leads)}</td>
       <td class="text-center" style="${style}">${fmtN(r.live_accounts)}</td>
+      <td class="text-center" style="${style}">${fmtScp(r.live_avg_scp)}</td>
       <td class="text-center" style="${style}">${fmtN(r.ftd)}</td>
+      <td class="text-center" style="${style}">${fmtScp(r.ftd_avg_scp)}</td>
       <td class="text-center" style="${style}">${fmtN(r.ftc)}</td>
       <td class="text-center" style="${style}">${fmtCr(r.cr_lead_to_live)}</td>
       <td class="text-center" style="${style}">${fmtCr(r.cr_live_to_ftd)}</td>
@@ -1053,7 +1062,7 @@
     if (hasG1) headers.push(g1Label);
     if (hasG2) headers.push(g2Label);
     if (hasPer) headers.push(perLabel);
-    headers.push('Leads','Live Accounts','FTD','FTC','CR% Lead→Live','CR% Live→FTD','CR% Lead→FTC','CR% Live→FTC','CR% FTD→FTC','Deposits','Withdrawals','Net Deposits','Traders','LTV');
+    headers.push('Leads','Live Accounts','Live Avg SCP','FTD','FTD Avg SCP','FTC','CR% Lead→Live','CR% Live→FTD','CR% Lead→FTC','CR% Live→FTC','CR% FTD→FTC','Deposits','Withdrawals','Net Deposits','Traders','LTV');
 
     const esc = v => '"' + String(v ?? '').replace(/"/g,'""') + '"';
     const lines = [headers.join(',')];
@@ -1063,7 +1072,7 @@
       if (hasG1) cols.push(esc(r.g1));
       if (hasG2) cols.push(esc(r.g2));
       if (hasPer) cols.push(esc(fmtPeriod(r.period, per)));
-      cols.push(r.leads, r.live_accounts, r.ftd, r.ftc,
+      cols.push(r.leads, r.live_accounts, r.live_avg_scp ?? '', r.ftd, r.ftd_avg_scp ?? '', r.ftc,
                 r.cr_lead_to_live, r.cr_live_to_ftd, r.cr_lead_to_ftc, r.cr_live_to_ftc, r.cr_ftd_to_ftc,
                 r.deposits, r.withdrawals, r.net_deposits, r.traders);
       lines.push(cols.join(','));
@@ -1073,7 +1082,7 @@
     const totCols = [];
     if (hasG1) totCols.push('"Total"');
     if (hasG2) totCols.push('""');
-    totCols.push(t.leads, t.live_accounts, t.ftd, t.ftc, t.deposits, t.withdrawals, t.net_deposits, t.traders);
+    totCols.push(t.leads, t.live_accounts, t.live_avg_scp ?? '', t.ftd, t.ftd_avg_scp ?? '', t.ftc, t.deposits, t.withdrawals, t.net_deposits, t.traders);
     lines.push(totCols.join(','));
 
     const df = document.getElementById('date-from').value;

@@ -752,6 +752,16 @@ def _camp_table_calc(
             if has_period: acct_sel.append(f"{acct_period_sql} AS period"); acct_grp.append(str(p)); p += 1
             if has_g1: acct_sel.append(f"{g1_sql} AS g1"); acct_grp.append(str(p)); p += 1
             if has_g2: acct_sel.append(f"{g2_sql} AS g2"); acct_grp.append(str(p)); p += 1
+            _scp_case_tbl = (
+                "CASE WHEN a.classification_int IS NOT NULL AND a.classification_int > 0"
+                " THEN a.classification_int::numeric"
+                " WHEN a.birth_date IS NOT NULL THEN CASE"
+                " WHEN DATE_PART('year', AGE(CURRENT_DATE, a.birth_date::date)) BETWEEN 25 AND 29 THEN 4"
+                " WHEN DATE_PART('year', AGE(CURRENT_DATE, a.birth_date::date)) BETWEEN 30 AND 34 THEN 5"
+                " WHEN DATE_PART('year', AGE(CURRENT_DATE, a.birth_date::date)) BETWEEN 35 AND 44 THEN 6"
+                " WHEN DATE_PART('year', AGE(CURRENT_DATE, a.birth_date::date)) >= 45 THEN 7"
+                " ELSE NULL END ELSE NULL END"
+            )
             acct_sel += [
                 "COUNT(*) FILTER (WHERE a.createdtime IS NOT NULL"
                 " AND a.createdtime >= %(date_from)s"
@@ -760,6 +770,10 @@ def _camp_table_calc(
                 " AND a.createdtime >= %(date_from)s"
                 " AND a.createdtime < %(date_to_excl)s"
                 " AND a.birth_date IS NOT NULL) AS live_accounts",
+                f"ROUND((AVG({_scp_case_tbl})"
+                " FILTER (WHERE a.birth_date IS NOT NULL"
+                " AND a.createdtime >= %(date_from)s"
+                " AND a.createdtime < %(date_to_excl)s)), 1) AS live_avg_scp",
                 # FTC handled in separate query (grouped by qualification date, not creation date)
             ]
             acct_date_filter = (
@@ -803,6 +817,8 @@ def _camp_table_calc(
                 " THEN t.usdamount ELSE 0 END), 0) AS deposits",
                 "COALESCE(SUM(CASE WHEN t.transaction_type_name IN ('Withdrawal', 'Deposit Cancelled')"
                 " THEN t.usdamount ELSE 0 END), 0) AS withdrawals",
+                f"ROUND((AVG({_scp_case_tbl}))"
+                " FILTER (WHERE t.ftd = 1 AND t.transaction_type_name = 'Deposit'), 1) AS ftd_avg_scp",
             ]
             txn_sql = (
                 f"SELECT {', '.join(txn_sel)}"
@@ -913,7 +929,8 @@ def _camp_table_calc(
             per = str(r[off]) if has_period else None; off += int(has_period)
             g1  = r[off] if has_g1 else None;          off += int(has_g1)
             g2  = r[off] if has_g2 else None;          off += int(has_g2)
-            return per, g1, g2, int(r[off] or 0), int(r[off + 1] or 0)
+            live_avg_scp = round(float(r[off + 2]), 1) if r[off + 2] is not None else None
+            return per, g1, g2, int(r[off] or 0), int(r[off + 1] or 0), live_avg_scp
 
         def _parse_ftc(r):
             off = 0
@@ -927,7 +944,8 @@ def _camp_table_calc(
             per = str(r[off]) if has_period else None; off += int(has_period)
             g1  = r[off] if has_g1 else None;          off += int(has_g1)
             g2  = r[off] if has_g2 else None;          off += int(has_g2)
-            return per, g1, g2, int(r[off] or 0), float(r[off + 1] or 0), float(r[off + 2] or 0)
+            ftd_avg_scp = round(float(r[off + 3]), 1) if r[off + 3] is not None else None
+            return per, g1, g2, int(r[off] or 0), float(r[off + 1] or 0), float(r[off + 2] or 0), ftd_avg_scp
 
         def _parse_traders(r):
             off = 0
@@ -936,29 +954,30 @@ def _camp_table_calc(
             g2  = r[off] if has_g2 else None;          off += int(has_g2)
             return per, g1, g2, int(r[off] or 0)
 
+        _empty = lambda per, g1, g2: {"period": per, "g1": g1, "g2": g2, "leads": 0, "live_accounts": 0,
+                                      "live_avg_scp": None, "ftc": 0, "ftd": 0, "ftd_avg_scp": None,
+                                      "deposits": 0.0, "withdrawals": 0.0, "net_deposits": 0.0, "traders": 0}
         merged: dict = {}
         for r in acct_rows:
-            per, g1, g2, leads, live = _parse_acct(r)
+            per, g1, g2, leads, live, live_avg_scp = _parse_acct(r)
             k = (per, g1, g2)
-            merged[k] = {"period": per, "g1": g1, "g2": g2, "leads": leads, "live_accounts": live, "ftc": 0,
-                         "ftd": 0, "deposits": 0.0, "withdrawals": 0.0, "net_deposits": 0.0, "traders": 0}
+            merged[k] = {**_empty(per, g1, g2), "leads": leads, "live_accounts": live, "live_avg_scp": live_avg_scp}
 
         for r in ftc_rows:
             per, g1, g2, ftc = _parse_ftc(r)
             k = (per, g1, g2)
             if k not in merged:
-                merged[k] = {"period": per, "g1": g1, "g2": g2, "leads": 0, "live_accounts": 0, "ftc": 0,
-                              "ftd": 0, "deposits": 0.0, "withdrawals": 0.0, "net_deposits": 0.0, "traders": 0}
+                merged[k] = _empty(per, g1, g2)
             merged[k]["ftc"] = ftc
 
         for r in txn_rows:
-            per, g1, g2, ftd, deps, wds = _parse_txn(r)
+            per, g1, g2, ftd, deps, wds, ftd_avg_scp = _parse_txn(r)
             k = (per, g1, g2)
             if k not in merged:
-                merged[k] = {"period": per, "g1": g1, "g2": g2, "leads": 0, "live_accounts": 0, "ftc": 0,
-                              "ftd": 0, "deposits": 0.0, "withdrawals": 0.0, "net_deposits": 0.0, "traders": 0}
+                merged[k] = _empty(per, g1, g2)
             merged[k].update({
                 "ftd": ftd,
+                "ftd_avg_scp": ftd_avg_scp,
                 "deposits": round(deps, 2),
                 "withdrawals": round(wds, 2),
                 "net_deposits": round(deps - wds, 2),
@@ -968,8 +987,7 @@ def _camp_table_calc(
             per, g1, g2, traders = _parse_traders(r)
             k = (per, g1, g2)
             if k not in merged:
-                merged[k] = {"period": per, "g1": g1, "g2": g2, "leads": 0, "live_accounts": 0, "ftc": 0,
-                              "ftd": 0, "deposits": 0.0, "withdrawals": 0.0, "net_deposits": 0.0, "traders": 0}
+                merged[k] = _empty(per, g1, g2)
             merged[k]["traders"] = traders
 
         # Translate country ISO codes to full names
@@ -1007,10 +1025,16 @@ def _camp_table_calc(
         else:
             rows = sorted(merged.values(), key=lambda r: r["deposits"], reverse=True)
 
+        _lws = [r for r in rows if r.get("live_avg_scp") is not None and r["live_accounts"] > 0]
+        _fws = [r for r in rows if r.get("ftd_avg_scp")  is not None and r["ftd"] > 0]
+        _tlive = sum(r["live_accounts"] for r in _lws)
+        _tftd  = sum(r["ftd"] for r in _fws)
         totals = _add_cr({
             "leads":         sum(r["leads"] for r in rows),
             "live_accounts": sum(r["live_accounts"] for r in rows),
+            "live_avg_scp":  round(sum(r["live_avg_scp"] * r["live_accounts"] for r in _lws) / _tlive, 1) if _tlive else None,
             "ftd":           sum(r["ftd"] for r in rows),
+            "ftd_avg_scp":   round(sum(r["ftd_avg_scp"] * r["ftd"] for r in _fws) / _tftd, 1) if _tftd else None,
             "ftc":           sum(r["ftc"] for r in rows),
             "deposits":      round(sum(r["deposits"] for r in rows), 2),
             "withdrawals":   round(sum(r["withdrawals"] for r in rows), 2),
