@@ -504,9 +504,11 @@
               <tr>
                 <th data-sort="name" style="cursor:pointer;user-select:none;">Office / Agent <i class="bi sort-icon bi-arrow-down-up" id="sort-icon-name"></i></th>
                 <th class="text-center" style="min-width:80px;" data-sort="dailyFtdTotal">Daily FTD <i class="bi sort-icon" id="sort-icon-dailyFtdTotal"></i></th>
+                <th class="text-center" style="min-width:90px;" data-sort="dailyAvgScpTotal">Daily Avg SCP <i class="bi sort-icon" id="sort-icon-dailyAvgScpTotal"></i></th>
                 <th class="text-center" style="min-width:90px;" data-sort="dailyTargetTotal">Daily Target <i class="bi sort-icon" id="sort-icon-dailyTargetTotal"></i></th>
                 <th class="text-center" style="min-width:80px;" data-sort="dailyPctTotal">Daily % <i class="bi sort-icon" id="sort-icon-dailyPctTotal"></i></th>
                 <th class="text-center" style="min-width:95px;" data-sort="ftdCountTotal">Monthly FTD <i class="bi sort-icon" id="sort-icon-ftdCountTotal"></i></th>
+                <th class="text-center" style="min-width:90px;" data-sort="avgScpTotal">Avg SCP <i class="bi sort-icon" id="sort-icon-avgScpTotal"></i></th>
                 <th class="text-center" style="min-width:110px;" data-sort="targetTotal">Monthly Target <i class="bi sort-icon" id="sort-icon-targetTotal"></i></th>
                 <th class="text-center" style="min-width:90px;" data-sort="monthlyPctTotal">Monthly % <i class="bi sort-icon" id="sort-icon-monthlyPctTotal"></i></th>
                 <th class="text-center" style="min-width:80px;" data-sort="ftdRrTotal">FTD RR <i class="bi sort-icon" id="sort-icon-ftdRrTotal"></i></th>
@@ -515,7 +517,6 @@
                 <th class="text-center" style="min-width:60px;" data-sort="ftcTotal">FTC <i class="bi sort-icon" id="sort-icon-ftcTotal"></i></th>
                 <th class="text-center" style="min-width:80px;" data-sort="ftcRrTotal">FTC RR <i class="bi sort-icon" id="sort-icon-ftcRrTotal"></i></th>
                 <th class="text-center" style="min-width:80px;" data-sort="ftcRrPctTotal">FTC RR% <i class="bi sort-icon" id="sort-icon-ftcRrPctTotal"></i></th>
-                <th class="text-center" style="min-width:90px;" data-sort="avgScpTotal">Avg SCP <i class="bi sort-icon" id="sort-icon-avgScpTotal"></i></th>
               </tr>
             </thead>
             <tbody id="table-body"></tbody>
@@ -958,6 +959,12 @@
         const totalFtd = withScp.reduce((s,a) => s + a.ftd_count, 0);
         return totalFtd > 0 ? Math.round(withScp.reduce((s,a) => s + a.avg_scp * a.ftd_count, 0) / totalFtd * 10) / 10 : null;
       },
+      get dailyAvgScpTotal() {
+        const withScp = agents.filter(a => a.avg_scp != null && a.daily_ftd > 0);
+        if (!withScp.length) return null;
+        const totalDailyFtd = withScp.reduce((s,a) => s + a.daily_ftd, 0);
+        return totalDailyFtd > 0 ? Math.round(withScp.reduce((s,a) => s + a.avg_scp * a.daily_ftd, 0) / totalDailyFtd * 10) / 10 : null;
+      },
     })).sort((a,b) => {
       if (sortState.col === 'name') return sortState.dir === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
       const av = a[sortState.col] ?? 0, bv = b[sortState.col] ?? 0;
@@ -982,9 +989,11 @@
       offTr.innerHTML = `
         <td><span class="chevron">&#9654;</span><i class="bi bi-building row-icon me-2" style="color:#484f58;font-size:0.75rem;"></i><strong>${escHtml(office.name)}</strong></td>
         <td class="text-center">${wCountHtml(office.dailyFtdTotal, true)}</td>
+        <td class="text-center">${office.dailyAvgScpTotal != null ? '<strong>'+office.dailyAvgScpTotal.toFixed(1)+'</strong>' : '—'}</td>
         <td class="text-center">${wCountHtml(Math.round(office.dailyTargetTotal), true)}</td>
         <td class="text-center">${pctHtml(office.dailyPctTotal, true)}</td>
         <td class="text-center">${wCountHtml(office.ftdCountTotal, true)}</td>
+        <td class="text-center">${office.avgScpTotal != null ? '<strong>'+office.avgScpTotal.toFixed(1)+'</strong>' : '—'}</td>
         <td class="text-center">${wCountHtml(office.targetTotal, true)}</td>
         <td class="text-center">${pctHtml(office.monthlyPctTotal, true)}</td>
         <td class="text-center">${wCountHtml(office.ftdRrTotal, true)}</td>
@@ -993,16 +1002,15 @@
         <td class="text-center">${wCountHtml(office.ftcTotal, true)}</td>
         <td class="text-center">${wCountHtml(office.ftcRrTotal, true)}</td>
         <td class="text-center">${pctHtml(office.ftcRrPctTotal, true)}</td>
-        <td class="text-center">${office.avgScpTotal != null ? '<strong>'+office.avgScpTotal.toFixed(1)+'</strong>' : '—'}</td>
       `;
       frag.appendChild(offTr);
 
       const agentColMap = {
-        name:'agent_name', dailyFtdTotal:'daily_ftd', dailyTargetTotal:'daily_target',
-        dailyPctTotal:'daily_pct', ftdCountTotal:'ftd_count', targetTotal:'target_ftc',
+        name:'agent_name', dailyFtdTotal:'daily_ftd', dailyAvgScpTotal:'avg_scp', dailyTargetTotal:'daily_target',
+        dailyPctTotal:'daily_pct', ftdCountTotal:'ftd_count', avgScpTotal:'avg_scp', targetTotal:'target_ftc',
         monthlyPctTotal:'monthly_pct', ftdRrTotal:'ftd_rr',
         rrMonthlyPctTotal:'rr_monthly_pct', netDepositsTotal:'net_deposits',
-        ftcTotal:'ftc', ftcRrTotal:'ftc_rr', ftcRrPctTotal:'ftc_rr_pct', avgScpTotal:'avg_scp',
+        ftcTotal:'ftc', ftcRrTotal:'ftc_rr', ftcRrPctTotal:'ftc_rr_pct',
       };
       const sortedAgents = [...office.agents].sort((a,b) => {
         if (sortState.col === 'name') return sortState.dir==='asc'?(a.agent_name||'').localeCompare(b.agent_name||''):(b.agent_name||'').localeCompare(a.agent_name||'');
@@ -1017,9 +1025,11 @@
         tr.innerHTML = `
           <td>${escHtml(r.agent_name)}</td>
           <td class="text-center">${wCountHtml(r.daily_ftd)}</td>
+          <td class="text-center">${r.avg_scp != null ? r.avg_scp.toFixed(1) : '—'}</td>
           <td class="text-center">${wCountHtml(Math.round(r.daily_target))}</td>
           <td class="text-center">${pctHtml(r.daily_pct)}</td>
           <td class="text-center">${wCountHtml(r.ftd_count)}</td>
+          <td class="text-center">${r.avg_scp != null ? r.avg_scp.toFixed(1) : '—'}</td>
           <td class="text-center">${wCountHtml(r.target_ftc)}</td>
           <td class="text-center">${pctHtml(r.monthly_pct)}</td>
           <td class="text-center">${wCountHtml(r.ftd_rr)}</td>
@@ -1028,7 +1038,6 @@
           <td class="text-center">${wCountHtml(r.ftc)}</td>
           <td class="text-center">${wCountHtml(r.ftc_rr)}</td>
           <td class="text-center">${pctHtml(r.ftc_rr_pct)}</td>
-          <td class="text-center">${r.avg_scp != null ? r.avg_scp.toFixed(1) : '—'}</td>
         `;
         frag.appendChild(tr);
       });
@@ -1046,25 +1055,31 @@
     });
 
     if (offices.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="14" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No data for this period</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="15" class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2"></i>No data for this period</td></tr>';
     } else {
       const safeWdp = workingDaysPassed > 0 ? workingDaysPassed : 1;
       const gDailyPct = gDailyTarget > 0 ? Math.round(gDailyFtd / gDailyTarget * 100) : null;
       const gMonthlyPct = gTarget > 0 ? Math.round(gFtdCount / gTarget * 100) : null;
       const gRrMonthly = gTarget > 0 ? Math.round(gFtdRr / gTarget * 100) : null;
       const gFtcRrPct = gTarget > 0 ? Math.round(gFtcRr / gTarget * 100) : null;
-      // Grand avg SCP (weighted by FTD count)
+      // Grand avg SCP weighted by monthly FTD count
       const allWithScp = allRows.filter(a => a.avg_scp != null && a.ftd_count > 0);
       const gScpFtd = allWithScp.reduce((s,a) => s + a.ftd_count, 0);
       const gAvgScp = gScpFtd > 0 ? Math.round(allWithScp.reduce((s,a) => s + a.avg_scp * a.ftd_count, 0) / gScpFtd * 10) / 10 : null;
+      // Grand daily avg SCP weighted by daily FTD
+      const allWithScpDaily = allRows.filter(a => a.avg_scp != null && a.daily_ftd > 0);
+      const gScpDailyFtd = allWithScpDaily.reduce((s,a) => s + a.daily_ftd, 0);
+      const gDailyAvgScp = gScpDailyFtd > 0 ? Math.round(allWithScpDaily.reduce((s,a) => s + a.avg_scp * a.daily_ftd, 0) / gScpDailyFtd * 10) / 10 : null;
       const totalTr = document.createElement('tr');
       totalTr.className = 'total-row';
       totalTr.innerHTML = `
         <td>Total</td>
         <td class="text-center">${wCountHtml(gDailyFtd, true)}</td>
+        <td class="text-center">${gDailyAvgScp != null ? '<strong>'+gDailyAvgScp.toFixed(1)+'</strong>' : '—'}</td>
         <td class="text-center">${wCountHtml(Math.round(gDailyTarget), true)}</td>
         <td class="text-center">${pctHtml(gDailyPct, true)}</td>
         <td class="text-center">${wCountHtml(gFtdCount, true)}</td>
+        <td class="text-center">${gAvgScp != null ? '<strong>'+gAvgScp.toFixed(1)+'</strong>' : '—'}</td>
         <td class="text-center">${wCountHtml(gTarget, true)}</td>
         <td class="text-center">${pctHtml(gMonthlyPct, true)}</td>
         <td class="text-center">${wCountHtml(gFtdRr, true)}</td>
@@ -1073,7 +1088,6 @@
         <td class="text-center">${wCountHtml(gFtc, true)}</td>
         <td class="text-center">${wCountHtml(gFtcRr, true)}</td>
         <td class="text-center">${pctHtml(gFtcRrPct, true)}</td>
-        <td class="text-center">${gAvgScp != null ? '<strong>'+gAvgScp.toFixed(1)+'</strong>' : '—'}</td>
       `;
       frag.appendChild(totalTr);
     }
@@ -1512,8 +1526,8 @@
   function exportSalesExcel() {
     if (!allRows.length) return;
     const filtered = allRows.filter(r => r.ftc > 0 || r.target_ftc > 0 || r.net_deposits !== 0 || r.ftd_count > 0 || r.daily_ftd > 0);
-    const headers = ['Office','Agent','Daily FTD','Daily Target','Daily %','Monthly FTD','Monthly Target','Monthly %','FTD RR','% RR Monthly','Net Sales Monthly','FTC','FTC RR','FTC RR%','Avg SCP'];
-    const rows = filtered.map(r => [r.office_name, r.agent_name, r.daily_ftd, Math.round(r.daily_target), r.daily_pct??'', r.ftd_count, r.target_ftc, r.monthly_pct??'', r.ftd_rr, r.rr_monthly_pct??'', Math.round(r.net_deposits*100)/100, r.ftc, r.ftc_rr, r.ftc_rr_pct??'', r.avg_scp??'']);
+    const headers = ['Office','Agent','Daily FTD','Daily Avg SCP','Daily Target','Daily %','Monthly FTD','Avg SCP','Monthly Target','Monthly %','FTD RR','% RR Monthly','Net Sales Monthly','FTC','FTC RR','FTC RR%'];
+    const rows = filtered.map(r => [r.office_name, r.agent_name, r.daily_ftd, r.avg_scp??'', Math.round(r.daily_target), r.daily_pct??'', r.ftd_count, r.avg_scp??'', r.target_ftc, r.monthly_pct??'', r.ftd_rr, r.rr_monthly_pct??'', Math.round(r.net_deposits*100)/100, r.ftc, r.ftc_rr, r.ftc_rr_pct??'']);
     const df = document.getElementById('date-from').value, dt = document.getElementById('date-to').value;
     const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
     const wb = XLSX.utils.book_new();
