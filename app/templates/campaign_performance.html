@@ -853,12 +853,12 @@
       <th class="text-center" onclick="tblSort('ftc')" style="cursor:pointer;">FTC <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
       <th class="text-center" onclick="tblSort('cr_lead_to_live')" style="cursor:pointer;white-space:nowrap;">CR% Lead→Live <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
       <th class="text-center" onclick="tblSort('cr_live_to_ftd')" style="cursor:pointer;white-space:nowrap;">CR% Live→FTD <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+      <th class="text-center" onclick="tblSort('ltv')" style="cursor:pointer;">LTV <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
+      <th class="text-center" onclick="tblSort('ltv_traders')" style="cursor:pointer;">LTV Traders <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
       <th class="text-center" onclick="tblSort('deposits')" style="cursor:pointer;">Deposits <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
       <th class="text-center" onclick="tblSort('withdrawals')" style="cursor:pointer;">Withdrawals <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
       <th class="text-center" onclick="tblSort('net_deposits')" style="cursor:pointer;">Net Dep <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
       <th class="text-center" onclick="tblSort('traders')" style="cursor:pointer;">Traders <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
-      <th class="text-center" onclick="tblSort('ltv')" style="cursor:pointer;">LTV <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
-      <th class="text-center" onclick="tblSort('ltv_traders')" style="cursor:pointer;">LTV Traders <i class="bi bi-arrow-down-up" style="font-size:0.65rem;"></i></th>
     </tr>`;
     document.getElementById('tbl-thead').innerHTML = html;
   }
@@ -888,12 +888,12 @@
       <td class="text-center" style="${style}">${fmtN(r.ftc)}</td>
       <td class="text-center" style="${style}">${fmtCr(r.cr_lead_to_live)}</td>
       <td class="text-center" style="${style}">${fmtCr(r.cr_live_to_ftd)}</td>
+      <td class="text-center" style="${style}">${fmtMoney(r.ltv ?? 0)}</td>
+      <td class="text-center" style="${style}">${fmtMoney(r.ltv_traders ?? 0)}</td>
       <td class="text-center" style="color:#3fb950;${style}">${fmtMoney(r.deposits)}</td>
       <td class="text-center" style="color:#f85149;${style}">${fmtMoney(r.withdrawals)}</td>
       <td class="text-center" style="color:${net >= 0 ? '#3fb950' : '#f85149'};${style}">${fmtMoney(net)}</td>
       <td class="text-center" style="${style}">${fmtN(r.traders)}</td>
-      <td class="text-center" style="${style}">${fmtMoney(r.ltv ?? 0)}</td>
-      <td class="text-center" style="${style}">${fmtMoney(r.ltv_traders ?? 0)}</td>
     `;
   }
 
@@ -1063,7 +1063,7 @@
     if (hasG1) headers.push(g1Label);
     if (hasG2) headers.push(g2Label);
     if (hasPer) headers.push(perLabel);
-    headers.push('Leads','Live Accounts','Live Avg SCP','FTD','FTD Avg SCP','FTC','CR% Lead→Live','CR% Live→FTD','Deposits','Withdrawals','Net Deposits','Traders','LTV','LTV Traders');
+    headers.push('Leads','Live Accounts','Live Avg SCP','FTD','FTD Avg SCP','FTC','CR% Lead→Live','CR% Live→FTD','LTV','LTV Traders','Deposits','Withdrawals','Net Deposits','Traders');
 
     const esc = v => '"' + String(v ?? '').replace(/"/g,'""') + '"';
     const lines = [headers.join(',')];
@@ -1074,8 +1074,8 @@
       if (hasG2) cols.push(esc(r.g2));
       if (hasPer) cols.push(esc(fmtPeriod(r.period, per)));
       cols.push(r.leads, r.live_accounts, r.live_avg_scp ?? '', r.ftd, r.ftd_avg_scp ?? '', r.ftc,
-                r.cr_lead_to_live, r.cr_live_to_ftd,
-                r.deposits, r.withdrawals, r.net_deposits, r.traders, r.ltv ?? 0, r.ltv_traders ?? 0);
+                r.cr_lead_to_live, r.cr_live_to_ftd, r.ltv ?? 0, r.ltv_traders ?? 0,
+                r.deposits, r.withdrawals, r.net_deposits, r.traders);
       lines.push(cols.join(','));
     });
 
@@ -1084,8 +1084,8 @@
     if (hasG1) totCols.push('"Total"');
     if (hasG2) totCols.push('""');
     totCols.push(t.leads, t.live_accounts, t.live_avg_scp ?? '', t.ftd, t.ftd_avg_scp ?? '', t.ftc,
-                 t.cr_lead_to_live, t.cr_live_to_ftd,
-                 t.deposits, t.withdrawals, t.net_deposits, t.traders, t.ltv ?? 0, t.ltv_traders ?? 0);
+                 t.cr_lead_to_live, t.cr_live_to_ftd, t.ltv ?? 0, t.ltv_traders ?? 0,
+                 t.deposits, t.withdrawals, t.net_deposits, t.traders);
     lines.push(totCols.join(','));
 
     const df = document.getElementById('date-from').value;
