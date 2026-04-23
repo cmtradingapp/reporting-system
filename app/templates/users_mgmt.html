@@ -84,7 +84,7 @@
     <a href="/performance" class="sidebar-link"><i class="bi bi-trophy"></i>Performance Report</a>
     {% endif %}
     {% if current_user.role == 'admin' or (_ap is not none and 'daily_monthly' in _ap) %}
-    <a href="/daily-monthly" class="sidebar-link"><i class="bi bi-calendar-day"></i>Performance</a>
+    <a href="/daily-monthly" class="sidebar-link"><i class="bi bi-calendar-day"></i>{{ 'Performance CRO' if current_user.email == 'admin@cmtrading.com' else 'Performance' }}</a>
     {% endif %}
     {% if (_ap is none and current_user.role in ('admin', 'marketing', 'general')) or (_ap is not none and 'marketing' in _ap) %}
     <a href="/campaign-performance" class="sidebar-link"><i class="bi bi-graph-up-arrow"></i>Marketing Performance</a>
