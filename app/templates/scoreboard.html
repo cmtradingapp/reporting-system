@@ -2600,6 +2600,13 @@
     tbody.innerHTML = '';
     tbody.appendChild(frag);
 
+    // Grand weighted avg SCP
+    const _dScpW = rows.filter(a=>a.daily_avg_scp!=null&&a.daily_ftd>0);
+    const _dScpFtd = _dScpW.reduce((s,a)=>s+a.daily_ftd,0);
+    const gDailyAvgScp = _dScpFtd>0 ? Math.round(_dScpW.reduce((s,a)=>s+a.daily_avg_scp*a.daily_ftd,0)/_dScpFtd*10)/10 : null;
+    const _mScpW = rows.filter(a=>a.avg_scp!=null&&a.ftd_count>0);
+    const _mScpFtd = _mScpW.reduce((s,a)=>s+a.ftd_count,0);
+    const gAvgScp = _mScpFtd>0 ? Math.round(_mScpW.reduce((s,a)=>s+a.avg_scp*a.ftd_count,0)/_mScpFtd*10)/10 : null;
     const gDPct  = gDTgt  > 0 ? Math.round(gDFtd/gDTgt*100) : null;
     const gMPct  = gTgt   > 0 ? Math.round(gFtd/gTgt*100) : null;
     const gRrPct = gTgt   > 0 ? Math.round(gFtdRr/gTgt*100) : null;
@@ -2607,12 +2614,12 @@
     tfoot.innerHTML = `<tr class="total-row">
       <td>Total</td>
       <td class="text-center">${wCountHtml(gDFtd,true)}</td>
-      <td class="text-center">—</td>
+      <td class="text-center">${gDailyAvgScp!=null?'<strong>'+gDailyAvgScp.toFixed(1)+'</strong>':'—'}</td>
       <td class="text-center">${wCountHtml(Math.round(gDTgt),true)}</td>
       <td class="text-center">${pctHtml(gDPct,true)}</td>
       <td class="text-center">${blueHtml(gDFtdAmt,true)}</td>
       <td class="text-center">${wCountHtml(gFtd,true)}</td>
-      <td class="text-center">—</td>
+      <td class="text-center">${gAvgScp!=null?'<strong>'+gAvgScp.toFixed(1)+'</strong>':'—'}</td>
       <td class="text-center">${wCountHtml(gTgt,true)}</td>
       <td class="text-center">${pctHtml(gMPct,true)}</td>
       <td class="text-center">${blueHtml(gFtdAmt,true)}</td>
@@ -2827,13 +2834,20 @@
     const gDPct = gDTgt > 0 ? gDNet/gDTgt : null;
     const gTgtPct = gTgt > 0 ? gNet/gTgt : null;
     const gNetRrPct = gTgt > 0 ? gNetRr/gTgt : null;
+    // Grand weighted avg SCP for retention
+    const _rdW = rows.filter(a=>a.daily_avg_scp!=null&&a.daily_traders>0);
+    const _rdT = _rdW.reduce((s,a)=>s+a.daily_traders,0);
+    const gRetDailyScp = _rdT>0 ? Math.round(_rdW.reduce((s,a)=>s+a.daily_avg_scp*a.daily_traders,0)/_rdT*10)/10 : null;
+    const _rmW = rows.filter(a=>a.monthly_avg_scp!=null&&a.traders_count>0);
+    const _rmT = _rmW.reduce((s,a)=>s+a.traders_count,0);
+    const gRetMonthlyScp = _rmT>0 ? Math.round(_rmW.reduce((s,a)=>s+a.monthly_avg_scp*a.traders_count,0)/_rmT*10)/10 : null;
     tfoot.innerHTML = `<tr class="total-row">
       <td>Total</td>
       <td class="text-center">${retDailyNetHtml(gDNet,true)}</td>
       <td class="text-center">${wDollarHtml(Math.round(gDTgt),true)}</td>
       <td class="text-center">${retPctHtml(gDPct,true)}</td>
       <td class="text-center">${wCountHtml(gDTraders,true)}</td>
-      <td class="text-center">—</td>
+      <td class="text-center">${gRetDailyScp!=null?'<strong>'+gRetDailyScp.toFixed(1)+'</strong>':'—'}</td>
       <td class="text-center">${wCountHtml(gDLoads,true)}</td>
       <td class="text-center">${wCountHtml(gDStd,true)}</td>
       <td class="text-center">${blueHtml(gNet,true)}</td>
@@ -2841,7 +2855,7 @@
       <td class="text-center">${retPctHtml(gTgtPct,true)}</td>
       <td class="text-center">${retPctHtml(gNetRrPct,true)}</td>
       <td class="text-center">${wCountHtml(gTraders,true)}</td>
-      <td class="text-center">—</td>
+      <td class="text-center">${gRetMonthlyScp!=null?'<strong>'+gRetMonthlyScp.toFixed(1)+'</strong>':'—'}</td>
       <td class="text-center">${wCountHtml(gMLoads,true)}</td>
       <td class="text-center">${wCountHtml(gStd,true)}</td>
       <td class="text-center">${wDollarHtml(gMiss100Rr,true)}</td>
