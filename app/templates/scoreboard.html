@@ -310,7 +310,7 @@
     <a href="/performance" class="sidebar-link active"><i class="bi bi-trophy"></i>Performance Report</a>
     {% endif %}
     {% if current_user.role == 'admin' or (_ap is not none and 'daily_monthly' in _ap) %}
-    <a href="/daily-monthly" class="sidebar-link"><i class="bi bi-calendar-day"></i>Daily/Monthly Performance</a>
+    <a href="/daily-monthly" class="sidebar-link"><i class="bi bi-calendar-day"></i>Performance</a>
     {% endif %}
     {% if (_ap is none and current_user.role in ('admin', 'marketing', 'general')) or (_ap is not none and 'marketing' in _ap) %}
     <a href="/campaign-performance" class="sidebar-link"><i class="bi bi-graph-up-arrow"></i>Marketing Performance</a>
@@ -725,6 +725,82 @@
     </div>
   {% endif %}
 
+  {# ── CRO View: Sales - CRO View ───────────────────────────────────────── #}
+  {% if show_cro_sales %}
+  <div class="mt-3" id="cro-sales-section">
+    <div class="card p-0" style="overflow:hidden;">
+      <div class="d-flex justify-content-between align-items-center px-4 py-3" style="border-bottom:1px solid #30363d;">
+        <div class="d-flex align-items-center gap-2">
+          <div class="section-title" style="border-left-color:#d29922;">Sales - CRO View</div>
+        </div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <span class="small" style="color:#e0e0e0;" id="cro-sal-row-count"></span>
+          <button onclick="croExpandAll('cro-sal-tbody')" class="btn btn-sm tbl-action-btn" style="background:#21262d;border:1px solid #30363d;color:#8b949e;border-radius:6px;font-size:0.8rem;padding:4px 10px;"><i class="bi bi-arrows-expand"></i><span class="d-none d-md-inline ms-1">Expand All</span></button>
+          <button onclick="croCollapseAll('cro-sal-tbody')" class="btn btn-sm tbl-action-btn" style="background:#21262d;border:1px solid #30363d;color:#8b949e;border-radius:6px;font-size:0.8rem;padding:4px 10px;"><i class="bi bi-arrows-collapse"></i><span class="d-none d-md-inline ms-1">Collapse All</span></button>
+        </div>
+      </div>
+      <div id="cro-sal-loading" style="display:none;text-align:center;padding:40px;color:#8b949e;"><div class="spinner-border text-success mb-2" style="width:2rem;height:2rem;"></div><div class="small">Loading...</div></div>
+      <div id="cro-sal-error" style="display:none;" class="text-danger text-center p-3 small"></div>
+      <div class="table-scroll" style="overflow-x:auto;">
+        <table class="scoreboard-table" id="cro-sal-table">
+          <thead><tr>
+            <th style="cursor:pointer;user-select:none;" onclick="croSalSort('name')">Office / Agent <i class="bi bi-arrow-down-up" style="font-size:0.65rem;opacity:0.5;"></i></th>
+            <th class="text-center" style="min-width:80px;" onclick="croSalSort('daily_ftd')" style="cursor:pointer;">Daily FTD</th>
+            <th class="text-center" style="min-width:90px;" onclick="croSalSort('daily_avg_scp')" style="cursor:pointer;">Daily Avg SCP</th>
+            <th class="text-center" style="min-width:90px;" onclick="croSalSort('daily_ftd_amount')" style="cursor:pointer;">Daily FTD $</th>
+            <th class="text-center" style="min-width:95px;" onclick="croSalSort('ftd_count')" style="cursor:pointer;">Monthly FTD</th>
+            <th class="text-center" style="min-width:90px;" onclick="croSalSort('avg_scp')" style="cursor:pointer;">Avg SCP</th>
+            <th class="text-center" style="min-width:110px;" onclick="croSalSort('monthly_ftd_amount')" style="cursor:pointer;">Monthly FTD $</th>
+            <th class="text-center" style="min-width:90px;" onclick="croSalSort('monthly_pct')" style="cursor:pointer;">Monthly %</th>
+            <th class="text-center" style="min-width:120px;" onclick="croSalSort('net_deposits')" style="cursor:pointer;">Net Sales Monthly</th>
+            <th class="text-center" style="min-width:60px;" onclick="croSalSort('ftc')" style="cursor:pointer;">FTC</th>
+          </tr></thead>
+          <tbody id="cro-sal-tbody"></tbody>
+          <tfoot id="cro-sal-tfoot"></tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {# ── CRO View: Retention - CRO View ──────────────────────────────────── #}
+  {% if show_cro_retention %}
+  <div class="mt-3" id="cro-ret-section">
+    <div class="card p-0" style="overflow:hidden;">
+      <div class="d-flex justify-content-between align-items-center px-4 py-3" style="border-bottom:1px solid #30363d;">
+        <div class="d-flex align-items-center gap-2">
+          <div class="section-title" style="border-left-color:#d29922;">Retention - CRO View</div>
+        </div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <span class="small" style="color:#e0e0e0;" id="cro-ret-row-count"></span>
+          <button onclick="croExpandAll('cro-ret-tbody')" class="btn btn-sm tbl-action-btn" style="background:#21262d;border:1px solid #30363d;color:#8b949e;border-radius:6px;font-size:0.8rem;padding:4px 10px;"><i class="bi bi-arrows-expand"></i><span class="d-none d-md-inline ms-1">Expand All</span></button>
+          <button onclick="croCollapseAll('cro-ret-tbody')" class="btn btn-sm tbl-action-btn" style="background:#21262d;border:1px solid #30363d;color:#8b949e;border-radius:6px;font-size:0.8rem;padding:4px 10px;"><i class="bi bi-arrows-collapse"></i><span class="d-none d-md-inline ms-1">Collapse All</span></button>
+        </div>
+      </div>
+      <div id="cro-ret-loading" style="display:none;text-align:center;padding:40px;color:#8b949e;"><div class="spinner-border mb-2" style="color:#388bfd;width:2rem;height:2rem;"></div><div class="small">Loading...</div></div>
+      <div id="cro-ret-error" style="display:none;" class="text-danger text-center p-3 small"></div>
+      <div class="table-scroll" style="overflow-x:auto;">
+        <table class="scoreboard-table" id="cro-ret-table">
+          <thead><tr>
+            <th style="cursor:pointer;user-select:none;" onclick="croRetSort('name')">Office / Dept / Agent <i class="bi bi-arrow-down-up" style="font-size:0.65rem;opacity:0.5;"></i></th>
+            <th class="text-center" style="min-width:90px;" onclick="croRetSort('daily_net_usd')" style="cursor:pointer;">Daily Net</th>
+            <th class="text-center" style="min-width:100px;" onclick="croRetSort('daily_traders')" style="cursor:pointer;">Daily Traders</th>
+            <th class="text-center" style="min-width:90px;" onclick="croRetSort('daily_avg_scp')" style="cursor:pointer;">Daily Avg SCP</th>
+            <th class="text-center" style="min-width:100px;" onclick="croRetSort('net_usd')" style="cursor:pointer;">Monthly Net</th>
+            <th class="text-center" style="min-width:110px;" onclick="croRetSort('traders_count')" style="cursor:pointer;">Monthly Traders</th>
+            <th class="text-center" style="min-width:90px;" onclick="croRetSort('monthly_avg_scp')" style="cursor:pointer;">Monthly Avg SCP</th>
+            <th class="text-center" style="min-width:90px;" onclick="croRetSort('target_net_pct')" style="cursor:pointer;">Monthly %</th>
+            <th class="text-center" style="min-width:100px;" onclick="croRetSort('deposit_usd')" style="cursor:pointer;">Deposit $</th>
+            <th class="text-center" style="min-width:90px;" onclick="croRetSort('rdp_net')" style="cursor:pointer;">RDP Net $</th>
+          </tr></thead>
+          <tbody id="cro-ret-tbody"></tbody>
+          <tfoot id="cro-ret-tfoot"></tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
 
 </div>
 </div>
@@ -732,6 +808,8 @@
 <script>
   const SHOW_SALES      = {{ 'true' if show_sales else 'false' }};
   const SHOW_RETENTION  = {{ 'true' if show_retention else 'false' }};
+  const SHOW_CRO_SALES     = {{ 'true' if show_cro_sales else 'false' }};
+  const SHOW_CRO_RETENTION = {{ 'true' if show_cro_retention else 'false' }};
   const IS_SALES        = {{ 'true' if current_user.role.startswith('sales') else 'false' }};
   // _sc: omit a table cell for sales users
   const _sc = IS_SALES ? () => '' : (html) => html;
@@ -1059,8 +1137,10 @@
       document.querySelectorAll('.kpi-value').forEach(el => { el.textContent = '—'; });
     }
     const tasks = [];
-    if (SHOW_SALES)     tasks.push(loadData(silent));
-    if (SHOW_RETENTION) tasks.push(loadRetentionData(silent));
+    if (SHOW_SALES)         tasks.push(loadData(silent));
+    if (SHOW_RETENTION)     tasks.push(loadRetentionData(silent));
+    if (SHOW_CRO_SALES)     tasks.push(loadCroSales(silent));
+    if (SHOW_CRO_RETENTION) tasks.push(loadCroRetention(silent));
     await Promise.all(tasks);
     updateStatsFromFiltered();
     try {
@@ -1410,6 +1490,11 @@
     return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
+  function retDailyNetHtml(val, bold=false) {
+    if (val===null||val===undefined) return '<span style="color:#484f58;">—</span>';
+    const fw = bold?'700':'600';
+    return `<span style="color:#c9d1d9;font-weight:${fw};">${(val<0?'-':'')+'$'+Math.round(Math.abs(val)).toLocaleString('en-US')}</span>`;
+  }
   function netHtml(val, bold = false) {
     if (val === null || val === undefined) return `<span style="color:#484f58;">—</span>`;
     const color = val >= 0 ? '#3fb950' : '#f85149';
@@ -2292,6 +2377,319 @@
       if (el) el.textContent = latest ? fmtRelTime(latest.toISOString()) : '—';
     } catch(e) {}
   }
+  updateSyncBar();
+  // Auto-refresh every 60 s when page is visible
+  setInterval(function() {
+    if (document.visibilityState !== 'visible') return;
+    const today = new Date().toISOString().split('T')[0];
+    const dt = document.getElementById('date-to').value;
+    updateSyncBar();
+    loadLiveEquity(dt);
+    if (dt === today) loadAll(true);
+  }, 60000);
+
+  // ── CRO View Tables ──────────────────────────────────────────────────────
+
+  function croExpandAll(tbodyId) {
+    const tbody = document.getElementById(tbodyId);
+    if (!tbody) return;
+    tbody.querySelectorAll('tr.cro-office-row').forEach(tr => {
+      tr.querySelector('.chevron')?.classList.add('open');
+      const oid = tr.dataset.officeId;
+      tbody.querySelectorAll(`tr[data-parent-office="${oid}"]`).forEach(r => r.style.display = '');
+    });
+  }
+  function croCollapseAll(tbodyId) {
+    const tbody = document.getElementById(tbodyId);
+    if (!tbody) return;
+    tbody.querySelectorAll('tr.cro-office-row').forEach(tr => {
+      tr.querySelector('.chevron')?.classList.remove('open');
+      const oid = tr.dataset.officeId;
+      tbody.querySelectorAll(`tr[data-parent-office="${oid}"]`).forEach(r => r.style.display = 'none');
+    });
+  }
+
+  // ── CRO Sales ────────────────────────────────────────────────────────────
+  let _croSalRows = [], _croSalSort = {col:'ftd_count', dir:'desc'};
+
+  function croSalSort(col) {
+    _croSalSort.dir = _croSalSort.col === col ? (_croSalSort.dir === 'desc' ? 'asc' : 'desc') : 'desc';
+    _croSalSort.col = col;
+    renderCroSales(_croSalRows);
+  }
+
+  async function loadCroSales(silent = false) {
+    const df = document.getElementById('date-from').value;
+    const dt = document.getElementById('date-to').value;
+    if (!df || !dt) return;
+    const loadEl = document.getElementById('cro-sal-loading');
+    const errEl  = document.getElementById('cro-sal-error');
+    if (!silent && loadEl) loadEl.style.display = 'block';
+    if (errEl) errEl.style.display = 'none';
+    try {
+      const res = await fetch(`/api/daily-monthly/sales?date_from=${df}&date_to=${dt}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Error');
+      _croSalRows = data.rows || [];
+      renderCroSales(_croSalRows, data);
+    } catch(e) {
+      if (errEl) { errEl.textContent = 'Error: ' + e.message; errEl.style.display = 'block'; }
+    } finally {
+      if (loadEl) loadEl.style.display = 'none';
+    }
+  }
+
+  function renderCroSales(rows, meta) {
+    const tbody = document.getElementById('cro-sal-tbody');
+    const tfoot = document.getElementById('cro-sal-tfoot');
+    if (!tbody) return;
+    const frag = document.createDocumentFragment();
+
+    // Group by office
+    const offMap = new Map();
+    rows.forEach(r => {
+      if (!offMap.has(r.office_name)) offMap.set(r.office_name, []);
+      offMap.get(r.office_name).push(r);
+    });
+
+    const sortFn = (a, b) => {
+      const col = _croSalSort.col;
+      if (col === 'name') {
+        const av = a.office_name || '', bv = b.office_name || '';
+        return _croSalSort.dir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+      }
+      const av = (a[col] ?? 0), bv = (b[col] ?? 0);
+      return _croSalSort.dir === 'desc' ? bv - av : av - bv;
+    };
+
+    let gFtd=0, gFtdAmt=0, gMonthlyFtd=0, gMonthlyFtdAmt=0, gNet=0, gFtc=0;
+    let offCount=0, agentCount=0;
+
+    const offices = [...offMap.entries()].map(([name, agents]) => ({
+      name, agents,
+      daily_ftd:         agents.reduce((s,a)=>s+(a.daily_ftd??0),0),
+      daily_avg_scp:     (() => { const w=agents.filter(a=>a.daily_avg_scp!=null&&a.daily_ftd>0); if(!w.length) return null; const td=w.reduce((s,a)=>s+a.daily_ftd,0); return td>0?Math.round(w.reduce((s,a)=>s+a.daily_avg_scp*a.daily_ftd,0)/td*10)/10:null; })(),
+      daily_ftd_amount:  agents.reduce((s,a)=>s+(a.daily_ftd_amount??0),0),
+      ftd_count:         agents.reduce((s,a)=>s+(a.ftd_count??0),0),
+      avg_scp:           (() => { const w=agents.filter(a=>a.avg_scp!=null&&a.ftd_count>0); if(!w.length) return null; const tf=w.reduce((s,a)=>s+a.ftd_count,0); return tf>0?Math.round(w.reduce((s,a)=>s+a.avg_scp*a.ftd_count,0)/tf*10)/10:null; })(),
+      monthly_ftd_amount: agents.reduce((s,a)=>s+(a.monthly_ftd_amount??0),0),
+      monthly_pct:       null,
+      net_deposits:      agents.reduce((s,a)=>s+(a.net_deposits??0),0),
+      ftc:               agents.reduce((s,a)=>s+(a.ftc??0),0),
+    })).sort(sortFn);
+
+    offices.forEach((off, oi) => {
+      gFtd+=off.daily_ftd; gFtdAmt+=off.daily_ftd_amount; gMonthlyFtd+=off.ftd_count;
+      gMonthlyFtdAmt+=off.monthly_ftd_amount; gNet+=off.net_deposits; gFtc+=off.ftc;
+      offCount++;
+      const oid = 'cro-sal-off-'+oi;
+      const offTr = document.createElement('tr');
+      offTr.className = 'office-row cro-office-row';
+      offTr.dataset.officeId = oid;
+      offTr.innerHTML = `
+        <td><span class="chevron">&#9654;</span><i class="bi bi-building row-icon me-2" style="color:#484f58;font-size:0.75rem;"></i><strong>${escHtml(off.name)}</strong></td>
+        <td class="text-center">${wCountHtml(off.daily_ftd, true)}</td>
+        <td class="text-center">${off.daily_avg_scp!=null?'<strong>'+off.daily_avg_scp.toFixed(1)+'</strong>':'—'}</td>
+        <td class="text-center">${blueHtml(off.daily_ftd_amount, true)}</td>
+        <td class="text-center">${wCountHtml(off.ftd_count, true)}</td>
+        <td class="text-center">${off.avg_scp!=null?'<strong>'+off.avg_scp.toFixed(1)+'</strong>':'—'}</td>
+        <td class="text-center">${blueHtml(off.monthly_ftd_amount, true)}</td>
+        <td class="text-center">—</td>
+        <td class="text-center">${blueHtml(off.net_deposits, true)}</td>
+        <td class="text-center">${wCountHtml(off.ftc, true)}</td>
+      `;
+      frag.appendChild(offTr);
+
+      [...off.agents].sort(sortFn).forEach(r => {
+        agentCount++;
+        const agTr = document.createElement('tr');
+        agTr.className = 'agent-row';
+        agTr.dataset.parentOffice = oid;
+        agTr.style.display = 'none';
+        agTr.innerHTML = `
+          <td>${escHtml(r.agent_name)}</td>
+          <td class="text-center">${wCountHtml(r.daily_ftd)}</td>
+          <td class="text-center">${r.daily_avg_scp!=null?r.daily_avg_scp.toFixed(1):'—'}</td>
+          <td class="text-center">${blueHtml(r.daily_ftd_amount)}</td>
+          <td class="text-center">${wCountHtml(r.ftd_count)}</td>
+          <td class="text-center">${r.avg_scp!=null?r.avg_scp.toFixed(1):'—'}</td>
+          <td class="text-center">${blueHtml(r.monthly_ftd_amount)}</td>
+          <td class="text-center">${r.monthly_pct!=null?pctHtml(r.monthly_pct):'—'}</td>
+          <td class="text-center">${blueHtml(r.net_deposits)}</td>
+          <td class="text-center">${wCountHtml(r.ftc)}</td>
+        `;
+        frag.appendChild(agTr);
+      });
+
+      offTr.addEventListener('click', () => {
+        const ch = offTr.querySelector('.chevron');
+        const open = ch.classList.contains('open');
+        ch.classList.toggle('open', !open);
+        tbody.querySelectorAll(`tr[data-parent-office="${oid}"]`).forEach(r => r.style.display = open ? 'none' : '');
+      });
+    });
+
+    tbody.innerHTML = '';
+    tbody.appendChild(frag);
+
+    // Total row
+    tfoot.innerHTML = `<tr class="total-row">
+      <td>Total</td>
+      <td class="text-center">${wCountHtml(gFtd,true)}</td>
+      <td class="text-center">—</td>
+      <td class="text-center">${blueHtml(gFtdAmt,true)}</td>
+      <td class="text-center">${wCountHtml(gMonthlyFtd,true)}</td>
+      <td class="text-center">—</td>
+      <td class="text-center">${blueHtml(gMonthlyFtdAmt,true)}</td>
+      <td class="text-center">—</td>
+      <td class="text-center">${blueHtml(gNet,true)}</td>
+      <td class="text-center">${wCountHtml(gFtc,true)}</td>
+    </tr>`;
+    const rc = document.getElementById('cro-sal-row-count');
+    if (rc) rc.textContent = `${offCount} offices · ${agentCount} agents`;
+  }
+
+  // ── CRO Retention ────────────────────────────────────────────────────────
+  let _croRetRows = [], _croRetSort = {col:'net_usd', dir:'desc'};
+
+  function croRetSort(col) {
+    _croRetSort.dir = _croRetSort.col === col ? (_croRetSort.dir === 'desc' ? 'asc' : 'desc') : 'desc';
+    _croRetSort.col = col;
+    renderCroRetention(_croRetRows);
+  }
+
+  async function loadCroRetention(silent = false) {
+    const df = document.getElementById('date-from').value;
+    const dt = document.getElementById('date-to').value;
+    if (!df || !dt) return;
+    const loadEl = document.getElementById('cro-ret-loading');
+    const errEl  = document.getElementById('cro-ret-error');
+    if (!silent && loadEl) loadEl.style.display = 'block';
+    if (errEl) errEl.style.display = 'none';
+    try {
+      const res = await fetch(`/api/daily-monthly/retention?date_from=${df}&date_to=${dt}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Error');
+      _croRetRows = data.rows || [];
+      renderCroRetention(_croRetRows);
+    } catch(e) {
+      if (errEl) { errEl.textContent = 'Error: ' + e.message; errEl.style.display = 'block'; }
+    } finally {
+      if (loadEl) loadEl.style.display = 'none';
+    }
+  }
+
+  function renderCroRetention(rows) {
+    const tbody = document.getElementById('cro-ret-tbody');
+    const tfoot = document.getElementById('cro-ret-tfoot');
+    if (!tbody) return;
+    const frag = document.createDocumentFragment();
+
+    const offMap = new Map();
+    rows.forEach(r => {
+      if (!offMap.has(r.office_name)) offMap.set(r.office_name, new Map());
+      const dm = offMap.get(r.office_name);
+      if (!dm.has(r.dept_name)) dm.set(r.dept_name, []);
+      dm.get(r.dept_name).push(r);
+    });
+
+    const sortVal = (o) => {
+      const col = _croRetSort.col;
+      const v = o[col] ?? 0;
+      return _croRetSort.dir === 'desc' ? -v : v;
+    };
+
+    let gDNet=0, gNet=0, gDTraders=0, gTraders=0, gDep=0, gRdp=0;
+    let offCount=0, agentCount=0;
+
+    const offList = [...offMap.entries()].map(([oName, dMap]) => {
+      const agents = []; dMap.forEach(ag => agents.push(...ag));
+      return {
+        oName, dMap,
+        daily_net_usd: agents.reduce((s,a)=>s+(a.daily_net_usd??0),0),
+        daily_traders: agents.reduce((s,a)=>s+(a.daily_traders??0),0),
+        daily_avg_scp: (() => { const w=agents.filter(a=>a.daily_avg_scp!=null&&a.daily_traders>0); if(!w.length) return null; const td=w.reduce((s,a)=>s+a.daily_traders,0); return td>0?Math.round(w.reduce((s,a)=>s+a.daily_avg_scp*a.daily_traders,0)/td*10)/10:null; })(),
+        net_usd:       agents.reduce((s,a)=>s+(a.net_usd??0),0),
+        traders_count: agents.reduce((s,a)=>s+(a.traders_count??0),0),
+        monthly_avg_scp: (() => { const w=agents.filter(a=>a.monthly_avg_scp!=null&&a.traders_count>0); if(!w.length) return null; const tm=w.reduce((s,a)=>s+a.traders_count,0); return tm>0?Math.round(w.reduce((s,a)=>s+a.monthly_avg_scp*a.traders_count,0)/tm*10)/10:null; })(),
+        target_net_pct: null,
+        deposit_usd:   agents.reduce((s,a)=>s+(a.deposit_usd??0),0),
+        rdp_net:       agents.reduce((s,a)=>s+(a.rdp_net??0),0),
+      };
+    }).sort((a,b) => sortVal(a) - sortVal(b));
+
+    offList.forEach((off, oi) => {
+      gDNet+=off.daily_net_usd; gNet+=off.net_usd; gDTraders+=off.daily_traders;
+      gTraders+=off.traders_count; gDep+=off.deposit_usd; gRdp+=off.rdp_net;
+      offCount++;
+      const oid = 'cro-ret-off-'+oi;
+      const offTr = document.createElement('tr');
+      offTr.className = 'office-row cro-office-row';
+      offTr.dataset.officeId = oid;
+      offTr.innerHTML = `
+        <td><span class="chevron">&#9654;</span><i class="bi bi-building row-icon me-2" style="color:#484f58;font-size:0.75rem;"></i><strong>${escHtml(off.oName)}</strong></td>
+        <td class="text-center">${retDailyNetHtml(off.daily_net_usd, true)}</td>
+        <td class="text-center">${wCountHtml(off.daily_traders, true)}</td>
+        <td class="text-center">${off.daily_avg_scp!=null?'<strong>'+off.daily_avg_scp.toFixed(1)+'</strong>':'—'}</td>
+        <td class="text-center">${blueHtml(off.net_usd, true)}</td>
+        <td class="text-center">${wCountHtml(off.traders_count, true)}</td>
+        <td class="text-center">${off.monthly_avg_scp!=null?'<strong>'+off.monthly_avg_scp.toFixed(1)+'</strong>':'—'}</td>
+        <td class="text-center">—</td>
+        <td class="text-center">${wDollarHtml(off.deposit_usd, true)}</td>
+        <td class="text-center">${netHtml(off.rdp_net, true)}</td>
+      `;
+      frag.appendChild(offTr);
+
+      off.dMap.forEach((agents, deptName) => {
+        agents.forEach(r => {
+          agentCount++;
+          const agTr = document.createElement('tr');
+          agTr.className = 'agent-row retention-agent-row';
+          agTr.dataset.parentOffice = oid;
+          agTr.style.display = 'none';
+          agTr.innerHTML = `
+            <td style="padding-left:20px;">${escHtml(r.agent_name)}</td>
+            <td class="text-center">${retDailyNetHtml(r.daily_net_usd)}</td>
+            <td class="text-center">${wCountHtml(r.daily_traders)}</td>
+            <td class="text-center">${r.daily_avg_scp!=null?r.daily_avg_scp.toFixed(1):'—'}</td>
+            <td class="text-center">${blueHtml(r.net_usd)}</td>
+            <td class="text-center">${wCountHtml(r.traders_count)}</td>
+            <td class="text-center">${r.monthly_avg_scp!=null?r.monthly_avg_scp.toFixed(1):'—'}</td>
+            <td class="text-center">${r.target_net_pct!=null?pctHtml(r.target_net_pct):'—'}</td>
+            <td class="text-center">${wDollarHtml(r.deposit_usd)}</td>
+            <td class="text-center">${netHtml(r.rdp_net)}</td>
+          `;
+          frag.appendChild(agTr);
+        });
+      });
+
+      offTr.addEventListener('click', () => {
+        const ch = offTr.querySelector('.chevron');
+        const open = ch.classList.contains('open');
+        ch.classList.toggle('open', !open);
+        tbody.querySelectorAll(`tr[data-parent-office="${oid}"]`).forEach(r => r.style.display = open ? 'none' : '');
+      });
+    });
+
+    tbody.innerHTML = '';
+    tbody.appendChild(frag);
+
+    tfoot.innerHTML = `<tr class="total-row">
+      <td>Total</td>
+      <td class="text-center">${retDailyNetHtml(gDNet,true)}</td>
+      <td class="text-center">${wCountHtml(gDTraders,true)}</td>
+      <td class="text-center">—</td>
+      <td class="text-center">${blueHtml(gNet,true)}</td>
+      <td class="text-center">${wCountHtml(gTraders,true)}</td>
+      <td class="text-center">—</td>
+      <td class="text-center">—</td>
+      <td class="text-center">${wDollarHtml(gDep,true)}</td>
+      <td class="text-center">${netHtml(gRdp,true)}</td>
+    </tr>`;
+    const rc = document.getElementById('cro-ret-row-count');
+    if (rc) rc.textContent = `${offCount} offices · ${agentCount} agents`;
+  }
+
   updateSyncBar();
   // Auto-refresh every 60 s when page is visible
   setInterval(function() {

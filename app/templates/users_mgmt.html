@@ -84,7 +84,7 @@
     <a href="/performance" class="sidebar-link"><i class="bi bi-trophy"></i>Performance Report</a>
     {% endif %}
     {% if current_user.role == 'admin' or (_ap is not none and 'daily_monthly' in _ap) %}
-    <a href="/daily-monthly" class="sidebar-link"><i class="bi bi-calendar-day"></i>Daily/Monthly Performance</a>
+    <a href="/daily-monthly" class="sidebar-link"><i class="bi bi-calendar-day"></i>Performance</a>
     {% endif %}
     {% if (_ap is none and current_user.role in ('admin', 'marketing', 'general')) or (_ap is not none and 'marketing' in _ap) %}
     <a href="/campaign-performance" class="sidebar-link"><i class="bi bi-graph-up-arrow"></i>Marketing Performance</a>
@@ -268,7 +268,7 @@
             <label style="cursor:pointer;font-size:0.85rem;"><input type="checkbox" id="add-ap-holidays" class="me-1">Holidays</label>
             <label style="cursor:pointer;font-size:0.85rem;"><input type="checkbox" id="add-ap-transactions_report" class="me-1">Transactions Report</label>
             <label style="cursor:pointer;font-size:0.85rem;"><input type="checkbox" id="add-ap-data_sync" class="me-1">Data Sync</label>
-            <label style="cursor:pointer;font-size:0.85rem;"><input type="checkbox" id="add-ap-daily_monthly" class="me-1">Daily/Monthly Performance</label>
+            <label style="cursor:pointer;font-size:0.85rem;"><input type="checkbox" id="add-ap-daily_monthly" class="me-1">Performance</label>
           </div>
         </div>
         <div class="text-secondary" style="font-size:0.8rem;">Default password: <code>Welcome1!</code> (user must change on first login)</div>
@@ -351,7 +351,7 @@
             <label style="cursor:pointer;font-size:0.85rem;"><input type="checkbox" id="edit-ap-holidays" class="me-1">Holidays</label>
             <label style="cursor:pointer;font-size:0.85rem;"><input type="checkbox" id="edit-ap-transactions_report" class="me-1">Transactions Report</label>
             <label style="cursor:pointer;font-size:0.85rem;"><input type="checkbox" id="edit-ap-data_sync" class="me-1">Data Sync</label>
-            <label style="cursor:pointer;font-size:0.85rem;"><input type="checkbox" id="edit-ap-daily_monthly" class="me-1">Daily/Monthly Performance</label>
+            <label style="cursor:pointer;font-size:0.85rem;"><input type="checkbox" id="edit-ap-daily_monthly" class="me-1">Performance</label>
           </div>
         </div>
       </div>
