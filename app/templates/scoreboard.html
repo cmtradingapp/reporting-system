@@ -745,15 +745,22 @@
         <table class="scoreboard-table" id="cro-sal-table">
           <thead><tr>
             <th style="cursor:pointer;user-select:none;" onclick="croSalSort('name')">Office / Agent <i class="bi bi-arrow-down-up" style="font-size:0.65rem;opacity:0.5;"></i></th>
-            <th class="text-center" style="min-width:80px;" onclick="croSalSort('daily_ftd')" style="cursor:pointer;">Daily FTD</th>
-            <th class="text-center" style="min-width:90px;" onclick="croSalSort('daily_avg_scp')" style="cursor:pointer;">Daily Avg SCP</th>
-            <th class="text-center" style="min-width:90px;" onclick="croSalSort('daily_ftd_amount')" style="cursor:pointer;">Daily FTD $</th>
-            <th class="text-center" style="min-width:95px;" onclick="croSalSort('ftd_count')" style="cursor:pointer;">Monthly FTD</th>
-            <th class="text-center" style="min-width:90px;" onclick="croSalSort('avg_scp')" style="cursor:pointer;">Avg SCP</th>
-            <th class="text-center" style="min-width:110px;" onclick="croSalSort('monthly_ftd_amount')" style="cursor:pointer;">Monthly FTD $</th>
-            <th class="text-center" style="min-width:90px;" onclick="croSalSort('monthly_pct')" style="cursor:pointer;">Monthly %</th>
-            <th class="text-center" style="min-width:120px;" onclick="croSalSort('net_deposits')" style="cursor:pointer;">Net Sales Monthly</th>
-            <th class="text-center" style="min-width:60px;" onclick="croSalSort('ftc')" style="cursor:pointer;">FTC</th>
+            <th class="text-center" style="min-width:80px;cursor:pointer;" onclick="croSalSort('daily_ftd')">Daily FTD</th>
+            <th class="text-center" style="min-width:90px;cursor:pointer;" onclick="croSalSort('daily_avg_scp')">Daily Avg SCP</th>
+            <th class="text-center" style="min-width:90px;cursor:pointer;" onclick="croSalSort('daily_target')">Daily Target</th>
+            <th class="text-center" style="min-width:80px;cursor:pointer;" onclick="croSalSort('daily_pct')">Daily %</th>
+            <th class="text-center" style="min-width:100px;cursor:pointer;" onclick="croSalSort('daily_ftd_amount')">Daily FTD $</th>
+            <th class="text-center" style="min-width:95px;cursor:pointer;" onclick="croSalSort('ftd_count')">Monthly FTD</th>
+            <th class="text-center" style="min-width:90px;cursor:pointer;" onclick="croSalSort('avg_scp')">Avg SCP</th>
+            <th class="text-center" style="min-width:110px;cursor:pointer;" onclick="croSalSort('target_ftc')">Monthly Target</th>
+            <th class="text-center" style="min-width:90px;cursor:pointer;" onclick="croSalSort('monthly_pct')">Monthly %</th>
+            <th class="text-center" style="min-width:110px;cursor:pointer;" onclick="croSalSort('monthly_ftd_amount')">Monthly FTD $</th>
+            <th class="text-center" style="min-width:80px;cursor:pointer;" onclick="croSalSort('ftd_rr')">FTD RR</th>
+            <th class="text-center" style="min-width:100px;cursor:pointer;" onclick="croSalSort('rr_monthly_pct')">% RR Monthly</th>
+            <th class="text-center" style="min-width:120px;cursor:pointer;" onclick="croSalSort('net_deposits')">Net Sales Monthly</th>
+            <th class="text-center" style="min-width:60px;cursor:pointer;" onclick="croSalSort('ftc')">FTC</th>
+            <th class="text-center" style="min-width:80px;cursor:pointer;" onclick="croSalSort('ftc_rr')">FTC RR</th>
+            <th class="text-center" style="min-width:80px;cursor:pointer;" onclick="croSalSort('ftc_rr_pct')">FTC RR%</th>
           </tr></thead>
           <tbody id="cro-sal-tbody"></tbody>
           <tfoot id="cro-sal-tfoot"></tfoot>
@@ -783,15 +790,29 @@
         <table class="scoreboard-table" id="cro-ret-table">
           <thead><tr>
             <th style="cursor:pointer;user-select:none;" onclick="croRetSort('name')">Office / Dept / Agent <i class="bi bi-arrow-down-up" style="font-size:0.65rem;opacity:0.5;"></i></th>
-            <th class="text-center" style="min-width:90px;" onclick="croRetSort('daily_net_usd')" style="cursor:pointer;">Daily Net</th>
-            <th class="text-center" style="min-width:100px;" onclick="croRetSort('daily_traders')" style="cursor:pointer;">Daily Traders</th>
-            <th class="text-center" style="min-width:90px;" onclick="croRetSort('daily_avg_scp')" style="cursor:pointer;">Daily Avg SCP</th>
-            <th class="text-center" style="min-width:100px;" onclick="croRetSort('net_usd')" style="cursor:pointer;">Monthly Net</th>
-            <th class="text-center" style="min-width:110px;" onclick="croRetSort('traders_count')" style="cursor:pointer;">Monthly Traders</th>
-            <th class="text-center" style="min-width:90px;" onclick="croRetSort('monthly_avg_scp')" style="cursor:pointer;">Monthly Avg SCP</th>
-            <th class="text-center" style="min-width:90px;" onclick="croRetSort('target_net_pct')" style="cursor:pointer;">Monthly %</th>
-            <th class="text-center" style="min-width:100px;" onclick="croRetSort('deposit_usd')" style="cursor:pointer;">Deposit $</th>
-            <th class="text-center" style="min-width:90px;" onclick="croRetSort('rdp_net')" style="cursor:pointer;">RDP Net $</th>
+            <th class="text-center" style="min-width:90px;cursor:pointer;" onclick="croRetSort('daily_net_usd')">Daily Net</th>
+            <th class="text-center" style="min-width:100px;cursor:pointer;" onclick="croRetSort('daily_target')">Daily Target</th>
+            <th class="text-center" style="min-width:80px;cursor:pointer;" onclick="croRetSort('daily_pct')">Daily %</th>
+            <th class="text-center" style="min-width:100px;cursor:pointer;" onclick="croRetSort('daily_traders')">Daily Traders</th>
+            <th class="text-center" style="min-width:90px;cursor:pointer;" onclick="croRetSort('daily_avg_scp')">Daily Avg SCP</th>
+            <th class="text-center" style="min-width:90px;cursor:pointer;" onclick="croRetSort('daily_loads')">Daily Loads</th>
+            <th class="text-center" style="min-width:80px;cursor:pointer;" onclick="croRetSort('daily_std')">Daily STD</th>
+            <th class="text-center" style="min-width:100px;cursor:pointer;" onclick="croRetSort('net_usd')">Monthly Net</th>
+            <th class="text-center" style="min-width:120px;cursor:pointer;" onclick="croRetSort('target_net')">Monthly Net Target</th>
+            <th class="text-center" style="min-width:90px;cursor:pointer;" onclick="croRetSort('target_net_pct')">Monthly %</th>
+            <th class="text-center" style="min-width:80px;cursor:pointer;" onclick="croRetSort('net_rr_pct')">RR%</th>
+            <th class="text-center" style="min-width:110px;cursor:pointer;" onclick="croRetSort('traders_count')">Monthly Traders</th>
+            <th class="text-center" style="min-width:90px;cursor:pointer;" onclick="croRetSort('monthly_avg_scp')">Monthly Avg SCP</th>
+            <th class="text-center" style="min-width:100px;cursor:pointer;" onclick="croRetSort('monthly_loads')">Monthly Loads</th>
+            <th class="text-center" style="min-width:95px;cursor:pointer;" onclick="croRetSort('std_count')">Monthly STD</th>
+            <th class="text-center" style="min-width:130px;cursor:pointer;" onclick="croRetSort('missing_100_rr')">Missing to 100% RR</th>
+            <th class="text-center" style="min-width:100px;cursor:pointer;" onclick="croRetSort('deposit_usd')">Deposit $</th>
+            <th class="text-center" style="min-width:90px;cursor:pointer;" onclick="croRetSort('net_rr')">NET RR</th>
+            <th class="text-center" style="min-width:160px;cursor:pointer;" onclick="croRetSort('need_on_target')">Need to be on Target</th>
+            <th class="text-center" style="min-width:140px;cursor:pointer;" onclick="croRetSort('missing_100')">Missing to Reach 100%</th>
+            <th class="text-center" style="min-width:120px;cursor:pointer;" onclick="croRetSort('per_wd')">Per Working Day</th>
+            <th class="text-center" style="min-width:110px;cursor:pointer;" onclick="croRetSort('open_volume_usd')">Open Volume</th>
+            <th class="text-center" style="min-width:110px;cursor:pointer;" onclick="croRetSort('rdp_net')">RDP Net $</th>
           </tr></thead>
           <tbody id="cro-ret-tbody"></tbody>
           <tfoot id="cro-ret-tfoot"></tfoot>
@@ -1494,6 +1515,12 @@
     if (val===null||val===undefined) return '<span style="color:#484f58;">—</span>';
     const fw = bold?'700':'600';
     return `<span style="color:#c9d1d9;font-weight:${fw};">${(val<0?'-':'')+'$'+Math.round(Math.abs(val)).toLocaleString('en-US')}</span>`;
+  }
+  function retPctHtml(pct, bold=false) {
+    if (pct===null||pct===undefined) return '<span style="color:#484f58;">—</span>';
+    const p = Math.round(pct*100);
+    const color = p>=85?'#3fb950':p>=65?'#d29922':'#f85149', fw=bold?'700':'600';
+    return `<span style="color:${color};font-weight:${fw};">${p}%</span>`;
   }
   function netHtml(val, bold = false) {
     if (val === null || val === undefined) return `<span style="color:#484f58;">—</span>`;
@@ -2411,6 +2438,7 @@
 
   // ── CRO Sales ────────────────────────────────────────────────────────────
   let _croSalRows = [], _croSalSort = {col:'ftd_count', dir:'desc'};
+  let _croSalWd = 0, _croSalWdp = 0, _croSalTgtRatio = 1;
 
   function croSalSort(col) {
     _croSalSort.dir = _croSalSort.col === col ? (_croSalSort.dir === 'desc' ? 'asc' : 'desc') : 'desc';
@@ -2430,8 +2458,24 @@
       const res = await fetch(`/api/daily-monthly/sales?date_from=${df}&date_to=${dt}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Error');
-      _croSalRows = data.rows || [];
-      renderCroSales(_croSalRows, data);
+      _croSalWd = data.working_days ?? 0;
+      _croSalWdp = data.working_days_passed ?? 0;
+      _croSalTgtRatio = data.target_ratio ?? 1;
+      const safeWdp = Math.max(_croSalWdp, 1);
+      const tgtR = _croSalTgtRatio;
+      const wd = _croSalWd;
+      _croSalRows = (data.rows || []).map(r => {
+        const pTgt = Math.round(r.target_ftc * tgtR);
+        const daily_target = wd > 0 ? pTgt / wd : 0;
+        const daily_pct = daily_target > 0 ? Math.round(r.daily_ftd / daily_target * 100) : null;
+        const monthly_pct = pTgt > 0 ? Math.round(r.ftd_count / pTgt * 100) : null;
+        const ftd_rr = Math.round(r.ftd_count / safeWdp * wd);
+        const rr_monthly_pct = pTgt > 0 ? Math.round(ftd_rr / pTgt * 100) : null;
+        const ftc_rr = Math.floor(r.ftc / safeWdp * wd);
+        const ftc_rr_pct = pTgt > 0 ? Math.round(ftc_rr / pTgt * 100) : null;
+        return { ...r, target_ftc: pTgt, daily_target, daily_pct, monthly_pct, ftd_rr, rr_monthly_pct, ftc_rr, ftc_rr_pct };
+      });
+      renderCroSales(_croSalRows);
     } catch(e) {
       if (errEl) { errEl.textContent = 'Error: ' + e.message; errEl.style.display = 'block'; }
     } finally {
@@ -2439,13 +2483,13 @@
     }
   }
 
-  function renderCroSales(rows, meta) {
+  function renderCroSales(rows) {
     const tbody = document.getElementById('cro-sal-tbody');
     const tfoot = document.getElementById('cro-sal-tfoot');
     if (!tbody) return;
+    const wd = _croSalWd, wdp = _croSalWdp, safeWdp = Math.max(wdp, 1);
     const frag = document.createDocumentFragment();
 
-    // Group by office
     const offMap = new Map();
     rows.forEach(r => {
       if (!offMap.has(r.office_name)) offMap.set(r.office_name, []);
@@ -2455,33 +2499,42 @@
     const sortFn = (a, b) => {
       const col = _croSalSort.col;
       if (col === 'name') {
-        const av = a.office_name || '', bv = b.office_name || '';
+        const av = a.office_name || a.name || '', bv = b.office_name || b.name || '';
         return _croSalSort.dir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
       }
-      const av = (a[col] ?? 0), bv = (b[col] ?? 0);
-      return _croSalSort.dir === 'desc' ? bv - av : av - bv;
+      return _croSalSort.dir === 'desc' ? (b[col]??0)-(a[col]??0) : (a[col]??0)-(b[col]??0);
     };
 
-    let gFtd=0, gFtdAmt=0, gMonthlyFtd=0, gMonthlyFtdAmt=0, gNet=0, gFtc=0;
+    let gDFtd=0, gDFtdAmt=0, gDTgt=0, gFtd=0, gTgt=0, gFtdAmt=0, gNet=0, gFtc=0, gFtdRr=0, gFtcRr=0;
     let offCount=0, agentCount=0;
 
-    const offices = [...offMap.entries()].map(([name, agents]) => ({
-      name, agents,
-      daily_ftd:         agents.reduce((s,a)=>s+(a.daily_ftd??0),0),
-      daily_avg_scp:     (() => { const w=agents.filter(a=>a.daily_avg_scp!=null&&a.daily_ftd>0); if(!w.length) return null; const td=w.reduce((s,a)=>s+a.daily_ftd,0); return td>0?Math.round(w.reduce((s,a)=>s+a.daily_avg_scp*a.daily_ftd,0)/td*10)/10:null; })(),
-      daily_ftd_amount:  agents.reduce((s,a)=>s+(a.daily_ftd_amount??0),0),
-      ftd_count:         agents.reduce((s,a)=>s+(a.ftd_count??0),0),
-      avg_scp:           (() => { const w=agents.filter(a=>a.avg_scp!=null&&a.ftd_count>0); if(!w.length) return null; const tf=w.reduce((s,a)=>s+a.ftd_count,0); return tf>0?Math.round(w.reduce((s,a)=>s+a.avg_scp*a.ftd_count,0)/tf*10)/10:null; })(),
-      monthly_ftd_amount: agents.reduce((s,a)=>s+(a.monthly_ftd_amount??0),0),
-      monthly_pct:       null,
-      net_deposits:      agents.reduce((s,a)=>s+(a.net_deposits??0),0),
-      ftc:               agents.reduce((s,a)=>s+(a.ftc??0),0),
-    })).sort(sortFn);
+    const offices = [...offMap.entries()].map(([name, agents]) => {
+      const dailyFtd    = agents.reduce((s,a)=>s+(a.daily_ftd??0),0);
+      const dailyTgt    = agents.reduce((s,a)=>s+(a.daily_target??0),0);
+      const dailyPct    = dailyTgt > 0 ? Math.round(dailyFtd/dailyTgt*100) : null;
+      const dailyFtdAmt = agents.reduce((s,a)=>s+(a.daily_ftd_amount??0),0);
+      const ftdCount    = agents.reduce((s,a)=>s+(a.ftd_count??0),0);
+      const tgt         = agents.reduce((s,a)=>s+(a.target_ftc??0),0);
+      const monthlyPct  = tgt > 0 ? Math.round(ftdCount/tgt*100) : null;
+      const ftdAmt      = agents.reduce((s,a)=>s+(a.monthly_ftd_amount??0),0);
+      const ftdRr       = Math.round(ftdCount/safeWdp*wd);
+      const rrPct       = tgt > 0 ? Math.round(ftdRr/tgt*100) : null;
+      const net         = agents.reduce((s,a)=>s+(a.net_deposits??0),0);
+      const ftc         = agents.reduce((s,a)=>s+(a.ftc??0),0);
+      const ftcRr       = Math.floor(ftc/safeWdp*wd);
+      const ftcRrPct    = tgt > 0 ? Math.round(ftcRr/tgt*100) : null;
+      const dailyAvgScp = (() => { const w=agents.filter(a=>a.daily_avg_scp!=null&&a.daily_ftd>0); if(!w.length) return null; const td=w.reduce((s,a)=>s+a.daily_ftd,0); return td>0?Math.round(w.reduce((s,a)=>s+a.daily_avg_scp*a.daily_ftd,0)/td*10)/10:null; })();
+      const avgScp      = (() => { const w=agents.filter(a=>a.avg_scp!=null&&a.ftd_count>0); if(!w.length) return null; const tf=w.reduce((s,a)=>s+a.ftd_count,0); return tf>0?Math.round(w.reduce((s,a)=>s+a.avg_scp*a.ftd_count,0)/tf*10)/10:null; })();
+      return { name, agents, dailyFtd, dailyTgt, dailyPct, dailyFtdAmt, ftdCount, tgt, monthlyPct, ftdAmt, ftdRr, rrPct, net, ftc, ftcRr, ftcRrPct, dailyAvgScp, avgScp };
+    }).sort(sortFn);
 
-    const activeOffices = offices.filter(o => o.daily_ftd > 0 || o.ftd_count > 0 || o.net_deposits !== 0 || o.ftc > 0);
+    const scp1 = v => v!=null?'<strong>'+v.toFixed(1)+'</strong>':'—';
+    const scp0 = v => v!=null?v.toFixed(1):'—';
+    const activeOffices = offices.filter(o => o.dailyFtd>0||o.ftdCount>0||o.net!==0||o.ftc>0);
     activeOffices.forEach((off, oi) => {
-      gFtd+=off.daily_ftd; gFtdAmt+=off.daily_ftd_amount; gMonthlyFtd+=off.ftd_count;
-      gMonthlyFtdAmt+=off.monthly_ftd_amount; gNet+=off.net_deposits; gFtc+=off.ftc;
+      gDFtd+=off.dailyFtd; gDFtdAmt+=off.dailyFtdAmt; gDTgt+=off.dailyTgt;
+      gFtd+=off.ftdCount; gTgt+=off.tgt; gFtdAmt+=off.ftdAmt;
+      gNet+=off.net; gFtc+=off.ftc; gFtdRr+=off.ftdRr; gFtcRr+=off.ftcRr;
       offCount++;
       const oid = 'cro-sal-off-'+oi;
       const offTr = document.createElement('tr');
@@ -2489,15 +2542,22 @@
       offTr.dataset.officeId = oid;
       offTr.innerHTML = `
         <td><span class="chevron">&#9654;</span><i class="bi bi-building row-icon me-2" style="color:#484f58;font-size:0.75rem;"></i><strong>${escHtml(off.name)}</strong></td>
-        <td class="text-center">${wCountHtml(off.daily_ftd, true)}</td>
-        <td class="text-center">${off.daily_avg_scp!=null?'<strong>'+off.daily_avg_scp.toFixed(1)+'</strong>':'—'}</td>
-        <td class="text-center">${blueHtml(off.daily_ftd_amount, true)}</td>
-        <td class="text-center">${wCountHtml(off.ftd_count, true)}</td>
-        <td class="text-center">${off.avg_scp!=null?'<strong>'+off.avg_scp.toFixed(1)+'</strong>':'—'}</td>
-        <td class="text-center">${blueHtml(off.monthly_ftd_amount, true)}</td>
-        <td class="text-center">—</td>
-        <td class="text-center">${blueHtml(off.net_deposits, true)}</td>
-        <td class="text-center">${wCountHtml(off.ftc, true)}</td>
+        <td class="text-center">${wCountHtml(off.dailyFtd,true)}</td>
+        <td class="text-center">${scp1(off.dailyAvgScp)}</td>
+        <td class="text-center">${wCountHtml(Math.round(off.dailyTgt),true)}</td>
+        <td class="text-center">${pctHtml(off.dailyPct,true)}</td>
+        <td class="text-center">${blueHtml(off.dailyFtdAmt,true)}</td>
+        <td class="text-center">${wCountHtml(off.ftdCount,true)}</td>
+        <td class="text-center">${scp1(off.avgScp)}</td>
+        <td class="text-center">${wCountHtml(off.tgt,true)}</td>
+        <td class="text-center">${pctHtml(off.monthlyPct,true)}</td>
+        <td class="text-center">${blueHtml(off.ftdAmt,true)}</td>
+        <td class="text-center">${wCountHtml(off.ftdRr,true)}</td>
+        <td class="text-center">${pctHtml(off.rrPct,true)}</td>
+        <td class="text-center">${blueHtml(off.net,true)}</td>
+        <td class="text-center">${wCountHtml(off.ftc,true)}</td>
+        <td class="text-center">${wCountHtml(off.ftcRr,true)}</td>
+        <td class="text-center">${pctHtml(off.ftcRrPct,true)}</td>
       `;
       frag.appendChild(offTr);
 
@@ -2510,14 +2570,21 @@
         agTr.innerHTML = `
           <td>${escHtml(r.agent_name)}</td>
           <td class="text-center">${wCountHtml(r.daily_ftd)}</td>
-          <td class="text-center">${r.daily_avg_scp!=null?r.daily_avg_scp.toFixed(1):'—'}</td>
+          <td class="text-center">${scp0(r.daily_avg_scp)}</td>
+          <td class="text-center">${wCountHtml(Math.round(r.daily_target))}</td>
+          <td class="text-center">${pctHtml(r.daily_pct)}</td>
           <td class="text-center">${blueHtml(r.daily_ftd_amount)}</td>
           <td class="text-center">${wCountHtml(r.ftd_count)}</td>
-          <td class="text-center">${r.avg_scp!=null?r.avg_scp.toFixed(1):'—'}</td>
+          <td class="text-center">${scp0(r.avg_scp)}</td>
+          <td class="text-center">${wCountHtml(r.target_ftc)}</td>
+          <td class="text-center">${pctHtml(r.monthly_pct)}</td>
           <td class="text-center">${blueHtml(r.monthly_ftd_amount)}</td>
-          <td class="text-center">${r.monthly_pct!=null?pctHtml(r.monthly_pct):'—'}</td>
+          <td class="text-center">${wCountHtml(r.ftd_rr)}</td>
+          <td class="text-center">${pctHtml(r.rr_monthly_pct)}</td>
           <td class="text-center">${blueHtml(r.net_deposits)}</td>
           <td class="text-center">${wCountHtml(r.ftc)}</td>
+          <td class="text-center">${wCountHtml(r.ftc_rr)}</td>
+          <td class="text-center">${pctHtml(r.ftc_rr_pct)}</td>
         `;
         frag.appendChild(agTr);
       });
@@ -2533,18 +2600,28 @@
     tbody.innerHTML = '';
     tbody.appendChild(frag);
 
-    // Total row
+    const gDPct  = gDTgt  > 0 ? Math.round(gDFtd/gDTgt*100) : null;
+    const gMPct  = gTgt   > 0 ? Math.round(gFtd/gTgt*100) : null;
+    const gRrPct = gTgt   > 0 ? Math.round(gFtdRr/gTgt*100) : null;
+    const gFtcRrPct = gTgt > 0 ? Math.round(gFtcRr/gTgt*100) : null;
     tfoot.innerHTML = `<tr class="total-row">
       <td>Total</td>
+      <td class="text-center">${wCountHtml(gDFtd,true)}</td>
+      <td class="text-center">—</td>
+      <td class="text-center">${wCountHtml(Math.round(gDTgt),true)}</td>
+      <td class="text-center">${pctHtml(gDPct,true)}</td>
+      <td class="text-center">${blueHtml(gDFtdAmt,true)}</td>
       <td class="text-center">${wCountHtml(gFtd,true)}</td>
       <td class="text-center">—</td>
+      <td class="text-center">${wCountHtml(gTgt,true)}</td>
+      <td class="text-center">${pctHtml(gMPct,true)}</td>
       <td class="text-center">${blueHtml(gFtdAmt,true)}</td>
-      <td class="text-center">${wCountHtml(gMonthlyFtd,true)}</td>
-      <td class="text-center">—</td>
-      <td class="text-center">${blueHtml(gMonthlyFtdAmt,true)}</td>
-      <td class="text-center">—</td>
+      <td class="text-center">${wCountHtml(gFtdRr,true)}</td>
+      <td class="text-center">${pctHtml(gRrPct,true)}</td>
       <td class="text-center">${blueHtml(gNet,true)}</td>
       <td class="text-center">${wCountHtml(gFtc,true)}</td>
+      <td class="text-center">${wCountHtml(gFtcRr,true)}</td>
+      <td class="text-center">${pctHtml(gFtcRrPct,true)}</td>
     </tr>`;
     const rc = document.getElementById('cro-sal-row-count');
     if (rc) rc.textContent = `${offCount} offices · ${agentCount} agents`;
@@ -2552,6 +2629,7 @@
 
   // ── CRO Retention ────────────────────────────────────────────────────────
   let _croRetRows = [], _croRetSort = {col:'net_usd', dir:'desc'};
+  let _croRetWd=0, _croRetWdp=0, _croRetWdLeft=0, _croRetTgtR=1, _croRetWdR=0;
 
   function croRetSort(col) {
     _croRetSort.dir = _croRetSort.col === col ? (_croRetSort.dir === 'desc' ? 'asc' : 'desc') : 'desc';
@@ -2571,7 +2649,25 @@
       const res = await fetch(`/api/daily-monthly/retention?date_from=${df}&date_to=${dt}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Error');
-      _croRetRows = data.rows || [];
+      _croRetWd = data.working_days ?? 0; _croRetWdp = data.working_days_passed ?? 0;
+      _croRetWdLeft = data.working_days_left ?? 0; _croRetTgtR = data.target_ratio ?? 1;
+      _croRetWdR = data.wd_in_range ?? _croRetWd;
+      const wd = _croRetWd, safe_wdp = Math.max(_croRetWdp, 1), tgtR = _croRetTgtR, wdR = _croRetWdR;
+      _croRetRows = (data.rows || []).map(r => {
+        const pTgt = r.target_net * tgtR;
+        const daily_target = wd > 0 ? pTgt / wd : 0;
+        const daily_pct = daily_target > 0 ? r.daily_net_usd / daily_target : null;
+        const net_rr = r.net_usd > 0 ? Math.floor(r.net_usd / safe_wdp * wd) : r.net_usd;
+        const net_rr_pct = pTgt > 0 ? net_rr / pTgt : null;
+        const safeWdR = wdR > 0 ? wdR : 1;
+        const need_on_target = wdR > 0 ? pTgt * Math.min(_croRetWdp, wdR) / safeWdR : 0;
+        const missing_100_rr = need_on_target - r.net_usd;
+        const target_net_pct = pTgt > 0 ? r.net_usd / pTgt : null;
+        const missing_100 = pTgt - r.net_usd;
+        const wdLeftPwd = tgtR < 1 ? Math.max(wdR - _croRetWdp, 0) : _croRetWdLeft;
+        const per_wd = wdLeftPwd > 0 ? missing_100 / wdLeftPwd : null;
+        return { ...r, target_net: pTgt, daily_target, daily_pct, net_rr, net_rr_pct, need_on_target, missing_100_rr, target_net_pct, missing_100, per_wd };
+      });
       renderCroRetention(_croRetRows);
     } catch(e) {
       if (errEl) { errEl.textContent = 'Error: ' + e.message; errEl.style.display = 'block'; }
@@ -2584,6 +2680,8 @@
     const tbody = document.getElementById('cro-ret-tbody');
     const tfoot = document.getElementById('cro-ret-tfoot');
     if (!tbody) return;
+    const wd = _croRetWd, wdp = _croRetWdp, wdLeft = _croRetWdLeft, tgtR = _croRetTgtR, wdR = _croRetWdR;
+    const safeWdp = Math.max(wdp, 1);
     const frag = document.createDocumentFragment();
 
     const offMap = new Map();
@@ -2594,35 +2692,55 @@
       dm.get(r.dept_name).push(r);
     });
 
-    const sortVal = (o) => {
+    const sortFn = (a, b) => {
       const col = _croRetSort.col;
-      const v = o[col] ?? 0;
-      return _croRetSort.dir === 'desc' ? -v : v;
+      if (col === 'name') { const av=a.oName||'', bv=b.oName||''; return _croRetSort.dir==='asc'?av.localeCompare(bv):bv.localeCompare(av); }
+      return _croRetSort.dir === 'desc' ? (b[col]??0)-(a[col]??0) : (a[col]??0)-(b[col]??0);
     };
 
-    let gDNet=0, gNet=0, gDTraders=0, gTraders=0, gDep=0, gRdp=0;
+    let gDNet=0, gDTgt=0, gDTraders=0, gDLoads=0, gDStd=0;
+    let gNet=0, gTgt=0, gTraders=0, gMLoads=0, gStd=0, gMiss100Rr=0, gDep=0, gNetRr=0, gNeedOnTgt=0, gMiss100=0, gOpenVol=0, gRdp=0;
     let offCount=0, agentCount=0;
 
-    const offList = [...offMap.entries()].map(([oName, dMap]) => {
-      const agents = []; dMap.forEach(ag => agents.push(...ag));
-      return {
-        oName, dMap,
-        daily_net_usd: agents.reduce((s,a)=>s+(a.daily_net_usd??0),0),
-        daily_traders: agents.reduce((s,a)=>s+(a.daily_traders??0),0),
-        daily_avg_scp: (() => { const w=agents.filter(a=>a.daily_avg_scp!=null&&a.daily_traders>0); if(!w.length) return null; const td=w.reduce((s,a)=>s+a.daily_traders,0); return td>0?Math.round(w.reduce((s,a)=>s+a.daily_avg_scp*a.daily_traders,0)/td*10)/10:null; })(),
-        net_usd:       agents.reduce((s,a)=>s+(a.net_usd??0),0),
-        traders_count: agents.reduce((s,a)=>s+(a.traders_count??0),0),
-        monthly_avg_scp: (() => { const w=agents.filter(a=>a.monthly_avg_scp!=null&&a.traders_count>0); if(!w.length) return null; const tm=w.reduce((s,a)=>s+a.traders_count,0); return tm>0?Math.round(w.reduce((s,a)=>s+a.monthly_avg_scp*a.traders_count,0)/tm*10)/10:null; })(),
-        target_net_pct: null,
-        deposit_usd:   agents.reduce((s,a)=>s+(a.deposit_usd??0),0),
-        rdp_net:       agents.reduce((s,a)=>s+(a.rdp_net??0),0),
-      };
-    }).sort((a,b) => sortVal(a) - sortVal(b));
+    const scp1 = v => v!=null?'<strong>'+v.toFixed(1)+'</strong>':'—';
+    const scp0 = v => v!=null?v.toFixed(1):'—';
 
-    const activeOffList = offList.filter(o => o.daily_net_usd !== 0 || o.net_usd !== 0 || o.traders_count > 0 || o.deposit_usd > 0);
+    const offList = [...offMap.entries()].map(([oName, dMap]) => {
+      const ags = []; dMap.forEach(ag => ags.push(...ag));
+      const tgtNet    = ags.reduce((s,a)=>s+(a.target_net??0),0);
+      const netUsd    = ags.reduce((s,a)=>s+(a.net_usd??0),0);
+      const depUsd    = ags.reduce((s,a)=>s+(a.deposit_usd??0),0);
+      const dNet      = ags.reduce((s,a)=>s+(a.daily_net_usd??0),0);
+      const dTgt      = ags.reduce((s,a)=>s+(a.daily_target??0),0);
+      const dTraders  = ags.reduce((s,a)=>s+(a.daily_traders??0),0);
+      const dLoads    = ags.reduce((s,a)=>s+(a.daily_loads??0),0);
+      const dStd      = ags.reduce((s,a)=>s+(a.daily_std??0),0);
+      const mTraders  = ags.reduce((s,a)=>s+(a.traders_count??0),0);
+      const mLoads    = ags.reduce((s,a)=>s+(a.monthly_loads??0),0);
+      const mStd      = ags.reduce((s,a)=>s+(a.std_count??0),0);
+      const openVol   = ags.reduce((s,a)=>s+(a.open_volume_usd??0),0);
+      const rdpNet    = ags.reduce((s,a)=>s+(a.rdp_net??0),0);
+      const netRr     = ags.reduce((s,a)=>s+(a.net_rr??0),0);
+      const needOnTgt = ags.reduce((s,a)=>s+(a.need_on_target??0),0);
+      const miss100   = ags.reduce((s,a)=>s+(a.missing_100??0),0);
+      const miss100Rr = needOnTgt - netUsd;
+      const dPct      = dTgt > 0 ? dNet / dTgt : null;
+      const tgtNetPct = tgtNet > 0 ? netUsd / tgtNet : null;
+      const netRrPct  = tgtNet > 0 ? netRr / tgtNet : null;
+      const wdLeftPwd = tgtR < 1 ? Math.max(wdR - wdp, 0) : wdLeft;
+      const perWd     = wdLeftPwd > 0 ? miss100 / wdLeftPwd : null;
+      const dAvgScp   = (() => { const w=ags.filter(a=>a.daily_avg_scp!=null&&a.daily_traders>0); if(!w.length) return null; const td=w.reduce((s,a)=>s+a.daily_traders,0); return td>0?Math.round(w.reduce((s,a)=>s+a.daily_avg_scp*a.daily_traders,0)/td*10)/10:null; })();
+      const mAvgScp   = (() => { const w=ags.filter(a=>a.monthly_avg_scp!=null&&a.traders_count>0); if(!w.length) return null; const tm=w.reduce((s,a)=>s+a.traders_count,0); return tm>0?Math.round(w.reduce((s,a)=>s+a.monthly_avg_scp*a.traders_count,0)/tm*10)/10:null; })();
+      return { oName, dMap, tgtNet, netUsd, depUsd, dNet, dTgt, dTraders, dLoads, dStd, mTraders, mLoads, mStd, openVol, rdpNet, netRr, needOnTgt, miss100, miss100Rr, dPct, tgtNetPct, netRrPct, perWd, dAvgScp, mAvgScp,
+        net_usd: netUsd, deposit_usd: depUsd, daily_net_usd: dNet, traders_count: mTraders, daily_traders: dTraders };
+    }).sort(sortFn);
+
+    const activeOffList = offList.filter(o => o.dNet!==0||o.netUsd!==0||o.mTraders>0||o.depUsd>0);
     activeOffList.forEach((off, oi) => {
-      gDNet+=off.daily_net_usd; gNet+=off.net_usd; gDTraders+=off.daily_traders;
-      gTraders+=off.traders_count; gDep+=off.deposit_usd; gRdp+=off.rdp_net;
+      gDNet+=off.dNet; gDTgt+=off.dTgt; gDTraders+=off.dTraders; gDLoads+=off.dLoads; gDStd+=off.dStd;
+      gNet+=off.netUsd; gTgt+=off.tgtNet; gTraders+=off.mTraders; gMLoads+=off.mLoads; gStd+=off.mStd;
+      gMiss100Rr+=off.miss100Rr; gDep+=off.depUsd; gNetRr+=off.netRr; gNeedOnTgt+=off.needOnTgt;
+      gMiss100+=off.miss100; gOpenVol+=off.openVol; gRdp+=off.rdpNet;
       offCount++;
       const oid = 'cro-ret-off-'+oi;
       const offTr = document.createElement('tr');
@@ -2630,20 +2748,34 @@
       offTr.dataset.officeId = oid;
       offTr.innerHTML = `
         <td><span class="chevron">&#9654;</span><i class="bi bi-building row-icon me-2" style="color:#484f58;font-size:0.75rem;"></i><strong>${escHtml(off.oName)}</strong></td>
-        <td class="text-center">${retDailyNetHtml(off.daily_net_usd, true)}</td>
-        <td class="text-center">${wCountHtml(off.daily_traders, true)}</td>
-        <td class="text-center">${off.daily_avg_scp!=null?'<strong>'+off.daily_avg_scp.toFixed(1)+'</strong>':'—'}</td>
-        <td class="text-center">${blueHtml(off.net_usd, true)}</td>
-        <td class="text-center">${wCountHtml(off.traders_count, true)}</td>
-        <td class="text-center">${off.monthly_avg_scp!=null?'<strong>'+off.monthly_avg_scp.toFixed(1)+'</strong>':'—'}</td>
-        <td class="text-center">—</td>
-        <td class="text-center">${wDollarHtml(off.deposit_usd, true)}</td>
-        <td class="text-center">${netHtml(off.rdp_net, true)}</td>
+        <td class="text-center">${retDailyNetHtml(off.dNet,true)}</td>
+        <td class="text-center">${wDollarHtml(Math.round(off.dTgt),true)}</td>
+        <td class="text-center">${retPctHtml(off.dPct,true)}</td>
+        <td class="text-center">${wCountHtml(off.dTraders,true)}</td>
+        <td class="text-center">${scp1(off.dAvgScp)}</td>
+        <td class="text-center">${wCountHtml(off.dLoads,true)}</td>
+        <td class="text-center">${wCountHtml(off.dStd,true)}</td>
+        <td class="text-center">${blueHtml(off.netUsd,true)}</td>
+        <td class="text-center">${blueHtml(off.tgtNet,true)}</td>
+        <td class="text-center">${retPctHtml(off.tgtNetPct,true)}</td>
+        <td class="text-center">${retPctHtml(off.netRrPct,true)}</td>
+        <td class="text-center">${wCountHtml(off.mTraders,true)}</td>
+        <td class="text-center">${scp1(off.mAvgScp)}</td>
+        <td class="text-center">${wCountHtml(off.mLoads,true)}</td>
+        <td class="text-center">${wCountHtml(off.mStd,true)}</td>
+        <td class="text-center">${wDollarHtml(off.miss100Rr,true)}</td>
+        <td class="text-center">${wDollarHtml(off.depUsd,true)}</td>
+        <td class="text-center">${wDollarHtml(off.netRr,true)}</td>
+        <td class="text-center">${wDollarHtml(off.needOnTgt,true)}</td>
+        <td class="text-center">${wDollarHtml(off.miss100,true)}</td>
+        <td class="text-center">${off.perWd!=null?wDollarHtml(off.perWd,true):'—'}</td>
+        <td class="text-center">${wDollarHtml(off.openVol,true)}</td>
+        <td class="text-center">${netHtml(off.rdpNet,true)}</td>
       `;
       frag.appendChild(offTr);
 
-      off.dMap.forEach((agents, deptName) => {
-        agents.forEach(r => {
+      off.dMap.forEach((ags) => {
+        ags.forEach(r => {
           agentCount++;
           const agTr = document.createElement('tr');
           agTr.className = 'agent-row retention-agent-row';
@@ -2652,13 +2784,27 @@
           agTr.innerHTML = `
             <td style="padding-left:20px;">${escHtml(r.agent_name)}</td>
             <td class="text-center">${retDailyNetHtml(r.daily_net_usd)}</td>
+            <td class="text-center">${wDollarHtml(Math.round(r.daily_target))}</td>
+            <td class="text-center">${retPctHtml(r.daily_pct)}</td>
             <td class="text-center">${wCountHtml(r.daily_traders)}</td>
-            <td class="text-center">${r.daily_avg_scp!=null?r.daily_avg_scp.toFixed(1):'—'}</td>
+            <td class="text-center">${scp0(r.daily_avg_scp)}</td>
+            <td class="text-center">${wCountHtml(r.daily_loads)}</td>
+            <td class="text-center">${wCountHtml(r.daily_std)}</td>
             <td class="text-center">${blueHtml(r.net_usd)}</td>
+            <td class="text-center">${blueHtml(r.target_net)}</td>
+            <td class="text-center">${retPctHtml(r.target_net_pct)}</td>
+            <td class="text-center">${retPctHtml(r.net_rr_pct)}</td>
             <td class="text-center">${wCountHtml(r.traders_count)}</td>
-            <td class="text-center">${r.monthly_avg_scp!=null?r.monthly_avg_scp.toFixed(1):'—'}</td>
-            <td class="text-center">${r.target_net_pct!=null?pctHtml(r.target_net_pct):'—'}</td>
+            <td class="text-center">${scp0(r.monthly_avg_scp)}</td>
+            <td class="text-center">${wCountHtml(r.monthly_loads)}</td>
+            <td class="text-center">${wCountHtml(r.std_count)}</td>
+            <td class="text-center">${wDollarHtml(r.missing_100_rr)}</td>
             <td class="text-center">${wDollarHtml(r.deposit_usd)}</td>
+            <td class="text-center">${wDollarHtml(r.net_rr)}</td>
+            <td class="text-center">${wDollarHtml(r.need_on_target)}</td>
+            <td class="text-center">${wDollarHtml(r.missing_100)}</td>
+            <td class="text-center">${r.per_wd!=null?wDollarHtml(r.per_wd):'—'}</td>
+            <td class="text-center">${wDollarHtml(r.open_volume_usd)}</td>
             <td class="text-center">${netHtml(r.rdp_net)}</td>
           `;
           frag.appendChild(agTr);
@@ -2676,16 +2822,35 @@
     tbody.innerHTML = '';
     tbody.appendChild(frag);
 
+    const gGwdLeft = tgtR < 1 ? Math.max(wdR - wdp, 0) : wdLeft;
+    const gPerWd = gGwdLeft > 0 ? gMiss100 / gGwdLeft : null;
+    const gDPct = gDTgt > 0 ? gDNet/gDTgt : null;
+    const gTgtPct = gTgt > 0 ? gNet/gTgt : null;
+    const gNetRrPct = gTgt > 0 ? gNetRr/gTgt : null;
     tfoot.innerHTML = `<tr class="total-row">
       <td>Total</td>
       <td class="text-center">${retDailyNetHtml(gDNet,true)}</td>
+      <td class="text-center">${wDollarHtml(Math.round(gDTgt),true)}</td>
+      <td class="text-center">${retPctHtml(gDPct,true)}</td>
       <td class="text-center">${wCountHtml(gDTraders,true)}</td>
       <td class="text-center">—</td>
+      <td class="text-center">${wCountHtml(gDLoads,true)}</td>
+      <td class="text-center">${wCountHtml(gDStd,true)}</td>
       <td class="text-center">${blueHtml(gNet,true)}</td>
+      <td class="text-center">${blueHtml(gTgt,true)}</td>
+      <td class="text-center">${retPctHtml(gTgtPct,true)}</td>
+      <td class="text-center">${retPctHtml(gNetRrPct,true)}</td>
       <td class="text-center">${wCountHtml(gTraders,true)}</td>
       <td class="text-center">—</td>
-      <td class="text-center">—</td>
+      <td class="text-center">${wCountHtml(gMLoads,true)}</td>
+      <td class="text-center">${wCountHtml(gStd,true)}</td>
+      <td class="text-center">${wDollarHtml(gMiss100Rr,true)}</td>
       <td class="text-center">${wDollarHtml(gDep,true)}</td>
+      <td class="text-center">${wDollarHtml(gNetRr,true)}</td>
+      <td class="text-center">${wDollarHtml(gNeedOnTgt,true)}</td>
+      <td class="text-center">${wDollarHtml(gMiss100,true)}</td>
+      <td class="text-center">${gPerWd!=null?wDollarHtml(gPerWd,true):'—'}</td>
+      <td class="text-center">${wDollarHtml(gOpenVol,true)}</td>
       <td class="text-center">${netHtml(gRdp,true)}</td>
     </tr>`;
     const rc = document.getElementById('cro-ret-row-count');
