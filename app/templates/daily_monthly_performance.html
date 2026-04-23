@@ -339,7 +339,7 @@
           {% if show_retention %}
           <div>
             <div class="kpi-value" style="color:#388bfd;" id="stat-daily-net-ret">—</div>
-            <div class="kpi-label">Daily Ret Net</div>
+            <div class="kpi-label">Daily Ret</div>
           </div>
           {% endif %}
         </div>
@@ -556,7 +556,7 @@
             <thead>
               <tr>
                 <th data-sort="ret-name" style="cursor:pointer;user-select:none;">Office / Dept / Agent <i class="bi sort-icon bi-arrow-down-up" id="ret-sort-icon-name"></i></th>
-                <th class="text-center" style="min-width:90px;"  data-sort="ret-dailyNet">Daily Net <i class="bi sort-icon" id="ret-sort-icon-dailyNet"></i></th>
+                <th class="text-center" style="min-width:90px;color:#c9d1d9;"  data-sort="ret-dailyNet">Daily Net <i class="bi sort-icon" id="ret-sort-icon-dailyNet"></i></th>
                 <th class="text-center" style="min-width:100px;" data-sort="ret-dailyTarget">Daily Target <i class="bi sort-icon" id="ret-sort-icon-dailyTarget"></i></th>
                 <th class="text-center" style="min-width:80px;"  data-sort="ret-dailyPct">Daily % <i class="bi sort-icon" id="ret-sort-icon-dailyPct"></i></th>
                 <th class="text-center" style="min-width:100px;" data-sort="ret-dailyTraders">Daily Traders <i class="bi sort-icon" id="ret-sort-icon-dailyTraders"></i></th>
@@ -772,6 +772,11 @@
     if (val===null||val===undefined) return '<span style="color:#484f58;">—</span>';
     const color = val>=0 ? '#3fb950' : '#f85149', fw = bold?'700':'600';
     return `<span style="color:${color};font-weight:${fw};">${(val<0?'-':'')+'$'+Math.round(Math.abs(val)).toLocaleString('en-US')}</span>`;
+  }
+  function retDailyNetHtml(val, bold=false) {
+    if (val===null||val===undefined) return '<span style="color:#484f58;">—</span>';
+    const fw = bold?'700':'600';
+    return `<span style="color:#c9d1d9;font-weight:${fw};">${(val<0?'-':'')+'$'+Math.round(Math.abs(val)).toLocaleString('en-US')}</span>`;
   }
   function blueHtml(val, bold=false) {
     if (val===null||val===undefined) return '<span style="color:#484f58;">—</span>';
@@ -1317,7 +1322,7 @@
 
     function retRowHtml(o, bold) {
       return `
-        <td class="text-center">${netHtml(o.dailyNet, bold)}</td>
+        <td class="text-center">${retDailyNetHtml(o.dailyNet, bold)}</td>
         <td class="text-center">${wDollarHtml(Math.round(o.dailyTarget), bold)}</td>
         <td class="text-center">${retPctHtml(o.dailyPct, bold)}</td>
         <td class="text-center">${wCountHtml(o.dailyTraders, bold)}</td>
@@ -1345,7 +1350,7 @@
 
     function retAgentRowHtml(r) {
       return `
-        <td class="text-center">${netHtml(r.daily_net_usd)}</td>
+        <td class="text-center">${retDailyNetHtml(r.daily_net_usd)}</td>
         <td class="text-center">${wDollarHtml(Math.round(r.daily_target))}</td>
         <td class="text-center">${retPctHtml(r.daily_pct)}</td>
         <td class="text-center">${wCountHtml(r.daily_traders)}</td>
