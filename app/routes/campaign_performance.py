@@ -42,6 +42,7 @@ VALID_GROUPS = {
     "country":              "COALESCE(a.country_iso, '(Unassigned)')",
     "client_classification": "COALESCE(a.classification_int::text, '(Unassigned)')",
     "segmentation":         "COALESCE(CASE a.segmentation WHEN '1' THEN '-A' WHEN '2' THEN 'B' WHEN '3' THEN 'C' WHEN '4' THEN '+A' END, '(Unassigned)')",
+    "account_id":           "a.accountid::text",
 }
 GROUP_LABELS = {
     "marketing_group":      "Marketing Group",
@@ -56,6 +57,7 @@ GROUP_LABELS = {
     "country":              "Country",
     "client_classification": "Sales Client Potential",
     "segmentation":         "Segmentation",
+    "account_id":           "Account ID",
     "none":                 "",
 }
 
