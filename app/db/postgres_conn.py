@@ -726,11 +726,15 @@ def upsert_users(df: pd.DataFrame):
 
 
 def cleanup_accounts():
-    """Delete test accounts and null/blank accountid rows from accounts table."""
+    """Remove null/blank accountid rows from accounts table.
+    Test accounts (is_test_account=1) are kept in the table permanently so the
+    GREATEST upsert logic can prevent MySQL from ever resetting them to 0.
+    All reporting queries already filter is_test_account=0, so they are invisible.
+    """
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute("DELETE FROM accounts WHERE is_test_account != 0 OR accountid IS NULL")
+            cur.execute("DELETE FROM accounts WHERE accountid IS NULL")
         conn.commit()
     finally:
         conn.close()
@@ -775,7 +779,13 @@ def upsert_accounts(df: pd.DataFrame):
         for _, row in df.iterrows()
     ]
     update_cols = [c for c in cols if c != "accountid"]
-    update_set = ", ".join(f"{c} = EXCLUDED.{c}" for c in update_cols)
+    # is_test_account uses GREATEST so a 1 set by MSSQL cross-check is never
+    # overwritten back to 0 by a subsequent MySQL sync that still has is_test=0.
+    update_set = ", ".join(
+        "is_test_account = GREATEST(EXCLUDED.is_test_account, accounts.is_test_account)"
+        if c == "is_test_account" else f"{c} = EXCLUDED.{c}"
+        for c in update_cols
+    )
     col_list = ", ".join(cols)
     sql = f"""
         INSERT INTO accounts ({col_list})
