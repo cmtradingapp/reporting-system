@@ -698,7 +698,7 @@
           <table class="scoreboard-table" id="retention-table">
             <thead>
               <tr>
-                <th data-sort="ret-name" style="cursor:pointer;user-select:none;">Office / Dept / Agent <i class="bi sort-icon bi-arrow-down-up" id="ret-sort-icon-name" style="margin-left:4px;font-size:0.7rem;opacity:0.4;"></i></th>
+                <th data-sort="ret-name" style="cursor:pointer;user-select:none;">Office / Agent<i class="bi sort-icon bi-arrow-down-up" id="ret-sort-icon-name" style="margin-left:4px;font-size:0.7rem;opacity:0.4;"></i></th>
                 <th class="text-center" style="min-width:110px;" data-sort="ret-targetNet">Target NET <i class="bi sort-icon" id="ret-sort-icon-targetNet"></i></th>
                 <th class="text-center" style="min-width:90px;"  data-sort="ret-netRrPct">NET RR % <i class="bi sort-icon" id="ret-sort-icon-netRrPct"></i></th>
                 <th class="text-center" style="min-width:130px;" data-sort="ret-miss100Rr">Missing to 100% RR <i class="bi sort-icon" id="ret-sort-icon-miss100Rr"></i></th>
@@ -789,7 +789,7 @@
       <div class="table-scroll" style="overflow-x:auto;">
         <table class="scoreboard-table" id="cro-ret-table">
           <thead><tr>
-            <th style="cursor:pointer;user-select:none;" onclick="croRetSort('name')">Office / Dept / Agent <i class="bi bi-arrow-down-up" style="font-size:0.65rem;opacity:0.5;"></i></th>
+            <th style="cursor:pointer;user-select:none;" onclick="croRetSort('name')">Office / Agent<i class="bi bi-arrow-down-up" style="font-size:0.65rem;opacity:0.5;"></i></th>
             <th class="text-center" style="min-width:90px;cursor:pointer;" onclick="croRetSort('daily_net_usd')">Daily Net</th>
             <th class="text-center" style="min-width:100px;cursor:pointer;" onclick="croRetSort('daily_target')">Daily Target</th>
             <th class="text-center" style="min-width:80px;cursor:pointer;" onclick="croRetSort('daily_pct')">Daily %</th>
@@ -1503,7 +1503,7 @@
       tbody.appendChild(totalTr);
     }
 
-    const _salesExcl = new Set(['General', 'Unassigned Sales Target']);
+    const _salesExcl = new Set(['General']);
     const _salesActOff = offices.filter(o => !_salesExcl.has(o.name) && o.agents.some(a => a.status === 'Active'));
     const _salesActAg  = _salesActOff.reduce((s,o) => s + o.agents.filter(a => a.status === 'Active').length, 0);
     document.getElementById('row-count').textContent = `${_salesActOff.length} offices · ${_salesActAg} agents`;
@@ -2542,7 +2542,7 @@
       gDFtd+=off.dailyFtd; gDFtdAmt+=off.dailyFtdAmt; gDTgt+=off.dailyTgt;
       gFtd+=off.ftdCount; gTgt+=off.tgt; gFtdAmt+=off.ftdAmt;
       gNet+=off.net; gFtc+=off.ftc; gFtdRr+=off.ftdRr; gFtcRr+=off.ftcRr;
-      const _croSalExcl = new Set(['General','Unassigned Sales Target']);
+      const _croSalExcl = new Set(['General']);
       if (!_croSalExcl.has(off.name)) offCount++;
       const oid = 'cro-sal-off-'+oi;
       const offTr = document.createElement('tr');
@@ -2570,7 +2570,7 @@
       frag.appendChild(offTr);
 
       [...off.agents].filter(r => r.daily_ftd>0||r.ftd_count>0||(r.net_deposits??0)!==0||r.ftc>0||r.target_ftc>0).sort(sortFn).forEach(r => {
-        if (r.status === 'Active' && !new Set(['General','Unassigned Sales Target']).has(off.name)) agentCount++;
+        if (r.status === 'Active' && !new Set(['General']).has(off.name)) agentCount++;
         const agTr = document.createElement('tr');
         agTr.className = 'agent-row';
         agTr.dataset.parentOffice = oid;

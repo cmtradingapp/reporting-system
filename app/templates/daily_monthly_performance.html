@@ -557,7 +557,7 @@
           <table class="scoreboard-table" id="retention-table">
             <thead>
               <tr>
-                <th data-sort="ret-name" style="cursor:pointer;user-select:none;">Office / Dept / Agent <i class="bi sort-icon bi-arrow-down-up" id="ret-sort-icon-name"></i></th>
+                <th data-sort="ret-name" style="cursor:pointer;user-select:none;">Office / Agent <i class="bi sort-icon bi-arrow-down-up" id="ret-sort-icon-name"></i></th>
                 <th class="text-center" style="min-width:90px;color:#c9d1d9;"  data-sort="ret-dailyNet">Daily Net <i class="bi sort-icon" id="ret-sort-icon-dailyNet"></i></th>
                 <th class="text-center" style="min-width:100px;" data-sort="ret-dailyTarget">Daily Target <i class="bi sort-icon" id="ret-sort-icon-dailyTarget"></i></th>
                 <th class="text-center" style="min-width:80px;"  data-sort="ret-dailyPct">Daily % <i class="bi sort-icon" id="ret-sort-icon-dailyPct"></i></th>
@@ -934,7 +934,7 @@
     });
 
     // Count active agents only
-    const _salExcl = new Set(['General', 'Unassigned Sales Target']);
+    const _salExcl = new Set(['General']);
     const activeFiltered = filtered.filter(r => r.status === 'Active' && !_salExcl.has(r.office_name));
     const activeOffices = new Set(activeFiltered.map(r => r.office_name));
     const activeAgentCount = activeFiltered.length;
