@@ -928,6 +928,115 @@ def _camp_table_calc(
             cur.execute(traders_sql, traders_params)
             traders_rows = cur.fetchall()
 
+            # ── RDP query (post-qualification deposits/withdrawals) ────────
+            rdp_params = {"date_from": date_from, "date_to_excl": date_to_exclusive}
+            rdp_filter_where, _, _ = _build_filter_clauses(
+                f_mkt_group, f_legacy_id, f_campaign_name, f_channel, f_sub_channel,
+                f_affiliate, f_classification, ftc_groups_list, date_to, rdp_params,
+                q_date_from=q_date_from, q_date_to_excl=q_date_to_excl,
+                f_country=f_country, f_office=f_office, f_agent=f_agent, f_team=f_team,
+                f_segmentation=f_segmentation
+            )
+            rdp_sel, rdp_grp = [], []
+            p = 1
+            if has_period: rdp_sel.append(f"{txn_period_sql} AS period"); rdp_grp.append(str(p)); p += 1
+            if has_g1: rdp_sel.append(f"{g1_sql} AS g1"); rdp_grp.append(str(p)); p += 1
+            if has_g2: rdp_sel.append(f"{g2_sql} AS g2"); rdp_grp.append(str(p)); p += 1
+            rdp_sel += [
+                "COUNT(DISTINCT a.accountid) AS rdp_count",
+                "COALESCE(SUM(CASE WHEN t.transaction_type_name IN ('Deposit','Withdrawal Cancelled') THEN t.usdamount ELSE 0 END)"
+                " - SUM(CASE WHEN t.transaction_type_name IN ('Withdrawal','Deposit Cancelled') THEN t.usdamount ELSE 0 END), 0) AS rdp_net",
+            ]
+            rdp_sql = (
+                f"SELECT {', '.join(rdp_sel)}"
+                " FROM transactions t"
+                " JOIN accounts a ON a.accountid = t.vtigeraccountid"
+                f"{campaign_join}"
+                " LEFT JOIN crm_users u ON u.id = t.original_deposit_owner"
+                f"{extra_joins}"
+                " WHERE t.transactionapproval = 'Approved'"
+                "   AND (t.deleted = 0 OR t.deleted IS NULL)"
+                "   AND t.transaction_type_name IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')"
+                "   AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'"
+                "   AND t.vtigeraccountid IS NOT NULL"
+                "   AND a.is_test_account = 0"
+                "   AND a.client_qualification_date IS NOT NULL"
+                "   AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'"
+                "   AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'"
+                "   AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'"
+                "   AND t.confirmation_time >= %(date_from)s"
+                "   AND t.confirmation_time < %(date_to_excl)s"
+                "   AND t.confirmation_time > a.client_qualification_date"
+                f"\n{rdp_filter_where}"
+            )
+            if rdp_grp:
+                rdp_sql += f" GROUP BY {', '.join(rdp_grp)}"
+            cur.execute(rdp_sql, rdp_params)
+            rdp_rows = cur.fetchall()
+
+            # ── Volume query (MT5 notional_value, open_time in period) ─────
+            if period == "day":
+                vol_period_pos = "p.open_time::date"
+                vol_period_cl  = "m.open_time::date"
+            elif period == "month":
+                vol_period_pos = "date_trunc('month', p.open_time)::date"
+                vol_period_cl  = "date_trunc('month', m.open_time)::date"
+            elif period == "year":
+                vol_period_pos = "date_trunc('year', p.open_time)::date"
+                vol_period_cl  = "date_trunc('year', m.open_time)::date"
+            else:
+                vol_period_pos = vol_period_cl = "NULL::date"
+
+            vol_params = {"date_from": date_from, "date_to_excl": date_to_exclusive}
+            vol_filter_where, _, _ = _build_filter_clauses(
+                f_mkt_group, f_legacy_id, f_campaign_name, f_channel, f_sub_channel,
+                f_affiliate, f_classification, ftc_groups_list, date_to, vol_params,
+                q_date_from=q_date_from, q_date_to_excl=q_date_to_excl,
+                f_country=f_country, f_office=f_office, f_agent=f_agent, f_team=f_team,
+                f_segmentation=f_segmentation
+            )
+
+            def _vol_inner(period_expr, notional_expr, from_clause):
+                sel, grp = [], []
+                p = 1
+                if has_period: sel.append(f"{period_expr} AS period"); grp.append(str(p)); p += 1
+                if has_g1: sel.append(f"{g1_sql} AS g1"); grp.append(str(p)); p += 1
+                if has_g2: sel.append(f"{g2_sql} AS g2"); grp.append(str(p)); p += 1
+                sel.append(f"COALESCE(SUM({notional_expr}), 0) AS vol")
+                grp_clause = f"GROUP BY {', '.join(grp)}" if grp else ""
+                return (f"SELECT {', '.join(sel)} FROM {from_clause}"
+                        f" WHERE open_time >= %(date_from)s AND open_time < %(date_to_excl)s"
+                        f"\n{vol_filter_where}\n{grp_clause}")
+
+            pos_from = (
+                f"dealio_positions p"
+                f" JOIN trading_accounts ta ON ta.login::bigint = p.login"
+                f" JOIN accounts a ON a.accountid = ta.vtigeraccountid"
+                f"{campaign_join}{extra_joins}"
+            )
+            cl_from = (
+                f"mv_mt5_resolved m"
+                f" JOIN trading_accounts ta ON ta.login::bigint = m.login"
+                f" JOIN accounts a ON a.accountid = ta.vtigeraccountid"
+                f"{campaign_join}{extra_joins}"
+            )
+            outer_vol_sel, outer_vol_grp = [], []
+            ov = 1
+            if has_period: outer_vol_sel.append("period"); outer_vol_grp.append(str(ov)); ov += 1
+            if has_g1:     outer_vol_sel.append("g1");     outer_vol_grp.append(str(ov)); ov += 1
+            if has_g2:     outer_vol_sel.append("g2");     outer_vol_grp.append(str(ov)); ov += 1
+            outer_vol_sel.append("SUM(vol) AS volume_usd")
+            outer_grp_clause = f"GROUP BY {', '.join(outer_vol_grp)}" if outer_vol_grp else ""
+            vol_sql = (
+                f"SELECT {', '.join(outer_vol_sel)} FROM ("
+                + _vol_inner(vol_period_pos, "p.notional_value", pos_from)
+                + " UNION ALL "
+                + _vol_inner(vol_period_cl,  "m.notional_value", cl_from)
+                + f") _vsub {outer_grp_clause}"
+            )
+            cur.execute(vol_sql, vol_params)
+            vol_rows = cur.fetchall()
+
         # ── Merge rows ────────────────────────────────────────────────────
         def _parse_acct(r):
             off = 0
@@ -959,9 +1068,24 @@ def _camp_table_calc(
             g2  = r[off] if has_g2 else None;          off += int(has_g2)
             return per, g1, g2, int(r[off] or 0)
 
+        def _parse_rdp(r):
+            off = 0
+            per = str(r[off]) if has_period else None; off += int(has_period)
+            g1  = r[off] if has_g1 else None;          off += int(has_g1)
+            g2  = r[off] if has_g2 else None;          off += int(has_g2)
+            return per, g1, g2, int(r[off] or 0), float(r[off + 1] or 0)
+
+        def _parse_vol(r):
+            off = 0
+            per = str(r[off]) if has_period else None; off += int(has_period)
+            g1  = r[off] if has_g1 else None;          off += int(has_g1)
+            g2  = r[off] if has_g2 else None;          off += int(has_g2)
+            return per, g1, g2, float(r[off] or 0)
+
         _empty = lambda per, g1, g2: {"period": per, "g1": g1, "g2": g2, "leads": 0, "live_accounts": 0,
                                       "live_avg_scp": None, "ftc": 0, "ftd": 0, "ftd_avg_scp": None,
-                                      "deposits": 0.0, "withdrawals": 0.0, "net_deposits": 0.0, "traders": 0}
+                                      "deposits": 0.0, "withdrawals": 0.0, "net_deposits": 0.0, "traders": 0,
+                                      "rdp_count": 0, "rdp_net": 0.0, "volume_usd": 0.0}
         merged: dict = {}
         for r in acct_rows:
             per, g1, g2, leads, live, live_avg_scp = _parse_acct(r)
@@ -994,6 +1118,21 @@ def _camp_table_calc(
             if k not in merged:
                 merged[k] = _empty(per, g1, g2)
             merged[k]["traders"] = traders
+
+        for r in rdp_rows:
+            per, g1, g2, rdp_count, rdp_net = _parse_rdp(r)
+            k = (per, g1, g2)
+            if k not in merged:
+                merged[k] = _empty(per, g1, g2)
+            merged[k]["rdp_count"] = rdp_count
+            merged[k]["rdp_net"]   = round(rdp_net, 2)
+
+        for r in vol_rows:
+            per, g1, g2, volume_usd = _parse_vol(r)
+            k = (per, g1, g2)
+            if k not in merged:
+                merged[k] = _empty(per, g1, g2)
+            merged[k]["volume_usd"] = round(volume_usd, 2)
 
         # Translate country ISO codes to full names
         if group1 == "country" or group2 == "country":
@@ -1043,6 +1182,9 @@ def _camp_table_calc(
             "withdrawals":   round(sum(r["withdrawals"] for r in rows), 2),
             "net_deposits":  round(sum(r["net_deposits"] for r in rows), 2),
             "traders":       sum(r["traders"] for r in rows),
+            "rdp_count":     sum(r["rdp_count"] for r in rows),
+            "rdp_net":       round(sum(r["rdp_net"] for r in rows), 2),
+            "volume_usd":    round(sum(r["volume_usd"] for r in rows), 2),
         })
 
         return {
@@ -1089,7 +1231,7 @@ async def campaign_performance_table_api(
         return JSONResponse(status_code=400, content={"detail": "Invalid period"})
 
     def _ck_part(v): return ','.join(sorted(v)) if v else ''
-    _ck = (f"camp_tbl_v14:{date_from}:{date_to}:{group1}:{group2}:{period}"
+    _ck = (f"camp_tbl_v15:{date_from}:{date_to}:{group1}:{group2}:{period}"
            f":{_ck_part(f_mkt_group)}:{_ck_part(f_legacy_id)}:{_ck_part(f_campaign_name)}:{_ck_part(f_channel)}"
            f":{_ck_part(f_sub_channel)}:{_ck_part(f_affiliate)}:{f_classification}:{ftc_groups}"
            f":{q_date_from}:{q_date_to}:{_ck_part(f_country)}:{_ck_part(f_office)}:{_ck_part(f_agent)}:{_ck_part(f_team)}"
