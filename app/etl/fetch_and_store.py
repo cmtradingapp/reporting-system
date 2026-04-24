@@ -2,7 +2,7 @@ import time
 import pandas as pd
 from datetime import datetime, timedelta, timezone
 from app.db.mysql_conn import get_operators, get_users, get_accounts, get_accounts_full, get_accounts_by_qual_date, get_accounts_by_created_date, get_crm_users, get_crm_users_full, get_transactions, get_transactions_full, get_transactions_by_confirmation_date, get_trading_accounts, get_trading_accounts_full, get_campaigns
-from app.db.mssql_conn import get_targets, get_vtiger_users, get_client_classification, get_bonus_transactions, get_bonus_transactions_full, get_mssql_dealio_mt5trades_full
+from app.db.mssql_conn import get_targets, get_vtiger_users, get_client_classification, get_bonus_transactions, get_bonus_transactions_full, get_mssql_dealio_mt5trades_full, get_mssql_test_account_ids
 from app.db.dealio_conn import get_dealio_users, get_dealio_users_full, get_dealio_trades_mt4, get_dealio_trades_mt4_full, get_dealio_trades_mt4_missing, get_dealio_trades_mt4_by_open_time, get_dealio_daily_profits, get_dealio_daily_profits_full, get_dealio_daily_profits_daterange, get_dealio_trades_mt5, get_dealio_trades_mt5_full, get_dealio_trades_mt5_missing, get_dealio_positions
 from app.db.postgres_conn import (
     ensure_table, delete_all_performance, insert_records,
@@ -23,6 +23,23 @@ from app.db.postgres_conn import get_connection as _pg_conn
 
 # Global lock: set to True while rebuild is running so the incremental scheduler skips
 _dealio_trades_mt4_rebuilding = False
+
+
+def _apply_mssql_test_flag(df: pd.DataFrame) -> pd.DataFrame:
+    """Override is_test_account=1 for any account that MSSQL marks as test,
+    even if MySQL has is_test=0. Fixes the Antelope sync gap where marking an
+    account as test in the CRM UI updates MSSQL but not MySQL.
+    """
+    if df.empty:
+        return df
+    mssql_test_ids = get_mssql_test_account_ids()
+    if mssql_test_ids:
+        mask = df["accountid"].isin(mssql_test_ids)
+        if mask.any():
+            print(f"[_apply_mssql_test_flag] overriding is_test_account=1 for {mask.sum()} accounts from MSSQL")
+            df = df.copy()
+            df.loc[mask, "is_test_account"] = 1
+    return df
 
 
 def run_etl() -> dict:
@@ -63,6 +80,7 @@ def run_accounts_etl(hours: int = 24) -> dict:
     rows = 0
     try:
         accounts_df = get_accounts(hours=hours)
+        accounts_df = _apply_mssql_test_flag(accounts_df)
         rows = len(accounts_df)
         upsert_accounts(accounts_df)
         cleanup_accounts()
@@ -94,6 +112,7 @@ def run_accounts_full_etl() -> dict:
     rows = 0
     try:
         for chunk in get_accounts_full():
+            chunk = _apply_mssql_test_flag(chunk)
             upsert_accounts(chunk)
             rows += len(chunk)
         cleanup_accounts()
@@ -115,6 +134,7 @@ def run_accounts_by_qual_date_etl(from_date: str) -> dict:
     rows = 0
     try:
         df = get_accounts_by_qual_date(from_date)
+        df = _apply_mssql_test_flag(df)
         rows = len(df)
         upsert_accounts(df)
     except Exception as e:
@@ -135,6 +155,7 @@ def run_accounts_by_created_date_etl(from_date: str) -> dict:
     rows = 0
     try:
         df = get_accounts_by_created_date(from_date)
+        df = _apply_mssql_test_flag(df)
         rows = len(df)
         upsert_accounts(df)
     except Exception as e:

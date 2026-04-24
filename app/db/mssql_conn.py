@@ -28,6 +28,26 @@ def _normalize_dealio_cols(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def get_mssql_test_account_ids() -> set:
+    """Return set of accountids marked as test in MSSQL report.ant_acc.
+    Used to override MySQL's is_test=0 when MSSQL correctly flags them as test.
+    Returns empty set on any error so the ETL continues unaffected.
+    """
+    try:
+        conn = _get_mssql_connection(timeout=30)
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT accountid FROM report.ant_acc WHERE is_test_account = 1"
+                )
+                return {row[0] for row in cur.fetchall()}
+        finally:
+            conn.close()
+    except Exception as e:
+        print(f"[get_mssql_test_account_ids] failed (non-fatal): {e}")
+        return set()
+
+
 def get_vtiger_users() -> pd.DataFrame:
     conn = _get_mssql_connection()
     try:
