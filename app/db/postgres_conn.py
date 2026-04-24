@@ -3007,17 +3007,22 @@ def refresh_single_mv(mv_name: str) -> None:
         try:
             try:
                 with conn.cursor() as cur:
+                    cur.execute("SET LOCAL statement_timeout = 0")
                     cur.execute(f"REFRESH MATERIALIZED VIEW CONCURRENTLY {mv_name}")
                 conn.commit()
             except Exception:
                 conn.rollback()
                 with conn.cursor() as cur:
+                    cur.execute("SET LOCAL statement_timeout = 0")
                     cur.execute(f"REFRESH MATERIALIZED VIEW {mv_name}")
                 conn.commit()
             _mv_refresh_status[mv_name]["last_refresh"] = datetime.now(timezone.utc).isoformat()
             _mv_refresh_status[mv_name]["last_error"] = None
         except Exception as e:
-            conn.rollback()
+            try:
+                conn.rollback()
+            except Exception:
+                pass
             _mv_refresh_status[mv_name]["last_error"] = str(e)
             print(f"[refresh_single_mv] {mv_name}: {e}")
         finally:
@@ -3052,15 +3057,25 @@ def refresh_materialized_views() -> None:
         return
     try:
         for mv in _MV_ORDER:
-            conn = get_connection()
+            # get_connection inside try so pool exhaustion is caught per-MV
+            try:
+                conn = get_connection()
+            except Exception as e:
+                err = str(e)
+                _mv_refresh_status[mv]["last_error"] = err
+                _pg_update_mv_refresh(mv, _mv_refresh_status[mv].get("last_refresh"), err)
+                print(f"[refresh_materialized_views] {mv} (get_connection): {e}")
+                continue
             try:
                 try:
                     with conn.cursor() as cur:
+                        cur.execute("SET LOCAL statement_timeout = 0")
                         cur.execute(f"REFRESH MATERIALIZED VIEW CONCURRENTLY {mv}")
                     conn.commit()
                 except Exception:
                     conn.rollback()
                     with conn.cursor() as cur:
+                        cur.execute("SET LOCAL statement_timeout = 0")
                         cur.execute(f"REFRESH MATERIALIZED VIEW {mv}")
                     conn.commit()
                 ts = datetime.now(timezone.utc).isoformat()
@@ -3068,7 +3083,10 @@ def refresh_materialized_views() -> None:
                 _mv_refresh_status[mv]["last_error"]   = None
                 _pg_update_mv_refresh(mv, ts, None)
             except Exception as e:
-                conn.rollback()
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
                 err = str(e)
                 _mv_refresh_status[mv]["last_error"] = err
                 _pg_update_mv_refresh(mv, _mv_refresh_status[mv].get("last_refresh"), err)
