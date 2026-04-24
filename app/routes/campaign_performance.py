@@ -974,18 +974,21 @@ def _camp_table_calc(
             cur.execute(rdp_sql, rdp_params)
             rdp_rows = cur.fetchall()
 
-            # ── Volume query (MT5 notional_value, open_time in period) ─────
+            # ── Volume query — matches FSA logic exactly ──────────────────
+            # Open volume:  dealio_positions (open_time) + mv_mt5_resolved (open_time)
+            # Close volume: dealio_trades_mt5 entry=1 (close_time)
+            # Total = open + close, identical to FSA section 6 Query 2+3
             if period == "day":
-                vol_period_pos = "p.open_time::date"
-                vol_period_cl  = "m.open_time::date"
+                vol_open_period = "open_time::date"
+                vol_cl_period   = "t.close_time::date"
             elif period == "month":
-                vol_period_pos = "date_trunc('month', p.open_time)::date"
-                vol_period_cl  = "date_trunc('month', m.open_time)::date"
+                vol_open_period = "date_trunc('month', open_time)::date"
+                vol_cl_period   = "date_trunc('month', t.close_time)::date"
             elif period == "year":
-                vol_period_pos = "date_trunc('year', p.open_time)::date"
-                vol_period_cl  = "date_trunc('year', m.open_time)::date"
+                vol_open_period = "date_trunc('year', open_time)::date"
+                vol_cl_period   = "date_trunc('year', t.close_time)::date"
             else:
-                vol_period_pos = vol_period_cl = "NULL::date"
+                vol_open_period = vol_cl_period = "NULL::date"
 
             vol_params = {"date_from": date_from, "date_to_excl": date_to_exclusive}
             vol_filter_where, _, _ = _build_filter_clauses(
@@ -996,7 +999,7 @@ def _camp_table_calc(
                 f_segmentation=f_segmentation
             )
 
-            def _vol_inner(period_expr, notional_expr, from_clause):
+            def _vol_inner(period_expr, notional_expr, from_clause, time_filter, extra_where=""):
                 sel, grp = [], []
                 p = 1
                 if has_period: sel.append(f"{period_expr} AS period"); grp.append(str(p)); p += 1
@@ -1005,21 +1008,24 @@ def _camp_table_calc(
                 sel.append(f"COALESCE(SUM({notional_expr}), 0) AS vol")
                 grp_clause = f"GROUP BY {', '.join(grp)}" if grp else ""
                 return (f"SELECT {', '.join(sel)} FROM {from_clause}"
-                        f" WHERE open_time >= %(date_from)s AND open_time < %(date_to_excl)s"
+                        f" WHERE {time_filter}"
+                        f" AND a.is_test_account = 0"
+                        f"{extra_where}"
                         f"\n{vol_filter_where}\n{grp_clause}")
 
-            pos_from = (
-                f"dealio_positions p"
-                f" JOIN trading_accounts ta ON ta.login::bigint = p.login"
-                f" JOIN accounts a ON a.accountid = ta.vtigeraccountid"
-                f"{campaign_join}{extra_joins}"
-            )
-            cl_from = (
-                f"mv_mt5_resolved m"
-                f" JOIN trading_accounts ta ON ta.login::bigint = m.login"
-                f" JOIN accounts a ON a.accountid = ta.vtigeraccountid"
-                f"{campaign_join}{extra_joins}"
-            )
+            ta_join = " JOIN trading_accounts ta ON ta.login::bigint = {alias}.login"
+            acct_join = " JOIN accounts a ON a.accountid = ta.vtigeraccountid"
+
+            pos_from = (f"dealio_positions p"
+                        + ta_join.format(alias="p") + acct_join
+                        + f"{campaign_join}{extra_joins}")
+            mv_from  = (f"mv_mt5_resolved m"
+                        + ta_join.format(alias="m") + acct_join
+                        + f"{campaign_join}{extra_joins}")
+            cl_from  = (f"dealio_trades_mt5 t"
+                        + ta_join.format(alias="t") + acct_join
+                        + f"{campaign_join}{extra_joins}")
+
             outer_vol_sel, outer_vol_grp = [], []
             ov = 1
             if has_period: outer_vol_sel.append("period"); outer_vol_grp.append(str(ov)); ov += 1
@@ -1027,11 +1033,19 @@ def _camp_table_calc(
             if has_g2:     outer_vol_sel.append("g2");     outer_vol_grp.append(str(ov)); ov += 1
             outer_vol_sel.append("SUM(vol) AS volume_usd")
             outer_grp_clause = f"GROUP BY {', '.join(outer_vol_grp)}" if outer_vol_grp else ""
+
+            open_time_filter = "p.open_time >= %(date_from)s AND p.open_time < %(date_to_excl)s"
+            mv_time_filter   = "m.open_time >= %(date_from)s AND m.open_time < %(date_to_excl)s"
+            cl_time_filter   = ("t.close_time >= %(date_from)s AND t.close_time < %(date_to_excl)s"
+                                " AND t.entry = 1 AND t.close_time > '1971-01-01'")
+
             vol_sql = (
                 f"SELECT {', '.join(outer_vol_sel)} FROM ("
-                + _vol_inner(vol_period_pos, "p.notional_value", pos_from)
+                + _vol_inner(vol_open_period, "p.notional_value", pos_from, open_time_filter)
                 + " UNION ALL "
-                + _vol_inner(vol_period_cl,  "m.notional_value", cl_from)
+                + _vol_inner(vol_open_period, "m.notional_value", mv_from,  mv_time_filter)
+                + " UNION ALL "
+                + _vol_inner(vol_cl_period,   "t.notional_value", cl_from,  cl_time_filter)
                 + f") _vsub {outer_grp_clause}"
             )
             cur.execute(vol_sql, vol_params)
@@ -1231,7 +1245,7 @@ async def campaign_performance_table_api(
         return JSONResponse(status_code=400, content={"detail": "Invalid period"})
 
     def _ck_part(v): return ','.join(sorted(v)) if v else ''
-    _ck = (f"camp_tbl_v15:{date_from}:{date_to}:{group1}:{group2}:{period}"
+    _ck = (f"camp_tbl_v16:{date_from}:{date_to}:{group1}:{group2}:{period}"
            f":{_ck_part(f_mkt_group)}:{_ck_part(f_legacy_id)}:{_ck_part(f_campaign_name)}:{_ck_part(f_channel)}"
            f":{_ck_part(f_sub_channel)}:{_ck_part(f_affiliate)}:{f_classification}:{ftc_groups}"
            f":{q_date_from}:{q_date_to}:{_ck_part(f_country)}:{_ck_part(f_office)}:{_ck_part(f_agent)}:{_ck_part(f_team)}"
