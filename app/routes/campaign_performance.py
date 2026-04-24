@@ -705,8 +705,14 @@ def _camp_table_calc(
     # Determine which extra JOINs are needed
     groups_needing_cu = {"office_name", "agent_name", "agent_team"}
     groups_needing_cc = set()
+    groups_needing_campaign = {"marketing_group", "campaign_legacy_id", "campaign_name", "campaign_channel", "campaign_sub_channel"}
     needs_cu_join_for_group = group1 in groups_needing_cu or group2 in groups_needing_cu
     needs_cc_join_for_group = group1 in groups_needing_cc or group2 in groups_needing_cc
+    needs_campaign_join = (
+        group1 in groups_needing_campaign or group2 in groups_needing_campaign or
+        bool(f_mkt_group or f_legacy_id or f_campaign_name or f_channel or f_sub_channel)
+    )
+    campaign_join = " LEFT JOIN campaigns c ON SPLIT_PART(a.campaign, '.', 1) = c.crmid" if needs_campaign_join else ""
 
     # Period SQL
     if period == "day":
@@ -778,13 +784,10 @@ def _camp_table_calc(
                 " AND a.createdtime < %(date_to_excl)s), 1) AS live_avg_scp",
                 # FTC handled in separate query (grouped by qualification date, not creation date)
             ]
-            acct_date_filter = (
-                " AND a.createdtime >= %(date_from)s AND a.createdtime < %(date_to_excl)s"
-                if has_period else ""
-            )
+            acct_date_filter = " AND a.createdtime >= %(date_from)s AND a.createdtime < %(date_to_excl)s"
             acct_sql = (
                 f"SELECT {', '.join(acct_sel)}"
-                " FROM accounts a LEFT JOIN campaigns c ON SPLIT_PART(a.campaign, '.', 1) = c.crmid"
+                f" FROM accounts a{campaign_join}"
                 f"{extra_joins}"
                 " WHERE a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)"
                 + _ACCT_FILTERS +
@@ -826,7 +829,7 @@ def _camp_table_calc(
                 f"SELECT {', '.join(txn_sel)}"
                 " FROM transactions t"
                 " JOIN accounts a ON a.accountid = t.vtigeraccountid"
-                " LEFT JOIN campaigns c ON SPLIT_PART(a.campaign, '.', 1) = c.crmid"
+                f"{campaign_join}"
                 " LEFT JOIN crm_users u ON u.id = t.original_deposit_owner"
                 f"{extra_joins}"
                 " WHERE t.transactionapproval = 'Approved'"
@@ -866,7 +869,7 @@ def _camp_table_calc(
             ftc_sel.append("COUNT(*) AS ftc")
             ftc_sql = (
                 f"SELECT {', '.join(ftc_sel)}"
-                " FROM accounts a LEFT JOIN campaigns c ON SPLIT_PART(a.campaign, '.', 1) = c.crmid"
+                f" FROM accounts a{campaign_join}"
                 f"{extra_joins}"
                 " WHERE a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)"
                 " AND a.client_qualification_date IS NOT NULL"
@@ -910,7 +913,7 @@ def _camp_table_calc(
                 " FROM mv_retention_traders rt"
                 " JOIN accounts a ON a.accountid = rt.accountid"
                 " LEFT JOIN crm_users u ON u.id = rt.assigned_to"
-                " LEFT JOIN campaigns c ON SPLIT_PART(a.campaign, '.', 1) = c.crmid"
+                f"{campaign_join}"
                 f"{extra_joins}"
                 " WHERE rt.accountid IS NOT NULL AND rt.accountid::text != ''"
                 "   AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'"
@@ -1086,7 +1089,7 @@ async def campaign_performance_table_api(
         return JSONResponse(status_code=400, content={"detail": "Invalid period"})
 
     def _ck_part(v): return ','.join(sorted(v)) if v else ''
-    _ck = (f"camp_tbl_v13:{date_from}:{date_to}:{group1}:{group2}:{period}"
+    _ck = (f"camp_tbl_v14:{date_from}:{date_to}:{group1}:{group2}:{period}"
            f":{_ck_part(f_mkt_group)}:{_ck_part(f_legacy_id)}:{_ck_part(f_campaign_name)}:{_ck_part(f_channel)}"
            f":{_ck_part(f_sub_channel)}:{_ck_part(f_affiliate)}:{f_classification}:{ftc_groups}"
            f":{q_date_from}:{q_date_to}:{_ck_part(f_country)}:{_ck_part(f_office)}:{_ck_part(f_agent)}:{_ck_part(f_team)}"
