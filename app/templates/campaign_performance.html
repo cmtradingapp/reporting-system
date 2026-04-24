@@ -1200,7 +1200,7 @@
           e.preventDefault();
           const val = item.dataset.val;
           if (val === '') {
-            values = new Set(opts);
+            values = (values.size === opts.length && opts.length > 0) ? new Set() : new Set(opts);
           } else {
             if (values.has(val)) values.delete(val); else values.add(val);
           }
@@ -1228,8 +1228,8 @@
 
     _sddRegistry[id] = {
       getValue: () => values.size === opts.length ? [] : [...values],
-      setOptions: (newOpts) => { opts = newOpts; values = new Set(newOpts); _updateBtn(); },
-      reset: () => { values = new Set(opts); _updateBtn(); },
+      setOptions: (newOpts) => { opts = newOpts; values = new Set(); _updateBtn(); },
+      reset: () => { values = new Set(); _updateBtn(); },
     };
   }
 
