@@ -41,7 +41,7 @@ VALID_GROUPS = {
     "agent_team":           "COALESCE(cu.team, '(Unassigned)')",
     "country":              "COALESCE(a.country_iso, '(Unassigned)')",
     "client_classification": "COALESCE(a.classification_int::text, '(Unassigned)')",
-    "segmentation":         "COALESCE(CASE a.segmentation WHEN '1' THEN '-A' WHEN '2' THEN 'B' WHEN '3' THEN 'C' WHEN '4' THEN '+A' END, '(Unassigned)')",
+    "segmentation":         "COALESCE(CASE a.segmentation WHEN '1' THEN 'A' WHEN '2' THEN 'B' WHEN '3' THEN 'C' WHEN '4' THEN 'A+' WHEN '17' THEN 'Unverified' END, '(Unassigned)')",
     "account_id":           "a.accountid::text",
 }
 GROUP_LABELS = {
@@ -667,7 +667,7 @@ def _build_filter_clauses(
         params["q_date_to_excl"] = q_date_to_excl
 
     if f_segmentation:
-        _seg_map = {'-A': '1', 'B': '2', 'C': '3', '+A': '4'}
+        _seg_map = {'A': '1', 'B': '2', 'C': '3', 'A+': '4', 'Unverified': '17'}
         db_val = _seg_map.get(f_segmentation)
         if db_val:
             clauses.append("AND a.segmentation = %(f_segmentation)s")

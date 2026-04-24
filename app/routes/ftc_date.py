@@ -128,7 +128,7 @@ _DIMS = {
     "sales_client_potential": {"val": "COALESCE(ROUND(a.sales_client_potential::numeric)::int::text, '(Unassigned)')", "sort": "ROUND(a.sales_client_potential::numeric)::int", "cu": False, "camp": False},
     "country_name":           {"val": "COALESCE(a.country_iso,            '(Unassigned)')",       "sort": "NULL::int",     "cu": False, "camp": False},
     "region":                 {"val": "COALESCE(a.country_iso,            '(Unassigned)')",       "sort": "NULL::int",     "cu": False, "camp": False},
-    "segmentation":           {"val": "COALESCE(CASE a.segmentation WHEN '1' THEN '-A' WHEN '2' THEN 'B' WHEN '3' THEN 'C' WHEN '4' THEN '+A' END, '(Unassigned)')", "sort": "COALESCE(a.segmentation::int, 99)", "cu": False, "camp": False},
+    "segmentation":           {"val": "COALESCE(CASE a.segmentation WHEN '1' THEN 'A' WHEN '2' THEN 'B' WHEN '3' THEN 'C' WHEN '4' THEN 'A+' WHEN '17' THEN 'Unverified' END, '(Unassigned)')", "sort": "COALESCE(a.segmentation::int, 99)", "cu": False, "camp": False},
     "retention_status":       {"val": "COALESCE(a.retention_status::text, '(Unassigned)')",       "sort": "COALESCE(a.retention_status::int, 999)", "cu": False, "camp": False},
     "sales_status":           {"val": "COALESCE(a.sales_status::text,     '(Unassigned)')",       "sort": "COALESCE(a.sales_status::int, 999)",     "cu": False, "camp": False},
 }
