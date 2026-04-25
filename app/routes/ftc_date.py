@@ -128,7 +128,21 @@ _DIMS = {
     "sales_client_potential": {"val": "COALESCE(ROUND(a.sales_client_potential::numeric)::int::text, '(Unassigned)')", "sort": "ROUND(a.sales_client_potential::numeric)::int", "cu": False, "camp": False},
     "country_name":           {"val": "COALESCE(a.country_iso,            '(Unassigned)')",       "sort": "NULL::int",     "cu": False, "camp": False},
     "region":                 {"val": "COALESCE(a.country_iso,            '(Unassigned)')",       "sort": "NULL::int",     "cu": False, "camp": False},
-    "segmentation":           {"val": "COALESCE(CASE a.segmentation WHEN '1' THEN 'A' WHEN '2' THEN 'B' WHEN '3' THEN 'C' WHEN '4' THEN 'A+' WHEN '17' THEN 'Unverified' END, '(Unassigned)')", "sort": "COALESCE(a.segmentation::int, 99)", "cu": False, "camp": False},
+    "segmentation":           {"val": ("CASE"
+                                       " WHEN a.segmentation IN ('1','2','3','4') THEN"
+                                       "   CASE a.segmentation WHEN '1' THEN 'A' WHEN '2' THEN 'B' WHEN '3' THEN 'C' WHEN '4' THEN 'A+' END"
+                                       " WHEN (a.segmentation IS NULL OR a.segmentation = '17')"
+                                       "   AND (a.classification_int IS NULL OR a.classification_int NOT BETWEEN 1 AND 10)"
+                                       "   AND a.birth_date IS NOT NULL THEN"
+                                       "   CASE"
+                                       "     WHEN DATE_PART('year', AGE(CURRENT_DATE, a.birth_date::date)) < 25 THEN 'C'"
+                                       "     WHEN DATE_PART('year', AGE(CURRENT_DATE, a.birth_date::date)) BETWEEN 25 AND 34 THEN 'B'"
+                                       "     WHEN DATE_PART('year', AGE(CURRENT_DATE, a.birth_date::date)) BETWEEN 35 AND 49 THEN 'A'"
+                                       "     WHEN DATE_PART('year', AGE(CURRENT_DATE, a.birth_date::date)) >= 50 THEN 'A+'"
+                                       "   END"
+                                       " WHEN a.segmentation = '17' THEN 'Unverified'"
+                                       " ELSE '(Unassigned)'"
+                                       " END"), "sort": "COALESCE(a.segmentation::int, 99)", "cu": False, "camp": False},
     "retention_status":       {"val": "COALESCE(a.retention_status::text, '(Unassigned)')",       "sort": "COALESCE(a.retention_status::int, 999)", "cu": False, "camp": False},
     "sales_status":           {"val": "COALESCE(a.sales_status::text,     '(Unassigned)')",       "sort": "COALESCE(a.sales_status::int, 999)",     "cu": False, "camp": False},
 }

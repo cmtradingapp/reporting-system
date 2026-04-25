@@ -41,7 +41,21 @@ VALID_GROUPS = {
     "agent_team":           "COALESCE(cu.team, '(Unassigned)')",
     "country":              "COALESCE(a.country_iso, '(Unassigned)')",
     "client_classification": "COALESCE(a.classification_int::text, '(Unassigned)')",
-    "segmentation":         "COALESCE(CASE a.segmentation WHEN '1' THEN 'A' WHEN '2' THEN 'B' WHEN '3' THEN 'C' WHEN '4' THEN 'A+' WHEN '17' THEN 'Unverified' END, '(Unassigned)')",
+    "segmentation":         ("CASE"
+                             " WHEN a.segmentation IN ('1','2','3','4') THEN"
+                             "   CASE a.segmentation WHEN '1' THEN 'A' WHEN '2' THEN 'B' WHEN '3' THEN 'C' WHEN '4' THEN 'A+' END"
+                             " WHEN (a.segmentation IS NULL OR a.segmentation = '17')"
+                             "   AND (a.classification_int IS NULL OR a.classification_int NOT BETWEEN 1 AND 10)"
+                             "   AND a.birth_date IS NOT NULL THEN"
+                             "   CASE"
+                             "     WHEN DATE_PART('year', AGE(CURRENT_DATE, a.birth_date::date)) < 25 THEN 'C'"
+                             "     WHEN DATE_PART('year', AGE(CURRENT_DATE, a.birth_date::date)) BETWEEN 25 AND 34 THEN 'B'"
+                             "     WHEN DATE_PART('year', AGE(CURRENT_DATE, a.birth_date::date)) BETWEEN 35 AND 49 THEN 'A'"
+                             "     WHEN DATE_PART('year', AGE(CURRENT_DATE, a.birth_date::date)) >= 50 THEN 'A+'"
+                             "   END"
+                             " WHEN a.segmentation = '17' THEN 'Unverified'"
+                             " ELSE '(Unassigned)'"
+                             " END"),
     "account_id":           "a.accountid::text",
 }
 GROUP_LABELS = {
@@ -555,7 +569,7 @@ async def campaign_performance_api(
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
     def _ck_part(v): return ','.join(sorted(v)) if v else ''
-    _ck = (f"camp_perf_v12:{date_from}:{date_to}:{f_classification}:{q_date_from}:{q_date_to}"
+    _ck = (f"camp_perf_v13:{date_from}:{date_to}:{f_classification}:{q_date_from}:{q_date_to}"
            f":{_ck_part(f_mkt_group)}:{_ck_part(f_legacy_id)}:{_ck_part(f_campaign_name)}"
            f":{_ck_part(f_channel)}:{_ck_part(f_sub_channel)}:{_ck_part(f_affiliate)}"
            f":{_ck_part(f_country)}:{_ck_part(f_office)}:{_ck_part(f_agent)}:{_ck_part(f_team)}"
@@ -667,11 +681,8 @@ def _build_filter_clauses(
         params["q_date_to_excl"] = q_date_to_excl
 
     if f_segmentation:
-        _seg_map = {'A': '1', 'B': '2', 'C': '3', 'A+': '4', 'Unverified': '17'}
-        db_val = _seg_map.get(f_segmentation)
-        if db_val:
-            clauses.append("AND a.segmentation = %(f_segmentation)s")
-            params["f_segmentation"] = db_val
+        clauses.append("AND " + VALID_GROUPS["segmentation"] + " = %(f_segmentation)s")
+        params["f_segmentation"] = f_segmentation
 
     return "\n".join(clauses), needs_cc_join, needs_cu_join
 
@@ -1245,7 +1256,7 @@ async def campaign_performance_table_api(
         return JSONResponse(status_code=400, content={"detail": "Invalid period"})
 
     def _ck_part(v): return ','.join(sorted(v)) if v else ''
-    _ck = (f"camp_tbl_v16:{date_from}:{date_to}:{group1}:{group2}:{period}"
+    _ck = (f"camp_tbl_v17:{date_from}:{date_to}:{group1}:{group2}:{period}"
            f":{_ck_part(f_mkt_group)}:{_ck_part(f_legacy_id)}:{_ck_part(f_campaign_name)}:{_ck_part(f_channel)}"
            f":{_ck_part(f_sub_channel)}:{_ck_part(f_affiliate)}:{f_classification}:{ftc_groups}"
            f":{q_date_from}:{q_date_to}:{_ck_part(f_country)}:{_ck_part(f_office)}:{_ck_part(f_agent)}:{_ck_part(f_team)}"
