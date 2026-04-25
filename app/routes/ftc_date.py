@@ -131,7 +131,7 @@ _DIMS = {
     "segmentation":           {"val": ("CASE"
                                        " WHEN a.segmentation IN ('1','2','3','4') THEN"
                                        "   CASE a.segmentation WHEN '1' THEN 'A' WHEN '2' THEN 'B' WHEN '3' THEN 'C' WHEN '4' THEN 'A+' END"
-                                       " WHEN (a.segmentation IS NULL OR a.segmentation = '17')"
+                                       " WHEN (a.segmentation IS NULL OR a.segmentation IN ('0','17'))"
                                        "   AND (a.classification_int IS NULL OR a.classification_int NOT BETWEEN 1 AND 10)"
                                        "   AND a.birth_date IS NOT NULL THEN"
                                        "   CASE"
