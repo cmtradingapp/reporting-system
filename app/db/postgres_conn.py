@@ -33,12 +33,16 @@ def _get_pool() -> ThreadedConnectionPool:
 
 
 class _PooledConnection:
-    """Thin proxy around a psycopg2 connection that returns it to the pool on close()."""
-    __slots__ = ("_conn", "_pool")
+    """Thin proxy around a psycopg2 connection that returns it to the pool on close().
+    Stores the thread key used during getconn() so putconn() always matches,
+    even if close() is called from a different thread."""
+    __slots__ = ("_conn", "_pool", "_key", "_closed")
 
-    def __init__(self, conn, pool):
+    def __init__(self, conn, pool, key):
         object.__setattr__(self, "_conn", conn)
         object.__setattr__(self, "_pool", pool)
+        object.__setattr__(self, "_key", key)
+        object.__setattr__(self, "_closed", False)
 
     # Proxy all attribute access to the real connection
     def __getattr__(self, name):
@@ -48,14 +52,33 @@ class _PooledConnection:
         setattr(object.__getattribute__(self, "_conn"), name, value)
 
     def close(self):
+        if object.__getattribute__(self, "_closed"):
+            return
+        object.__setattr__(self, "_closed", True)
         conn = object.__getattribute__(self, "_conn")
         pool = object.__getattribute__(self, "_pool")
+        key = object.__getattribute__(self, "_key")
         try:
             if not conn.closed and conn.status != psycopg2.extensions.STATUS_READY:
                 conn.rollback()
         except Exception:
             pass
-        pool.putconn(conn)
+        try:
+            pool.putconn(conn, key=key)
+        except Exception:
+            # If putconn fails (e.g. pool closed), actually close the connection
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+    def __del__(self):
+        """Safety net: return connection to pool if close() was never called."""
+        try:
+            if not object.__getattribute__(self, "_closed"):
+                self.close()
+        except Exception:
+            pass
 
     def cursor(self, *args, **kwargs):
         return object.__getattribute__(self, "_conn").cursor(*args, **kwargs)
@@ -74,10 +97,12 @@ def get_connection() -> "_PooledConnection":
     import time
     from psycopg2.pool import PoolError
     pool = _get_pool()
+    import uuid
+    key = uuid.uuid4().hex
     for attempt in range(4):
         try:
-            conn = pool.getconn()
-            return _PooledConnection(conn, pool)
+            conn = pool.getconn(key=key)
+            return _PooledConnection(conn, pool, key)
         except PoolError:
             if attempt == 3:
                 raise
