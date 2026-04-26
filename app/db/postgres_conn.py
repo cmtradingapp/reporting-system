@@ -2997,33 +2997,29 @@ def _pg_read_mv_refresh() -> dict:
 
 
 def refresh_single_mv(mv_name: str) -> None:
-    """Refresh a single MV by name. Uses advisory lock to avoid conflicts with full refresh."""
+    """Refresh a single MV by name. Uses advisory lock to avoid conflicts with full refresh.
+    Reuses a single connection for both the lock and the refresh to avoid pool pressure."""
     from datetime import datetime, timezone
     if mv_name not in _MV_ORDER:
         return
-    lock_conn = get_connection()
+    conn = get_connection()
     try:
-        with lock_conn.cursor() as cur:
+        with conn.cursor() as cur:
             cur.execute("SELECT pg_try_advisory_lock(123456789)")
             got_lock = cur.fetchone()[0]
+        conn.commit()  # release implicit transaction immediately
         if not got_lock:
-            lock_conn.close()
             return
-    except Exception:
-        lock_conn.close()
-        return
-    try:
-        conn = get_connection()
         try:
             try:
                 with conn.cursor() as cur:
-                    cur.execute("SET LOCAL statement_timeout = 0")
+                    cur.execute("SET statement_timeout = 0")
                     cur.execute(f"REFRESH MATERIALIZED VIEW CONCURRENTLY {mv_name}")
                 conn.commit()
             except Exception:
                 conn.rollback()
                 with conn.cursor() as cur:
-                    cur.execute("SET LOCAL statement_timeout = 0")
+                    cur.execute("SET statement_timeout = 0")
                     cur.execute(f"REFRESH MATERIALIZED VIEW {mv_name}")
                 conn.commit()
             _mv_refresh_status[mv_name]["last_refresh"] = datetime.now(timezone.utc).isoformat()
@@ -3036,82 +3032,85 @@ def refresh_single_mv(mv_name: str) -> None:
             _mv_refresh_status[mv_name]["last_error"] = str(e)
             print(f"[refresh_single_mv] {mv_name}: {e}")
         finally:
-            conn.close()
+            # Release advisory lock before returning connection
+            try:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT pg_advisory_unlock(123456789)")
+                conn.commit()
+            except Exception:
+                pass
     finally:
+        # Reset statement_timeout to default before returning to pool
         try:
-            with lock_conn.cursor() as cur:
-                cur.execute("SELECT pg_advisory_unlock(123456789)")
-            lock_conn.commit()
+            conn.rollback()
+            with conn.cursor() as cur:
+                cur.execute("RESET statement_timeout")
+            conn.commit()
         except Exception:
             pass
-        lock_conn.close()
+        conn.close()
 
 
 def refresh_materialized_views() -> None:
     """Refresh all MVs. Uses an advisory lock so only one process refreshes at a time.
     Tries CONCURRENTLY first (non-blocking); falls back to plain refresh if no unique index.
     Order matters: mv_daily_kpis before mv_run_rate.
+    Uses a single connection for both lock and all MV refreshes to minimize pool pressure.
     """
     from datetime import datetime, timezone
-    # Grab advisory lock — skip entirely if another process is already refreshing
-    lock_conn = get_connection()
+    conn = get_connection()
     try:
-        with lock_conn.cursor() as cur:
+        with conn.cursor() as cur:
             cur.execute("SELECT pg_try_advisory_lock(123456789)")
             got_lock = cur.fetchone()[0]
+        conn.commit()  # release implicit transaction immediately
         if not got_lock:
-            lock_conn.close()
             return
-    except Exception:
-        lock_conn.close()
-        return
-    try:
-        for mv in _MV_ORDER:
-            # get_connection inside try so pool exhaustion is caught per-MV
-            try:
-                conn = get_connection()
-            except Exception as e:
-                err = str(e)
-                _mv_refresh_status[mv]["last_error"] = err
-                _pg_update_mv_refresh(mv, _mv_refresh_status[mv].get("last_refresh"), err)
-                print(f"[refresh_materialized_views] {mv} (get_connection): {e}")
-                continue
-            try:
-                try:
-                    with conn.cursor() as cur:
-                        cur.execute("SET LOCAL statement_timeout = 0")
-                        cur.execute(f"REFRESH MATERIALIZED VIEW CONCURRENTLY {mv}")
-                    conn.commit()
-                except Exception:
-                    conn.rollback()
-                    with conn.cursor() as cur:
-                        cur.execute("SET LOCAL statement_timeout = 0")
-                        cur.execute(f"REFRESH MATERIALIZED VIEW {mv}")
-                    conn.commit()
-                ts = datetime.now(timezone.utc).isoformat()
-                _mv_refresh_status[mv]["last_refresh"] = ts
-                _mv_refresh_status[mv]["last_error"]   = None
-                _pg_update_mv_refresh(mv, ts, None)
-            except Exception as e:
-                try:
-                    conn.rollback()
-                except Exception:
-                    pass
-                err = str(e)
-                _mv_refresh_status[mv]["last_error"] = err
-                _pg_update_mv_refresh(mv, _mv_refresh_status[mv].get("last_refresh"), err)
-                print(f"[refresh_materialized_views] {mv}: {e}")
-            finally:
-                conn.close()
-    finally:
-        # Release advisory lock
         try:
-            with lock_conn.cursor() as cur:
-                cur.execute("SELECT pg_advisory_unlock(123456789)")
-            lock_conn.commit()
+            for mv in _MV_ORDER:
+                try:
+                    try:
+                        with conn.cursor() as cur:
+                            cur.execute("SET statement_timeout = 0")
+                            cur.execute(f"REFRESH MATERIALIZED VIEW CONCURRENTLY {mv}")
+                        conn.commit()
+                    except Exception:
+                        conn.rollback()
+                        with conn.cursor() as cur:
+                            cur.execute("SET statement_timeout = 0")
+                            cur.execute(f"REFRESH MATERIALIZED VIEW {mv}")
+                        conn.commit()
+                    ts = datetime.now(timezone.utc).isoformat()
+                    _mv_refresh_status[mv]["last_refresh"] = ts
+                    _mv_refresh_status[mv]["last_error"]   = None
+                    _pg_update_mv_refresh(mv, ts, None)
+                except Exception as e:
+                    try:
+                        conn.rollback()
+                    except Exception:
+                        pass
+                    err = str(e)
+                    _mv_refresh_status[mv]["last_error"] = err
+                    _pg_update_mv_refresh(mv, _mv_refresh_status[mv].get("last_refresh"), err)
+                    print(f"[refresh_materialized_views] {mv}: {e}")
+        finally:
+            # Release advisory lock
+            try:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT pg_advisory_unlock(123456789)")
+                conn.commit()
+            except Exception:
+                pass
+    finally:
+        # Reset statement_timeout to default before returning to pool
+        try:
+            conn.rollback()
+            with conn.cursor() as cur:
+                cur.execute("RESET statement_timeout")
+            conn.commit()
         except Exception:
             pass
-        lock_conn.close()
+        conn.close()
 
 
 def get_mv_status() -> list:

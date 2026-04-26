@@ -89,7 +89,7 @@ def warm_cache():
 
     # KPI cards — no filters, current month
     # Key must match camp_performance.py route: camp_perf_v11:{from}:{to}:{class}:{qfrom}:{qto}:{mkt}:{leg}:{name}:{ch}:{sub}:{aff}:{country}:{office}:{agent}:{team}:{seg}
-    _ck = f"camp_perf_v11:{month_start}:{today_iso}:None:None:None:::::::::::None"
+    _ck = f"camp_perf_v14:{month_start}:{today_iso}:None:None:None:::::::::::None"
     try:
         cache.set(_ck, _camp_kpi_calc(month_start, today_iso))
     except Exception as e:
@@ -97,7 +97,7 @@ def warm_cache():
 
     # Table — no groups, period=day, no filters (most common default view)
     # Key must match camp_performance.py route: camp_tbl_v12:{from}:{to}:{g1}:{g2}:{period}:{mkt}:{leg}:{name}:{ch}:{sub}:{aff}:{class}:{ftc}:{qfrom}:{qto}:{country}:{office}:{agent}:{team}:{seg}
-    _ck = f"camp_tbl_v12:{month_start}:{today_iso}:none:none:day:::::::None:None:None:None::::None"
+    _ck = f"camp_tbl_v18:{month_start}:{today_iso}:none:none:day:::::::None:None:None:None::::None"
     try:
         cache.set(_ck, _camp_table_calc(month_start, today_iso, period="day"))
     except Exception as e:
