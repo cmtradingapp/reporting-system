@@ -20,6 +20,6 @@ if [ -z "$CONTAINER" ]; then
 else
   echo "[deploy] Container: $CONTAINER"
   echo "[deploy] Sending graceful reload signal (SIGHUP)..."
-  docker exec "$CONTAINER" kill -HUP 1
+  docker exec "$CONTAINER" sh -c 'kill -HUP 1'
   echo "[deploy] Done. Workers reloading with new code — no downtime."
 fi
