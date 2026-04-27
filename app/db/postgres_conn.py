@@ -2494,6 +2494,12 @@ def ensure_dealio_positions_table():
 
 
 def truncate_and_insert_dealio_positions(df: pd.DataFrame) -> int:
+    """Sync open positions using UPSERT + delete-stale instead of TRUNCATE+INSERT.
+    TRUNCATE requires ACCESS EXCLUSIVE which conflicts with concurrent MV refresh
+    reads (share lock), causing lock timeouts and intermittent 0-row syncs that
+    make the Total Traders count drop unexpectedly.
+    UPSERT only needs ROW EXCLUSIVE — never blocks concurrent reads.
+    """
     cols = [
         "id", "login", "cmd", "volume", "symbol", "core_symbol", "book",
         "open_price", "close_price", "profit", "computed_profit",
@@ -2504,17 +2510,26 @@ def truncate_and_insert_dealio_positions(df: pd.DataFrame) -> int:
         "currency_base", "currency_profit", "exposure_base", "exposure_profit",
     ]
     rows = [tuple(_clean(row.get(c)) for c in cols) for _, row in df.iterrows()]
-    col_list = ", ".join(cols)
+    col_list   = ", ".join(cols)
+    update_set = ", ".join(f"{c} = EXCLUDED.{c}" for c in cols if c != "id")
+    current_ids = [r[0] for r in rows] if rows else []
+
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute("TRUNCATE TABLE dealio_positions")
+            # 1. Upsert all current open positions (no exclusive lock needed)
             if rows:
                 execute_values(
                     cur,
-                    f"INSERT INTO dealio_positions ({col_list}) VALUES %s",
+                    f"""INSERT INTO dealio_positions ({col_list}) VALUES %s
+                        ON CONFLICT (id) DO UPDATE SET {update_set}""",
                     rows,
                 )
+            # 2. Delete positions no longer open (closed since last sync)
+            cur.execute(
+                "DELETE FROM dealio_positions WHERE id != ALL(%s)",
+                (current_ids,)
+            )
         conn.commit()
         return len(rows)
     except Exception:
