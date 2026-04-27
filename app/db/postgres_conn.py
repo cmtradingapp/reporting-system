@@ -2933,10 +2933,12 @@ _MV_SETUP_SQL = [
     "CREATE INDEX IF NOT EXISTS idx_mv_ret_traders_assigned   ON mv_retention_traders (assigned_to, day)",
     # mv_mt5_resolved — pre-computed self-join of dealio_trades_mt5 (entry=1 → entry=0)
     # Eliminates the 17M×17M self-join in ftc_date.py and fsa_report.py
+    # Includes ex.position_id + ex.source_id for the unique index needed by REFRESH CONCURRENTLY
     """CREATE MATERIALIZED VIEW IF NOT EXISTS mv_mt5_resolved AS
     SELECT ex.login,
            en.open_time,
-           ex.notional_value
+           ex.notional_value,
+           ROW_NUMBER() OVER () AS row_id
     FROM dealio_trades_mt5 ex
     JOIN dealio_trades_mt5 en
         ON en.position_id = ex.position_id
@@ -2947,6 +2949,8 @@ _MV_SETUP_SQL = [
     """,
     "CREATE INDEX IF NOT EXISTS idx_mv_mt5r_open_time ON mv_mt5_resolved (open_time)",
     "CREATE INDEX IF NOT EXISTS idx_mv_mt5r_login ON mv_mt5_resolved (login)",
+    # Unique index on row_id enables REFRESH CONCURRENTLY (non-blocking reads during refresh)
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_mt5r_unique ON mv_mt5_resolved (row_id)",
 ]
 
 
@@ -3054,12 +3058,14 @@ def refresh_single_mv(mv_name: str) -> None:
             try:
                 with conn.cursor() as cur:
                     cur.execute("SET statement_timeout = 0")
+                    cur.execute("SET lock_timeout = 0")
                     cur.execute(f"REFRESH MATERIALIZED VIEW CONCURRENTLY {mv_name}")
                 conn.commit()
             except Exception:
                 conn.rollback()
                 with conn.cursor() as cur:
                     cur.execute("SET statement_timeout = 0")
+                    cur.execute("SET lock_timeout = 0")
                     cur.execute(f"REFRESH MATERIALIZED VIEW {mv_name}")
                 conn.commit()
             _mv_refresh_status[mv_name]["last_refresh"] = datetime.now(timezone.utc).isoformat()
@@ -3084,7 +3090,7 @@ def refresh_single_mv(mv_name: str) -> None:
         try:
             conn.rollback()
             with conn.cursor() as cur:
-                cur.execute("RESET statement_timeout")
+                cur.execute("RESET statement_timeout"); cur.execute("RESET lock_timeout")
             conn.commit()
         except Exception:
             pass
@@ -3112,12 +3118,14 @@ def refresh_materialized_views() -> None:
                     try:
                         with conn.cursor() as cur:
                             cur.execute("SET statement_timeout = 0")
+                            cur.execute("SET lock_timeout = 0")
                             cur.execute(f"REFRESH MATERIALIZED VIEW CONCURRENTLY {mv}")
                         conn.commit()
                     except Exception:
                         conn.rollback()
                         with conn.cursor() as cur:
                             cur.execute("SET statement_timeout = 0")
+                            cur.execute("SET lock_timeout = 0")
                             cur.execute(f"REFRESH MATERIALIZED VIEW {mv}")
                         conn.commit()
                     ts = datetime.now(timezone.utc).isoformat()
@@ -3146,7 +3154,7 @@ def refresh_materialized_views() -> None:
         try:
             conn.rollback()
             with conn.cursor() as cur:
-                cur.execute("RESET statement_timeout")
+                cur.execute("RESET statement_timeout"); cur.execute("RESET lock_timeout")
             conn.commit()
         except Exception:
             pass
