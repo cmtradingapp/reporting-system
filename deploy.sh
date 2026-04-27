@@ -9,7 +9,7 @@ set -e
 cd "$(dirname "$0")"
 
 echo "[deploy] Pulling latest code..."
-git pull
+git pull origin main
 
 # Find the running container
 CONTAINER=$(docker ps --filter "name=reporting-system" --format "{{.Names}}" | head -1)
