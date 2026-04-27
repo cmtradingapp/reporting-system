@@ -725,3 +725,137 @@ async def dmp_retention_api(request: Request, date_from: str, date_to: str):
         return JSONResponse(status_code=500, content={"detail": str(e)})
     finally:
         conn.close()
+
+
+# ── Marketing table ────────────────────────────────────────────────────────────
+_MKT_G1_EXPRS = {
+    "marketing_group":     "COALESCE(c.marketing_group,     '(Unassigned)')",
+    "campaign_channel":    "COALESCE(c.campaign_channel,    '(Unassigned)')",
+    "campaign_sub_channel":"COALESCE(c.campaign_sub_channel,'(Unassigned)')",
+    "original_affiliate":  "COALESCE(a.original_affiliate,  '(Unassigned)')",
+}
+_MKT_G2_EXPRS = {
+    "campaign_code_legacy":"COALESCE(a.campaign_code_legacy,'(Unassigned)')",
+    "campaign_name":       "COALESCE(c.campaign_name,       '(Unassigned)')",
+    "none":                "''",
+}
+
+
+@router.get("/api/daily-monthly/marketing")
+async def dmp_marketing_api(
+    request: Request,
+    date_from: str,
+    date_to: str,
+    group1: str = "marketing_group",
+    group2: str = "campaign_code_legacy",
+):
+    user = await get_current_user(request)
+    if isinstance(user, RedirectResponse):
+        return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+
+    g1_expr = _MKT_G1_EXPRS.get(group1, _MKT_G1_EXPRS["marketing_group"])
+    g2_expr = _MKT_G2_EXPRS.get(group2, _MKT_G2_EXPRS["campaign_code_legacy"])
+
+    _ck = f"dmp_mkt_v1:{date_from}:{date_to}:{group1}:{group2}"
+    _hit = cache.get(_ck)
+    if _hit is not None:
+        return JSONResponse(content=_hit)
+
+    try:
+        dt_to         = datetime.strptime(date_to, "%Y-%m-%d").date()
+        daily_from    = dt_to.strftime("%Y-%m-%d")
+        daily_to_excl = (dt_to + timedelta(days=1)).strftime("%Y-%m-%d")
+    except ValueError:
+        return JSONResponse(status_code=400, content={"detail": "Invalid date format"})
+
+    sql = f"""
+        WITH leads_cte AS (
+            SELECT {g1_expr} AS g1, {g2_expr} AS g2,
+                COUNT(*)                                                            AS daily_leads,
+                COUNT(*) FILTER (WHERE a.birth_date IS NOT NULL)                    AS daily_live,
+                ROUND(AVG(CASE WHEN a.birth_date IS NOT NULL
+                               THEN a.classification_int::float END)::numeric, 1)  AS live_avg_scp
+            FROM accounts a
+            LEFT JOIN campaigns c ON c.id::text = a.campaign::text
+            WHERE a.is_test_account = 0
+              AND (a.is_demo = 0 OR a.is_demo IS NULL)
+              AND a.createdtime >= %(df)s AND a.createdtime < %(dt)s
+              AND a.createdtime >= '2024-01-01'
+              AND (a.assigned_to IS NULL OR a.assigned_to NOT IN (
+                  SELECT id FROM crm_users
+                  WHERE TRIM(COALESCE(agent_name,full_name,'')) ILIKE 'test%%'
+                     OR TRIM(COALESCE(agent_name,full_name,'')) ILIKE 'duplicated%%'))
+            GROUP BY 1, 2
+        ),
+        ftd_cte AS (
+            SELECT {g1_expr} AS g1, {g2_expr} AS g2,
+                COUNT(DISTINCT t.vtigeraccountid)                                   AS daily_ftd,
+                COALESCE(SUM(t.usdamount), 0)                                      AS daily_ftd_amount,
+                ROUND(AVG(a.classification_int::float)::numeric, 1)                AS ftd_avg_scp
+            FROM transactions t
+            JOIN accounts a ON a.accountid = t.vtigeraccountid
+            LEFT JOIN campaigns c ON c.id::text = a.campaign::text
+            WHERE t.transactionapproval = 'Approved'
+              AND (t.deleted = 0 OR t.deleted IS NULL)
+              AND t.transaction_type_name = 'Deposit' AND t.ftd = 1
+              AND t.confirmation_time >= %(df)s AND t.confirmation_time < %(dt)s
+              AND a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)
+            GROUP BY 1, 2
+        ),
+        ftc_cte AS (
+            SELECT {g1_expr} AS g1, {g2_expr} AS g2,
+                COUNT(*) AS daily_ftc
+            FROM accounts a
+            LEFT JOIN campaigns c ON c.id::text = a.campaign::text
+            WHERE a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)
+              AND a.client_qualification_date >= %(df)s
+              AND a.client_qualification_date <  %(dt)s
+            GROUP BY 1, 2
+        ),
+        all_groups AS (
+            SELECT g1, g2 FROM leads_cte UNION
+            SELECT g1, g2 FROM ftd_cte   UNION
+            SELECT g1, g2 FROM ftc_cte
+        )
+        SELECT ag.g1, ag.g2,
+            COALESCE(l.daily_leads,      0) AS daily_leads,
+            COALESCE(l.daily_live,       0) AS daily_live,
+            l.live_avg_scp,
+            COALESCE(f.daily_ftd,        0) AS daily_ftd,
+            COALESCE(f.daily_ftd_amount, 0) AS daily_ftd_amount,
+            f.ftd_avg_scp,
+            COALESCE(fc.daily_ftc,       0) AS daily_ftc
+        FROM all_groups ag
+        LEFT JOIN leads_cte l  ON l.g1  = ag.g1 AND l.g2  = ag.g2
+        LEFT JOIN ftd_cte   f  ON f.g1  = ag.g1 AND f.g2  = ag.g2
+        LEFT JOIN ftc_cte   fc ON fc.g1 = ag.g1 AND fc.g2 = ag.g2
+        ORDER BY COALESCE(l.daily_live, 0) DESC NULLS LAST, ag.g1, ag.g2
+    """
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql, {"df": daily_from, "dt": daily_to_excl})
+            rows = []
+            for r in cur.fetchall():
+                dl = int(r[2] or 0); dv = int(r[3] or 0); df2 = int(r[5] or 0)
+                rows.append({
+                    "g1":               r[0] or "(Unassigned)",
+                    "g2":               r[1] or "(Unassigned)",
+                    "daily_leads":      dl,
+                    "daily_live":       dv,
+                    "live_avg_scp":     round(float(r[4]), 1) if r[4] is not None else None,
+                    "daily_ftd":        df2,
+                    "daily_ftd_amount": round(float(r[6] or 0), 2),
+                    "ftd_avg_scp":      round(float(r[7]), 1) if r[7] is not None else None,
+                    "daily_ftc":        int(r[8] or 0),
+                    "cr_lead_live":     round(dv / dl * 100, 1) if dl > 0 else None,
+                    "cr_live_ftd":      round(df2 / dv * 100, 1) if dv > 0 else None,
+                })
+        _result = {"rows": rows, "date": daily_from, "group1": group1, "group2": group2}
+        cache.set(_ck, _result, ttl=120)
+        return JSONResponse(content=_result)
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+    finally:
+        conn.close()

@@ -591,6 +591,59 @@
     </div>
   {% endif %}
 
+  <!-- ── Marketing Table ───────────────────────────────────────────────── -->
+  <div class="table-section mt-4">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+      <div class="d-flex align-items-center gap-3 flex-wrap">
+        <div class="section-title" style="border-left-color:#d29922;">Marketing</div>
+        <span class="small" style="color:#8b949e;" id="mkt-date-label"></span>
+      </div>
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <!-- View By -->
+        <div class="d-flex align-items-center gap-1">
+          <span class="small" style="color:#8b949e;white-space:nowrap;">View By</span>
+          <select id="mkt-group1" class="form-select form-select-sm" style="background:#161b22;color:#c9d1d9;border:1px solid #30363d;font-size:0.78rem;padding:3px 8px;min-width:160px;">
+            <option value="marketing_group" selected>Marketing Group</option>
+            <option value="campaign_channel">Campaign Channel</option>
+            <option value="campaign_sub_channel">Campaign Sub Channel</option>
+            <option value="original_affiliate">Original Affiliate</option>
+          </select>
+        </div>
+        <!-- Sub Group -->
+        <div class="d-flex align-items-center gap-1">
+          <span class="small" style="color:#8b949e;white-space:nowrap;">Sub Group</span>
+          <select id="mkt-group2" class="form-select form-select-sm" style="background:#161b22;color:#c9d1d9;border:1px solid #30363d;font-size:0.78rem;padding:3px 8px;min-width:170px;">
+            <option value="campaign_code_legacy" selected>Campaign Legacy ID</option>
+            <option value="campaign_name">Campaign Name</option>
+            <option value="none">None</option>
+          </select>
+        </div>
+        <button onclick="mktExpandAll()" class="btn btn-sm tbl-action-btn" style="background:#21262d;border:1px solid #30363d;color:#8b949e;border-radius:6px;font-size:0.8rem;padding:4px 10px;"><i class="bi bi-arrows-expand"></i><span class="d-none d-md-inline ms-1">Expand All</span></button>
+        <button onclick="mktCollapseAll()" class="btn btn-sm tbl-action-btn" style="background:#21262d;border:1px solid #30363d;color:#8b949e;border-radius:6px;font-size:0.8rem;padding:4px 10px;"><i class="bi bi-arrows-collapse"></i><span class="d-none d-md-inline ms-1">Collapse All</span></button>
+      </div>
+    </div>
+    <div id="mkt-loading" style="display:none;text-align:center;padding:40px;color:#8b949e;"><div class="spinner-border mb-2" style="color:#d29922;width:2rem;height:2rem;"></div><div class="small">Loading...</div></div>
+    <div id="mkt-error" style="display:none;" class="text-danger text-center p-3 small"></div>
+    <div class="table-scroll" style="overflow-x:auto;">
+      <table class="scoreboard-table" id="mkt-table">
+        <thead><tr>
+          <th style="cursor:pointer;user-select:none;min-width:180px;" onclick="mktSort('name')">Group / Sub Group <i class="bi bi-arrow-down-up" style="font-size:0.65rem;opacity:0.5;"></i></th>
+          <th class="text-center" style="min-width:95px;cursor:pointer;" onclick="mktSort('daily_leads')">Daily Leads <i class="bi bi-arrow-down-up" style="font-size:0.55rem;opacity:0.4;"></i></th>
+          <th class="text-center" style="min-width:90px;cursor:pointer;" onclick="mktSort('daily_live')">Daily Live <i class="bi bi-arrow-down-up" style="font-size:0.55rem;opacity:0.4;"></i></th>
+          <th class="text-center" style="min-width:105px;cursor:pointer;" onclick="mktSort('live_avg_scp')">Live Avg SCP <i class="bi bi-arrow-down-up" style="font-size:0.55rem;opacity:0.4;"></i></th>
+          <th class="text-center" style="min-width:90px;cursor:pointer;" onclick="mktSort('daily_ftd')">Daily FTD <i class="bi bi-arrow-down-up" style="font-size:0.55rem;opacity:0.4;"></i></th>
+          <th class="text-center" style="min-width:105px;cursor:pointer;" onclick="mktSort('ftd_avg_scp')">FTD Avg SCP <i class="bi bi-arrow-down-up" style="font-size:0.55rem;opacity:0.4;"></i></th>
+          <th class="text-center" style="min-width:90px;cursor:pointer;" onclick="mktSort('daily_ftc')">Daily FTC <i class="bi bi-arrow-down-up" style="font-size:0.55rem;opacity:0.4;"></i></th>
+          <th class="text-center" style="min-width:110px;cursor:pointer;" onclick="mktSort('cr_lead_live')">CR% Lead→Live <i class="bi bi-arrow-down-up" style="font-size:0.55rem;opacity:0.4;"></i></th>
+          <th class="text-center" style="min-width:110px;cursor:pointer;" onclick="mktSort('cr_live_ftd')">CR% Live→FTD <i class="bi bi-arrow-down-up" style="font-size:0.55rem;opacity:0.4;"></i></th>
+          <th class="text-center" style="min-width:130px;cursor:pointer;" onclick="mktSort('daily_ftd_amount')">Daily FTD Amount <i class="bi bi-arrow-down-up" style="font-size:0.55rem;opacity:0.4;"></i></th>
+        </tr></thead>
+        <tbody id="mkt-tbody"></tbody>
+        <tfoot id="mkt-tfoot"></tfoot>
+      </table>
+    </div>
+  </div>
+
 </div>
 </div>
 
@@ -849,6 +902,7 @@
     if (SHOW_SALES)     tasks.push(loadData(silent));
     if (SHOW_RETENTION) tasks.push(loadRetentionData(silent));
     tasks.push(loadLiveEquity());
+    tasks.push(loadMarketingData(silent));
     await Promise.all(tasks);
   }
 
@@ -1736,6 +1790,196 @@
     updateSyncBar();
     if (dt === today) loadAll(true);
   }, 60000);
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // MARKETING TABLE
+  // ═══════════════════════════════════════════════════════════════════════
+  let _mktRows = [];         // flat rows from API
+  let _mktSortCol = 'daily_live';
+  let _mktSortDir = 'desc';
+  let _mktExpandState = new Set(); // expanded g1 keys
+
+  async function loadMarketingData(silent=false) {
+    const df  = document.getElementById('date-from').value;
+    const dt  = document.getElementById('date-to').value;
+    const g1  = document.getElementById('mkt-group1').value;
+    const g2  = document.getElementById('mkt-group2').value;
+    if (!df || !dt) return;
+    if (!silent) {
+      document.getElementById('mkt-loading').style.display = 'block';
+      document.getElementById('mkt-error').style.display   = 'none';
+    }
+    try {
+      const r = await fetch(`/api/daily-monthly/marketing?date_from=${df}&date_to=${dt}&group1=${g1}&group2=${g2}`);
+      if (!r.ok) throw new Error(await r.text());
+      const d = await r.json();
+      _mktRows = d.rows || [];
+      const lbl = document.getElementById('mkt-date-label');
+      if (lbl) lbl.textContent = d.date ? `(${d.date})` : '';
+      renderMarketingTable();
+    } catch(e) {
+      document.getElementById('mkt-error').style.display = 'block';
+      document.getElementById('mkt-error').textContent   = 'Error loading marketing data: ' + e.message;
+    } finally {
+      document.getElementById('mkt-loading').style.display = 'none';
+    }
+  }
+
+  function renderMarketingTable() {
+    const g2Mode = document.getElementById('mkt-group2').value !== 'none';
+    const tbody  = document.getElementById('mkt-tbody');
+    const tfoot  = document.getElementById('mkt-tfoot');
+
+    // Group rows by g1
+    const g1Map = new Map();
+    for (const r of _mktRows) {
+      if (!g1Map.has(r.g1)) g1Map.set(r.g1, []);
+      g1Map.get(r.g1).push(r);
+    }
+
+    // Sort g1 groups by sort col (aggregate)
+    function g1Agg(rows, col) {
+      if (col === 'name')         return rows[0]?.g1 || '';
+      if (col === 'live_avg_scp') return rows.reduce((s,r)=>s+(r.live_avg_scp||0),0)/rows.length;
+      if (col === 'ftd_avg_scp')  return rows.reduce((s,r)=>s+(r.ftd_avg_scp||0),0)/rows.length;
+      if (col === 'cr_lead_live') { const l=rows.reduce((s,r)=>s+r.daily_leads,0),v=rows.reduce((s,r)=>s+r.daily_live,0); return l>0?v/l*100:0; }
+      if (col === 'cr_live_ftd')  { const v=rows.reduce((s,r)=>s+r.daily_live,0),f=rows.reduce((s,r)=>s+r.daily_ftd,0); return v>0?f/v*100:0; }
+      return rows.reduce((s,r)=>s+(r[col]||0),0);
+    }
+
+    const g1Arr = [...g1Map.entries()].sort((a,b) => {
+      const va = g1Agg(a[1], _mktSortCol), vb = g1Agg(b[1], _mktSortCol);
+      if (typeof va === 'string') return _mktSortDir==='asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+      return _mktSortDir === 'asc' ? va - vb : vb - va;
+    });
+
+    // Sort sub-rows within each g1 by daily_live desc
+    for (const [, rows] of g1Arr) rows.sort((a,b) => b.daily_live - a.daily_live);
+
+    const fmtN = v => v === null || v === undefined ? '<span style="color:#484f58;">—</span>' : `<span>${v.toLocaleString()}</span>`;
+    const fmtS = v => v === null || v === undefined ? '<span style="color:#484f58;">—</span>' : `<span style="color:#d29922;">${v.toFixed(1)}</span>`;
+    const fmtP = v => v === null || v === undefined ? '<span style="color:#484f58;">—</span>' : (() => { const c=v>=30?'#3fb950':v>=15?'#d29922':'#f85149'; return `<span style="color:${c};font-weight:600;">${v.toFixed(1)}%</span>`; })();
+    const fmtA = v => v === null || v === undefined ? '<span style="color:#484f58;">—</span>' : `<span style="color:#388bfd;">$${v.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})}</span>`;
+
+    const frag = document.createDocumentFragment();
+    let totLeads=0, totLive=0, totFtd=0, totFtc=0, totAmt=0, totLiveScp=0, totFtdScp=0, liveCnt=0, ftdCnt=0;
+
+    for (const [g1, rows] of g1Arr) {
+      const aLeads = rows.reduce((s,r)=>s+r.daily_leads,0);
+      const aLive  = rows.reduce((s,r)=>s+r.daily_live,0);
+      const aFtd   = rows.reduce((s,r)=>s+r.daily_ftd,0);
+      const aFtc   = rows.reduce((s,r)=>s+r.daily_ftc,0);
+      const aAmt   = rows.reduce((s,r)=>s+r.daily_ftd_amount,0);
+      const aLiveScp = rows.filter(r=>r.live_avg_scp!==null).reduce((s,r)=>s+(r.live_avg_scp||0)*r.daily_live,0);
+      const aFtdScp  = rows.filter(r=>r.ftd_avg_scp!==null).reduce((s,r)=>s+(r.ftd_avg_scp||0)*r.daily_ftd,0);
+      const crLL  = aLeads > 0 ? aLive/aLeads*100 : null;
+      const crLF  = aLive  > 0 ? aFtd/aLive*100   : null;
+      const lScp  = aLive > 0 ? aLiveScp/aLive : null;
+      const fScp  = aFtd  > 0 ? aFtdScp/aFtd   : null;
+
+      totLeads+=aLeads; totLive+=aLive; totFtd+=aFtd; totFtc+=aFtc; totAmt+=aAmt;
+      if (lScp!==null){totLiveScp+=lScp*aLive;liveCnt+=aLive;}
+      if (fScp!==null){totFtdScp+=fScp*aFtd;ftdCnt+=aFtd;}
+
+      const exp    = _mktExpandState.has(g1);
+      const g1Id   = 'mkt-g1-' + g1.replace(/[^a-z0-9]/gi,'_');
+      const hasSub = g2Mode && rows.length > 0;
+
+      const g1Tr = document.createElement('tr');
+      g1Tr.className = 'office-row';
+      g1Tr.dataset.g1 = g1;
+      g1Tr.style.cursor = hasSub ? 'pointer' : '';
+      g1Tr.innerHTML = `
+        <td><span class="chevron" style="margin-right:6px;font-size:0.7rem;opacity:${hasSub?'1':'0'};transition:transform 0.15s;display:inline-block;transform:${exp&&hasSub?'rotate(90deg)':'rotate(0deg)'};">&#9654;</span>
+            <i class="bi bi-bar-chart-fill row-icon me-2" style="color:#d29922;font-size:0.75rem;"></i>
+            <strong>${escHtml(g1)}</strong></td>
+        <td class="text-center">${fmtN(aLeads)}</td>
+        <td class="text-center">${fmtN(aLive)}</td>
+        <td class="text-center">${fmtS(lScp!==null?Math.round(lScp*10)/10:null)}</td>
+        <td class="text-center">${fmtN(aFtd)}</td>
+        <td class="text-center">${fmtS(fScp!==null?Math.round(fScp*10)/10:null)}</td>
+        <td class="text-center">${fmtN(aFtc)}</td>
+        <td class="text-center">${fmtP(crLL)}</td>
+        <td class="text-center">${fmtP(crLF)}</td>
+        <td class="text-center">${fmtA(aAmt)}</td>
+      `;
+      if (hasSub) {
+        g1Tr.addEventListener('click', () => {
+          const open = _mktExpandState.has(g1);
+          open ? _mktExpandState.delete(g1) : _mktExpandState.add(g1);
+          const chev = g1Tr.querySelector('.chevron');
+          if (chev) chev.style.transform = open ? 'rotate(0deg)' : 'rotate(90deg)';
+          tbody.querySelectorAll(`tr.mkt-sub-row[data-g1="${CSS.escape(g1)}"]`).forEach(tr => {
+            tr.style.display = open ? 'none' : '';
+          });
+        });
+      }
+      frag.appendChild(g1Tr);
+
+      if (hasSub) {
+        for (const r of rows) {
+          const subTr = document.createElement('tr');
+          subTr.className = 'mkt-sub-row agent-row';
+          subTr.dataset.g1 = g1;
+          subTr.style.display = exp ? '' : 'none';
+          subTr.innerHTML = `
+            <td style="padding-left:42px;color:#8b949e;">${escHtml(r.g2)}</td>
+            <td class="text-center">${fmtN(r.daily_leads)}</td>
+            <td class="text-center">${fmtN(r.daily_live)}</td>
+            <td class="text-center">${fmtS(r.live_avg_scp)}</td>
+            <td class="text-center">${fmtN(r.daily_ftd)}</td>
+            <td class="text-center">${fmtS(r.ftd_avg_scp)}</td>
+            <td class="text-center">${fmtN(r.daily_ftc)}</td>
+            <td class="text-center">${fmtP(r.cr_lead_live)}</td>
+            <td class="text-center">${fmtP(r.cr_live_ftd)}</td>
+            <td class="text-center">${fmtA(r.daily_ftd_amount)}</td>
+          `;
+          frag.appendChild(subTr);
+        }
+      }
+    }
+
+    tbody.innerHTML = '';
+    tbody.appendChild(frag);
+
+    // Totals row
+    const tLL = totLeads>0?totLive/totLeads*100:null;
+    const tLF = totLive>0?totFtd/totLive*100:null;
+    const tLS = liveCnt>0?totLiveScp/liveCnt:null;
+    const tFS = ftdCnt>0?totFtdScp/ftdCnt:null;
+    tfoot.innerHTML = `<tr style="background:#1c2128;font-weight:700;color:#e0e0e0;border-top:2px solid #30363d;">
+      <td><strong>Total</strong></td>
+      <td class="text-center">${fmtN(totLeads)}</td>
+      <td class="text-center">${fmtN(totLive)}</td>
+      <td class="text-center">${fmtS(tLS!==null?Math.round(tLS*10)/10:null)}</td>
+      <td class="text-center">${fmtN(totFtd)}</td>
+      <td class="text-center">${fmtS(tFS!==null?Math.round(tFS*10)/10:null)}</td>
+      <td class="text-center">${fmtN(totFtc)}</td>
+      <td class="text-center">${fmtP(tLL)}</td>
+      <td class="text-center">${fmtP(tLF)}</td>
+      <td class="text-center">${fmtA(totAmt)}</td>
+    </tr>`;
+  }
+
+  function mktSort(col) {
+    if (_mktSortCol === col) _mktSortDir = _mktSortDir === 'desc' ? 'asc' : 'desc';
+    else { _mktSortCol = col; _mktSortDir = 'desc'; }
+    renderMarketingTable();
+  }
+
+  function mktExpandAll() {
+    _mktRows.forEach(r => _mktExpandState.add(r.g1));
+    renderMarketingTable();
+  }
+
+  function mktCollapseAll() {
+    _mktExpandState.clear();
+    renderMarketingTable();
+  }
+
+  // Reload when dropdowns change
+  document.getElementById('mkt-group1').addEventListener('change', () => { _mktExpandState.clear(); loadMarketingData(); });
+  document.getElementById('mkt-group2').addEventListener('change', () => { _mktExpandState.clear(); loadMarketingData(); });
 </script>
 
 <script src="https://instant.page/5.2.0/instantpage.min.js" type="module"></script>
