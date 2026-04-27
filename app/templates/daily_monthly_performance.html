@@ -640,6 +640,15 @@
           <th class="text-center" style="min-width:100px;cursor:pointer;" onclick="mktSort('ltv30')">LTV 30 <i class="bi bi-arrow-down-up" style="font-size:0.55rem;opacity:0.4;"></i></th>
           <th class="text-center" style="min-width:120px;cursor:pointer;" onclick="mktSort('net30')">Net 30d <i class="bi bi-arrow-down-up" style="font-size:0.55rem;opacity:0.4;"></i></th>
           <th class="text-center" style="min-width:90px;cursor:pointer;" onclick="mktSort('ftc30')">FTC 30d <i class="bi bi-arrow-down-up" style="font-size:0.55rem;opacity:0.4;"></i></th>
+          <th class="text-center" style="min-width:100px;cursor:pointer;" onclick="mktSort('ltv60')">LTV 60 <i class="bi bi-arrow-down-up" style="font-size:0.55rem;opacity:0.4;"></i></th>
+          <th class="text-center" style="min-width:120px;cursor:pointer;" onclick="mktSort('net60')">Net 60d <i class="bi bi-arrow-down-up" style="font-size:0.55rem;opacity:0.4;"></i></th>
+          <th class="text-center" style="min-width:90px;cursor:pointer;" onclick="mktSort('ftc60')">FTC 60d <i class="bi bi-arrow-down-up" style="font-size:0.55rem;opacity:0.4;"></i></th>
+          <th class="text-center" style="min-width:100px;cursor:pointer;" onclick="mktSort('ltv90')">LTV 90 <i class="bi bi-arrow-down-up" style="font-size:0.55rem;opacity:0.4;"></i></th>
+          <th class="text-center" style="min-width:120px;cursor:pointer;" onclick="mktSort('net90')">Net 90d <i class="bi bi-arrow-down-up" style="font-size:0.55rem;opacity:0.4;"></i></th>
+          <th class="text-center" style="min-width:90px;cursor:pointer;" onclick="mktSort('ftc90')">FTC 90d <i class="bi bi-arrow-down-up" style="font-size:0.55rem;opacity:0.4;"></i></th>
+          <th class="text-center" style="min-width:100px;cursor:pointer;" onclick="mktSort('ltv120')">LTV 120 <i class="bi bi-arrow-down-up" style="font-size:0.55rem;opacity:0.4;"></i></th>
+          <th class="text-center" style="min-width:120px;cursor:pointer;" onclick="mktSort('net120')">Net 120d <i class="bi bi-arrow-down-up" style="font-size:0.55rem;opacity:0.4;"></i></th>
+          <th class="text-center" style="min-width:90px;cursor:pointer;" onclick="mktSort('ftc120')">FTC 120d <i class="bi bi-arrow-down-up" style="font-size:0.55rem;opacity:0.4;"></i></th>
         </tr></thead>
         <tbody id="mkt-tbody"></tbody>
         <tfoot id="mkt-tfoot"></tfoot>
@@ -1847,7 +1856,10 @@
       if (col === 'ftd_avg_scp')  return rows.reduce((s,r)=>s+(r.ftd_avg_scp||0),0)/rows.length;
       if (col === 'cr_lead_live') { const l=rows.reduce((s,r)=>s+r.daily_leads,0),v=rows.reduce((s,r)=>s+r.daily_live,0); return l>0?v/l*100:0; }
       if (col === 'cr_live_ftd')  { const v=rows.reduce((s,r)=>s+r.daily_live,0),f=rows.reduce((s,r)=>s+r.daily_ftd,0); return v>0?f/v*100:0; }
-      if (col === 'ltv30')        { const n=rows.reduce((s,r)=>s+(r.net30||0),0),f=rows.reduce((s,r)=>s+(r.ftc30||0),0); return f>0?n/f:0; }
+      if (col === 'ltv30')  { const n=rows.reduce((s,r)=>s+(r.net30||0),0), f=rows.reduce((s,r)=>s+(r.ftc30||0),0);  return f>0?n/f:0; }
+      if (col === 'ltv60')  { const n=rows.reduce((s,r)=>s+(r.net60||0),0), f=rows.reduce((s,r)=>s+(r.ftc60||0),0);  return f>0?n/f:0; }
+      if (col === 'ltv90')  { const n=rows.reduce((s,r)=>s+(r.net90||0),0), f=rows.reduce((s,r)=>s+(r.ftc90||0),0);  return f>0?n/f:0; }
+      if (col === 'ltv120') { const n=rows.reduce((s,r)=>s+(r.net120||0),0),f=rows.reduce((s,r)=>s+(r.ftc120||0),0); return f>0?n/f:0; }
       return rows.reduce((s,r)=>s+(r[col]||0),0);
     }
 
@@ -1867,7 +1879,8 @@
     const fmtL = v => v === null || v === undefined ? '<span style="color:#484f58;">—</span>' : `<span style="color:#3fb950;">$${v.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})}</span>`;
 
     const frag = document.createDocumentFragment();
-    let totLeads=0, totLive=0, totFtd=0, totFtc=0, totAmt=0, totLiveScp=0, totFtdScp=0, liveCnt=0, ftdCnt=0, totNet30=0, totFtc30=0;
+    let totLeads=0, totLive=0, totFtd=0, totFtc=0, totAmt=0, totLiveScp=0, totFtdScp=0, liveCnt=0, ftdCnt=0;
+    let totNet30=0,totFtc30=0,totNet60=0,totFtc60=0,totNet90=0,totFtc90=0,totNet120=0,totFtc120=0;
 
     for (const [g1, rows] of g1Arr) {
       const aLeads = rows.reduce((s,r)=>s+r.daily_leads,0);
@@ -1875,9 +1888,10 @@
       const aFtd   = rows.reduce((s,r)=>s+r.daily_ftd,0);
       const aFtc   = rows.reduce((s,r)=>s+r.daily_ftc,0);
       const aAmt   = rows.reduce((s,r)=>s+r.daily_ftd_amount,0);
-      const aNet30 = rows.reduce((s,r)=>s+(r.net30||0),0);
-      const aFtc30 = rows.reduce((s,r)=>s+(r.ftc30||0),0);
-      const aLtv30 = aFtc30 > 0 ? aNet30/aFtc30 : null;
+      const aNet30=rows.reduce((s,r)=>s+(r.net30||0),0),  aFtc30=rows.reduce((s,r)=>s+(r.ftc30||0),0),  aLtv30=aFtc30>0?aNet30/aFtc30:null;
+      const aNet60=rows.reduce((s,r)=>s+(r.net60||0),0),  aFtc60=rows.reduce((s,r)=>s+(r.ftc60||0),0),  aLtv60=aFtc60>0?aNet60/aFtc60:null;
+      const aNet90=rows.reduce((s,r)=>s+(r.net90||0),0),  aFtc90=rows.reduce((s,r)=>s+(r.ftc90||0),0),  aLtv90=aFtc90>0?aNet90/aFtc90:null;
+      const aNet120=rows.reduce((s,r)=>s+(r.net120||0),0),aFtc120=rows.reduce((s,r)=>s+(r.ftc120||0),0),aLtv120=aFtc120>0?aNet120/aFtc120:null;
       const aLiveScp = rows.filter(r=>r.live_avg_scp!==null).reduce((s,r)=>s+(r.live_avg_scp||0)*r.daily_live,0);
       const aFtdScp  = rows.filter(r=>r.ftd_avg_scp!==null).reduce((s,r)=>s+(r.ftd_avg_scp||0)*r.daily_ftd,0);
       const crLL  = aLeads > 0 ? aLive/aLeads*100 : null;
@@ -1886,7 +1900,8 @@
       const fScp  = aFtd  > 0 ? aFtdScp/aFtd   : null;
 
       totLeads+=aLeads; totLive+=aLive; totFtd+=aFtd; totFtc+=aFtc; totAmt+=aAmt;
-      totNet30+=aNet30; totFtc30+=aFtc30;
+      totNet30+=aNet30; totFtc30+=aFtc30; totNet60+=aNet60; totFtc60+=aFtc60;
+      totNet90+=aNet90; totFtc90+=aFtc90; totNet120+=aNet120; totFtc120+=aFtc120;
       if (lScp!==null){totLiveScp+=lScp*aLive;liveCnt+=aLive;}
       if (fScp!==null){totFtdScp+=fScp*aFtd;ftdCnt+=aFtd;}
 
@@ -1914,6 +1929,15 @@
         <td class="text-center">${fmtL(aLtv30!==null?Math.round(aLtv30):null)}</td>
         <td class="text-center">${fmtA(aNet30)}</td>
         <td class="text-center">${fmtN(aFtc30)}</td>
+        <td class="text-center">${fmtL(aLtv60!==null?Math.round(aLtv60):null)}</td>
+        <td class="text-center">${fmtA(aNet60)}</td>
+        <td class="text-center">${fmtN(aFtc60)}</td>
+        <td class="text-center">${fmtL(aLtv90!==null?Math.round(aLtv90):null)}</td>
+        <td class="text-center">${fmtA(aNet90)}</td>
+        <td class="text-center">${fmtN(aFtc90)}</td>
+        <td class="text-center">${fmtL(aLtv120!==null?Math.round(aLtv120):null)}</td>
+        <td class="text-center">${fmtA(aNet120)}</td>
+        <td class="text-center">${fmtN(aFtc120)}</td>
       `;
       if (hasSub) {
         g1Tr.addEventListener('click', () => {
@@ -1948,6 +1972,15 @@
             <td class="text-center">${fmtL(r.ltv30!==null?Math.round(r.ltv30):null)}</td>
             <td class="text-center">${fmtA(r.net30)}</td>
             <td class="text-center">${fmtN(r.ftc30)}</td>
+            <td class="text-center">${fmtL(r.ltv60!==null?Math.round(r.ltv60):null)}</td>
+            <td class="text-center">${fmtA(r.net60)}</td>
+            <td class="text-center">${fmtN(r.ftc60)}</td>
+            <td class="text-center">${fmtL(r.ltv90!==null?Math.round(r.ltv90):null)}</td>
+            <td class="text-center">${fmtA(r.net90)}</td>
+            <td class="text-center">${fmtN(r.ftc90)}</td>
+            <td class="text-center">${fmtL(r.ltv120!==null?Math.round(r.ltv120):null)}</td>
+            <td class="text-center">${fmtA(r.net120)}</td>
+            <td class="text-center">${fmtN(r.ftc120)}</td>
           `;
           frag.appendChild(subTr);
         }
@@ -1976,6 +2009,15 @@
       <td class="text-center">${fmtL(totFtc30>0?Math.round(totNet30/totFtc30):null)}</td>
       <td class="text-center">${fmtA(totNet30)}</td>
       <td class="text-center">${fmtN(totFtc30)}</td>
+      <td class="text-center">${fmtL(totFtc60>0?Math.round(totNet60/totFtc60):null)}</td>
+      <td class="text-center">${fmtA(totNet60)}</td>
+      <td class="text-center">${fmtN(totFtc60)}</td>
+      <td class="text-center">${fmtL(totFtc90>0?Math.round(totNet90/totFtc90):null)}</td>
+      <td class="text-center">${fmtA(totNet90)}</td>
+      <td class="text-center">${fmtN(totFtc90)}</td>
+      <td class="text-center">${fmtL(totFtc120>0?Math.round(totNet120/totFtc120):null)}</td>
+      <td class="text-center">${fmtA(totNet120)}</td>
+      <td class="text-center">${fmtN(totFtc120)}</td>
     </tr>`;
   }
 
