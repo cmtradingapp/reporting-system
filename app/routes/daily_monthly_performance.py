@@ -776,7 +776,7 @@ async def dmp_marketing_api(
                 ROUND(AVG(CASE WHEN a.birth_date IS NOT NULL
                                THEN a.classification_int::float END)::numeric, 1)  AS live_avg_scp
             FROM accounts a
-            LEFT JOIN campaigns c ON c.crmid::text = a.campaign::text
+            LEFT JOIN campaigns c ON c.crmid::text = SPLIT_PART(a.campaign, '.', 1)
             WHERE a.is_test_account = 0
               AND (a.is_demo = 0 OR a.is_demo IS NULL)
               AND a.createdtime >= %(df)s AND a.createdtime < %(dt)s
@@ -794,7 +794,7 @@ async def dmp_marketing_api(
                 ROUND(AVG(a.classification_int::float)::numeric, 1)                AS ftd_avg_scp
             FROM transactions t
             JOIN accounts a ON a.accountid = t.vtigeraccountid
-            LEFT JOIN campaigns c ON c.crmid::text = a.campaign::text
+            LEFT JOIN campaigns c ON c.crmid::text = SPLIT_PART(a.campaign, '.', 1)
             WHERE t.transactionapproval = 'Approved'
               AND (t.deleted = 0 OR t.deleted IS NULL)
               AND t.transaction_type_name = 'Deposit' AND t.ftd = 1
@@ -806,7 +806,7 @@ async def dmp_marketing_api(
             SELECT {g1_expr} AS g1, {g2_expr} AS g2,
                 COUNT(*) AS daily_ftc
             FROM accounts a
-            LEFT JOIN campaigns c ON c.crmid::text = a.campaign::text
+            LEFT JOIN campaigns c ON c.crmid::text = SPLIT_PART(a.campaign, '.', 1)
             WHERE a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)
               AND a.client_qualification_date >= %(df)s
               AND a.client_qualification_date <  %(dt)s
