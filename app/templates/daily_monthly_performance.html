@@ -599,24 +599,25 @@
         <span class="small" style="color:#8b949e;" id="mkt-date-label"></span>
       </div>
       <div class="d-flex align-items-center gap-2 flex-wrap">
-        <!-- View By -->
-        <div class="d-flex align-items-center gap-1">
-          <span class="small" style="color:#8b949e;white-space:nowrap;">View By</span>
-          <select id="mkt-group1" class="form-select form-select-sm" style="background:#161b22;color:#c9d1d9;border:1px solid #30363d;font-size:0.78rem;padding:3px 8px;min-width:160px;">
-            <option value="marketing_group" selected>Marketing Group</option>
-            <option value="campaign_channel">Campaign Channel</option>
-            <option value="campaign_sub_channel">Campaign Sub Channel</option>
-            <option value="original_affiliate">Original Affiliate</option>
-          </select>
-        </div>
-        <!-- Sub Group -->
-        <div class="d-flex align-items-center gap-1">
-          <span class="small" style="color:#8b949e;white-space:nowrap;">Sub Group</span>
-          <select id="mkt-group2" class="form-select form-select-sm" style="background:#161b22;color:#c9d1d9;border:1px solid #30363d;font-size:0.78rem;padding:3px 8px;min-width:170px;">
-            <option value="campaign_code_legacy" selected>Campaign Legacy ID</option>
-            <option value="campaign_name">Campaign Name</option>
-            <option value="none">None</option>
-          </select>
+        <!-- View By / Sub Group — hidden on mobile -->
+        <div class="d-none d-md-flex align-items-center gap-2 flex-wrap">
+          <div class="d-flex align-items-center gap-1">
+            <span class="small" style="color:#8b949e;white-space:nowrap;">View By</span>
+            <select id="mkt-group1" class="form-select form-select-sm" style="background:#161b22;color:#c9d1d9;border:1px solid #30363d;font-size:0.78rem;padding:3px 8px;min-width:160px;">
+              <option value="marketing_group" selected>Marketing Group</option>
+              <option value="campaign_channel">Campaign Channel</option>
+              <option value="campaign_sub_channel">Campaign Sub Channel</option>
+              <option value="original_affiliate">Original Affiliate</option>
+            </select>
+          </div>
+          <div class="d-flex align-items-center gap-1">
+            <span class="small" style="color:#8b949e;white-space:nowrap;">Sub Group</span>
+            <select id="mkt-group2" class="form-select form-select-sm" style="background:#161b22;color:#c9d1d9;border:1px solid #30363d;font-size:0.78rem;padding:3px 8px;min-width:170px;">
+              <option value="campaign_code_legacy" selected>Campaign Legacy ID</option>
+              <option value="campaign_name">Campaign Name</option>
+              <option value="none">None</option>
+            </select>
+          </div>
         </div>
         <button onclick="mktExpandAll()" class="btn btn-sm tbl-action-btn" style="background:#21262d;border:1px solid #30363d;color:#8b949e;border-radius:6px;font-size:0.8rem;padding:4px 10px;"><i class="bi bi-arrows-expand"></i><span class="d-none d-md-inline ms-1">Expand All</span></button>
         <button onclick="mktCollapseAll()" class="btn btn-sm tbl-action-btn" style="background:#21262d;border:1px solid #30363d;color:#8b949e;border-radius:6px;font-size:0.8rem;padding:4px 10px;"><i class="bi bi-arrows-collapse"></i><span class="d-none d-md-inline ms-1">Collapse All</span></button>
