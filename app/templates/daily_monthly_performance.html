@@ -637,6 +637,7 @@
           <th class="text-center" style="min-width:110px;cursor:pointer;" onclick="mktSort('cr_lead_live')">CR% Lead→Live <i class="bi bi-arrow-down-up" style="font-size:0.55rem;opacity:0.4;"></i></th>
           <th class="text-center" style="min-width:110px;cursor:pointer;" onclick="mktSort('cr_live_ftd')">CR% Live→FTD <i class="bi bi-arrow-down-up" style="font-size:0.55rem;opacity:0.4;"></i></th>
           <th class="text-center" style="min-width:130px;cursor:pointer;" onclick="mktSort('daily_ftd_amount')">Daily FTD Amount <i class="bi bi-arrow-down-up" style="font-size:0.55rem;opacity:0.4;"></i></th>
+          <th class="text-center" style="min-width:100px;cursor:pointer;" onclick="mktSort('ltv30')">LTV 30 <i class="bi bi-arrow-down-up" style="font-size:0.55rem;opacity:0.4;"></i></th>
         </tr></thead>
         <tbody id="mkt-tbody"></tbody>
         <tfoot id="mkt-tfoot"></tfoot>
@@ -1844,6 +1845,7 @@
       if (col === 'ftd_avg_scp')  return rows.reduce((s,r)=>s+(r.ftd_avg_scp||0),0)/rows.length;
       if (col === 'cr_lead_live') { const l=rows.reduce((s,r)=>s+r.daily_leads,0),v=rows.reduce((s,r)=>s+r.daily_live,0); return l>0?v/l*100:0; }
       if (col === 'cr_live_ftd')  { const v=rows.reduce((s,r)=>s+r.daily_live,0),f=rows.reduce((s,r)=>s+r.daily_ftd,0); return v>0?f/v*100:0; }
+      if (col === 'ltv30')        { const n=rows.reduce((s,r)=>s+(r.net30||0),0),f=rows.reduce((s,r)=>s+(r.ftc30||0),0); return f>0?n/f:0; }
       return rows.reduce((s,r)=>s+(r[col]||0),0);
     }
 
@@ -1860,9 +1862,10 @@
     const fmtS = v => v === null || v === undefined ? '<span style="color:#484f58;">—</span>' : `<span style="color:#d29922;">${v.toFixed(1)}</span>`;
     const fmtP = v => v === null || v === undefined ? '<span style="color:#484f58;">—</span>' : (() => { const c=v>=30?'#3fb950':v>=15?'#d29922':'#f85149'; return `<span style="color:${c};font-weight:600;">${v.toFixed(1)}%</span>`; })();
     const fmtA = v => v === null || v === undefined ? '<span style="color:#484f58;">—</span>' : `<span style="color:#388bfd;">$${v.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})}</span>`;
+    const fmtL = v => v === null || v === undefined ? '<span style="color:#484f58;">—</span>' : `<span style="color:#3fb950;">$${v.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})}</span>`;
 
     const frag = document.createDocumentFragment();
-    let totLeads=0, totLive=0, totFtd=0, totFtc=0, totAmt=0, totLiveScp=0, totFtdScp=0, liveCnt=0, ftdCnt=0;
+    let totLeads=0, totLive=0, totFtd=0, totFtc=0, totAmt=0, totLiveScp=0, totFtdScp=0, liveCnt=0, ftdCnt=0, totNet30=0, totFtc30=0;
 
     for (const [g1, rows] of g1Arr) {
       const aLeads = rows.reduce((s,r)=>s+r.daily_leads,0);
@@ -1870,6 +1873,9 @@
       const aFtd   = rows.reduce((s,r)=>s+r.daily_ftd,0);
       const aFtc   = rows.reduce((s,r)=>s+r.daily_ftc,0);
       const aAmt   = rows.reduce((s,r)=>s+r.daily_ftd_amount,0);
+      const aNet30 = rows.reduce((s,r)=>s+(r.net30||0),0);
+      const aFtc30 = rows.reduce((s,r)=>s+(r.ftc30||0),0);
+      const aLtv30 = aFtc30 > 0 ? aNet30/aFtc30 : null;
       const aLiveScp = rows.filter(r=>r.live_avg_scp!==null).reduce((s,r)=>s+(r.live_avg_scp||0)*r.daily_live,0);
       const aFtdScp  = rows.filter(r=>r.ftd_avg_scp!==null).reduce((s,r)=>s+(r.ftd_avg_scp||0)*r.daily_ftd,0);
       const crLL  = aLeads > 0 ? aLive/aLeads*100 : null;
@@ -1878,6 +1884,7 @@
       const fScp  = aFtd  > 0 ? aFtdScp/aFtd   : null;
 
       totLeads+=aLeads; totLive+=aLive; totFtd+=aFtd; totFtc+=aFtc; totAmt+=aAmt;
+      totNet30+=aNet30; totFtc30+=aFtc30;
       if (lScp!==null){totLiveScp+=lScp*aLive;liveCnt+=aLive;}
       if (fScp!==null){totFtdScp+=fScp*aFtd;ftdCnt+=aFtd;}
 
@@ -1902,6 +1909,7 @@
         <td class="text-center">${fmtP(crLL)}</td>
         <td class="text-center">${fmtP(crLF)}</td>
         <td class="text-center">${fmtA(aAmt)}</td>
+        <td class="text-center">${fmtL(aLtv30!==null?Math.round(aLtv30):null)}</td>
       `;
       if (hasSub) {
         g1Tr.addEventListener('click', () => {
@@ -1933,6 +1941,7 @@
             <td class="text-center">${fmtP(r.cr_lead_live)}</td>
             <td class="text-center">${fmtP(r.cr_live_ftd)}</td>
             <td class="text-center">${fmtA(r.daily_ftd_amount)}</td>
+            <td class="text-center">${fmtL(r.ltv30!==null?Math.round(r.ltv30):null)}</td>
           `;
           frag.appendChild(subTr);
         }
@@ -1958,6 +1967,7 @@
       <td class="text-center">${fmtP(tLL)}</td>
       <td class="text-center">${fmtP(tLF)}</td>
       <td class="text-center">${fmtA(totAmt)}</td>
+      <td class="text-center">${fmtL(totFtc30>0?Math.round(totNet30/totFtc30):null)}</td>
     </tr>`;
   }
 

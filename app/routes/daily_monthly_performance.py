@@ -756,7 +756,7 @@ async def dmp_marketing_api(
     g1_expr = _MKT_G1_EXPRS.get(group1, _MKT_G1_EXPRS["marketing_group"])
     g2_expr = _MKT_G2_EXPRS.get(group2, _MKT_G2_EXPRS["campaign_code_legacy"])
 
-    _ck = f"dmp_mkt_v1:{date_from}:{date_to}:{group1}:{group2}"
+    _ck = f"dmp_mkt_v2:{date_from}:{date_to}:{group1}:{group2}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -765,6 +765,8 @@ async def dmp_marketing_api(
         dt_to         = datetime.strptime(date_to, "%Y-%m-%d").date()
         daily_from    = dt_to.strftime("%Y-%m-%d")
         daily_to_excl = (dt_to + timedelta(days=1)).strftime("%Y-%m-%d")
+        # LTV 30: last 30 days window (date_to-29 → date_to inclusive)
+        ltv30_from    = (dt_to - timedelta(days=29)).strftime("%Y-%m-%d")
     except ValueError:
         return JSONResponse(status_code=400, content={"detail": "Invalid date format"})
 
@@ -816,6 +818,34 @@ async def dmp_marketing_api(
             SELECT g1, g2 FROM leads_cte UNION
             SELECT g1, g2 FROM ftd_cte   UNION
             SELECT g1, g2 FROM ftc_cte
+        ),
+        -- LTV 30: net deposits over last 30 days
+        net30_cte AS (
+            SELECT {g1_expr} AS g1, {g2_expr} AS g2,
+                COALESCE(SUM(CASE
+                    WHEN t.transaction_type_name IN ('Deposit','Withdrawal Cancelled')  THEN  t.usdamount
+                    WHEN t.transaction_type_name IN ('Withdrawal','Deposit Cancelled')  THEN -t.usdamount
+                END), 0)                                                                AS net30
+            FROM transactions t
+            JOIN accounts a ON a.accountid = t.vtigeraccountid
+            LEFT JOIN campaigns c ON c.crmid::text = SPLIT_PART(a.campaign, '.', 1)
+            WHERE t.transactionapproval = 'Approved'
+              AND (t.deleted = 0 OR t.deleted IS NULL)
+              AND t.transaction_type_name IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
+              AND t.confirmation_time >= %(ltv30_from)s AND t.confirmation_time < %(dt)s
+              AND a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)
+            GROUP BY 1, 2
+        ),
+        -- LTV 30: FTC clients over last 30 days
+        ftc30_cte AS (
+            SELECT {g1_expr} AS g1, {g2_expr} AS g2,
+                COUNT(*) AS ftc30
+            FROM accounts a
+            LEFT JOIN campaigns c ON c.crmid::text = SPLIT_PART(a.campaign, '.', 1)
+            WHERE a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)
+              AND a.client_qualification_date >= %(ltv30_from)s
+              AND a.client_qualification_date <  %(dt)s
+            GROUP BY 1, 2
         )
         SELECT ag.g1, ag.g2,
             COALESCE(l.daily_leads,      0) AS daily_leads,
@@ -824,21 +854,26 @@ async def dmp_marketing_api(
             COALESCE(f.daily_ftd,        0) AS daily_ftd,
             COALESCE(f.daily_ftd_amount, 0) AS daily_ftd_amount,
             f.ftd_avg_scp,
-            COALESCE(fc.daily_ftc,       0) AS daily_ftc
+            COALESCE(fc.daily_ftc,       0) AS daily_ftc,
+            COALESCE(n30.net30,          0) AS net30,
+            COALESCE(f30.ftc30,          0) AS ftc30
         FROM all_groups ag
-        LEFT JOIN leads_cte l  ON l.g1  = ag.g1 AND l.g2  = ag.g2
-        LEFT JOIN ftd_cte   f  ON f.g1  = ag.g1 AND f.g2  = ag.g2
-        LEFT JOIN ftc_cte   fc ON fc.g1 = ag.g1 AND fc.g2 = ag.g2
+        LEFT JOIN leads_cte l   ON l.g1   = ag.g1 AND l.g2   = ag.g2
+        LEFT JOIN ftd_cte   f   ON f.g1   = ag.g1 AND f.g2   = ag.g2
+        LEFT JOIN ftc_cte   fc  ON fc.g1  = ag.g1 AND fc.g2  = ag.g2
+        LEFT JOIN net30_cte n30 ON n30.g1 = ag.g1 AND n30.g2 = ag.g2
+        LEFT JOIN ftc30_cte f30 ON f30.g1 = ag.g1 AND f30.g2 = ag.g2
         ORDER BY COALESCE(l.daily_live, 0) DESC NULLS LAST, ag.g1, ag.g2
     """
 
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute(sql, {"df": daily_from, "dt": daily_to_excl})
+            cur.execute(sql, {"df": daily_from, "dt": daily_to_excl, "ltv30_from": ltv30_from})
             rows = []
             for r in cur.fetchall():
                 dl = int(r[2] or 0); dv = int(r[3] or 0); df2 = int(r[5] or 0)
+                net30 = float(r[9] or 0); ftc30 = int(r[10] or 0)
                 rows.append({
                     "g1":               r[0] or "(Unassigned)",
                     "g2":               r[1] or "(Unassigned)",
@@ -851,6 +886,9 @@ async def dmp_marketing_api(
                     "daily_ftc":        int(r[8] or 0),
                     "cr_lead_live":     round(dv / dl * 100, 1) if dl > 0 else None,
                     "cr_live_ftd":      round(df2 / dv * 100, 1) if dv > 0 else None,
+                    "net30":            round(net30, 2),
+                    "ftc30":            ftc30,
+                    "ltv30":            round(net30 / ftc30, 2) if ftc30 > 0 else None,
                 })
         _result = {"rows": rows, "date": daily_from, "group1": group1, "group2": group2}
         cache.set(_ck, _result, ttl=120)
