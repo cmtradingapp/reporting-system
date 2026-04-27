@@ -638,6 +638,8 @@
           <th class="text-center" style="min-width:110px;cursor:pointer;" onclick="mktSort('cr_live_ftd')">CR% Live→FTD <i class="bi bi-arrow-down-up" style="font-size:0.55rem;opacity:0.4;"></i></th>
           <th class="text-center" style="min-width:130px;cursor:pointer;" onclick="mktSort('daily_ftd_amount')">Daily FTD Amount <i class="bi bi-arrow-down-up" style="font-size:0.55rem;opacity:0.4;"></i></th>
           <th class="text-center" style="min-width:100px;cursor:pointer;" onclick="mktSort('ltv30')">LTV 30 <i class="bi bi-arrow-down-up" style="font-size:0.55rem;opacity:0.4;"></i></th>
+          <th class="text-center" style="min-width:120px;cursor:pointer;" onclick="mktSort('net30')">Net 30d <i class="bi bi-arrow-down-up" style="font-size:0.55rem;opacity:0.4;"></i></th>
+          <th class="text-center" style="min-width:90px;cursor:pointer;" onclick="mktSort('ftc30')">FTC 30d <i class="bi bi-arrow-down-up" style="font-size:0.55rem;opacity:0.4;"></i></th>
         </tr></thead>
         <tbody id="mkt-tbody"></tbody>
         <tfoot id="mkt-tfoot"></tfoot>
@@ -1910,6 +1912,8 @@
         <td class="text-center">${fmtP(crLF)}</td>
         <td class="text-center">${fmtA(aAmt)}</td>
         <td class="text-center">${fmtL(aLtv30!==null?Math.round(aLtv30):null)}</td>
+        <td class="text-center">${fmtA(aNet30)}</td>
+        <td class="text-center">${fmtN(aFtc30)}</td>
       `;
       if (hasSub) {
         g1Tr.addEventListener('click', () => {
@@ -1942,6 +1946,8 @@
             <td class="text-center">${fmtP(r.cr_live_ftd)}</td>
             <td class="text-center">${fmtA(r.daily_ftd_amount)}</td>
             <td class="text-center">${fmtL(r.ltv30!==null?Math.round(r.ltv30):null)}</td>
+            <td class="text-center">${fmtA(r.net30)}</td>
+            <td class="text-center">${fmtN(r.ftc30)}</td>
           `;
           frag.appendChild(subTr);
         }
@@ -1968,6 +1974,8 @@
       <td class="text-center">${fmtP(tLF)}</td>
       <td class="text-center">${fmtA(totAmt)}</td>
       <td class="text-center">${fmtL(totFtc30>0?Math.round(totNet30/totFtc30):null)}</td>
+      <td class="text-center">${fmtA(totNet30)}</td>
+      <td class="text-center">${fmtN(totFtc30)}</td>
     </tr>`;
   }
 
