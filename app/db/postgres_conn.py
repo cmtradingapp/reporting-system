@@ -2973,15 +2973,20 @@ def ensure_materialized_views() -> None:
 
 
 _MV_ORDER = [
-    "mv_daily_kpis",      # base — must be first
-    "mv_volume_stats",    # independent
-    "mv_sales_bonuses",   # independent
-    "mv_run_rate",        # depends on mv_daily_kpis — must be last
-    "mv_account_stats",   # independent — new leads + live accounts
-    "mv_std_clients",     # independent — STD (second deposit after $240 running total)
-    "mv_retention_traders",  # independent — total traders report (positions+trades per day/account)
-    "mv_mt5_resolved",       # independent — pre-computed MT5 self-join for ftc_date + fsa_report
+    "mv_daily_kpis",         # base — must be first
+    "mv_volume_stats",       # independent
+    "mv_sales_bonuses",      # independent
+    "mv_run_rate",           # depends on mv_daily_kpis — must be last
+    "mv_account_stats",      # independent — new leads + live accounts
+    "mv_std_clients",        # independent — STD (second deposit after $240 running total)
+    "mv_retention_traders",  # independent — total traders report
+    # mv_mt5_resolved is NOT in this list — it has 8.7M rows and takes too long
+    # to refresh concurrently every minute. It is refreshed on its own hourly
+    # schedule via refresh_mv_mt5_resolved() with a separate advisory lock.
 ]
+
+# mv_mt5_resolved refreshed separately (hourly) to avoid blocking the per-minute cycle
+_MV_MT5_LOCK_ID = 123456790  # different lock from main refresh (123456789)
 
 # Module-level status dict — kept for backward compat but no longer the source of truth.
 # The authoritative last_refresh is stored in mv_refresh_log (PostgreSQL) so all workers share it.
@@ -3087,6 +3092,58 @@ def refresh_single_mv(mv_name: str) -> None:
                 pass
     finally:
         # Reset statement_timeout to default before returning to pool
+        try:
+            conn.rollback()
+            with conn.cursor() as cur:
+                cur.execute("RESET statement_timeout"); cur.execute("RESET lock_timeout")
+            conn.commit()
+        except Exception:
+            pass
+        conn.close()
+
+
+def refresh_mv_mt5_resolved() -> None:
+    """Refresh mv_mt5_resolved on its own schedule (hourly).
+    Uses a separate advisory lock so it never blocks the per-minute MV refresh cycle.
+    Always uses non-concurrent refresh (CONCURRENTLY is too slow for 8.7M rows with ROW_NUMBER).
+    """
+    from datetime import datetime, timezone
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT pg_try_advisory_lock(%s)", (_MV_MT5_LOCK_ID,))
+            got_lock = cur.fetchone()[0]
+        conn.commit()
+        if not got_lock:
+            return
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SET statement_timeout = 0")
+                cur.execute("SET lock_timeout = 0")
+                cur.execute("REFRESH MATERIALIZED VIEW mv_mt5_resolved")
+            conn.commit()
+            ts = datetime.now(timezone.utc).isoformat()
+            _mv_refresh_status["mv_mt5_resolved"]["last_refresh"] = ts
+            _mv_refresh_status["mv_mt5_resolved"]["last_error"]   = None
+            _pg_update_mv_refresh("mv_mt5_resolved", ts, None)
+            print(f"[refresh_mv_mt5_resolved] done at {ts}")
+        except Exception as e:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            err = str(e)
+            _mv_refresh_status["mv_mt5_resolved"]["last_error"] = err
+            _pg_update_mv_refresh("mv_mt5_resolved", _mv_refresh_status["mv_mt5_resolved"].get("last_refresh"), err)
+            print(f"[refresh_mv_mt5_resolved] error: {e}")
+        finally:
+            try:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT pg_advisory_unlock(%s)", (_MV_MT5_LOCK_ID,))
+                conn.commit()
+            except Exception:
+                pass
+    finally:
         try:
             conn.rollback()
             with conn.cursor() as cur:

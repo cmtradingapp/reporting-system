@@ -33,7 +33,7 @@ from app.routes.transactions_report import router as transactions_report_router
 from app.routes.fsa_report import router as fsa_report_router
 from app.routes.mssql_dealio_mt5trades_sync import router as mssql_dealio_mt5trades_sync_router
 from app.routes.daily_monthly_performance import router as dmp_router
-from app.db.postgres_conn import ensure_table, ensure_auth_table, seed_admin_user, seed_company_targets, ensure_client_classification_table, ensure_bonus_transactions_table, ensure_daily_equity_zeroed_table, ensure_materialized_views, refresh_materialized_views, backfill_classification_int, ensure_agent_dept_history_table, ensure_dealio_positions_table, ensure_mssql_dealio_mt5trades_table, ensure_mv_refresh_log
+from app.db.postgres_conn import ensure_table, ensure_auth_table, seed_admin_user, seed_company_targets, ensure_client_classification_table, ensure_bonus_transactions_table, ensure_daily_equity_zeroed_table, ensure_materialized_views, refresh_materialized_views, refresh_mv_mt5_resolved, backfill_classification_int, ensure_agent_dept_history_table, ensure_dealio_positions_table, ensure_mssql_dealio_mt5trades_table, ensure_mv_refresh_log
 import threading
 import fcntl
 from app.auth.auth import hash_password
@@ -380,6 +380,17 @@ async def lifespan(app: FastAPI):
         minutes=MV_REFRESH_INTERVAL_MINUTES,
         id="mv_refresh",
         start_date=_base + timedelta(seconds=90),
+        replace_existing=True,
+        max_instances=1,
+    )
+    # mv_mt5_resolved refreshed hourly on its own schedule — too large (8.7M rows)
+    # to include in the per-minute cycle without blocking all other MVs
+    scheduler.add_job(
+        refresh_mv_mt5_resolved,
+        "interval",
+        hours=1,
+        id="mv_mt5_refresh",
+        start_date=_base + timedelta(seconds=120),
         replace_existing=True,
         max_instances=1,
     )
