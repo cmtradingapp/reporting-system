@@ -120,6 +120,8 @@ async def scoreboard_page(request: Request):
     ap = user.get("allowed_pages_list")
     if role == "marketing" and ap is None:
         return RedirectResponse(url="/campaign-performance", status_code=302)
+    if role == "admin":
+        ap = None  # admins always get full access regardless of allowed_pages
     if ap is not None and "performance" not in ap:
         # Prefer daily_monthly as first fallback (renamed to "Performance")
         if "daily_monthly" in ap:
