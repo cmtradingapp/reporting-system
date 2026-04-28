@@ -248,9 +248,9 @@
     </div>
     <div class="col-md-6 col-lg-3">
       <div class="kpi-card">
-        <div class="kpi-label"><i class="bi bi-star me-1"></i>Avg Sales Client Potential</div>
-        <div class="kpi-value" id="kpiAvgScore" style="color:#d29922;">—</div>
-        <div class="kpi-sub">Avg score of traders (1–10)</div>
+        <div class="kpi-label"><i class="bi bi-currency-dollar me-1"></i>Net Deposits</div>
+        <div class="kpi-value" id="kpiNetDeposits" style="color:#3fb950;">—</div>
+        <div class="kpi-sub">Deposits − Withdrawals (Retention)</div>
       </div>
     </div>
   </div>
@@ -410,7 +410,17 @@ function renderKPIs(d) {
   document.getElementById('kpiTraders').textContent = fmt(d.totals.traders);
   document.getElementById('kpiDepositors').textContent = fmt(d.totals.depositors);
   document.getElementById('kpiDepositorPct').textContent = (d.totals.depositor_pct ?? 0).toFixed(2) + '%';
-  document.getElementById('kpiAvgScore').textContent = (d.totals.avg_score ?? 0).toFixed(2);
+  const net = d.totals.net ?? 0;
+  const sign = net < 0 ? '-' : '';
+  const absNet = Math.abs(net);
+  const netFmt = absNet >= 1000000
+    ? sign + '$' + (absNet / 1000000).toFixed(2) + 'M'
+    : absNet >= 1000
+    ? sign + '$' + Math.round(absNet).toLocaleString('en-US')
+    : sign + '$' + absNet.toFixed(2);
+  const netEl = document.getElementById('kpiNetDeposits');
+  netEl.textContent = netFmt;
+  netEl.style.color = net < 0 ? '#f85149' : '#3fb950';
   document.getElementById('kpiPeriod').textContent = d.date_from + ' → ' + d.date_to;
 }
 
