@@ -1161,7 +1161,7 @@ def list_auth_users() -> list:
                     'last_login': r[8].strftime('%Y-%m-%d %H:%M') if r[8] else '',
                     'crm_name': r[9] or '',
                     'allowed_pages': r[10] or '',
-                    'extra_roles': _json.dumps(r[11]) if isinstance(r[11], list) else (r[11] or ''),
+                    'extra_roles': __import__('json').dumps(r[11]) if isinstance(r[11], list) else (r[11] or ''),
                 }
                 for r in rows
             ]
