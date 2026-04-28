@@ -808,7 +808,11 @@ def upsert_accounts(df: pd.DataFrame):
     # overwritten back to 0 by a subsequent MySQL sync that still has is_test=0.
     update_set = ", ".join(
         "is_test_account = GREATEST(EXCLUDED.is_test_account, accounts.is_test_account)"
-        if c == "is_test_account" else f"{c} = EXCLUDED.{c}"
+        if c == "is_test_account" else
+        # Keep age-based fallback: only overwrite classification_int if CRM provides a value
+        "classification_int = COALESCE(EXCLUDED.classification_int, accounts.classification_int)"
+        if c == "classification_int" else
+        f"{c} = EXCLUDED.{c}"
         for c in update_cols
     )
     col_list = ", ".join(cols)
