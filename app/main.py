@@ -431,10 +431,19 @@ def _warm_report_caches(date_from: str, date_to: str):
 app = FastAPI(title="Agent Performance Report", lifespan=lifespan)
 
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import Response
 import pathlib
 app.add_middleware(GZipMiddleware, minimum_size=500)
-app.mount("/static", StaticFiles(directory=pathlib.Path(__file__).parent / "static"), name="static")
+
+_STATIC_DIR = pathlib.Path(__file__).parent / "static"
+_STATIC_TYPES = {".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon", ".webp": "image/webp"}
+
+@app.get("/static/{filename}")
+async def static_file(filename: str):
+    path = _STATIC_DIR / filename
+    if not path.exists() or not path.is_file():
+        return Response(status_code=404)
+    return Response(content=path.read_bytes(), media_type=_STATIC_TYPES.get(path.suffix.lower(), "application/octet-stream"))
 
 
 @app.get("/")
