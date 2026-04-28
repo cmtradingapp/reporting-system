@@ -3405,3 +3405,40 @@ def fetch_mssql_dealio_mt5trades_stats() -> dict:
         return {"total_records": 0, "last_synced_at": "Unknown"}
     finally:
         conn.close()
+
+
+def backfill_age_classification() -> int:
+    """Nightly job: set classification_int from birth_date for accounts that
+    have a birth_date but no explicit classification (NULL or out of 1-10 range).
+    Scale: <25→3, 25-29→4, 30-34→5, 35-44→6, 45+→7.
+    """
+    sql = """
+        UPDATE accounts
+        SET classification_int = CASE
+            WHEN DATE_PART('year', AGE(NOW(), birth_date::date)) < 25              THEN 3
+            WHEN DATE_PART('year', AGE(NOW(), birth_date::date)) BETWEEN 25 AND 29 THEN 4
+            WHEN DATE_PART('year', AGE(NOW(), birth_date::date)) BETWEEN 30 AND 34 THEN 5
+            WHEN DATE_PART('year', AGE(NOW(), birth_date::date)) BETWEEN 35 AND 44 THEN 6
+            WHEN DATE_PART('year', AGE(NOW(), birth_date::date)) >= 45             THEN 7
+        END
+        WHERE birth_date IS NOT NULL
+          AND is_test_account = 0
+          AND (is_demo = 0 OR is_demo IS NULL)
+          AND (classification_int IS NULL OR classification_int NOT BETWEEN 1 AND 10)
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+            updated = cur.rowcount
+        conn.commit()
+        if updated:
+            print(f"[backfill_age_classification] updated {updated:,} accounts")
+        return updated
+    except Exception as e:
+        conn.rollback()
+        print(f"[backfill_age_classification] error: {e}")
+        return 0
+    finally:
+        conn.close()
+
