@@ -132,7 +132,7 @@
   <div style="padding:14px 20px;border-top:1px solid #30363d;">
     <div style="font-size:0.68rem;color:#8b949e;margin-bottom:2px;">Signed in as</div>
     <div style="font-weight:600;font-size:0.82rem;color:#e0e0e0;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ current_user.full_name }}</div>
-    <div style="font-size:0.7rem;color:#3fb950;margin-bottom:8px;">{{ current_user.role | replace('_', ' ') | title }}</div>
+    <div style="font-size:0.7rem;color:#3fb950;margin-bottom:8px;">{{ current_user.role | replace('_', ' ') | title }}{% if current_user.extra_roles %} + {% for r in current_user.extra_roles %}{{ r | replace('_', ' ') | title }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}</div>
     <div style="display:flex;gap:12px;align-items:center;">
       {% if current_user.role == 'admin' %}<a href="/admin/users" style="color:#8b949e;text-decoration:none;font-size:1.05rem;" title="Admin Users"><i class="bi bi-people-fill"></i></a>{% endif %}
       <a href="/logout" style="color:#f85149;text-decoration:none;font-size:1.05rem;" title="Logout"><i class="bi bi-box-arrow-right"></i></a>
