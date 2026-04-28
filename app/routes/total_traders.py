@@ -236,7 +236,6 @@ async def total_traders_api(
     _txn_where = f"""t.transactionapproval = 'Approved'
           AND (t.deleted = 0 OR t.deleted IS NULL)
           AND t.transaction_type_name IN ('Deposit','Withdrawal Cancelled','Withdrawal','Deposit Cancelled')
-          AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
           AND t.vtigeraccountid IS NOT NULL
           AND a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)
           AND a.accountid IS NOT NULL AND a.accountid::text != ''
@@ -310,8 +309,7 @@ async def total_traders_api(
                 WHERE t.transactionapproval = 'Approved'
                   AND (t.deleted = 0 OR t.deleted IS NULL)
                   AND t.transaction_type_name = 'Deposit'
-                  AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'
-                  AND t.vtigeraccountid IS NOT NULL
+                          AND t.vtigeraccountid IS NOT NULL
                   AND a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)
                   AND a.accountid IS NOT NULL AND a.accountid::text != ''
                   AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
