@@ -243,6 +243,9 @@
             <option value="retention_bg_team1">Retention — BG Team 1</option>
             <option value="retention_bg_team2">Retention — BG Team 2</option>
             <option value="retention_bg_team3">Retention — BG Team 3</option>
+            <option value="retention_abj_ng_team1">Retention — ABJ-NG Team 1</option>
+            <option value="retention_abj_ng_team2">Retention — ABJ-NG Team 2</option>
+            <option value="retention_abj_ng_team3">Retention — ABJ-NG Team 3</option>
             <option value="sales_all">Sales — All</option>
             <option value="sales_gmt">Sales — GMT</option>
             <option value="sales_lag_ng">Sales — LAG-NG</option>
@@ -328,6 +331,9 @@
             <option value="retention_bg_team1">Retention — BG Team 1</option>
             <option value="retention_bg_team2">Retention — BG Team 2</option>
             <option value="retention_bg_team3">Retention — BG Team 3</option>
+            <option value="retention_abj_ng_team1">Retention — ABJ-NG Team 1</option>
+            <option value="retention_abj_ng_team2">Retention — ABJ-NG Team 2</option>
+            <option value="retention_abj_ng_team3">Retention — ABJ-NG Team 3</option>
             <option value="sales_all">Sales — All</option>
             <option value="sales_gmt">Sales — GMT</option>
             <option value="sales_lag_ng">Sales — LAG-NG</option>
@@ -335,6 +341,30 @@
             <option value="sales_sa">Sales — SA</option>
             <option value="sales_bg">Sales — BG</option>
           </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Additional Roles <span style="font-size:0.75rem;color:#8b949e;">(hold Ctrl/Cmd to select multiple)</span></label>
+          <select id="edit-extra-roles" class="form-select" multiple style="height:140px;background:#161b22;color:#c9d1d9;border:1px solid #30363d;">
+            <option value="retention_all">Retention — All</option>
+            <option value="retention_gmt">Retention — GMT</option>
+            <option value="retention_cy">Retention — CY</option>
+            <option value="retention_abj_ng">Retention — ABJ-NG</option>
+            <option value="retention_lag_ng">Retention — LAG-NG</option>
+            <option value="retention_sa">Retention — SA</option>
+            <option value="retention_bg_team1">Retention — BG Team 1</option>
+            <option value="retention_bg_team2">Retention — BG Team 2</option>
+            <option value="retention_bg_team3">Retention — BG Team 3</option>
+            <option value="retention_abj_ng_team1">Retention — ABJ-NG Team 1</option>
+            <option value="retention_abj_ng_team2">Retention — ABJ-NG Team 2</option>
+            <option value="retention_abj_ng_team3">Retention — ABJ-NG Team 3</option>
+            <option value="sales_all">Sales — All</option>
+            <option value="sales_gmt">Sales — GMT</option>
+            <option value="sales_lag_ng">Sales — LAG-NG</option>
+            <option value="sales_abj_ng">Sales — ABJ-NG</option>
+            <option value="sales_sa">Sales — SA</option>
+            <option value="sales_bg">Sales — BG</option>
+          </select>
+          <div style="font-size:0.75rem;color:#8b949e;margin-top:4px;">User will see the union of Primary Role + Additional Roles</div>
         </div>
         <div class="mb-3">
           <label class="form-label">Active</label>
@@ -497,6 +527,11 @@
     let apList = [];
     try { apList = JSON.parse(u.allowed_pages || '[]'); } catch(e) { apList = []; }
     _AP_KEYS.forEach(p => { document.getElementById(`edit-ap-${p}`).checked = apList.includes(p); });
+    // Populate extra_roles multi-select
+    let erList = [];
+    try { erList = JSON.parse(u.extra_roles || '[]'); } catch(e) { erList = []; }
+    const erSel = document.getElementById('edit-extra-roles');
+    Array.from(erSel.options).forEach(o => { o.selected = erList.includes(o.value); });
     new bootstrap.Modal(document.getElementById('editUserModal')).show();
   }
 
@@ -509,6 +544,11 @@
       is_active: parseInt(document.getElementById('edit-active').value),
       crm_user_id: document.getElementById('edit-crm-user-id').value || null,
       allowed_pages: getCheckedPages('edit'),
+      extra_roles: (() => {
+        const sel = document.getElementById('edit-extra-roles');
+        const vals = Array.from(sel.selectedOptions).map(o => o.value);
+        return vals.length > 0 ? vals : null;
+      })(),
     };
     fetch(`/api/admin/users/${id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) })
       .then(r => { if (!r.ok) throw new Error('Server error ' + r.status); return r.json(); })

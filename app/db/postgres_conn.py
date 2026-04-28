@@ -1085,7 +1085,8 @@ def get_auth_user_by_id(user_id: int) -> dict | None:
         return cached[0]
     sql = """
         SELECT a.id, a.crm_user_id, a.email, a.full_name, a.password_hash, a.role,
-               a.is_active, a.force_password_change, c.department_, a.allowed_pages
+               a.is_active, a.force_password_change, c.department_, a.allowed_pages,
+               a.extra_roles
         FROM auth_users a
         LEFT JOIN crm_users c ON c.id = a.crm_user_id
         WHERE a.id = %s
@@ -1098,10 +1099,15 @@ def get_auth_user_by_id(user_id: int) -> dict | None:
             if row is None:
                 return None
             ap_raw = row[9]
+            er_raw = row[10]
             try:
                 ap_list = _json.loads(ap_raw) if ap_raw else None
             except Exception:
                 ap_list = None
+            try:
+                er_list = _json.loads(er_raw) if er_raw else []
+            except Exception:
+                er_list = []
             result = {
                 'id': row[0], 'crm_user_id': row[1], 'email': row[2],
                 'full_name': row[3], 'password_hash': row[4], 'role': row[5],
@@ -1109,6 +1115,7 @@ def get_auth_user_by_id(user_id: int) -> dict | None:
                 'department_': row[8],
                 'allowed_pages': ap_raw,
                 'allowed_pages_list': ap_list,
+                'extra_roles': er_list,
             }
             _auth_user_cache[user_id] = (result, now + _AUTH_CACHE_TTL)
             return result
@@ -1131,7 +1138,7 @@ def list_auth_users() -> list:
         SELECT
             a.id, a.crm_user_id, a.email, a.full_name, a.role,
             a.is_active, a.force_password_change, a.created_at, a.last_login,
-            COALESCE(c.agent_name, c.full_name) AS crm_name, a.allowed_pages
+            COALESCE(c.agent_name, c.full_name) AS crm_name, a.allowed_pages, a.extra_roles
         FROM auth_users a
         LEFT JOIN crm_users c ON c.id = a.crm_user_id
         ORDER BY a.id
@@ -1149,6 +1156,7 @@ def list_auth_users() -> list:
                     'last_login': r[8].strftime('%Y-%m-%d %H:%M') if r[8] else '',
                     'crm_name': r[9] or '',
                     'allowed_pages': r[10] or '',
+                    'extra_roles': r[11] or '',
                 }
                 for r in rows
             ]
@@ -1173,17 +1181,18 @@ def create_auth_user(email: str, full_name: str, password_hash: str, role: str, 
         conn.close()
 
 
-def update_auth_user(user_id: int, full_name: str, email: str, role: str, is_active: int, crm_user_id, allowed_pages: str | None = None):
+def update_auth_user(user_id: int, full_name: str, email: str, role: str, is_active: int, crm_user_id, allowed_pages: str | None = None, extra_roles: str | None = None):
     sql = """
         UPDATE auth_users
-        SET full_name = %s, email = %s, role = %s, is_active = %s, crm_user_id = %s, allowed_pages = %s
+        SET full_name = %s, email = %s, role = %s, is_active = %s, crm_user_id = %s,
+            allowed_pages = %s, extra_roles = %s
         WHERE id = %s
     """
     conn = get_connection()
     try:
         with conn.cursor() as cur:
             cur.execute("SET LOCAL lock_timeout = '5s'")
-            cur.execute(sql, (full_name, email, role, is_active, crm_user_id or None, allowed_pages or None, user_id))
+            cur.execute(sql, (full_name, email, role, is_active, crm_user_id or None, allowed_pages or None, extra_roles or None, user_id))
         conn.commit()
     finally:
         conn.close()

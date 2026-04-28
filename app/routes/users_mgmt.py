@@ -64,6 +64,8 @@ async def api_update_user(user_id: int, request: Request):
     body = await request.json()
     ap_list = body.get('allowed_pages') or None
     allowed_pages = _json.dumps(ap_list) if ap_list else None
+    er_list = body.get('extra_roles') or None
+    extra_roles = _json.dumps(er_list) if er_list else None
     try:
         update_auth_user(
             user_id,
@@ -73,6 +75,7 @@ async def api_update_user(user_id: int, request: Request):
             int(body.get('is_active', 1)),
             body.get('crm_user_id') or None,
             allowed_pages,
+            extra_roles,
         )
         return JSONResponse(content={"status": "ok"})
     except Exception as e:
