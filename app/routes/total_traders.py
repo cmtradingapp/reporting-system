@@ -257,10 +257,11 @@ async def total_traders_api(
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            # Q1: Traders daily + avg score daily (combined, was 2 queries)
+            # Q1: Traders daily + avg score daily + high quality traders daily
             cur.execute(f"""
                 SELECT rt.day, COUNT(DISTINCT rt.accountid),
-                       ROUND(AVG({_score_case.format(ref='rt.day')}), 2)
+                       ROUND(AVG({_score_case.format(ref='rt.day')}), 2),
+                       COUNT(DISTINCT CASE WHEN a.classification_int BETWEEN 6 AND 10 THEN rt.accountid END)
                 FROM mv_retention_traders rt
                 JOIN accounts a ON a.accountid = rt.accountid
                 LEFT JOIN crm_users u ON u.id = rt.assigned_to
@@ -268,8 +269,9 @@ async def total_traders_api(
                 GROUP BY 1
             """, params)
             _rows = cur.fetchall()
-            traders_map = {r[0].strftime("%Y-%m-%d"): int(r[1]) for r in _rows}
-            avg_score_map = {r[0].strftime("%Y-%m-%d"): float(r[2]) for r in _rows if r[2] is not None}
+            traders_map    = {r[0].strftime("%Y-%m-%d"): int(r[1]) for r in _rows}
+            avg_score_map  = {r[0].strftime("%Y-%m-%d"): float(r[2]) for r in _rows if r[2] is not None}
+            high_traders_map = {r[0].strftime("%Y-%m-%d"): int(r[3]) for r in _rows}
 
             # Q2: Traders total + avg score total (combined, was 2 queries)
             cur.execute(f"""
@@ -424,7 +426,7 @@ async def total_traders_api(
     finally:
         conn.close()
 
-    labels, traders_series, deps_series, avg_score_series, net_series = [], [], [], [], []
+    labels, traders_series, deps_series, avg_score_series, net_series, high_traders_series = [], [], [], [], [], []
     cur_d = dt_from
     while cur_d <= dt_end:
         # Skip weekends (Saturday=5, Sunday=6)
@@ -435,6 +437,7 @@ async def total_traders_api(
             deps_series.append(deps_map.get(key, 0))
             avg_score_series.append(avg_score_map.get(key, 0))
             net_series.append(net_map.get(key, 0))
+            high_traders_series.append(high_traders_map.get(key, 0))
         cur_d += timedelta(days=1)
 
     result = {
@@ -452,6 +455,7 @@ async def total_traders_api(
             "depositors": deps_series,
             "avg_score": avg_score_series,
             "net": net_series,
+            "high_traders": high_traders_series,
         },
     }
     if matrix_data:

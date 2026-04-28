@@ -444,12 +444,12 @@ function renderChart(d) {
                         formatter: v => v > 0 ? v.toLocaleString('en-US') : '' }
         },
         {
-          type: 'line', label: 'Avg Score', data: d.series.avg_score, yAxisID: 'y1',
-          borderColor: '#d29922', backgroundColor: 'rgba(210,153,34,0.1)', tension: 0.3, fill: false,
-          pointRadius: 3, pointHoverRadius: 5, pointBackgroundColor: '#d29922', pointBorderColor: '#0f1117', pointBorderWidth: 1.5,
-          borderWidth: 2, borderDash: [5, 3], order: 2,
-          datalabels: { anchor: 'end', align: 'bottom', color: '#d29922', font: { size: 11, weight: '700' },
-                        formatter: v => v > 0 ? v.toFixed(1) : '' }
+          type: 'line', label: 'High Quality', data: d.series.high_traders || [], yAxisID: 'y',
+          borderColor: '#f0883e', backgroundColor: 'rgba(240,136,62,0.08)', tension: 0.25, fill: false,
+          pointRadius: 3, pointHoverRadius: 5, pointBackgroundColor: '#f0883e', pointBorderColor: '#0f1117', pointBorderWidth: 1.5,
+          borderWidth: 2, order: 2,
+          datalabels: { anchor: 'end', align: 'bottom', color: '#f0883e', font: { size: 10, weight: '600' },
+                        formatter: v => v > 0 ? v.toLocaleString('en-US') : '' }
         },
       ]
     },
@@ -479,8 +479,7 @@ function renderChart(d) {
       interaction: { mode: 'index', intersect: false },
       scales: {
         x: { ticks: { color: '#8b949e', maxRotation: 0, autoSkip: true }, grid: { color: '#21262d' } },
-        y: { beginAtZero: true, ticks: { color: '#8b949e' }, grid: { color: '#21262d' }, position: 'left' },
-        y1: { beginAtZero: true, max: 10, ticks: { color: '#d29922', stepSize: 1 }, grid: { drawOnChartArea: false }, position: 'right', title: { display: true, text: 'Avg Score', color: '#d29922', font: { size: 11 } } }
+        y: { beginAtZero: true, ticks: { color: '#8b949e' }, grid: { color: '#21262d' }, position: 'left' }
       }
     }
   });
@@ -497,37 +496,25 @@ function updateChartForAgents(agentIds, label) {
   const days = d.series.labels;
   const m = d.matrix;
 
-  const traders = [], depositors = [], avgScores = [], nets = [];
+  const traders = [], depositors = [], nets = [];
   days.forEach(day => {
-    let tSet = new Set(), depSet = new Set(), scoreSum = 0, scoreN = 0, net = 0;
-    agentIds.forEach(id => {
-      const ad = _matrixAgentData[id] || {};
-      const dd = ad[day] || {};
-      // traders: count distinct accountids — we only have counts, so sum them
-      tSet = null; // can't do true distinct across agents, use sum as proxy
-      if (dd.traders) { }
-      if (dd.depositors) { }
-    });
-    // Use summed counts (same as matrix table does)
-    let tCount = 0, dCount = 0;
+    let net = 0, tCount = 0, dCount = 0;
     agentIds.forEach(id => {
       const ad = _matrixAgentData[id] || {};
       const dd = ad[day] || {};
       tCount += dd.traders || 0;
       dCount += dd.depositors || 0;
       net += dd.net || 0;
-      if (dd.avg_score) { scoreSum += dd.avg_score * (dd.traders || 1); scoreN += dd.traders || 1; }
     });
     traders.push(tCount);
     depositors.push(dCount);
-    avgScores.push(scoreN > 0 ? Math.round(scoreSum / scoreN * 100) / 100 : 0);
     nets.push(Math.round(net * 100) / 100);
   });
 
-  // Update chart datasets
+  // Update chart datasets (0=Depositors, 1=Traders, 2=High Quality)
   chart.data.datasets[0].data = depositors;
   chart.data.datasets[1].data = traders;
-  chart.data.datasets[2].data = avgScores;
+  chart.data.datasets[2].data = []; // high quality not filterable by agent
   chart.update();
 
   // Update tooltip net data
@@ -584,11 +571,11 @@ function renderMatrix(d) {
   days.forEach(day => {
     const parts = day.split('-');
     const label = parseInt(parts[2]) + '/' + parseInt(parts[1]) + '/' + parts[0];
-    h1 += `<th class="date-group day-sep" colspan="5">${label}</th>`;
-    h2 += `<th class="date-sub day-sep sortable" data-sort-col="${colIdx++}">Traders${arrow}</th><th class="date-sub sortable" data-sort-col="${colIdx++}">Avg Score${arrow}</th><th class="date-sub sortable" data-sort-col="${colIdx++}">#Dep${arrow}</th><th class="date-sub sortable" data-sort-col="${colIdx++}">NET${arrow}</th><th class="date-sub sortable" data-sort-col="${colIdx++}">%Dep${arrow}</th>`;
+    h1 += `<th class="date-group day-sep" colspan="4">${label}</th>`;
+    h2 += `<th class="date-sub day-sep sortable" data-sort-col="${colIdx++}">Traders${arrow}</th><th class="date-sub sortable" data-sort-col="${colIdx++}">#Dep${arrow}</th><th class="date-sub sortable" data-sort-col="${colIdx++}">NET${arrow}</th><th class="date-sub sortable" data-sort-col="${colIdx++}">%Dep${arrow}</th>`;
   });
-  h1 += '<th class="date-group day-sep" colspan="5" style="background:#1a2636;">Total</th></tr>';
-  h2 += `<th class="date-sub day-sep sortable" data-sort-col="${colIdx++}" style="background:#1a2636;">Traders${arrow}</th><th class="date-sub sortable" data-sort-col="${colIdx++}" style="background:#1a2636;">Avg Score${arrow}</th><th class="date-sub sortable" data-sort-col="${colIdx++}" style="background:#1a2636;">#Dep${arrow}</th><th class="date-sub sortable" data-sort-col="${colIdx++}" style="background:#1a2636;">NET${arrow}</th><th class="date-sub sortable" data-sort-col="${colIdx++}" style="background:#1a2636;">%Dep${arrow}</th></tr>`;
+  h1 += '<th class="date-group day-sep" colspan="4" style="background:#1a2636;">Total</th></tr>';
+  h2 += `<th class="date-sub day-sep sortable" data-sort-col="${colIdx++}" style="background:#1a2636;">Traders${arrow}</th><th class="date-sub sortable" data-sort-col="${colIdx++}" style="background:#1a2636;">#Dep${arrow}</th><th class="date-sub sortable" data-sort-col="${colIdx++}" style="background:#1a2636;">NET${arrow}</th><th class="date-sub sortable" data-sort-col="${colIdx++}" style="background:#1a2636;">%Dep${arrow}</th></tr>`;
   thead.innerHTML = h1 + h2;
 
   // Index agent data: agentId -> { day -> {traders, depositors, net} }
@@ -669,20 +656,18 @@ function renderMatrix(d) {
     return totals;
   }
 
-  const fmtScore = v => v > 0 ? v.toFixed(2) : '';
   function makeCells(dayTotals, totalsObj) {
     let html = '';
     days.forEach(day => {
       const t = dayTotals[day].traders;
-      const sc = dayTotals[day].avg_score || 0;
       const dep = dayTotals[day].depositors;
       const n = dayTotals[day].net;
       const nCls = n < 0 ? ' val-neg' : (n === 0 ? ' val-zero' : '');
-      html += `<td class="day-sep">${fmtN(t)}</td><td style="color:#d29922;">${fmtScore(sc)}</td><td>${fmtN(dep)}</td><td class="${nCls}">${fmtMoney(n)}</td><td>${fmtPct(dep, t)}</td>`;
+      html += `<td class="day-sep">${fmtN(t)}</td><td>${fmtN(dep)}</td><td class="${nCls}">${fmtMoney(n)}</td><td>${fmtPct(dep, t)}</td>`;
     });
-    const tt = totalsObj.traders, tsc = totalsObj.avg_score || 0, td = totalsObj.depositors, tn = totalsObj.net;
+    const tt = totalsObj.traders, td = totalsObj.depositors, tn = totalsObj.net;
     const nCls = tn < 0 ? ' val-neg' : (tn === 0 ? ' val-zero' : '');
-    html += `<td class="day-sep"><b>${fmtN(tt)}</b></td><td style="color:#d29922;"><b>${fmtScore(tsc)}</b></td><td><b>${fmtN(td)}</b></td><td class="${nCls}"><b>${fmtMoney(tn)}</b></td><td><b>${fmtPct(td, tt)}</b></td>`;
+    html += `<td class="day-sep"><b>${fmtN(tt)}</b></td><td><b>${fmtN(td)}</b></td><td class="${nCls}"><b>${fmtMoney(tn)}</b></td><td><b>${fmtPct(td, tt)}</b></td>`;
     return html;
   }
 
@@ -903,13 +888,12 @@ function renderMatrix(d) {
   days.forEach(day => { grandDays[day].avg_score = grandDays[day]._scoreN > 0 ? Math.round(grandDays[day]._scoreSum / grandDays[day]._scoreN * 100) / 100 : 0; });
   let footHtml = '<tr><td class="col-name"><b>Total</b></td>';
   days.forEach(day => {
-    const t = grandDays[day].traders, sc = grandDays[day].avg_score, dep = grandDays[day].depositors, n = grandDays[day].net;
+    const t = grandDays[day].traders, dep = grandDays[day].depositors, n = grandDays[day].net;
     const nCls = n < 0 ? ' val-neg' : (n === 0 ? ' val-zero' : '');
-    footHtml += `<td class="day-sep"><b>${fmtN(t)}</b></td><td style="color:#d29922;"><b>${fmtScore(sc)}</b></td><td><b>${fmtN(dep)}</b></td><td class="${nCls}"><b>${fmtMoney(n)}</b></td><td><b>${fmtPct(dep, t)}</b></td>`;
+    footHtml += `<td class="day-sep"><b>${fmtN(t)}</b></td><td><b>${fmtN(dep)}</b></td><td class="${nCls}"><b>${fmtMoney(n)}</b></td><td><b>${fmtPct(dep, t)}</b></td>`;
   });
   const gnCls = grandNetTotal < 0 ? ' val-neg' : (grandNetTotal === 0 ? ' val-zero' : '');
-  const gtAvgScore = d.totals.avg_score || 0;
-  footHtml += `<td class="day-sep"><b>${fmtN(gtTraders)}</b></td><td style="color:#d29922;"><b>${fmtScore(gtAvgScore)}</b></td><td><b>${fmtN(gtDeps)}</b></td><td class="${gnCls}"><b>${fmtMoney(grandNetTotal)}</b></td><td><b>${fmtPct(gtDeps, gtTraders)}</b></td></tr>`;
+  footHtml += `<td class="day-sep"><b>${fmtN(gtTraders)}</b></td><td><b>${fmtN(gtDeps)}</b></td><td class="${gnCls}"><b>${fmtMoney(grandNetTotal)}</b></td><td><b>${fmtPct(gtDeps, gtTraders)}</b></td></tr>`;
   tfoot.innerHTML = footHtml;
 }
 
