@@ -264,6 +264,13 @@
         <div class="kpi-sub">Net Deposits / Total Traders</div>
       </div>
     </div>
+    <div class="col">
+      <div class="kpi-card">
+        <div class="kpi-label"><i class="bi bi-cash me-1"></i>LTV Depositors</div>
+        <div class="kpi-value" id="kpiLtvDepositors" style="color:#58a6ff;">—</div>
+        <div class="kpi-sub">Net Deposits / Depositors</div>
+      </div>
+    </div>
   </div>
 
   <!-- Chart -->
@@ -430,6 +437,9 @@ function renderKPIs(d) {
   const ltv = d.totals.ltv_traders ?? 0;
   const ltvEl = document.getElementById('kpiLtvTraders');
   if (ltvEl) ltvEl.textContent = '$' + Math.round(Math.abs(ltv)).toLocaleString('en-US');
+  const ltvDep = d.totals.ltv_depositors ?? 0;
+  const ltvDepEl = document.getElementById('kpiLtvDepositors');
+  if (ltvDepEl) ltvDepEl.textContent = '$' + Math.round(Math.abs(ltvDep)).toLocaleString('en-US');
   document.getElementById('kpiPeriod').textContent = d.date_from + ' → ' + d.date_to;
 }
 

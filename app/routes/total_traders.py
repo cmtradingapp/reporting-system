@@ -447,7 +447,8 @@ async def total_traders_api(
             "depositor_pct": round((deps_total / traders_total * 100), 2) if traders_total else 0.0,
             "avg_score": avg_score_total,
             "net": round(sum(net_map.values()), 2),
-            "ltv_traders": round(sum(net_map.values()) / traders_total, 2) if traders_total else 0.0,
+            "ltv_traders":    round(sum(net_map.values()) / traders_total, 2) if traders_total else 0.0,
+            "ltv_depositors": round(sum(net_map.values()) / deps_total,    2) if deps_total    else 0.0,
         },
         "series": {
             "labels": labels,
