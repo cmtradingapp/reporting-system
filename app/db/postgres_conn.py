@@ -1104,9 +1104,14 @@ def get_auth_user_by_id(user_id: int) -> dict | None:
                 ap_list = _json.loads(ap_raw) if ap_raw else None
             except Exception:
                 ap_list = None
-            try:
-                er_list = _json.loads(er_raw) if er_raw else []
-            except Exception:
+            if isinstance(er_raw, list):
+                er_list = er_raw  # JSONB already parsed by psycopg2
+            elif er_raw:
+                try:
+                    er_list = _json.loads(er_raw)
+                except Exception:
+                    er_list = []
+            else:
                 er_list = []
             result = {
                 'id': row[0], 'crm_user_id': row[1], 'email': row[2],
@@ -1156,7 +1161,7 @@ def list_auth_users() -> list:
                     'last_login': r[8].strftime('%Y-%m-%d %H:%M') if r[8] else '',
                     'crm_name': r[9] or '',
                     'allowed_pages': r[10] or '',
-                    'extra_roles': r[11] or '',
+                    'extra_roles': _json.dumps(r[11]) if isinstance(r[11], list) else (r[11] or ''),
                 }
                 for r in rows
             ]
