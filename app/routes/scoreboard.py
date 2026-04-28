@@ -131,18 +131,23 @@ async def scoreboard_page(request: Request):
             if p in _page_urls:
                 return RedirectResponse(url=_page_urls[p], status_code=302)
         return RedirectResponse(url="/agent-bonuses", status_code=302)
+    _is_cro_admin = user.get("email", "") == "admin@cmtrading.com"
+    _ap = user.get("allowed_pages_list") or []
+
     if role == "agent":
         dept = user.get("department_") or ""
-        show_sales = dept != "Retention"
-        show_retention = dept != "Sales"
+        show_sales     = dept != "Retention" or "perf_sales"     in _ap
+        show_retention = dept != "Sales"     or "perf_retention" in _ap
     else:
-        show_sales = not role.startswith("retention_")
-        show_retention = not role.startswith("sales_")
+        show_sales     = (not role.startswith("retention_")) or "perf_sales"     in _ap
+        show_retention = (not role.startswith("sales_"))     or "perf_retention" in _ap
+
+    # Allow explicit per-user grants via allowed_pages
+    if "perf_sales"     in _ap: show_sales     = True
+    if "perf_retention" in _ap: show_retention = True
 
     # CRO view: admin@cmtrading.com sees both; sales_all sees sales CRO; retention_all sees retention CRO
     # Individual users can also get access via "cro_sales" / "cro_retention" in allowed_pages
-    _is_cro_admin = user.get("email", "") == "admin@cmtrading.com"
-    _ap = user.get("allowed_pages_list") or []
     show_cro_sales     = _is_cro_admin or role == "sales_all"     or "cro_sales"     in _ap
     show_cro_retention = _is_cro_admin or role == "retention_all" or "cro_retention" in _ap
 
