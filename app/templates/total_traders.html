@@ -412,7 +412,7 @@ function renderKPIs(d) {
   document.getElementById('kpiDepositorPct').textContent = (d.totals.depositor_pct ?? 0).toFixed(2) + '%';
   const net = d.totals.net ?? 0;
   const sign = net < 0 ? '-' : '';
-  const netFmt = sign + '$' + Math.abs(net).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  const netFmt = sign + '$' + Math.round(Math.abs(net)).toLocaleString('en-US');
   const netEl = document.getElementById('kpiNetDeposits');
   netEl.textContent = netFmt;
   netEl.style.color = net < 0 ? '#f85149' : '#3fb950';
