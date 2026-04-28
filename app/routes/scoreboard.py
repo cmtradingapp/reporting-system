@@ -171,7 +171,8 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
     role_filter = get_role_filter(user)
     cls_where, cls_params, cls_suffix = _build_cls_filter(request)
     has_cls = bool(cls_where)
-    _ck = f"perf_v26:{user.get('role','')}:{date_from}:{date_to}{cls_suffix}"
+    _er = ','.join(sorted(user.get('extra_roles') or []))
+    _ck = f"perf_v26:{user.get('role','')}:{_er}:{date_from}:{date_to}{cls_suffix}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -489,7 +490,8 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
     role_filter = get_role_filter(user)
     cls_where, cls_params, cls_suffix = _build_cls_filter(request)
     has_cls = bool(cls_where)
-    _ck = f"perf_ret_v21:{user.get('role','')}:{date_from}:{date_to}{cls_suffix}"
+    _er = ','.join(sorted(user.get('extra_roles') or []))
+    _ck = f"perf_ret_v21:{user.get('role','')}:{_er}:{date_from}:{date_to}{cls_suffix}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
