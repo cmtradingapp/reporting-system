@@ -1765,6 +1765,8 @@
       const wdR       = data.wd_in_range ?? wd;
       retWd = wd; retWdPassed = wd_passed; retWdLeft = wd_left;
       retTgtRatio = tgtR; retWdRange = wdR;
+      // For retention-only roles (no Sales API call), workingDays stays 0 — set it here
+      if (workingDays === 0) { workingDays = wd; workingDaysPassed = wd_passed; workingDaysLeft = wd_left; }
 
       retAllRows = data.rows.map(r => {
         const pTgt                = r.target_net * tgtR;
