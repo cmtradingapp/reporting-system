@@ -140,9 +140,11 @@ async def scoreboard_page(request: Request):
         show_retention = not role.startswith("sales_")
 
     # CRO view: admin@cmtrading.com sees both; sales_all sees sales CRO; retention_all sees retention CRO
+    # Individual users can also get access via "cro_sales" / "cro_retention" in allowed_pages
     _is_cro_admin = user.get("email", "") == "admin@cmtrading.com"
-    show_cro_sales     = _is_cro_admin or role == "sales_all"
-    show_cro_retention = _is_cro_admin or role == "retention_all"
+    _ap = user.get("allowed_pages_list") or []
+    show_cro_sales     = _is_cro_admin or role == "sales_all"     or "cro_sales"     in _ap
+    show_cro_retention = _is_cro_admin or role == "retention_all" or "cro_retention" in _ap
 
     return templates.TemplateResponse("scoreboard.html", {
         "request": request,
