@@ -358,7 +358,7 @@ async def dmp_retention_api(request: Request, date_from: str, date_to: str):
     cls_where, cls_params, cls_suffix = _build_cls_filter(request)
     has_cls = bool(cls_where)
     _er = ','.join(sorted(user.get('extra_roles') or []))
-    _ck = f"dmp_ret_v2:{user.get('role','')}:{_er}:{date_from}:{date_to}{cls_suffix}"
+    _ck = f"dmp_ret_v3:{user.get('role','')}:{_er}:{date_from}:{date_to}{cls_suffix}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -391,7 +391,8 @@ async def dmp_retention_api(request: Request, date_from: str, date_to: str):
             COALESCE(dt_std.daily_std, 0)::int                AS daily_std,
             COALESCE(loads.monthly_loads, 0)::int             AS monthly_loads,
             daily_scp.daily_avg_scp                           AS daily_avg_scp,
-            monthly_scp.monthly_avg_scp                       AS monthly_avg_scp
+            monthly_scp.monthly_avg_scp                       AS monthly_avg_scp,
+            COALESCE(trd.daily_traders_hq, 0)::int            AS daily_traders_hq
         FROM crm_users u
         LEFT JOIN ({tgt_subq}) tgt ON tgt.agent_id = u.id
         LEFT JOIN (
@@ -425,7 +426,18 @@ async def dmp_retention_api(request: Request, date_from: str, date_to: str):
         LEFT JOIN (
             SELECT rt.assigned_to AS agent_id,
                    COUNT(DISTINCT rt.accountid) AS traders_count,
-                   COUNT(DISTINCT CASE WHEN rt.day = %(date_to)s::date THEN rt.accountid END)::int AS daily_traders
+                   COUNT(DISTINCT CASE WHEN rt.day = %(date_to)s::date THEN rt.accountid END)::int AS daily_traders,
+                   COUNT(DISTINCT CASE WHEN rt.day = %(date_to)s::date
+                       AND (CASE WHEN a.classification_int IS NOT NULL AND a.classification_int > 0
+                                 THEN a.classification_int
+                                 WHEN a.birth_date IS NOT NULL THEN CASE
+                                   WHEN DATE_PART('year', AGE(%(date_to)s::date, a.birth_date::date)) BETWEEN 25 AND 29 THEN 4
+                                   WHEN DATE_PART('year', AGE(%(date_to)s::date, a.birth_date::date)) BETWEEN 30 AND 34 THEN 5
+                                   WHEN DATE_PART('year', AGE(%(date_to)s::date, a.birth_date::date)) BETWEEN 35 AND 44 THEN 6
+                                   WHEN DATE_PART('year', AGE(%(date_to)s::date, a.birth_date::date)) >= 45 THEN 7
+                                   ELSE NULL END
+                                 ELSE NULL END) BETWEEN 6 AND 10
+                       THEN rt.accountid END)::int AS daily_traders_hq
             FROM mv_retention_traders rt
             JOIN accounts a ON a.accountid = rt.accountid
             WHERE rt.day >= %(date_from)s::date
@@ -620,6 +632,7 @@ async def dmp_retention_api(request: Request, date_from: str, date_to: str):
                 "monthly_loads":   int(r[15] or 0),
                 "daily_avg_scp":   round(float(r[16]), 1) if r[16] is not None else None,
                 "monthly_avg_scp": round(float(r[17]), 1) if r[17] is not None else None,
+                "daily_traders_hq": int(r[18] or 0),
             }
             for r in rows
         ]
@@ -655,6 +668,27 @@ async def dmp_retention_api(request: Request, date_from: str, date_to: str):
                   {_global_base}
             """, _gp)
             _daily_traders_global = int(cur2.fetchone()[0] or 0)
+
+            # Daily traders A,A+ (global distinct — classification score 6-10 with age fallback)
+            cur2.execute(f"""
+                SELECT COUNT(DISTINCT rt.accountid)
+                FROM mv_retention_traders rt
+                JOIN accounts a ON a.accountid = rt.accountid
+                LEFT JOIN crm_users u ON u.id = rt.assigned_to
+                WHERE rt.day = %(date_to)s::date
+                  AND a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)
+                  {_global_base}
+                  AND (CASE WHEN a.classification_int IS NOT NULL AND a.classification_int > 0
+                            THEN a.classification_int
+                            WHEN a.birth_date IS NOT NULL THEN CASE
+                              WHEN DATE_PART('year', AGE(%(date_to)s::date, a.birth_date::date)) BETWEEN 25 AND 29 THEN 4
+                              WHEN DATE_PART('year', AGE(%(date_to)s::date, a.birth_date::date)) BETWEEN 30 AND 34 THEN 5
+                              WHEN DATE_PART('year', AGE(%(date_to)s::date, a.birth_date::date)) BETWEEN 35 AND 44 THEN 6
+                              WHEN DATE_PART('year', AGE(%(date_to)s::date, a.birth_date::date)) >= 45 THEN 7
+                              ELSE NULL END
+                            ELSE NULL END) BETWEEN 6 AND 10
+            """, _gp)
+            _daily_traders_hq_global = int(cur2.fetchone()[0] or 0)
 
             # Monthly depositors (global distinct)
             cur2.execute(f"""
@@ -718,6 +752,7 @@ async def dmp_retention_api(request: Request, date_from: str, date_to: str):
             "wd_in_range":             wd_in_range,
             "global_monthly_traders":  _monthly_traders_global,
             "global_daily_traders":    _daily_traders_global,
+            "global_daily_traders_hq": _daily_traders_hq_global,
             "global_monthly_loads":    _monthly_loads_global,
             "global_daily_loads":      _daily_loads_global,
         }

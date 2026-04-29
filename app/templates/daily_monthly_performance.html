@@ -462,8 +462,8 @@
           </div>
           <div style="color:#484f58;font-size:1.2rem;line-height:1;">/</div>
           <div>
-            <div class="kpi-value" style="color:#a371f7;" id="stat-monthly-traders">—</div>
-            <div class="kpi-label">Monthly Traders</div>
+            <div class="kpi-value" style="color:#a371f7;" id="stat-daily-traders-hq">—</div>
+            <div class="kpi-label">Daily Traders A,A+</div>
           </div>
         </div>
       </div>
@@ -778,13 +778,13 @@
     // when no client-side filters are active; fall back to per-agent sums when filtered
     const noRetFilter = !fOffice && !fTeam && !fAgent && !fStatus;
     const dTraders = noRetFilter ? retGlobal.dailyTraders  : fRet.reduce((s,r) => s + (r.daily_traders ?? 0), 0);
-    const mTraders = noRetFilter ? retGlobal.monthlyTraders : fRet.reduce((s,r) => s + (r.traders_count ?? 0), 0);
+    const dTradersHQ = noRetFilter ? retGlobal.dailyTradersHQ : fRet.reduce((s,r) => s + (r.daily_traders_hq ?? 0), 0);
     const dLoads   = noRetFilter ? retGlobal.dailyLoads    : fRet.reduce((s,r) => s + (r.daily_loads ?? 0), 0);
     const mLoads   = noRetFilter ? retGlobal.monthlyLoads  : fRet.reduce((s,r) => s + (r.monthly_loads ?? 0), 0);
     const dStd     = fRet.reduce((s,r) => s + (r.daily_std ?? 0), 0);
     const mStd     = fRet.reduce((s,r) => s + (r.std_count ?? 0), 0);
     const dtEl = document.getElementById('stat-daily-traders'); if (dtEl) dtEl.textContent = dTraders.toLocaleString();
-    const mtEl = document.getElementById('stat-monthly-traders'); if (mtEl) mtEl.textContent = mTraders.toLocaleString();
+    const mtEl = document.getElementById('stat-daily-traders-hq'); if (mtEl) mtEl.textContent = dTradersHQ.toLocaleString();
     const dlEl = document.getElementById('stat-daily-loads'); if (dlEl) dlEl.textContent = dLoads.toLocaleString();
     const mlEl = document.getElementById('stat-monthly-loads'); if (mlEl) mlEl.textContent = mLoads.toLocaleString();
     const dsEl = document.getElementById('stat-daily-std'); if (dsEl) dsEl.textContent = dStd.toLocaleString();
@@ -1231,6 +1231,7 @@
       retGlobal = {
         dailyTraders:  data.global_daily_traders ?? 0,
         monthlyTraders: data.global_monthly_traders ?? 0,
+        dailyTradersHQ: data.global_daily_traders_hq ?? 0,
         dailyLoads:    data.global_daily_loads ?? 0,
         monthlyLoads:  data.global_monthly_loads ?? 0,
       };
