@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Redis Performance</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <style>
+    body { background-color: #0f1117; color: #e0e0e0; font-family: 'Segoe UI', sans-serif; }
+    .card { background-color: #161b22; border: 1px solid #30363d; border-radius: 12px; }
+    .kpi-card { text-align: center; padding: 16px 10px; }
+    .kpi-label { font-size: 0.72rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+    .kpi-value { font-size: 1.3rem; font-weight: 700; color: #e0e0e0; }
+    .kpi-value.positive { color: #3fb950; }
+    .kpi-value.negative { color: #f85149; }
+    .table-dark-custom { background-color: #0f1117; color: #e0e0e0; font-size: 0.82rem; }
+    .table-dark-custom thead th { background-color: #161b22; border-color: #30363d; color: #8b949e; font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; position: sticky; top: 0; z-index: 1; }
+    .table-dark-custom tbody td { border-color: #21262d; padding: 6px 10px; }
+    .table-dark-custom tbody tr:hover { background-color: #161b22; }
+    .freshness { font-size: 0.72rem; color: #8b949e; }
+    .freshness .stale { color: #f85149; }
+    .freshness .fresh { color: #3fb950; }
+    .badge-source { font-size: 0.7rem; padding: 2px 8px; border-radius: 4px; background: rgba(63,185,80,0.15); color: #3fb950; border: 1px solid rgba(63,185,80,0.3); }
+    .spinner-sm { width: 14px; height: 14px; border-width: 2px; }
+    h5 { color: #c9d1d9; font-size: 0.95rem; font-weight: 600; }
+    .month-btn { background: #21262d; border: 1px solid #30363d; color: #8b949e; font-size: 0.78rem; padding: 4px 12px; border-radius: 6px; cursor: pointer; }
+    .month-btn:hover { background: #30363d; color: #e0e0e0; }
+    .month-btn.active { background: rgba(63,185,80,0.15); color: #3fb950; border-color: rgba(63,185,80,0.3); }
+    .volume-breakdown { font-size: 0.68rem; color: #8b949e; margin-top: 2px; }
+  </style>
+</head>
+<body>
+  <div class="container-fluid py-3 px-4">
+    <!-- Header -->
+    <div class="d-flex align-items-center justify-content-between mb-3">
+      <div>
+        <h4 class="mb-0" style="color:#e0e0e0;">Redis Performance <span class="badge-source">REDIS ONLY</span></h4>
+        <div class="freshness mt-1">
+          Data source: MT5 Bridge Redis &bull;
+          <span id="computedAt">—</span> &bull;
+          <span id="autoRefresh">Auto-refresh: 30s</span> &bull;
+          Period: <span id="periodLabel">—</span>
+        </div>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <div id="monthSelector" class="d-flex gap-1"></div>
+        <a href="/performance" class="btn btn-sm" style="background:#21262d;border:1px solid #30363d;color:#8b949e;font-size:0.8rem;">← Back to PG Panel</a>
+      </div>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="row g-2 mb-3" id="kpiCards">
+      <div class="col-6 col-md-2">
+        <div class="card kpi-card">
+          <div class="kpi-label">Open Volume</div>
+          <div class="kpi-value" id="kpi-volume">—</div>
+          <div class="volume-breakdown" id="volume-breakdown"></div>
+        </div>
+      </div>
+      <div class="col-6 col-md-2"><div class="card kpi-card"><div class="kpi-label">Total Floating</div><div class="kpi-value" id="kpi-floating">—</div></div></div>
+      <div class="col-6 col-md-2"><div class="card kpi-card"><div class="kpi-label">Total Balance</div><div class="kpi-value" id="kpi-balance">—</div></div></div>
+      <div class="col-6 col-md-2"><div class="card kpi-card"><div class="kpi-label">Computed Equity</div><div class="kpi-value" id="kpi-equity">—</div></div></div>
+      <div class="col-6 col-md-2"><div class="card kpi-card"><div class="kpi-label">EEZ (no bonus)</div><div class="kpi-value" id="kpi-eez">—</div></div></div>
+      <div class="col-6 col-md-2"><div class="card kpi-card"><div class="kpi-label">Active Traders</div><div class="kpi-value" id="kpi-traders">—</div></div></div>
+    </div>
+
+    <!-- Second row -->
+    <div class="row g-2 mb-3">
+      <div class="col-6 col-md-2"><div class="card kpi-card"><div class="kpi-label">Positions</div><div class="kpi-value" id="kpi-positions">—</div></div></div>
+      <div class="col-6 col-md-2"><div class="card kpi-card"><div class="kpi-label">Accounts w/ Balance</div><div class="kpi-value" id="kpi-accounts">—</div></div></div>
+      <div class="col-6 col-md-2"><div class="card kpi-card"><div class="kpi-label">Today Closed PnL</div><div class="kpi-value" id="kpi-closed-pnl">—</div></div></div>
+      <div class="col-6 col-md-2"><div class="card kpi-card"><div class="kpi-label">Closed Trades Today</div><div class="kpi-value" id="kpi-closed-count">—</div></div></div>
+      <div class="col-6 col-md-2"><div class="card kpi-card"><div class="kpi-label">Closed Commission</div><div class="kpi-value" id="kpi-closed-comm">—</div></div></div>
+      <div class="col-6 col-md-2"><div class="card kpi-card"><div class="kpi-label">Closed Swap</div><div class="kpi-value" id="kpi-closed-swap">—</div></div></div>
+    </div>
+
+    <!-- Freshness -->
+    <div class="card mb-3 p-3">
+      <h5 class="mb-2">Data Freshness</h5>
+      <div class="row freshness">
+        <div class="col-md-3">Positions: <span id="fresh-positions">—</span></div>
+        <div class="col-md-3">Accounts: <span id="fresh-accounts">—</span></div>
+        <div class="col-md-3">Closed Positions: <span id="fresh-closed">—</span></div>
+        <div class="col-md-3">Rates: <span id="fresh-rates">—</span></div>
+      </div>
+    </div>
+
+    <div class="row g-3">
+      <!-- Symbol breakdown -->
+      <div class="col-md-7">
+        <div class="card p-3">
+          <h5 class="mb-2">Open Positions by Symbol</h5>
+          <div style="max-height:400px;overflow-y:auto;">
+            <table class="table table-dark-custom table-sm mb-0">
+              <thead><tr><th>Symbol</th><th class="text-end">Volume</th><th class="text-end">Floating</th><th class="text-end">Count</th></tr></thead>
+              <tbody id="symbolTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Rates -->
+      <div class="col-md-5">
+        <div class="card p-3">
+          <h5 class="mb-2">Live Rates</h5>
+          <table class="table table-dark-custom table-sm mb-0">
+            <thead><tr><th>Symbol</th><th class="text-end">Bid</th><th class="text-end">Ask</th><th class="text-end">Spread</th></tr></thead>
+            <tbody id="ratesTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Top logins -->
+    <div class="card p-3 mt-3">
+      <h5 class="mb-2">Top 20 Logins by Volume</h5>
+      <div style="max-height:350px;overflow-y:auto;">
+        <table class="table table-dark-custom table-sm mb-0">
+          <thead><tr><th>Login</th><th class="text-end">Volume</th><th class="text-end">Floating</th><th class="text-end">Positions</th></tr></thead>
+          <tbody id="loginsTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const fmt = (v) => v == null ? '—' : v.toLocaleString('en-US', {maximumFractionDigits: 0});
+    const fmtD = (v, d=2) => v == null ? '—' : v.toLocaleString('en-US', {minimumFractionDigits: d, maximumFractionDigits: d});
+    const fmtPnl = (v) => {
+      if (v == null) return '—';
+      const s = '$' + Math.abs(v).toLocaleString('en-US', {maximumFractionDigits: 0});
+      return v >= 0 ? s : '-' + s;
+    };
+    const colorClass = (v) => v > 0 ? 'positive' : v < 0 ? 'negative' : '';
+
+    // Month selector state
+    const now = new Date();
+    let selectedYear = now.getFullYear();
+    let selectedMonth = now.getMonth() + 1;
+    const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+    function buildMonthSelector() {
+      const container = document.getElementById('monthSelector');
+      container.innerHTML = '';
+      // Show last 6 months
+      for (let i = 5; i >= 0; i--) {
+        let m = now.getMonth() + 1 - i;
+        let y = now.getFullYear();
+        if (m <= 0) { m += 12; y--; }
+        const btn = document.createElement('button');
+        btn.className = 'month-btn' + (m === selectedMonth && y === selectedYear ? ' active' : '');
+        btn.textContent = monthNames[m - 1] + ' ' + y;
+        btn.onclick = () => { selectedMonth = m; selectedYear = y; buildMonthSelector(); fetchData(); };
+        container.appendChild(btn);
+      }
+    }
+
+    function ageFmt(isoStr) {
+      if (!isoStr) return '<span class="stale">N/A</span>';
+      const d = new Date(isoStr);
+      const secs = Math.round((Date.now() - d.getTime()) / 1000);
+      if (secs < 0) return '<span class="fresh">just now</span>';
+      if (secs < 60) return `<span class="fresh">${secs}s ago</span>`;
+      if (secs < 3600) return `<span class="${secs<300?'fresh':'stale'}">${Math.round(secs/60)}m ago</span>`;
+      return `<span class="stale">${Math.round(secs/3600)}h ago</span>`;
+    }
+
+    async function fetchData() {
+      try {
+        const r = await fetch(`/api/redis-perf?month=${selectedMonth}&year=${selectedYear}`);
+        if (!r.ok) { console.error('API error', r.status); return; }
+        const d = await r.json();
+
+        // Period label
+        const period = d.period || {};
+        document.getElementById('periodLabel').textContent = period.label || '—';
+
+        // KPI cards
+        const op = d.open_positions || {};
+        const ac = d.accounts || {};
+        const cl = d.closed_today || {};
+
+        // Open Volume = combined (open in period + closed opened in period)
+        const combinedVol = d.combined_volume;
+        const volEl = document.getElementById('kpi-volume');
+        volEl.textContent = combinedVol != null ? '$' + fmt(combinedVol) : '$' + fmt(op.total_volume);
+
+        // Volume breakdown
+        const bkEl = document.getElementById('volume-breakdown');
+        if (cl.closed_volume != null) {
+          bkEl.innerHTML = `Still open: $${fmt(op.total_volume)} &bull; Closed: $${fmt(cl.closed_volume)} (${fmt(cl.closed_volume_count)} trades)`;
+        } else {
+          bkEl.innerHTML = `Still open: $${fmt(op.total_volume)} &bull; Closed: <span class="spinner-border spinner-sm"></span>`;
+        }
+
+        const fltEl = document.getElementById('kpi-floating');
+        fltEl.textContent = fmtPnl(op.total_floating);
+        fltEl.className = 'kpi-value ' + colorClass(op.total_floating);
+
+        document.getElementById('kpi-balance').textContent = '$' + fmt(ac.total_balance);
+
+        const eqEl = document.getElementById('kpi-equity');
+        eqEl.textContent = '$' + fmt(ac.total_equity_computed);
+        eqEl.className = 'kpi-value ' + colorClass(ac.total_equity_computed);
+
+        document.getElementById('kpi-eez').textContent = '$' + fmt(ac.eez_no_bonus);
+        document.getElementById('kpi-traders').textContent = fmt(op.trader_count);
+        document.getElementById('kpi-positions').textContent = fmt(op.position_count);
+        document.getElementById('kpi-accounts').textContent = fmt(ac.account_count);
+
+        const cpEl = document.getElementById('kpi-closed-pnl');
+        if (cl.total_pnl != null) {
+          cpEl.textContent = fmtPnl(cl.total_pnl);
+          cpEl.className = 'kpi-value ' + colorClass(cl.total_pnl);
+        } else {
+          cpEl.innerHTML = '<span class="spinner-border spinner-sm"></span>';
+        }
+        document.getElementById('kpi-closed-count').textContent = cl.trade_count != null ? fmt(cl.trade_count) : '...';
+        document.getElementById('kpi-closed-comm').textContent = cl.total_commission != null ? fmtPnl(cl.total_commission) : '...';
+        document.getElementById('kpi-closed-swap').textContent = cl.total_swap != null ? fmtPnl(cl.total_swap) : '...';
+
+        // Freshness
+        const fr = d.data_freshness || {};
+        document.getElementById('fresh-positions').innerHTML = ageFmt(fr.positions);
+        document.getElementById('fresh-accounts').innerHTML = ageFmt(fr.accounts);
+        document.getElementById('fresh-closed').innerHTML = ageFmt(fr.closed_positions);
+        document.getElementById('fresh-rates').innerHTML = ageFmt(fr.rates);
+        document.getElementById('computedAt').textContent = 'Computed: ' + (d.computed_at || '—');
+
+        // Symbol table
+        const syms = op.by_symbol || {};
+        let symHtml = '';
+        for (const [sym, v] of Object.entries(syms)) {
+          const fc = v.floating >= 0 ? 'positive' : 'negative';
+          symHtml += `<tr><td>${sym}</td><td class="text-end">$${fmt(v.volume)}</td><td class="text-end ${fc}">${fmtPnl(v.floating)}</td><td class="text-end">${v.count}</td></tr>`;
+        }
+        document.getElementById('symbolTable').innerHTML = symHtml || '<tr><td colspan="4" class="text-center">No data</td></tr>';
+
+        // Rates table
+        const rates = d.rates || [];
+        let ratesHtml = '';
+        for (const r of rates) {
+          const digits = r.symbol.includes('JPY') ? 3 : r.symbol.includes('XAU') || r.symbol.includes('BTC') || r.symbol.includes('ETH') ? 2 : 5;
+          ratesHtml += `<tr><td>${r.symbol}</td><td class="text-end">${fmtD(r.bid, digits)}</td><td class="text-end">${fmtD(r.ask, digits)}</td><td class="text-end">${fmtD(r.spread, digits)}</td></tr>`;
+        }
+        document.getElementById('ratesTable').innerHTML = ratesHtml || '<tr><td colspan="4" class="text-center">No data</td></tr>';
+
+        // Top logins
+        const logins = op.top_logins || [];
+        let logHtml = '';
+        for (const l of logins) {
+          const fc = l.floating >= 0 ? 'positive' : 'negative';
+          logHtml += `<tr><td>${l.login}</td><td class="text-end">$${fmt(l.volume)}</td><td class="text-end ${fc}">${fmtPnl(l.floating)}</td><td class="text-end">${l.count}</td></tr>`;
+        }
+        document.getElementById('loginsTable').innerHTML = logHtml || '<tr><td colspan="4" class="text-center">No data</td></tr>';
+
+      } catch (e) {
+        console.error('Fetch error:', e);
+      }
+    }
+
+    buildMonthSelector();
+    fetchData();
+    setInterval(fetchData, 30000);
+  </script>
+</body>
+</html>
