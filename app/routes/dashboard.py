@@ -1,4 +1,3 @@
-import calendar
 from datetime import date as date_type
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -10,27 +9,12 @@ from fastapi.templating import Jinja2Templates
 from app import cache
 from app.auth.dependencies import get_current_user
 from app.db.postgres_conn import get_connection
+from app.utils.dates import count_working_days, last_day_of_month
 
 _TZ = ZoneInfo("Europe/Nicosia")
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
-
-
-def last_day_of_month(d: date_type) -> date_type:
-    return d.replace(day=calendar.monthrange(d.year, d.month)[1])
-
-
-def count_working_days(start: date_type, end: date_type, holidays: set) -> int:
-    if end < start:
-        return 0
-    count = 0
-    current = start
-    while current <= end:
-        if current.weekday() < 5 and current not in holidays:
-            count += 1
-        current += timedelta(days=1)
-    return count
 
 
 @router.get("/dashboard", response_class=HTMLResponse)
