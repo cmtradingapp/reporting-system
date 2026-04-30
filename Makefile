@@ -1,4 +1,4 @@
-.PHONY: setup test test-fast test-unit test-contract test-integration test-gui lint format coverage clean
+.PHONY: setup test test-fast test-unit test-contract test-integration test-gui lint format coverage coverage-html clean
 
 setup:
 	python -m pip install --upgrade pip
@@ -27,6 +27,9 @@ test:
 coverage:
 	TESTING=1 pytest tests/unit tests/contract --cov --cov-report=term-missing --cov-report=html
 	@echo "Open htmlcov/index.html to view detailed coverage."
+
+coverage-html: coverage
+	@python -c "import os, webbrowser; webbrowser.open('file://' + os.path.abspath('htmlcov/index.html'))"
 
 lint:
 	ruff check app tests

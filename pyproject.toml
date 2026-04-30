@@ -25,6 +25,7 @@ markers = [
     "gui: Playwright browser tests, requires the app running.",
 ]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 filterwarnings = [
     "error",
     "ignore::DeprecationWarning:apscheduler.*",
@@ -51,7 +52,10 @@ parallel = true
 [tool.coverage.report]
 show_missing = true
 skip_covered = false
-fail_under = 0
+# Floor set just below current measured coverage on test-coverage HEAD (~13%).
+# Ratchet up as Phase 2 contract tests land. Set per-directory thresholds when the
+# legacy app/db/* and app/routes/* are gradually covered.
+fail_under = 12
 exclude_lines = [
     "pragma: no cover",
     "raise NotImplementedError",
