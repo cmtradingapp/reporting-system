@@ -190,7 +190,10 @@ def _auto_mssql_dmt5_sync():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Only one worker runs schema migrations — others skip (idempotent DDL already done)
+    # Only one worker runs schema migrations. The advisory lock is session-scoped,
+    # so we MUST keep the same connection open across the whole setup block —
+    # closing it before setup runs would release the lock and let other workers
+    # also enter the if-block (which previously caused 4× concurrent DDL races).
     from app.db.postgres_conn import get_connection as _pgconn
     _mc = _pgconn()
     try:
@@ -198,22 +201,39 @@ async def lifespan(app: FastAPI):
             _c.execute("SELECT pg_try_advisory_lock(987654321)")
             _run_setup = _c.fetchone()[0]
         _mc.commit()
+        if _run_setup:
+            # All ensure_* / seed_* / backfill calls are idempotent. If any one of
+            # them fails (e.g. transient lock_timeout from an in-flight MV refresh),
+            # log and continue — the next worker boot or scheduled job will retry.
+            # Without this, a single transient DDL error would crash the worker,
+            # which under --workers 4 can cascade into "master shutting down".
+            for step in (
+                ensure_table,
+                ensure_auth_table,
+                ensure_client_classification_table,
+                ensure_bonus_transactions_table,
+                ensure_daily_equity_zeroed_table,
+                ensure_agent_dept_history_table,
+                ensure_dealio_positions_table,
+                ensure_mssql_dealio_mt5trades_table,
+                ensure_mv_refresh_log,
+                ensure_materialized_views,
+                lambda: seed_admin_user(hash_password('Admin123!')),
+                seed_company_targets,
+            ):
+                try:
+                    step()
+                except Exception as _e:
+                    print(f"[lifespan setup] {getattr(step, '__name__', 'step')} failed: {_e}")
+            threading.Thread(target=backfill_classification_int, daemon=True).start()
+            try:
+                with _mc.cursor() as _c:
+                    _c.execute("SELECT pg_advisory_unlock(987654321)")
+                _mc.commit()
+            except Exception:
+                pass
     finally:
         _mc.close()
-    if _run_setup:
-        ensure_table()
-        ensure_auth_table()
-        ensure_client_classification_table()
-        ensure_bonus_transactions_table()
-        ensure_daily_equity_zeroed_table()
-        ensure_agent_dept_history_table()
-        ensure_dealio_positions_table()
-        ensure_mssql_dealio_mt5trades_table()
-        ensure_mv_refresh_log()
-        ensure_materialized_views()
-        seed_admin_user(hash_password('Admin123!'))
-        seed_company_targets()
-        threading.Thread(target=backfill_classification_int, daemon=True).start()
     _run_scheduler = _acquire_scheduler_lock()
     if not _run_scheduler:
         # Another worker already holds the scheduler lock — this worker only serves requests.
