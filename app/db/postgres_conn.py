@@ -3008,7 +3008,12 @@ _MV_MT5_LOCK_ID = 123456790  # different lock from main refresh (123456789)
 
 # Module-level status dict — kept for backward compat but no longer the source of truth.
 # The authoritative last_refresh is stored in mv_refresh_log (PostgreSQL) so all workers share it.
-_mv_refresh_status: dict = {mv: {"last_refresh": None, "last_error": None} for mv in _MV_ORDER}
+# mv_mt5_resolved is included here even though it's not in _MV_ORDER, because
+# refresh_mv_mt5_resolved() writes its status under that key.
+_mv_refresh_status: dict = {
+    mv: {"last_refresh": None, "last_error": None}
+    for mv in (*_MV_ORDER, "mv_mt5_resolved")
+}
 
 
 def ensure_mv_refresh_log() -> None:
