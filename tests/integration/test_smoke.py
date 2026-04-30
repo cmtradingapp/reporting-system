@@ -18,9 +18,9 @@ import pytest
 @pytest.mark.integration
 def test_test_database_url_set_in_ci() -> None:
     """If we got here, TEST_DATABASE_URL must be set — otherwise conftest skipped us."""
-    assert os.environ.get("TEST_DATABASE_URL"), (
-        "Integration tier ran without TEST_DATABASE_URL — conftest skip rule broken."
-    )
+    assert os.environ.get(
+        "TEST_DATABASE_URL"
+    ), "Integration tier ran without TEST_DATABASE_URL — conftest skip rule broken."
 
 
 @pytest.mark.integration

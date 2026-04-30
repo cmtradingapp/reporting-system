@@ -29,9 +29,9 @@ def test_app_has_registered_routes() -> None:
     from app.main import app
 
     paths = [getattr(r, "path", "") for r in app.routes]
-    assert any(p.startswith("/api/") for p in paths), (
-        "No /api/ routes registered — route module imports may be silently failing."
-    )
+    assert any(
+        p.startswith("/api/") for p in paths
+    ), "No /api/ routes registered — route module imports may be silently failing."
 
 
 @pytest.mark.contract
@@ -42,6 +42,6 @@ def test_lifespan_skipped_under_testing() -> None:
     from app import main as app_main
 
     assert os.environ.get("TESTING") == "1"
-    assert app_main._TESTING is True, (
-        "_TESTING flag did not pick up TESTING=1 — APScheduler / DB DDL would run during tests."
-    )
+    assert (
+        app_main._TESTING is True
+    ), "_TESTING flag did not pick up TESTING=1 — APScheduler / DB DDL would run during tests."
