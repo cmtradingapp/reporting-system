@@ -969,6 +969,7 @@
       const wdMob = document.getElementById('stat-wd-mob'); if (wdMob) wdMob.textContent = workingDays;
       const wdLMob = document.getElementById('stat-wd-left-mob'); if (wdLMob) wdLMob.textContent = workingDaysLeft;
       globalStats = {
+        ...GLOBAL_STATS_DEFAULTS,
         dailyFtd:    data.global_daily_ftd    ?? 0,
         monthlyFtd:  data.global_monthly_ftd  ?? 0,
         dailyFtc:    data.global_daily_ftc    ?? 0,
@@ -979,6 +980,10 @@
       populateFilterDropdowns();
       renderTable();
       updateStatsFromFiltered();
+      // Clear any previously-shown error banner — a stale error from a prior render
+      // failure (e.g. lost race with retention) shouldn't survive a successful refresh.
+      const errEl = document.getElementById('error-msg');
+      if (errEl) errEl.style.display = 'none';
     } catch(e) {
       if (!silent) {
         document.getElementById('error-msg').textContent = 'Error: ' + e.message;
@@ -1205,8 +1210,25 @@
   let retSortState = { col: 'ret-dailyNet', dir: 'desc' };
   let retWd = 0, retWdPassed = 0, retWdLeft = 0;
   let retTgtRatio = 1, retWdRange = 0;
-  let retGlobal = { dailyTraders:0, monthlyTraders:0, dailyLoads:0, monthlyLoads:0 };
-  let globalStats = { dailyFtd:0, monthlyFtd:0, dailyFtc:0, monthlyFtc:0, dailyNet:0, monthlyNet:0 };
+  // Single source of truth for shape. New global stat? Add it here — defaults are
+  // spread into every assignment so render code never sees `undefined`, even mid-race
+  // (sales API responding before retention) or on partial backend responses.
+  const RET_GLOBAL_DEFAULTS = Object.freeze({
+    dailyTraders:   0,
+    dailyTradersHQ: 0,
+    dailyLoads:     0,
+    monthlyLoads:   0,
+  });
+  const GLOBAL_STATS_DEFAULTS = Object.freeze({
+    dailyFtd:   0,
+    monthlyFtd: 0,
+    dailyFtc:   0,
+    monthlyFtc: 0,
+    dailyNet:   0,
+    monthlyNet: 0,
+  });
+  let retGlobal   = { ...RET_GLOBAL_DEFAULTS };
+  let globalStats = { ...GLOBAL_STATS_DEFAULTS };
 
   async function loadRetentionData(silent=false) {
     const df = document.getElementById('date-from').value;
@@ -1229,11 +1251,11 @@
       retWd = wd; retWdPassed = wd_passed; retWdLeft = wd_left;
       retTgtRatio = tgtR; retWdRange = wdR;
       retGlobal = {
-        dailyTraders:  data.global_daily_traders ?? 0,
-        monthlyTraders: data.global_monthly_traders ?? 0,
-        dailyTradersHQ: data.global_daily_traders_hq ?? 0,
-        dailyLoads:    data.global_daily_loads ?? 0,
-        monthlyLoads:  data.global_monthly_loads ?? 0,
+        ...RET_GLOBAL_DEFAULTS,
+        dailyTraders:   data.global_daily_traders     ?? 0,
+        dailyTradersHQ: data.global_daily_traders_hq  ?? 0,
+        dailyLoads:     data.global_daily_loads       ?? 0,
+        monthlyLoads:   data.global_monthly_loads     ?? 0,
       };
 
       retAllRows = data.rows.map(r => {
@@ -1262,6 +1284,8 @@
       }
       populateFilterDropdowns();
       renderRetentionTable(wd, wd_passed, wd_left);
+      const retErrEl = document.getElementById('ret-error-msg');
+      if (retErrEl) retErrEl.style.display = 'none';
     } catch(e) {
       if (!silent) {
         document.getElementById('ret-error-msg').textContent = 'Error: ' + e.message;

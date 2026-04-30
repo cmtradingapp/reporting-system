@@ -358,7 +358,7 @@ async def dmp_retention_api(request: Request, date_from: str, date_to: str):
     cls_where, cls_params, cls_suffix = _build_cls_filter(request)
     has_cls = bool(cls_where)
     _er = ','.join(sorted(user.get('extra_roles') or []))
-    _ck = f"dmp_ret_v3:{user.get('role','')}:{_er}:{date_from}:{date_to}{cls_suffix}"
+    _ck = f"dmp_ret_v4:{user.get('role','')}:{_er}:{date_from}:{date_to}{cls_suffix}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -645,18 +645,6 @@ async def dmp_retention_api(request: Request, date_from: str, date_to: str):
             AND u.department_ = 'Retention'
         """
         with conn.cursor() as cur2:
-            # Monthly traders (global distinct)
-            cur2.execute(f"""
-                SELECT COUNT(DISTINCT rt.accountid)
-                FROM mv_retention_traders rt
-                JOIN accounts a ON a.accountid = rt.accountid
-                LEFT JOIN crm_users u ON u.id = rt.assigned_to
-                WHERE rt.day >= %(date_from)s::date AND rt.day < %(date_to_excl)s::date
-                  AND a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)
-                  {_global_base}
-            """, _gp)
-            _monthly_traders_global = int(cur2.fetchone()[0] or 0)
-
             # Daily traders (global distinct)
             cur2.execute(f"""
                 SELECT COUNT(DISTINCT rt.accountid)
@@ -750,7 +738,6 @@ async def dmp_retention_api(request: Request, date_from: str, date_to: str):
             "working_days_left":       working_days_left,
             "target_ratio":            target_ratio,
             "wd_in_range":             wd_in_range,
-            "global_monthly_traders":  _monthly_traders_global,
             "global_daily_traders":    _daily_traders_global,
             "global_daily_traders_hq": _daily_traders_hq_global,
             "global_monthly_loads":    _monthly_loads_global,
