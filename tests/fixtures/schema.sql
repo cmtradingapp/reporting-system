@@ -3,15 +3,25 @@
 -- This file is intentionally narrower: only the tables the integration tier exercises.
 -- Keep it small — every column added here is a maintenance liability.
 
+-- Mirrors app/db/postgres_conn.py::ensure_auth_table + the prod migrations
+-- that added allowed_pages and extra_roles. Keep these column definitions
+-- in sync if the prod DDL evolves.
 CREATE TABLE IF NOT EXISTS auth_users (
-    id           SERIAL PRIMARY KEY,
-    username     TEXT UNIQUE NOT NULL,
-    password     TEXT NOT NULL,
-    role         TEXT NOT NULL,
-    extra_roles  JSONB DEFAULT '[]'::jsonb,
-    allowed_pages JSONB DEFAULT '[]'::jsonb,
-    created_at   TIMESTAMP DEFAULT NOW()
+    id                    SERIAL PRIMARY KEY,
+    crm_user_id           BIGINT NULL,
+    email                 VARCHAR(255) NOT NULL UNIQUE,
+    full_name             VARCHAR(255) NOT NULL,
+    password_hash         VARCHAR(255) NOT NULL,
+    role                  VARCHAR(50)  NOT NULL,
+    is_active             SMALLINT DEFAULT 1,
+    force_password_change SMALLINT DEFAULT 0,
+    created_at            TIMESTAMP DEFAULT NOW(),
+    last_login            TIMESTAMP,
+    allowed_pages         TEXT NULL,
+    extra_roles           JSONB NULL
 );
+CREATE INDEX IF NOT EXISTS idx_auth_users_email ON auth_users(email);
+CREATE INDEX IF NOT EXISTS idx_auth_users_crm_user_id ON auth_users(crm_user_id);
 
 CREATE TABLE IF NOT EXISTS crm_users (
     id            BIGINT PRIMARY KEY,

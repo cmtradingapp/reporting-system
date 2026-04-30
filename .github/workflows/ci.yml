@@ -71,6 +71,12 @@ jobs:
           --health-retries 10
     env:
       TEST_DATABASE_URL: postgresql://test:test@localhost:5432/reporting_test
+      # Make app.db.postgres_conn.get_connection() resolve to the test container.
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test
+      POSTGRES_DB: reporting_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
