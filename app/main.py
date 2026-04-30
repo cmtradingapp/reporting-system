@@ -37,7 +37,7 @@ from app.db.postgres_conn import ensure_table, ensure_auth_table, seed_admin_use
 import threading
 import fcntl
 from app.auth.auth import hash_password
-from app.etl.fetch_and_store import run_accounts_etl, run_users_etl, run_transactions_etl, run_targets_etl, run_trading_accounts_etl, run_ftd100_etl, run_client_classification_etl, run_dealio_users_etl, run_dealio_trades_mt4_etl, run_dealio_daily_profits_etl, run_bonus_transactions_etl, run_daily_equity_zeroed_snapshot, run_campaigns_etl, run_dealio_trades_mt5_etl, run_dealio_trades_mt5_full_etl, run_dealio_positions_etl, run_mssql_dealio_mt5trades_full_etl
+from app.etl.fetch_and_store import run_accounts_etl, run_users_etl, run_transactions_etl, run_targets_etl, run_trading_accounts_etl, run_ftd100_etl, run_client_classification_etl, run_dealio_users_etl, run_dealio_daily_profits_etl, run_bonus_transactions_etl, run_daily_equity_zeroed_snapshot, run_campaigns_etl, run_dealio_trades_mt5_etl, run_dealio_trades_mt5_full_etl, run_dealio_positions_etl, run_mssql_dealio_mt5trades_full_etl
 from app import cache
 import os
 from datetime import datetime, timedelta
@@ -297,17 +297,6 @@ async def lifespan(app: FastAPI):
         replace_existing=True,
         max_instances=1,
     )
-    # MT4 trades sync disabled — not needed
-    # scheduler.add_job(
-    #     run_dealio_trades_mt4_etl,
-    #     "interval",
-    #     minutes=SYNC_INTERVAL_MINUTES,
-    #     kwargs={"hours": DEALIO_TRADES_MT4_SYNC_HOURS},
-    #     id="dealio_trades_mt4_sync",
-    #     start_date=_base + timedelta(seconds=300),
-    #     replace_existing=True,
-    #     max_instances=1,
-    # )
     scheduler.add_job(
         run_dealio_trades_mt5_etl,
         "interval",
