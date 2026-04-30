@@ -28,7 +28,8 @@ def test_get_returns_none_for_missing_key() -> None:
 def test_ttl_expires(monkeypatch: pytest.MonkeyPatch) -> None:
     cache.set("k", "v", ttl=1)
     assert cache.get("k") == "v"
-    monkeypatch.setattr(time, "time", lambda: time.time() + 5)
+    real_time = time.time
+    monkeypatch.setattr(cache.time, "time", lambda: real_time() + 5)
     assert cache.get("k") is None
 
 

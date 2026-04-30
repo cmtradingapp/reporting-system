@@ -29,6 +29,9 @@ filterwarnings = [
     "error",
     "ignore::DeprecationWarning:apscheduler.*",
     "ignore::DeprecationWarning:passlib.*",
+    # pytest-asyncio plugin uses several asyncio APIs deprecated in Python 3.14+.
+    # CI target is 3.11 where these don't fire; this keeps local dev on 3.14 green.
+    "ignore:'asyncio\\..+' is deprecated:DeprecationWarning",
 ]
 
 [tool.coverage.run]
