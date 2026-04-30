@@ -37,6 +37,15 @@ filterwarnings = [
     # Migration to `datetime.now(UTC)` requires timezone-correctness review (server TZ vs
     # JWT exp encoding) and is tracked as a Phase 1+ follow-up.
     "ignore:datetime.datetime.utcnow.. is deprecated:DeprecationWarning",
+    # Python 3.14 + httpx ASGITransport sometimes leaves an unclosed GzipFile during
+    # contract-test client teardown. Pytest's unraisable-exception hook escalates this
+    # to PytestUnraisableExceptionWarning. Benign on 3.14, doesn't fire on CI's 3.11.
+    "ignore::ResourceWarning",
+    "ignore:.*unclosed GzipFile.*:pytest.PytestUnraisableExceptionWarning",
+    # starlette's Jinja2Templates.TemplateResponse signature changed: routes use the
+    # legacy (name, context) form. Migrating every route's template call is a separate
+    # mechanical change tracked as a Phase 2+ follow-up.
+    "ignore:.*The `name` is not the first parameter anymore.*:DeprecationWarning",
 ]
 
 [tool.coverage.run]

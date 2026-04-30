@@ -66,3 +66,70 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
     for item in items:
         if "integration" in item.keywords or "tests/integration" in str(item.fspath).replace("\\", "/"):
             item.add_marker(skip_integration)
+
+
+# ── Contract-tier helpers ─────────────────────────────────────────────
+
+
+def make_user(
+    user_id: int = 1,
+    role: str = "admin",
+    *,
+    email: str = "user@example.test",
+    extra_roles: list[str] | None = None,
+    allowed_pages_list: list[str] | None = None,
+    crm_user_id: int | None = None,
+    department_: str = "",
+    is_active: int = 1,
+    full_name: str = "Test User",
+) -> dict:
+    """Build the user dict shape returned by `get_auth_user_by_id`.
+
+    Defaults to an admin user; override fields per-test as needed.
+    """
+    return {
+        "id": user_id,
+        "email": email,
+        "full_name": full_name,
+        "role": role,
+        "extra_roles": extra_roles,
+        "allowed_pages_list": allowed_pages_list,
+        "crm_user_id": crm_user_id,
+        "department_": department_,
+        "is_active": is_active,
+    }
+
+
+@pytest.fixture
+def client_factory(monkeypatch: pytest.MonkeyPatch):
+    """Build authenticated/anonymous httpx AsyncClients against the FastAPI app.
+
+    Stubs the DB lookup in `app.auth.dependencies.get_auth_user_by_id` so contract
+    tests don't need a Postgres. Pass a user dict (use `make_user(...)`) to mint a
+    valid `access_token` cookie; pass None for an anonymous client.
+
+    Returns a callable: `await client_factory(user)` → AsyncClient ready for use
+    with `async with`.
+    """
+    from httpx import ASGITransport, AsyncClient
+
+    from app.auth.auth import create_access_token
+    from app.main import app
+
+    user_db: dict[int, dict] = {}
+
+    def _fake_get_auth_user_by_id(user_id: int) -> dict | None:
+        return user_db.get(user_id)
+
+    monkeypatch.setattr("app.auth.dependencies.get_auth_user_by_id", _fake_get_auth_user_by_id)
+
+    transport = ASGITransport(app=app)
+
+    def _make(user: dict | None = None) -> AsyncClient:
+        cookies: dict[str, str] = {}
+        if user is not None:
+            user_db[user["id"]] = user
+            cookies["access_token"] = create_access_token(user["id"])
+        return AsyncClient(transport=transport, cookies=cookies, base_url="http://test")
+
+    return _make
