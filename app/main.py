@@ -1,6 +1,10 @@
-import fcntl
 import os
 import threading
+
+try:
+    import fcntl  # POSIX-only; missing on Windows. The scheduler lock degrades gracefully below.
+except ImportError:  # pragma: no cover
+    fcntl = None  # type: ignore[assignment]
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -90,6 +94,10 @@ _sched_lock_fd = None
 
 def _acquire_scheduler_lock() -> bool:
     global _sched_lock_fd
+    if fcntl is None:
+        # No flock available (Windows / non-POSIX). This worker won't run scheduler jobs.
+        # In production we always run on Linux, so this branch only triggers in dev / tests.
+        return False
     try:
         # Lock file deliberately stays open for process lifetime (would release the
         # flock if closed). Owns scheduler election across gunicorn workers.
