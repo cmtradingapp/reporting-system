@@ -1,0 +1,37 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: \.md$
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: ['--maxkb=1024']
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff-format
+
+  - repo: local
+    hooks:
+      - id: pytest-fast
+        name: pytest (unit tests only — must stay sub-15s)
+        entry: pytest tests/unit -q
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
+        env:
+          TESTING: "1"
+
+      - id: mypy
+        name: mypy (incremental)
+        entry: mypy app
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]

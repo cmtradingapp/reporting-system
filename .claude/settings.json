@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'cd \"$CLAUDE_PROJECT_DIR\" && b=$(git rev-parse --abbrev-ref HEAD) && if [ \"$b\" != \"main\" ]; then echo \"[branch-guard] On $b, switching to main\" >&2 && git checkout main; else echo \"[branch-guard] Already on main\" >&2; fi'"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -188,8 +188,18 @@ def _auto_mssql_dmt5_sync():
         print(f"[auto_mssql_dmt5] Error: {e}")
 
 
+_TESTING = os.environ.get("TESTING") == "1"
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Skip every side effect during tests: no DB connection, no DDL, no APScheduler,
+    # no background threads. The FastAPI app object is still importable so contract
+    # tests can hit routes via httpx.AsyncClient.
+    if _TESTING:
+        yield
+        return
+
     # Only one worker runs schema migrations — others skip (idempotent DDL already done)
     from app.db.postgres_conn import get_connection as _pgconn
     _mc = _pgconn()

@@ -40,3 +40,14 @@ def get_long(key: str):
         if entry and time.time() < entry[1]:
             return entry[0]
     return None
+
+
+def _reset_for_tests() -> None:
+    """Test-only — wipe both namespaces so each test starts isolated.
+
+    Public API on purpose (single underscore, not double): conftest's autouse
+    fixture imports this. Don't call from production code.
+    """
+    with _lock:
+        _store.clear()
+        _long_store.clear()

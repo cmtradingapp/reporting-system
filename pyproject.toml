@@ -1,0 +1,94 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "reporting-system"
+version = "0.1.0"
+description = "CMTrading internal financial/trading reporting platform"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+    "--showlocals",
+    "-p", "no:cacheprovider",
+]
+markers = [
+    "unit: fast, no IO, no DB. Pre-commit runs these.",
+    "contract: route/HTTP tests against the FastAPI app, no real DB.",
+    "integration: requires a real Postgres test DB (TEST_DATABASE_URL).",
+    "gui: Playwright browser tests, requires the app running.",
+]
+asyncio_mode = "auto"
+filterwarnings = [
+    "error",
+    "ignore::DeprecationWarning:apscheduler.*",
+    "ignore::DeprecationWarning:passlib.*",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["app"]
+omit = [
+    "app/main.py",
+    "app/etl/*",
+    "*/__init__.py",
+]
+parallel = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+fail_under = 0
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
+
+[tool.coverage.html]
+directory = "htmlcov"
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+extend-exclude = ["app/templates", "scripts"]
+
+[tool.ruff.lint]
+select = [
+    "E", "F", "W",
+    "I",
+    "B",
+    "UP",
+    "SIM",
+]
+ignore = [
+    "E501",
+    "B008",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["B011"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = false
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_return_any = false
+no_implicit_optional = true
+check_untyped_defs = true
+exclude = [
+    "scripts/",
+    "build/",
+]
+
+[[tool.mypy.overrides]]
+module = ["pymssql.*", "pymysql.*", "psycopg2.*", "apscheduler.*", "reportlab.*"]
+ignore_missing_imports = true
