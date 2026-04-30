@@ -1,20 +1,23 @@
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+
+from app import cache
 from app.auth.dependencies import get_current_user
 from app.db.postgres_conn import get_connection
-from app import cache
-from datetime import datetime
-from zoneinfo import ZoneInfo
 
 _TZ = ZoneInfo("Europe/Nicosia")
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
-_country_map_cache    = None
-_region_map_cache     = None
-_ret_status_cache     = None
-_sales_status_cache   = None
+_country_map_cache = None
+_region_map_cache = None
+_ret_status_cache = None
+_sales_status_cache = None
+
 
 def _get_country_map() -> dict:
     global _country_map_cache
@@ -22,6 +25,7 @@ def _get_country_map() -> dict:
         return _country_map_cache
     try:
         from app.db.mssql_conn import get_country_map
+
         result = get_country_map()
         if result:
             _country_map_cache = result
@@ -29,12 +33,14 @@ def _get_country_map() -> dict:
     except Exception:
         return {}
 
+
 def _get_region_map() -> dict:
     global _region_map_cache
     if _region_map_cache:
         return _region_map_cache
     try:
         from app.db.mssql_conn import get_country_region_map
+
         result = get_country_region_map()
         if result:
             _region_map_cache = result
@@ -42,12 +48,14 @@ def _get_region_map() -> dict:
     except Exception:
         return {}
 
+
 def _get_ret_status_map() -> dict:
     global _ret_status_cache
     if _ret_status_cache:
         return _ret_status_cache
     try:
         from app.db.mssql_conn import get_ret_status_map
+
         result = get_ret_status_map()
         if result:
             _ret_status_cache = result
@@ -55,18 +63,21 @@ def _get_ret_status_map() -> dict:
     except Exception:
         return {}
 
+
 def _get_sales_status_map() -> dict:
     global _sales_status_cache
     if _sales_status_cache:
         return _sales_status_cache
     try:
         from app.db.mssql_conn import get_sales_status_map
+
         result = get_sales_status_map()
         if result:
             _sales_status_cache = result
         return result or {}
     except Exception:
         return {}
+
 
 # ── Group dimension SQL fragments ─────────────────────────────────────────────
 
@@ -118,33 +129,90 @@ _AGE_GROUP_SORT = (
 )
 
 _DIMS = {
-    "days_from_ftc":          {"val": _DAYS_FTC_VAL,                                              "sort": _DAYS_FTC_SORT,  "cu": False, "camp": False},
-    "marketing_group":        {"val": "COALESCE(c.marketing_group,        '(Unassigned)')",       "sort": "NULL::int",     "cu": False, "camp": True },
-    "campaign_legacy":        {"val": "COALESCE(c.campaign_legacy_id,     '(Unassigned)')",       "sort": "NULL::int",     "cu": False, "camp": True },
-    "office_name":            {"val": "COALESCE(u.office_name,            '(Unassigned)')",       "sort": "NULL::int",     "cu": True,  "camp": False},
-    "team":                   {"val": "COALESCE(u.department,             '(Unassigned)')",       "sort": "NULL::int",     "cu": True,  "camp": False},
-    "agent":                  {"val": "COALESCE(u.agent_name,             '(Unassigned)')",       "sort": "NULL::int",     "cu": True,  "camp": False},
-    "age_group":              {"val": _AGE_GROUP_VAL,                                             "sort": _AGE_GROUP_SORT, "cu": False, "camp": False},
-    "sales_client_potential": {"val": "COALESCE(ROUND(a.sales_client_potential::numeric)::int::text, '(Unassigned)')", "sort": "ROUND(a.sales_client_potential::numeric)::int", "cu": False, "camp": False},
-    "country_name":           {"val": "COALESCE(a.country_iso,            '(Unassigned)')",       "sort": "NULL::int",     "cu": False, "camp": False},
-    "region":                 {"val": "COALESCE(a.country_iso,            '(Unassigned)')",       "sort": "NULL::int",     "cu": False, "camp": False},
-    "segmentation":           {"val": ("CASE"
-                                       " WHEN a.segmentation IN ('1','2','3','4') THEN"
-                                       "   CASE a.segmentation WHEN '1' THEN 'A' WHEN '2' THEN 'B' WHEN '3' THEN 'C' WHEN '4' THEN 'A+' END"
-                                       " WHEN (a.segmentation IS NULL OR a.segmentation IN ('0','17'))"
-                                       "   AND (a.classification_int IS NULL OR a.classification_int NOT BETWEEN 1 AND 10)"
-                                       "   AND a.birth_date IS NOT NULL THEN"
-                                       "   CASE"
-                                       "     WHEN DATE_PART('year', AGE(CURRENT_DATE, a.birth_date::date)) < 25 THEN 'C'"
-                                       "     WHEN DATE_PART('year', AGE(CURRENT_DATE, a.birth_date::date)) BETWEEN 25 AND 34 THEN 'B'"
-                                       "     WHEN DATE_PART('year', AGE(CURRENT_DATE, a.birth_date::date)) BETWEEN 35 AND 49 THEN 'A'"
-                                       "     WHEN DATE_PART('year', AGE(CURRENT_DATE, a.birth_date::date)) >= 50 THEN 'A+'"
-                                       "   END"
-                                       " WHEN a.segmentation = '17' THEN 'Unverified'"
-                                       " ELSE '(Unassigned)'"
-                                       " END"), "sort": "COALESCE(a.segmentation::int, 99)", "cu": False, "camp": False},
-    "retention_status":       {"val": "COALESCE(a.retention_status::text, '(Unassigned)')",       "sort": "COALESCE(a.retention_status::int, 999)", "cu": False, "camp": False},
-    "sales_status":           {"val": "COALESCE(a.sales_status::text,     '(Unassigned)')",       "sort": "COALESCE(a.sales_status::int, 999)",     "cu": False, "camp": False},
+    "days_from_ftc": {"val": _DAYS_FTC_VAL, "sort": _DAYS_FTC_SORT, "cu": False, "camp": False},
+    "marketing_group": {
+        "val": "COALESCE(c.marketing_group,        '(Unassigned)')",
+        "sort": "NULL::int",
+        "cu": False,
+        "camp": True,
+    },
+    "campaign_legacy": {
+        "val": "COALESCE(c.campaign_legacy_id,     '(Unassigned)')",
+        "sort": "NULL::int",
+        "cu": False,
+        "camp": True,
+    },
+    "office_name": {
+        "val": "COALESCE(u.office_name,            '(Unassigned)')",
+        "sort": "NULL::int",
+        "cu": True,
+        "camp": False,
+    },
+    "team": {
+        "val": "COALESCE(u.department,             '(Unassigned)')",
+        "sort": "NULL::int",
+        "cu": True,
+        "camp": False,
+    },
+    "agent": {
+        "val": "COALESCE(u.agent_name,             '(Unassigned)')",
+        "sort": "NULL::int",
+        "cu": True,
+        "camp": False,
+    },
+    "age_group": {"val": _AGE_GROUP_VAL, "sort": _AGE_GROUP_SORT, "cu": False, "camp": False},
+    "sales_client_potential": {
+        "val": "COALESCE(ROUND(a.sales_client_potential::numeric)::int::text, '(Unassigned)')",
+        "sort": "ROUND(a.sales_client_potential::numeric)::int",
+        "cu": False,
+        "camp": False,
+    },
+    "country_name": {
+        "val": "COALESCE(a.country_iso,            '(Unassigned)')",
+        "sort": "NULL::int",
+        "cu": False,
+        "camp": False,
+    },
+    "region": {
+        "val": "COALESCE(a.country_iso,            '(Unassigned)')",
+        "sort": "NULL::int",
+        "cu": False,
+        "camp": False,
+    },
+    "segmentation": {
+        "val": (
+            "CASE"
+            " WHEN a.segmentation IN ('1','2','3','4') THEN"
+            "   CASE a.segmentation WHEN '1' THEN 'A' WHEN '2' THEN 'B' WHEN '3' THEN 'C' WHEN '4' THEN 'A+' END"
+            " WHEN (a.segmentation IS NULL OR a.segmentation IN ('0','17'))"
+            "   AND (a.classification_int IS NULL OR a.classification_int NOT BETWEEN 1 AND 10)"
+            "   AND a.birth_date IS NOT NULL THEN"
+            "   CASE"
+            "     WHEN DATE_PART('year', AGE(CURRENT_DATE, a.birth_date::date)) < 25 THEN 'C'"
+            "     WHEN DATE_PART('year', AGE(CURRENT_DATE, a.birth_date::date)) BETWEEN 25 AND 34 THEN 'B'"
+            "     WHEN DATE_PART('year', AGE(CURRENT_DATE, a.birth_date::date)) BETWEEN 35 AND 49 THEN 'A'"
+            "     WHEN DATE_PART('year', AGE(CURRENT_DATE, a.birth_date::date)) >= 50 THEN 'A+'"
+            "   END"
+            " WHEN a.segmentation = '17' THEN 'Unverified'"
+            " ELSE '(Unassigned)'"
+            " END"
+        ),
+        "sort": "COALESCE(a.segmentation::int, 99)",
+        "cu": False,
+        "camp": False,
+    },
+    "retention_status": {
+        "val": "COALESCE(a.retention_status::text, '(Unassigned)')",
+        "sort": "COALESCE(a.retention_status::int, 999)",
+        "cu": False,
+        "camp": False,
+    },
+    "sales_status": {
+        "val": "COALESCE(a.sales_status::text,     '(Unassigned)')",
+        "sort": "COALESCE(a.sales_status::int, 999)",
+        "cu": False,
+        "camp": False,
+    },
 }
 
 
@@ -156,10 +224,13 @@ async def ftc_date_page(request: Request):
     ap = user.get("allowed_pages_list")
     if user.get("role") != "admin" and not (ap is not None and "ftc_date" in ap):
         return RedirectResponse(url="/performance")
-    return templates.TemplateResponse("ftc_date.html", {
-        "request": request,
-        "current_user": user,
-    })
+    return templates.TemplateResponse(
+        "ftc_date.html",
+        {
+            "request": request,
+            "current_user": user,
+        },
+    )
 
 
 @router.get("/api/ftc-date/options")
@@ -185,9 +256,9 @@ async def ftc_date_options(request: Request):
         with conn.cursor() as cur:
             cur.execute(sql)
             rows = cur.fetchall()
-        agents  = [{"id": r[0], "name": r[1]} for r in rows]
+        agents = [{"id": r[0], "name": r[1]} for r in rows]
         offices = sorted(set(r[2] for r in rows if r[2]))
-        teams   = sorted(set(r[3] for r in rows if r[3]))
+        teams = sorted(set(r[3] for r in rows if r[3]))
         result = {"agents": agents, "offices": offices, "teams": teams}
         cache.set(_ck, result)
         return JSONResponse(content=result)
@@ -197,16 +268,24 @@ async def ftc_date_options(request: Request):
         conn.close()
 
 
-_ALL_FTC_GROUPS = {"0 - 7 days", "8 - 14 days", "15 - 30 days", "31 - 60 days", "61 - 90 days", "91 - 120 days", "120+ days"}
+_ALL_FTC_GROUPS = {
+    "0 - 7 days",
+    "8 - 14 days",
+    "15 - 30 days",
+    "31 - 60 days",
+    "61 - 90 days",
+    "91 - 120 days",
+    "120+ days",
+}
 
 _GROUP_DAY_SQL = {
-    "0 - 7 days":    "(%(end_date)s::date - a.client_qualification_date::date) BETWEEN 0 AND 7",
-    "8 - 14 days":   "(%(end_date)s::date - a.client_qualification_date::date) BETWEEN 8 AND 14",
-    "15 - 30 days":  "(%(end_date)s::date - a.client_qualification_date::date) BETWEEN 15 AND 30",
-    "31 - 60 days":  "(%(end_date)s::date - a.client_qualification_date::date) BETWEEN 31 AND 60",
-    "61 - 90 days":  "(%(end_date)s::date - a.client_qualification_date::date) BETWEEN 61 AND 90",
+    "0 - 7 days": "(%(end_date)s::date - a.client_qualification_date::date) BETWEEN 0 AND 7",
+    "8 - 14 days": "(%(end_date)s::date - a.client_qualification_date::date) BETWEEN 8 AND 14",
+    "15 - 30 days": "(%(end_date)s::date - a.client_qualification_date::date) BETWEEN 15 AND 30",
+    "31 - 60 days": "(%(end_date)s::date - a.client_qualification_date::date) BETWEEN 31 AND 60",
+    "61 - 90 days": "(%(end_date)s::date - a.client_qualification_date::date) BETWEEN 61 AND 90",
     "91 - 120 days": "(%(end_date)s::date - a.client_qualification_date::date) BETWEEN 91 AND 120",
-    "120+ days":     "(%(end_date)s::date - a.client_qualification_date::date) > 120",
+    "120+ days": "(%(end_date)s::date - a.client_qualification_date::date) > 120",
 }
 
 
@@ -220,7 +299,7 @@ async def ftc_date_api(
     office: str = None,
     team: str = None,
     classification: str = None,
-    ftc_groups: str = None,   # comma-separated checked group names
+    ftc_groups: str = None,  # comma-separated checked group names
 ):
     user = await get_current_user(request)
     if isinstance(user, RedirectResponse):
@@ -237,7 +316,7 @@ async def ftc_date_api(
 
     # Parse checked FTC groups — empty / all-7 = no filter
     ftc_groups_list = [g.strip() for g in ftc_groups.split(",")] if ftc_groups else []
-    ftc_groups_set  = set(ftc_groups_list)
+    ftc_groups_set = set(ftc_groups_list)
     apply_group_filter = bool(ftc_groups_set) and ftc_groups_set != _ALL_FTC_GROUPS
 
     _ck = f"ftc_v9:{end_date}:{group1}:{group2}:{agent_id}:{office}:{team}:{classification}:{ftc_groups}"
@@ -248,11 +327,11 @@ async def ftc_date_api(
     d1 = _DIMS[group1]
     d2 = _DIMS.get(group2)
 
-    needs_cu   = d1["cu"] or (d2 and d2["cu"]) or bool(agent_id or office or team)
+    needs_cu = d1["cu"] or (d2 and d2["cu"]) or bool(agent_id or office or team)
     needs_camp = d1["camp"] or (d2 and d2["camp"])
-    age_filter = "AND a.birth_date IS NOT NULL\n" if (group1 == 'age_group' or group2 == 'age_group') else ""
+    age_filter = "AND a.birth_date IS NOT NULL\n" if (group1 == "age_group" or group2 == "age_group") else ""
 
-    cu_join   = "LEFT JOIN crm_users u ON u.id = a.assigned_to" if needs_cu   else ""
+    cu_join = "LEFT JOIN crm_users u ON u.id = a.assigned_to" if needs_cu else ""
     camp_join = "LEFT JOIN campaigns c ON SPLIT_PART(a.campaign, '.', 1) = c.crmid" if needs_camp else ""
 
     params = {"end_date": end_date}
@@ -278,19 +357,18 @@ async def ftc_date_api(
             filter_parts.append("AND (" + " OR ".join(or_clauses) + ")")
     filter_sql = "\n      ".join(filter_parts)
 
-    g2_sel    = (", (" + d2["val"] + ") AS g2, (" + d2["sort"] + ") AS g2_sort") if has_g2 else ""
+    g2_sel = (", (" + d2["val"] + ") AS g2, (" + d2["sort"] + ") AS g2_sort") if has_g2 else ""
     g2_joined = ", b.g2, b.g2_sort" if has_g2 else ""
-    g2_grp    = ", g2, g2_sort" if has_g2 else ""
-    g2_ord    = ", COALESCE(g2_sort, 0), g2" if has_g2 else ""
+    g2_grp = ", g2, g2_sort" if has_g2 else ""
+    g2_ord = ", COALESCE(g2_sort, 0), g2" if has_g2 else ""
 
     sql = (
         "WITH base_accounts AS (\n"
         "    SELECT a.accountid,\n"
-        "           (" + d1["val"]  + ") AS g1,\n"
-        "           (" + d1["sort"] + ") AS g1_sort"
-        + (",\n           " + g2_sel.lstrip(", ") if has_g2 else "") + "\n"
+        "           (" + d1["val"] + ") AS g1,\n"
+        "           (" + d1["sort"] + ") AS g1_sort" + (",\n           " + g2_sel.lstrip(", ") if has_g2 else "") + "\n"
         "    FROM accounts a\n"
-        + ("    " + cu_join   + "\n" if cu_join   else "")
+        + ("    " + cu_join + "\n" if cu_join else "")
         + ("    " + camp_join + "\n" if camp_join else "")
         + "    WHERE a.client_qualification_date >= '2024-01-01'\n"
         "      AND a.client_qualification_date < (%(end_date)s::date + INTERVAL '1 day')\n"
@@ -365,14 +443,20 @@ async def ftc_date_api(
             db_rows = cur.fetchall()
 
         def _build(g1, g2, ftc, rdp_cnt, dep, wd, wdcount, traders):
-            ftc = int(ftc or 0); rdp_cnt = int(rdp_cnt or 0)
-            dep = float(dep or 0); wd = float(wd or 0)
-            wdcount = int(wdcount or 0); traders = int(traders or 0)
+            ftc = int(ftc or 0)
+            rdp_cnt = int(rdp_cnt or 0)
+            dep = float(dep or 0)
+            wd = float(wd or 0)
+            wdcount = int(wdcount or 0)
+            traders = int(traders or 0)
             net = dep - wd
             return {
-                "g1": g1, "g2": g2,
-                "ftc": ftc, "rdp": rdp_cnt,
-                "deposit": round(dep), "withdrawal": round(wd),
+                "g1": g1,
+                "g2": g2,
+                "ftc": ftc,
+                "rdp": rdp_cnt,
+                "deposit": round(dep),
+                "withdrawal": round(wd),
                 "net_deposit": round(net),
                 "ltv": round(net / ftc, 2) if ftc > 0 else 0,
                 "pct_std": round(rdp_cnt / ftc * 100) if ftc > 0 else 0,
@@ -392,69 +476,80 @@ async def ftc_date_api(
                 g2_val = None
             data.append(_build(g1, g2_val, ftc, rdp, dep, wd, wdc, traders))
 
-        if group1 == 'country_name' or group2 == 'country_name':
+        if group1 == "country_name" or group2 == "country_name":
             cmap = _get_country_map()
             for row in data:
-                if group1 == 'country_name' and row.get('g1') and row['g1'] != '(Unassigned)':
-                    row['g1'] = cmap.get(row['g1'].strip().upper(), row['g1'])
-                if group2 == 'country_name' and row.get('g2') and row['g2'] != '(Unassigned)':
-                    row['g2'] = cmap.get(row['g2'].strip().upper(), row['g2'])
+                if group1 == "country_name" and row.get("g1") and row["g1"] != "(Unassigned)":
+                    row["g1"] = cmap.get(row["g1"].strip().upper(), row["g1"])
+                if group2 == "country_name" and row.get("g2") and row["g2"] != "(Unassigned)":
+                    row["g2"] = cmap.get(row["g2"].strip().upper(), row["g2"])
 
-        if group1 == 'region' or group2 == 'region':
+        if group1 == "region" or group2 == "region":
             rmap = _get_region_map()
             for row in data:
-                if group1 == 'region' and row.get('g1') and row['g1'] != '(Unassigned)':
-                    row['g1'] = rmap.get(row['g1'].strip().upper(), row['g1'])
-                if group2 == 'region' and row.get('g2') and row['g2'] != '(Unassigned)':
-                    row['g2'] = rmap.get(row['g2'].strip().upper(), row['g2'])
+                if group1 == "region" and row.get("g1") and row["g1"] != "(Unassigned)":
+                    row["g1"] = rmap.get(row["g1"].strip().upper(), row["g1"])
+                if group2 == "region" and row.get("g2") and row["g2"] != "(Unassigned)":
+                    row["g2"] = rmap.get(row["g2"].strip().upper(), row["g2"])
             # Re-aggregate: many country_iso → same region name
             merged = {}
             for row in data:
-                key = (row['g1'], row.get('g2'))
+                key = (row["g1"], row.get("g2"))
                 if key not in merged:
                     merged[key] = dict(row)
                 else:
                     m = merged[key]
-                    m['ftc']      += row['ftc'];   m['rdp']      += row['rdp']
-                    m['deposit']  += row['deposit']; m['withdrawal'] += row['withdrawal']
-                    m['wd_count'] += row['wd_count']; m['traders']  += row['traders']
+                    m["ftc"] += row["ftc"]
+                    m["rdp"] += row["rdp"]
+                    m["deposit"] += row["deposit"]
+                    m["withdrawal"] += row["withdrawal"]
+                    m["wd_count"] += row["wd_count"]
+                    m["traders"] += row["traders"]
             for row in merged.values():
-                ftc = row['ftc']; dep = row['deposit']; wd = row['withdrawal']
+                ftc = row["ftc"]
+                dep = row["deposit"]
+                wd = row["withdrawal"]
                 net = dep - wd
-                row['net_deposit']    = round(net)
-                row['ltv']            = round(net / ftc, 2) if ftc > 0 else 0
-                row['pct_std']        = round(row['rdp'] / ftc * 100) if ftc > 0 else 0
-                row['pct_wd_clients'] = round(row['wd_count'] / ftc * 100) if ftc > 0 else 0
-                row['pct_wd_usd']     = round(wd / dep * 100) if dep > 0 else 0
-                row['traders_pct']    = round(row['traders'] / ftc * 100) if ftc > 0 else 0
+                row["net_deposit"] = round(net)
+                row["ltv"] = round(net / ftc, 2) if ftc > 0 else 0
+                row["pct_std"] = round(row["rdp"] / ftc * 100) if ftc > 0 else 0
+                row["pct_wd_clients"] = round(row["wd_count"] / ftc * 100) if ftc > 0 else 0
+                row["pct_wd_usd"] = round(wd / dep * 100) if dep > 0 else 0
+                row["traders_pct"] = round(row["traders"] / ftc * 100) if ftc > 0 else 0
             data = list(merged.values())
 
-        if group1 == 'retention_status' or group2 == 'retention_status':
+        if group1 == "retention_status" or group2 == "retention_status":
             rsmap = _get_ret_status_map()
             for row in data:
-                if group1 == 'retention_status' and row.get('g1') and row['g1'] != '(Unassigned)':
-                    row['g1'] = rsmap.get(row['g1'], row['g1'])
-                if group2 == 'retention_status' and row.get('g2') and row['g2'] != '(Unassigned)':
-                    row['g2'] = rsmap.get(row['g2'], row['g2'])
+                if group1 == "retention_status" and row.get("g1") and row["g1"] != "(Unassigned)":
+                    row["g1"] = rsmap.get(row["g1"], row["g1"])
+                if group2 == "retention_status" and row.get("g2") and row["g2"] != "(Unassigned)":
+                    row["g2"] = rsmap.get(row["g2"], row["g2"])
 
-        if group1 == 'sales_status' or group2 == 'sales_status':
+        if group1 == "sales_status" or group2 == "sales_status":
             ssmap = _get_sales_status_map()
             for row in data:
-                if group1 == 'sales_status' and row.get('g1') and row['g1'] != '(Unassigned)':
-                    row['g1'] = ssmap.get(row['g1'], row['g1'])
-                if group2 == 'sales_status' and row.get('g2') and row['g2'] != '(Unassigned)':
-                    row['g2'] = ssmap.get(row['g2'], row['g2'])
+                if group1 == "sales_status" and row.get("g1") and row["g1"] != "(Unassigned)":
+                    row["g1"] = ssmap.get(row["g1"], row["g1"])
+                if group2 == "sales_status" and row.get("g2") and row["g2"] != "(Unassigned)":
+                    row["g2"] = ssmap.get(row["g2"], row["g2"])
 
         total_ftc = total_rdp = total_dep = total_wd = total_wdc = total_traders = 0
         for r in data:
-            total_ftc     += r["ftc"];      total_rdp     += r["rdp"]
-            total_dep     += r["deposit"];  total_wd      += r["withdrawal"]
-            total_wdc     += r["wd_count"]; total_traders += r["traders"]
+            total_ftc += r["ftc"]
+            total_rdp += r["rdp"]
+            total_dep += r["deposit"]
+            total_wd += r["withdrawal"]
+            total_wdc += r["wd_count"]
+            total_traders += r["traders"]
         net = total_dep - total_wd
         grand = {
-            "g1": "Grand Total", "g2": None,
-            "ftc": total_ftc, "rdp": total_rdp,
-            "deposit": round(total_dep), "withdrawal": round(total_wd),
+            "g1": "Grand Total",
+            "g2": None,
+            "ftc": total_ftc,
+            "rdp": total_rdp,
+            "deposit": round(total_dep),
+            "withdrawal": round(total_wd),
             "net_deposit": round(net),
             "ltv": round(net / total_ftc, 2) if total_ftc > 0 else 0,
             "pct_std": round(total_rdp / total_ftc * 100) if total_ftc > 0 else 0,
@@ -466,8 +561,11 @@ async def ftc_date_api(
         }
 
         _result = {
-            "rows": data, "grand_total": grand,
-            "end_date": end_date, "group1": group1, "group2": group2,
+            "rows": data,
+            "grand_total": grand,
+            "end_date": end_date,
+            "group1": group1,
+            "group2": group2,
         }
         cache.set(_ck, _result, ttl=3600)
         return JSONResponse(content=_result)

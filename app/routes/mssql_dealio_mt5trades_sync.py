@@ -1,5 +1,6 @@
 from fastapi import APIRouter, BackgroundTasks
 from fastapi.responses import JSONResponse
+
 from app.etl.fetch_and_store import run_mssql_dealio_mt5trades_full_etl
 
 router = APIRouter()

@@ -1,23 +1,33 @@
+from datetime import date
+
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+
+from app import cache
 from app.auth.dependencies import get_current_user
 from app.db.postgres_conn import get_connection
-from app import cache
-from datetime import date
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
-FSA_COUNTRIES = ('CM','KE','SE','ZM','DK','NL','ES','FI','NO')
+FSA_COUNTRIES = ("CM", "KE", "SE", "ZM", "DK", "NL", "ES", "FI", "NO")
 # Aruba (AW) is a constituent country of the Kingdom of the Netherlands.
 # Included in filters so its clients are counted, but rolled up under NL for display
 # (Section 4 uses CASE to normalize AW -> NL; display loop still shows 9 countries).
-FSA_COUNTRIES_FILTER = FSA_COUNTRIES + ('AW',)
+FSA_COUNTRIES_FILTER = FSA_COUNTRIES + ("AW",)
 FSA_COUNTRY_NAMES = {
-    'CM': 'Cameroon', 'KE': 'Kenya', 'SE': 'Sweden', 'ZM': 'Zambia',
-    'DK': 'Denmark', 'NL': 'Netherlands', 'ES': 'Spain', 'FI': 'Finland', 'NO': 'Norway',
+    "CM": "Cameroon",
+    "KE": "Kenya",
+    "SE": "Sweden",
+    "ZM": "Zambia",
+    "DK": "Denmark",
+    "NL": "Netherlands",
+    "ES": "Spain",
+    "FI": "Finland",
+    "NO": "Norway",
 }
+
 
 def _quarter_dates(year: int, quarter: int):
     q_start_month = (quarter - 1) * 3 + 1
@@ -31,8 +41,7 @@ def _quarter_dates(year: int, quarter: int):
         q_end = date(year, 9, 30)
     else:
         q_end = date(year, 12, 31)
-    q_end_excl = date(year + (1 if quarter == 4 else 0),
-                      1 if quarter == 4 else q_end_month + 1, 1)
+    q_end_excl = date(year + (1 if quarter == 4 else 0), 1 if quarter == 4 else q_end_month + 1, 1)
     return q_start, q_end, q_end_excl
 
 
@@ -71,7 +80,8 @@ async def fsa_report_section3(request: Request, year: int = 2026, quarter: int =
     try:
         with conn.cursor() as cur:
             # Query 1: Active/Inactive counts BOP + EOP
-            cur.execute(f"""
+            cur.execute(
+                f"""
                 SELECT
                   SUM(CASE WHEN compliance_status IN ('4','9') AND createdtime < %(q_start)s THEN 1 ELSE 0 END) AS active_bop,
                   SUM(CASE WHEN compliance_status NOT IN ('4','9') AND createdtime < %(q_start)s THEN 1 ELSE 0 END) AS inactive_bop,
@@ -79,7 +89,9 @@ async def fsa_report_section3(request: Request, year: int = 2026, quarter: int =
                   SUM(CASE WHEN compliance_status NOT IN ('4','9') AND createdtime < %(q_end_excl)s THEN 1 ELSE 0 END) AS inactive_eop
                 FROM accounts
                 WHERE {base_filter}
-            """, {"q_start": q_start, "q_end_excl": q_end_excl})
+            """,
+                {"q_start": q_start, "q_end_excl": q_end_excl},
+            )
             row = cur.fetchone()
             counts = {
                 "active_bop": row[0] or 0,
@@ -90,7 +102,8 @@ async def fsa_report_section3(request: Request, year: int = 2026, quarter: int =
 
             # Query 2: Clients' Funds from daily_equity_zeroed (last day of quarter)
             # Find the latest snapshot day on or before quarter end
-            cur.execute(f"""
+            cur.execute(
+                """
                 SELECT COALESCE(SUM(GREATEST(dez.end_equity_zeroed, 0)), 0)
                 FROM daily_equity_zeroed dez
                 JOIN trading_accounts ta ON ta.login::bigint = dez.login
@@ -101,11 +114,14 @@ async def fsa_report_section3(request: Request, year: int = 2026, quarter: int =
                   AND a.is_test_account = 0
                   AND (a.sales_rep_id IS NULL OR a.sales_rep_id != 3303)
                   AND a.country_iso IN ('CM','KE','SE','ZM','DK','NL','ES','FI','NO','AW')
-            """, {"q_end": q_end})
+            """,
+                {"q_end": q_end},
+            )
             clients_funds = float(cur.fetchone()[0])
 
             # Query 3: Age groups
-            cur.execute(f"""
+            cur.execute(
+                f"""
                 SELECT
                   SUM(CASE WHEN DATE_PART('year', AGE(%(q_end)s::date, birth_date::date)) < 18 THEN 1 ELSE 0 END) AS under_18,
                   SUM(CASE WHEN DATE_PART('year', AGE(%(q_end)s::date, birth_date::date)) BETWEEN 18 AND 25 THEN 1 ELSE 0 END) AS age_18_25,
@@ -119,7 +135,9 @@ async def fsa_report_section3(request: Request, year: int = 2026, quarter: int =
                   AND compliance_status IN ('4','9')
                   AND createdtime < %(q_end_excl)s
                   AND birth_date IS NOT NULL
-            """, {"q_end": q_end, "q_end_excl": q_end_excl})
+            """,
+                {"q_end": q_end, "q_end_excl": q_end_excl},
+            )
             age_row = cur.fetchone()
             age_groups = {
                 "under_18": age_row[0] or 0,
@@ -132,7 +150,8 @@ async def fsa_report_section3(request: Request, year: int = 2026, quarter: int =
             }
 
             # Query 4: Classification of active clients (PEP + total active EOP)
-            cur.execute(f"""
+            cur.execute(
+                f"""
                 SELECT
                   COUNT(*) AS total_active,
                   SUM(CASE WHEN pep_sanctions = 1 THEN 1 ELSE 0 END) AS pep_count
@@ -140,7 +159,9 @@ async def fsa_report_section3(request: Request, year: int = 2026, quarter: int =
                 WHERE {base_filter}
                   AND compliance_status IN ('4','9')
                   AND createdtime < %(q_end_excl)s
-            """, {"q_end_excl": q_end_excl})
+            """,
+                {"q_end_excl": q_end_excl},
+            )
             cls_row = cur.fetchone()
             classification = {
                 "total_active": cls_row[0] or 0,
@@ -186,7 +207,8 @@ async def fsa_report_section4(request: Request, year: int = 2026, quarter: int =
         with conn.cursor() as cur:
             # Query 1: Active/Inactive counts per country at EOP
             # Map AW -> NL so Aruba clients are counted under Netherlands
-            cur.execute(f"""
+            cur.execute(
+                f"""
                 SELECT
                   CASE WHEN a.country_iso = 'AW' THEN 'NL' ELSE a.country_iso END AS country_iso,
                   SUM(CASE WHEN a.compliance_status IN ('4','9') THEN 1 ELSE 0 END) AS active,
@@ -196,7 +218,9 @@ async def fsa_report_section4(request: Request, year: int = 2026, quarter: int =
                   AND a.createdtime < %(q_end_excl)s
                   AND a.country_iso IN %(countries)s
                 GROUP BY CASE WHEN a.country_iso = 'AW' THEN 'NL' ELSE a.country_iso END
-            """, {"q_end_excl": q_end_excl, "countries": FSA_COUNTRIES_FILTER})
+            """,
+                {"q_end_excl": q_end_excl, "countries": FSA_COUNTRIES_FILTER},
+            )
             country_counts = {}
             for row in cur.fetchall():
                 country_counts[row[0]] = {"active": row[1] or 0, "inactive": row[2] or 0}
@@ -204,10 +228,10 @@ async def fsa_report_section4(request: Request, year: int = 2026, quarter: int =
             # Query 2: Open volume per country
             # Same as performance report / PBI: dealio_positions + closed trades
             # mapped back to open_time via position_id
-            vol_params = {"q_start": q_start, "q_end_excl": q_end_excl,
-                          "countries": FSA_COUNTRIES_FILTER}
+            vol_params = {"q_start": q_start, "q_end_excl": q_end_excl, "countries": FSA_COUNTRIES_FILTER}
 
-            cur.execute(f"""
+            cur.execute(
+                f"""
                 SELECT country_iso, COALESCE(SUM(notional_usd), 0)
                 FROM (
                     -- Open positions by open_time
@@ -239,13 +263,16 @@ async def fsa_report_section4(request: Request, year: int = 2026, quarter: int =
                       AND a.country_iso IN %(countries)s
                 ) combined
                 GROUP BY country_iso
-            """, vol_params)
+            """,
+                vol_params,
+            )
             country_volume = {}
             for row in cur.fetchall():
                 country_volume[row[0]] = float(row[1] or 0)
 
             # Query 3: Close volume per country (entry=1 by close_time)
-            cur.execute(f"""
+            cur.execute(
+                f"""
                 SELECT
                     CASE WHEN a.country_iso = 'AW' THEN 'NL' ELSE a.country_iso END AS country_iso,
                     COALESCE(SUM(t.notional_value), 0)
@@ -259,7 +286,9 @@ async def fsa_report_section4(request: Request, year: int = 2026, quarter: int =
                   AND {base_filter}
                   AND a.country_iso IN %(countries)s
                 GROUP BY CASE WHEN a.country_iso = 'AW' THEN 'NL' ELSE a.country_iso END
-            """, vol_params)
+            """,
+                vol_params,
+            )
             for row in cur.fetchall():
                 country_volume[row[0]] = country_volume.get(row[0], 0) + float(row[1] or 0)
 
@@ -267,13 +296,15 @@ async def fsa_report_section4(request: Request, year: int = 2026, quarter: int =
         countries = []
         for iso in FSA_COUNTRIES:
             cc = country_counts.get(iso, {"active": 0, "inactive": 0})
-            countries.append({
-                "iso": iso,
-                "name": FSA_COUNTRY_NAMES.get(iso, iso),
-                "active": cc["active"],
-                "inactive": cc["inactive"],
-                "cfds": country_volume.get(iso, 0),
-            })
+            countries.append(
+                {
+                    "iso": iso,
+                    "name": FSA_COUNTRY_NAMES.get(iso, iso),
+                    "active": cc["active"],
+                    "inactive": cc["inactive"],
+                    "cfds": country_volume.get(iso, 0),
+                }
+            )
 
         _result = {"countries": countries}
         cache.set(_ck, _result, ttl=3600)
@@ -303,7 +334,8 @@ async def fsa_report_section5(request: Request, year: int = 2026, quarter: int =
         with conn.cursor() as cur:
             # 6.1 Actual Client's Equity = SUM(GREATEST(convertedequity, 0))
             # at last available date <= quarter end
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT COALESCE(SUM(GREATEST(ddp.convertedequity, 0)), 0)
                 FROM dealio_daily_profits ddp
                 JOIN trading_accounts ta ON ta.login::bigint = ddp.login
@@ -315,11 +347,14 @@ async def fsa_report_section5(request: Request, year: int = 2026, quarter: int =
                   AND a.is_test_account = 0
                   AND (a.sales_rep_id IS NULL OR a.sales_rep_id != 3303)
                   AND a.country_iso IN %(countries)s
-            """, {"q_end": q_end, "countries": FSA_COUNTRIES_FILTER})
+            """,
+                {"q_end": q_end, "countries": FSA_COUNTRIES_FILTER},
+            )
             actual_equity = float(cur.fetchone()[0])
 
             # 6.2 Floating PnL = SUM(converteddeltafloatingpnl) for all days in quarter
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT COALESCE(SUM(ddp.converteddeltafloatingpnl), 0)
                 FROM dealio_daily_profits ddp
                 JOIN trading_accounts ta ON ta.login::bigint = ddp.login
@@ -329,8 +364,9 @@ async def fsa_report_section5(request: Request, year: int = 2026, quarter: int =
                   AND a.is_test_account = 0
                   AND (a.sales_rep_id IS NULL OR a.sales_rep_id != 3303)
                   AND a.country_iso IN %(countries)s
-            """, {"q_start": q_start, "q_end_excl": q_end_excl,
-                  "countries": FSA_COUNTRIES_FILTER})
+            """,
+                {"q_start": q_start, "q_end_excl": q_end_excl, "countries": FSA_COUNTRIES_FILTER},
+            )
             floating_pnl = float(cur.fetchone()[0])
 
         total_equity = actual_equity + floating_pnl
@@ -350,8 +386,8 @@ async def fsa_report_section5(request: Request, year: int = 2026, quarter: int =
         conn.close()
 
 
-EU_COUNTRIES = {'SE', 'DK', 'NL', 'ES', 'FI', 'NO'}
-OTHER_FOREIGN = {'CM', 'KE', 'ZM'}
+EU_COUNTRIES = {"SE", "DK", "NL", "ES", "FI", "NO"}
+OTHER_FOREIGN = {"CM", "KE", "ZM"}
 
 
 @router.get("/api/fsa-report/section6")
@@ -384,11 +420,11 @@ async def fsa_report_section6(request: Request, year: int = 2026, quarter: int =
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            vol_params = {"q_start": q_start, "q_end_excl": q_end_excl,
-                          "countries": FSA_COUNTRIES_FILTER}
+            vol_params = {"q_start": q_start, "q_end_excl": q_end_excl, "countries": FSA_COUNTRIES_FILTER}
 
             # --- Volume per country (open + close, same as section 4) ---
-            cur.execute(f"""
+            cur.execute(
+                f"""
                 SELECT country_iso, COALESCE(SUM(notional_usd), 0)
                 FROM (
                     SELECT
@@ -418,13 +454,16 @@ async def fsa_report_section6(request: Request, year: int = 2026, quarter: int =
                       AND a.country_iso IN %(countries)s
                 ) combined
                 GROUP BY country_iso
-            """, vol_params)
+            """,
+                vol_params,
+            )
             country_volume = {}
             for row in cur.fetchall():
                 country_volume[row[0]] = float(row[1] or 0)
 
             # Close volume per country
-            cur.execute(f"""
+            cur.execute(
+                f"""
                 SELECT
                     CASE WHEN a.country_iso = 'AW' THEN 'NL' ELSE a.country_iso END AS country_iso,
                     COALESCE(SUM(t.notional_value), 0)
@@ -438,14 +477,17 @@ async def fsa_report_section6(request: Request, year: int = 2026, quarter: int =
                   AND {base_filter}
                   AND a.country_iso IN %(countries)s
                 GROUP BY CASE WHEN a.country_iso = 'AW' THEN 'NL' ELSE a.country_iso END
-            """, vol_params)
+            """,
+                vol_params,
+            )
             for row in cur.fetchall():
                 country_volume[row[0]] = country_volume.get(row[0], 0) + float(row[1] or 0)
 
             total_volume = sum(country_volume.values())
 
             # --- end_net_equity (same as section 5 actual equity) ---
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT COALESCE(SUM(GREATEST(ddp.convertedequity, 0)), 0)
                 FROM dealio_daily_profits ddp
                 JOIN trading_accounts ta ON ta.login::bigint = ddp.login
@@ -457,11 +499,14 @@ async def fsa_report_section6(request: Request, year: int = 2026, quarter: int =
                   AND a.is_test_account = 0
                   AND (a.sales_rep_id IS NULL OR a.sales_rep_id != 3303)
                   AND a.country_iso IN %(countries)s
-            """, {"q_end": q_end, "countries": FSA_COUNTRIES_FILTER})
+            """,
+                {"q_end": q_end, "countries": FSA_COUNTRIES_FILTER},
+            )
             end_net_equity = float(cur.fetchone()[0])
 
             # --- start_net_equity (last date BEFORE quarter start) ---
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT COALESCE(SUM(GREATEST(ddp.convertedequity, 0)), 0)
                 FROM dealio_daily_profits ddp
                 JOIN trading_accounts ta ON ta.login::bigint = ddp.login
@@ -473,11 +518,14 @@ async def fsa_report_section6(request: Request, year: int = 2026, quarter: int =
                   AND a.is_test_account = 0
                   AND (a.sales_rep_id IS NULL OR a.sales_rep_id != 3303)
                   AND a.country_iso IN %(countries)s
-            """, {"q_start": q_start, "countries": FSA_COUNTRIES_FILTER})
+            """,
+                {"q_start": q_start, "countries": FSA_COUNTRIES_FILTER},
+            )
             start_net_equity = float(cur.fetchone()[0])
 
             # --- net_usd (standard deposits - standard withdrawals) ---
-            cur.execute(f"""
+            cur.execute(
+                f"""
                 SELECT COALESCE(SUM(
                   CASE
                     WHEN t.transactiontype = 'Deposit' THEN t.usdamount
@@ -496,12 +544,14 @@ async def fsa_report_section6(request: Request, year: int = 2026, quarter: int =
                         AND t.transaction_type_name IN ('Withdrawal', 'Deposit Cancelled'))
                   )
                   AND t.vtigeraccountid IN ({acct_subquery})
-            """, {"q_start": q_start, "q_end_excl": q_end_excl,
-                  "countries": FSA_COUNTRIES_FILTER})
+            """,
+                {"q_start": q_start, "q_end_excl": q_end_excl, "countries": FSA_COUNTRIES_FILTER},
+            )
             net_usd = float(cur.fetchone()[0])
 
             # --- dep_bonuses_fees_adj (non-standard deposit transactions) ---
-            cur.execute(f"""
+            cur.execute(
+                f"""
                 SELECT COALESCE(SUM(t.usdamount), 0)
                 FROM transactions t
                 WHERE t.transactionapproval = 'Approved'
@@ -513,12 +563,14 @@ async def fsa_report_section6(request: Request, year: int = 2026, quarter: int =
                     OR t.transaction_type_name = 'Transfer To Account'
                   )
                   AND t.vtigeraccountid IN ({acct_subquery})
-            """, {"q_start": q_start, "q_end_excl": q_end_excl,
-                  "countries": FSA_COUNTRIES_FILTER})
+            """,
+                {"q_start": q_start, "q_end_excl": q_end_excl, "countries": FSA_COUNTRIES_FILTER},
+            )
             dep_bonuses = float(cur.fetchone()[0])
 
             # --- wd_bonuses_fees_adj (non-standard withdrawal transactions) ---
-            cur.execute(f"""
+            cur.execute(
+                f"""
                 SELECT COALESCE(SUM(t.usdamount), 0)
                 FROM transactions t
                 WHERE t.transactionapproval = 'Approved'
@@ -530,8 +582,9 @@ async def fsa_report_section6(request: Request, year: int = 2026, quarter: int =
                     OR t.transaction_type_name = 'Transfer From Account'
                   )
                   AND t.vtigeraccountid IN ({acct_subquery})
-            """, {"q_start": q_start, "q_end_excl": q_end_excl,
-                  "countries": FSA_COUNTRIES_FILTER})
+            """,
+                {"q_start": q_start, "q_end_excl": q_end_excl, "countries": FSA_COUNTRIES_FILTER},
+            )
             wd_bonuses = float(cur.fetchone()[0])
 
         # PnL equity (income generated)

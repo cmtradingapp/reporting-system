@@ -1,13 +1,15 @@
+import time
+import traceback
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, RedirectResponse
-from app.auth.dependencies import get_current_user
-from app.db.postgres_conn import get_connection
-from app.db.dealio_conn import get_dealio_connection, _EXCLUDED_SYMBOLS_TUPLE
+
 from app import cache
-from datetime import date, datetime
-from zoneinfo import ZoneInfo
-import traceback
-import time
+from app.auth.dependencies import get_current_user
+from app.db.dealio_conn import _EXCLUDED_SYMBOLS_TUPLE, get_dealio_connection
+from app.db.postgres_conn import get_connection
 
 _TZ = ZoneInfo("Europe/Nicosia")
 
@@ -24,35 +26,42 @@ async def debug_eez(request: Request, login: int = None):
         return JSONResponse(status_code=403, content={"detail": "Admin only"})
 
     today = datetime.now(_TZ).date()
-    yesterday = str(today - __import__('datetime').timedelta(days=1))
+    yesterday = str(today - __import__("datetime").timedelta(days=1))
     conn = get_connection()
     result = {}
     try:
         with conn.cursor() as cur:
             # 1. Snapshot stats for yesterday (no joins needed)
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT COUNT(*), COALESCE(SUM(end_equity_zeroed), 0),
                        MIN(end_equity_zeroed), MAX(end_equity_zeroed),
                        ROUND(AVG(end_equity_zeroed)::numeric, 2)
                 FROM daily_equity_zeroed WHERE day = %s
-            """, (yesterday,))
+            """,
+                (yesterday,),
+            )
             r = cur.fetchone()
             result["snapshot_stats"] = {
-                "day": yesterday, "login_count": r[0],
-                "total_eez": float(r[1]), "min_eez": float(r[2] or 0),
-                "max_eez": float(r[3] or 0), "avg_eez": float(r[4] or 0),
+                "day": yesterday,
+                "login_count": r[0],
+                "total_eez": float(r[1]),
+                "min_eez": float(r[2] or 0),
+                "max_eez": float(r[3] or 0),
+                "avg_eez": float(r[4] or 0),
             }
 
             # 2. Top 20 logins by EEZ (NO accounts join)
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT dez.login, dez.end_equity_zeroed
                 FROM daily_equity_zeroed dez
                 WHERE dez.day = %s
                 ORDER BY dez.end_equity_zeroed DESC LIMIT 20
-            """, (yesterday,))
-            result["top_20_logins"] = [
-                {"login": r[0], "eez": float(r[1] or 0)} for r in cur.fetchall()
-            ]
+            """,
+                (yesterday,),
+            )
+            result["top_20_logins"] = [{"login": r[0], "eez": float(r[1] or 0)} for r in cur.fetchall()]
 
             # 3. All corrupt rows in local dealio_daily_profits
             cur.execute("""
@@ -62,8 +71,13 @@ async def debug_eez(request: Request, login: int = None):
                 ORDER BY ABS(convertedfloatingpnl) DESC
             """)
             result["corrupt_local_rows"] = [
-                {"login": r[0], "date": str(r[1]), "sourceid": r[2],
-                 "convertedfloatingpnl": float(r[3] or 0), "convertedbalance": float(r[4] or 0)}
+                {
+                    "login": r[0],
+                    "date": str(r[1]),
+                    "sourceid": r[2],
+                    "convertedfloatingpnl": float(r[3] or 0),
+                    "convertedbalance": float(r[4] or 0),
+                }
                 for r in cur.fetchall()
             ]
 
@@ -75,9 +89,7 @@ async def debug_eez(request: Request, login: int = None):
                 GROUP BY login::bigint HAVING COUNT(*) > 1
                 ORDER BY COUNT(*) DESC LIMIT 20
             """)
-            result["duplicate_logins_in_ta"] = [
-                {"login": r[0], "ta_count": r[1]} for r in cur.fetchall()
-            ]
+            result["duplicate_logins_in_ta"] = [{"login": r[0], "ta_count": r[1]} for r in cur.fetchall()]
 
             # 4. Live stats from trading_accounts only (no accounts join)
             cur.execute("""
@@ -88,14 +100,18 @@ async def debug_eez(request: Request, login: int = None):
             r = cur.fetchone()
             result["live_ta_stats"] = {
                 "equity_logins": r[0],
-                "sum_equity": float(r[1]), "sum_balance": float(r[2]),
+                "sum_equity": float(r[1]),
+                "sum_balance": float(r[2]),
             }
 
             # 5. Bonus totals
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT COUNT(DISTINCT login), COALESCE(SUM(net_amount), 0)
                 FROM bonus_transactions WHERE confirmation_time < (%s::date + INTERVAL '1 day')
-            """, (str(today),))
+            """,
+                (str(today),),
+            )
             r = cur.fetchone()
             result["bonus_stats"] = {
                 "logins_with_bonus": r[0] or 0,
@@ -104,55 +120,76 @@ async def debug_eez(request: Request, login: int = None):
 
             # 6. Specific login investigation
             check_login = login or 141727130
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT day, end_equity_zeroed, start_equity_zeroed
                 FROM daily_equity_zeroed
                 WHERE login = %s ORDER BY day DESC LIMIT 10
-            """, (check_login,))
+            """,
+                (check_login,),
+            )
             login_snapshots = [
-                {"day": str(r[0]), "end_eez": float(r[1] or 0),
-                 "start_eez": float(r[2] or 0) if r[2] else None}
+                {"day": str(r[0]), "end_eez": float(r[1] or 0), "start_eez": float(r[2] or 0) if r[2] else None}
                 for r in cur.fetchall()
             ]
 
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT login, vtigeraccountid, equity, balance, deleted
                 FROM trading_accounts WHERE login::bigint = %s
-            """, (check_login,))
+            """,
+                (check_login,),
+            )
             ta_rows = [
-                {"login": r[0], "accountid": r[1], "equity": float(r[2] or 0),
-                 "balance": float(r[3] or 0), "deleted": r[4]}
+                {
+                    "login": r[0],
+                    "accountid": r[1],
+                    "equity": float(r[2] or 0),
+                    "balance": float(r[3] or 0),
+                    "deleted": r[4],
+                }
                 for r in cur.fetchall()
             ]
 
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT date, convertedbalance, convertedfloatingpnl
                 FROM dealio_daily_profits
                 WHERE login = %s ORDER BY date DESC LIMIT 5
-            """, (check_login,))
+            """,
+                (check_login,),
+            )
             ddp_rows = [
-                {"date": str(r[0]), "convertedbalance": float(r[1] or 0),
-                 "convertedfloatingpnl": float(r[2] or 0)}
+                {"date": str(r[0]), "convertedbalance": float(r[1] or 0), "convertedfloatingpnl": float(r[2] or 0)}
                 for r in cur.fetchall()
             ]
 
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT COALESCE(SUM(net_amount), 0)
                 FROM bonus_transactions
                 WHERE login = %s AND confirmation_time < (%s::date + INTERVAL '1 day')
-            """, (check_login, str(today)))
+            """,
+                (check_login, str(today)),
+            )
             login_bonus = float(cur.fetchone()[0])
 
             # Check dealio_users for compbalance
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT login, compbalance, compcredit, lastupdate
                 FROM dealio_users WHERE login = %s
                 ORDER BY lastupdate DESC NULLS LAST LIMIT 3
-            """, (check_login,))
+            """,
+                (check_login,),
+            )
             du_rows = [
-                {"login": r[0], "compbalance": float(r[1] or 0),
-                 "compcredit": float(r[2] or 0),
-                 "lastupdate": str(r[3]) if r[3] else None}
+                {
+                    "login": r[0],
+                    "compbalance": float(r[1] or 0),
+                    "compcredit": float(r[2] or 0),
+                    "lastupdate": str(r[3]) if r[3] else None,
+                }
                 for r in cur.fetchall()
             ]
 
@@ -160,17 +197,25 @@ async def debug_eez(request: Request, login: int = None):
             remote_ddp = []
             try:
                 from app.db.dealio_conn import get_dealio_connection
+
                 dconn = get_dealio_connection()
                 try:
                     with dconn.cursor() as dcur:
-                        dcur.execute("""
+                        dcur.execute(
+                            """
                             SELECT date, convertedbalance, convertedfloatingpnl, sourceid
                             FROM dealio.daily_profits
                             WHERE login = %s ORDER BY date DESC LIMIT 10
-                        """, (check_login,))
+                        """,
+                            (check_login,),
+                        )
                         remote_ddp = [
-                            {"date": str(r[0]), "convertedbalance": float(r[1] or 0),
-                             "convertedfloatingpnl": float(r[2] or 0), "sourceid": r[3]}
+                            {
+                                "date": str(r[0]),
+                                "convertedbalance": float(r[1] or 0),
+                                "convertedfloatingpnl": float(r[2] or 0),
+                                "sourceid": r[3],
+                            }
                             for r in dcur.fetchall()
                         ]
                 finally:
@@ -214,8 +259,10 @@ async def cleanup_corrupt_ddp(request: Request):
                 FROM dealio_daily_profits
                 WHERE ABS(COALESCE(convertedfloatingpnl, 0)) >= 100000000
             """)
-            corrupt = [{"login": r[0], "date": str(r[1]), "sourceid": r[2],
-                        "convertedfloatingpnl": float(r[3] or 0)} for r in cur.fetchall()]
+            corrupt = [
+                {"login": r[0], "date": str(r[1]), "sourceid": r[2], "convertedfloatingpnl": float(r[3] or 0)}
+                for r in cur.fetchall()
+            ]
             result["corrupt_rows_found"] = len(corrupt)
             result["corrupt_rows"] = corrupt[:50]  # cap output
 
@@ -233,10 +280,11 @@ async def cleanup_corrupt_ddp(request: Request):
 
     # 2. Re-run snapshots for last 5 days
     from app.etl.fetch_and_store import run_daily_equity_zeroed_snapshot
+
     today = datetime.now(_TZ).date()
     snapshot_results = []
     for i in range(1, 6):
-        d = str(today - __import__('datetime').timedelta(days=i))
+        d = str(today - __import__("datetime").timedelta(days=i))
         try:
             sr = run_daily_equity_zeroed_snapshot(d)
             snapshot_results.append({"date": d, **sr})
@@ -248,6 +296,7 @@ async def cleanup_corrupt_ddp(request: Request):
 
 
 _RETRYABLE_ERRORS = ("conflict with recovery", "ssl syscall error", "eof detected", "timeout expired")
+
 
 def _with_retry(fn, *args, retries=1, delay=0):
     """Retry fn on transient dealio replica errors (replication conflict, SSL drop, timeout)."""
@@ -277,7 +326,7 @@ async def live_equity_zeroed(request: Request, date: str = None):
         except ValueError:
             return JSONResponse(status_code=400, content={"detail": "Invalid date"})
 
-    is_current_month = (d.year == today.year and d.month == today.month)
+    is_current_month = d.year == today.year and d.month == today.month
     _ck = f"live_eez_v24:{d}"
     _hit = cache.get(_ck)
     if _hit is not None:
@@ -363,7 +412,8 @@ def _historical_calc(d) -> dict:
             cur.execute(sql, {"d": str(d)})
             row = cur.fetchone()
             total = float(row[0] or 0)
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT COALESCE(SUM(end_equity_zeroed), 0)
                 FROM daily_equity_zeroed
                 WHERE day = %(d)s::date - INTERVAL '1 day'
@@ -372,10 +422,19 @@ def _historical_calc(d) -> dict:
                       WHERE vtigeraccountid IS NOT NULL
                         AND (deleted = 0 OR deleted IS NULL)
                   )
-            """, {"d": str(d)})
+            """,
+                {"d": str(d)},
+            )
             start_row = cur.fetchone()
             start_eez = float(start_row[0] or 0)
-        return {"total": round(total), "start_equity_zeroed": round(start_eez), "pnl_cash": None, "net_deposits_today": None, "is_live": False, "date": str(d)}
+        return {
+            "total": round(total),
+            "start_equity_zeroed": round(start_eez),
+            "pnl_cash": None,
+            "net_deposits_today": None,
+            "is_live": False,
+            "date": str(d),
+        }
     finally:
         conn.close()
 
@@ -402,29 +461,42 @@ def _live_calc(d) -> dict:
             valid_logins = [int(r[0]) for r in cur.fetchall()]
 
             if not valid_logins:
-                return {"total": 0, "start_equity_zeroed": 0, "net_deposits_today": 0, "pnl_cash": 0, "is_live": True, "date": str(d)}
+                return {
+                    "total": 0,
+                    "start_equity_zeroed": 0,
+                    "net_deposits_today": 0,
+                    "pnl_cash": 0,
+                    "is_live": True,
+                    "date": str(d),
+                }
 
             # Start EEZ per login (yesterday snapshot)
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT login, end_equity_zeroed
                 FROM daily_equity_zeroed
                 WHERE day = %(d)s::date - INTERVAL '1 day'
                   AND login = ANY(%(logins)s)
-            """, {"d": str(d), "logins": valid_logins})
+            """,
+                {"d": str(d), "logins": valid_logins},
+            )
             start_eez_map = {}
             start_eez_total = 0.0
             for r in cur.fetchall():
                 login_id = int(r[0])
-                eez_val  = float(r[1] or 0)
+                eez_val = float(r[1] or 0)
                 start_eez_map[login_id] = eez_val
                 start_eez_total += eez_val
 
             # Net deposits today — read from MV (pre-filtered, indexed on tx_date)
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT COALESCE(SUM(net_usd), 0)
                 FROM mv_daily_kpis
                 WHERE tx_date = %(d)s::date
-            """, {"d": str(d)})
+            """,
+                {"d": str(d)},
+            )
             net_deposits_today = float(cur.fetchone()[0] or 0)
 
             # Logins with equity > 0 from live trading_accounts (+ equity for sanity cap)
@@ -440,19 +512,23 @@ def _live_calc(d) -> dict:
             equity_logins = [int(r[0]) for r in _eq_rows]
 
             # Cumulative bonus per login up to today (for equity_logins only)
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT login, SUM(net_amount)
                 FROM bonus_transactions
                 WHERE confirmation_time < (%(d)s::date + INTERVAL '1 day')
                   AND login = ANY(%(logins)s)
                 GROUP BY login
-            """, {"d": str(d), "logins": equity_logins})
+            """,
+                {"d": str(d), "logins": equity_logins},
+            )
             bonus_map = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
 
             # Daily start net equity: MAX(0, convertedbalance + convertedfloatingpnl)
             # from dealio_daily_profits for yesterday, same equity_logins set.
             # Sanity cap: skip rows where ABS(convertedfloatingpnl) > 100M (corrupt data).
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT COALESCE(SUM(CASE
                     WHEN COALESCE(d.convertedbalance,0) + COALESCE(d.convertedfloatingpnl,0) <= 0 THEN 0
                     ELSE COALESCE(d.convertedbalance,0) + COALESCE(d.convertedfloatingpnl,0)
@@ -465,15 +541,20 @@ def _live_calc(d) -> dict:
                       AND date <  %(d)s::date
                     ORDER BY login, date DESC
                 ) d
-            """, {"d": str(d), "logins": equity_logins})
+            """,
+                {"d": str(d), "logins": equity_logins},
+            )
             start_net_equity = float(cur.fetchone()[0] or 0)
 
             # Today's bonuses (for daily pnl cash)
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT COALESCE(SUM(net_amount), 0)
                 FROM bonus_transactions
                 WHERE confirmation_time >= %(d)s::date AND confirmation_time < (%(d)s::date + INTERVAL '1 day')
-            """, {"d": str(d)})
+            """,
+                {"d": str(d)},
+            )
             today_bonuses = float(cur.fetchone()[0] or 0)
 
     finally:
@@ -483,17 +564,18 @@ def _live_calc(d) -> dict:
     # back to locally-synced copies (dealio_positions / dealio_users / dealio_trades_mt5)
     # when the replica is unhealthy (recovery conflicts, SSL drops). Local tables are
     # refreshed every ~1 min, so this is still "live" in practice.
-    floating_map     = {}
-    bal_map          = {}
+    floating_map = {}
+    bal_map = {}
     today_closed_pnl = 0.0
-    data_source      = "remote"
-    local_synced_at  = None
+    data_source = "remote"
+    local_synced_at = None
     if equity_logins:
         try:
             dc = get_dealio_connection()
             try:
                 with dc.cursor() as cur:
-                    cur.execute("""
+                    cur.execute(
+                        """
                         SELECT login,
                                SUM(COALESCE(computedcommission,0)
                                  + COALESCE(computedprofit,0)
@@ -501,16 +583,16 @@ def _live_calc(d) -> dict:
                         FROM dealio.positions
                         WHERE login = ANY(%s) AND cmd < 2 AND symbol NOT IN %s
                         GROUP BY login
-                    """, (equity_logins, _EXCLUDED_SYMBOLS_TUPLE))
+                    """,
+                        (equity_logins, _EXCLUDED_SYMBOLS_TUPLE),
+                    )
                     floating_map = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
 
-                    cur.execute(
-                        "SELECT login, compbalance FROM dealio.users WHERE login = ANY(%s)",
-                        (equity_logins,)
-                    )
+                    cur.execute("SELECT login, compbalance FROM dealio.users WHERE login = ANY(%s)", (equity_logins,))
                     bal_map = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
 
-                    cur.execute("""
+                    cur.execute(
+                        """
                         SELECT login,
                                SUM(COALESCE(computedcommission,0)
                                  + COALESCE(computedprofit,0)
@@ -523,7 +605,9 @@ def _live_calc(d) -> dict:
                           AND cmd < 2
                           AND symbol NOT IN %s
                         GROUP BY login
-                    """, (equity_logins, str(d), str(d), _EXCLUDED_SYMBOLS_TUPLE))
+                    """,
+                        (equity_logins, str(d), str(d), _EXCLUDED_SYMBOLS_TUPLE),
+                    )
                     today_closed_pnl = sum(float(r[1] or 0) for r in cur.fetchall())
             finally:
                 dc.close()
@@ -535,7 +619,8 @@ def _live_calc(d) -> dict:
             conn3 = get_connection()
             try:
                 with conn3.cursor() as cur:
-                    cur.execute("""
+                    cur.execute(
+                        """
                         SELECT login,
                                SUM(COALESCE(computed_commission,0)
                                  + COALESCE(computed_profit,0)
@@ -543,20 +628,26 @@ def _live_calc(d) -> dict:
                         FROM dealio_positions
                         WHERE login = ANY(%s) AND cmd < 2 AND symbol NOT IN %s
                         GROUP BY login
-                    """, (equity_logins, _EXCLUDED_SYMBOLS_TUPLE))
+                    """,
+                        (equity_logins, _EXCLUDED_SYMBOLS_TUPLE),
+                    )
                     floating_map = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
 
                     # Use compbalance directly from local dealio_users (synced from remote).
                     # A login may have multiple sourceid rows; pick the most recently updated.
-                    cur.execute("""
+                    cur.execute(
+                        """
                         SELECT DISTINCT ON (login) login, COALESCE(compbalance,0)
                         FROM dealio_users
                         WHERE login = ANY(%s)
                         ORDER BY login, lastupdate DESC NULLS LAST
-                    """, (equity_logins,))
+                    """,
+                        (equity_logins,),
+                    )
                     bal_map = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
 
-                    cur.execute("""
+                    cur.execute(
+                        """
                         SELECT COALESCE(SUM(
                             COALESCE(computed_commission,0)
                           + COALESCE(computed_profit,0)
@@ -569,7 +660,9 @@ def _live_calc(d) -> dict:
                           AND close_time <  %s::date + INTERVAL '1 day'
                           AND cmd < 2
                           AND symbol NOT IN %s
-                    """, (equity_logins, str(d), str(d), _EXCLUDED_SYMBOLS_TUPLE))
+                    """,
+                        (equity_logins, str(d), str(d), _EXCLUDED_SYMBOLS_TUPLE),
+                    )
                     today_closed_pnl = float(cur.fetchone()[0] or 0)
 
                     # Freshness indicator for the card.
@@ -581,7 +674,7 @@ def _live_calc(d) -> dict:
                 conn3.close()
 
     current_floating = sum(floating_map.values())
-    open_logins      = list(floating_map.keys())
+    open_logins = list(floating_map.keys())
 
     # EEZ: MAX(0, compbalance + live_floating - bonus)
     # compbalance = pure balance (no credit) — matches snapshot formula exactly.
@@ -590,12 +683,12 @@ def _live_calc(d) -> dict:
     grand_total = 0.0
     daily_end_net_equity = 0.0
     for login, balance in bal_map.items():
-        flt    = floating_map.get(login, 0.0)
+        flt = floating_map.get(login, 0.0)
         net_eq = balance + flt
-        bonus  = max(0.0, bonus_map.get(login, 0.0))
-        eez    = max(0.0, net_eq - bonus)
-        neq    = max(0.0, net_eq)
-        grand_total          += eez
+        bonus = max(0.0, bonus_map.get(login, 0.0))
+        eez = max(0.0, net_eq - bonus)
+        neq = max(0.0, net_eq)
+        grand_total += eez
         daily_end_net_equity += neq
 
     # Query eod_floating_yesterday only for currently-open logins
@@ -604,7 +697,8 @@ def _live_calc(d) -> dict:
         conn2 = get_connection()
         try:
             with conn2.cursor() as cur:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT COALESCE(SUM(COALESCE(d.convertedfloatingpnl, 0)), 0)
                     FROM (
                         SELECT DISTINCT ON (login) login, convertedfloatingpnl
@@ -614,30 +708,32 @@ def _live_calc(d) -> dict:
                           AND date <  %(d)s::date
                         ORDER BY login, date DESC
                     ) d
-                """, {"d": str(d), "logins": open_logins})
+                """,
+                    {"d": str(d), "logins": open_logins},
+                )
                 eod_floating_yesterday = float(cur.fetchone()[0] or 0)
         finally:
             conn2.close()
 
-    delta_floating   = current_floating - eod_floating_yesterday
-    daily_pnl        = round(delta_floating + today_closed_pnl)
+    delta_floating = current_floating - eod_floating_yesterday
+    daily_pnl = round(delta_floating + today_closed_pnl)
 
-    pnl_cash       = round(start_eez_total - grand_total - net_deposits_today)
+    pnl_cash = round(start_eez_total - grand_total - net_deposits_today)
     daily_pnl_cash = round(daily_end_net_equity - start_net_equity - net_deposits_today - today_bonuses)
     return {
-        "total":                  round(grand_total),
-        "start_equity_zeroed":    round(start_eez_total),
-        "net_deposits_today":     round(net_deposits_today),
-        "pnl_cash":               pnl_cash,
-        "daily_pnl_cash":         daily_pnl_cash,
-        "daily_pnl":              daily_pnl,
-        "current_floating":       round(current_floating),
+        "total": round(grand_total),
+        "start_equity_zeroed": round(start_eez_total),
+        "net_deposits_today": round(net_deposits_today),
+        "pnl_cash": pnl_cash,
+        "daily_pnl_cash": daily_pnl_cash,
+        "daily_pnl": daily_pnl,
+        "current_floating": round(current_floating),
         "eod_floating_yesterday": round(eod_floating_yesterday),
-        "today_closed_pnl":       round(today_closed_pnl),
-        "daily_end_net_equity":   round(daily_end_net_equity),
+        "today_closed_pnl": round(today_closed_pnl),
+        "daily_end_net_equity": round(daily_end_net_equity),
         "daily_start_net_equity": round(start_net_equity),
-        "is_live":                True,
-        "date":                   str(d),
-        "data_source":            data_source,       # "remote" or "local_snapshot"
-        "local_synced_at":        local_synced_at,   # last_update of local positions (if fallback)
+        "is_live": True,
+        "date": str(d),
+        "data_source": data_source,  # "remote" or "local_snapshot"
+        "local_synced_at": local_synced_at,  # last_update of local positions (if fallback)
     }

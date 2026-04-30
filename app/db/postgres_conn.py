@@ -1,12 +1,19 @@
+import contextlib
+import threading
+from datetime import UTC
+
+import pandas as pd
 import psycopg2
 import psycopg2.extensions
-from psycopg2.pool import ThreadedConnectionPool
 from psycopg2.extras import execute_values
-import pandas as pd
-import threading
+from psycopg2.pool import ThreadedConnectionPool
+
 from app.config import (
-    POSTGRES_HOST, POSTGRES_PORT, POSTGRES_USER,
-    POSTGRES_PASSWORD, POSTGRES_DB,
+    POSTGRES_DB,
+    POSTGRES_HOST,
+    POSTGRES_PASSWORD,
+    POSTGRES_PORT,
+    POSTGRES_USER,
 )
 
 _pool: ThreadedConnectionPool | None = None
@@ -36,6 +43,7 @@ class _PooledConnection:
     """Thin proxy around a psycopg2 connection that returns it to the pool on close().
     Stores the thread key used during getconn() so putconn() always matches,
     even if close() is called from a different thread."""
+
     __slots__ = ("_conn", "_pool", "_key", "_closed")
 
     def __init__(self, conn, pool, key):
@@ -67,10 +75,8 @@ class _PooledConnection:
             pool.putconn(conn, key=key)
         except Exception:
             # If putconn fails (e.g. pool closed), actually close the connection
-            try:
+            with contextlib.suppress(Exception):
                 conn.close()
-            except Exception:
-                pass
 
     def __del__(self):
         """Safety net: return connection to pool if close() was never called."""
@@ -95,9 +101,12 @@ def get_connection() -> "_PooledConnection":
     it returns the connection to the pool instead of closing the socket.
     Retries up to 3 times with a short delay on pool exhaustion."""
     import time
+
     from psycopg2.pool import PoolError
+
     pool = _get_pool()
     import uuid
+
     key = uuid.uuid4().hex
     for attempt in range(4):
         try:
@@ -645,6 +654,7 @@ def ensure_table():
             cur.execute(sql)
             # Seed recurring holidays for 2024 through current year + 5
             from datetime import date
+
             current_year = date.today().year
             holiday_rows = []
             for y in range(2024, current_year + 11):
@@ -686,7 +696,7 @@ def _clean(val):
     except (TypeError, ValueError):
         pass
     if isinstance(val, str):
-        val = val.replace('\x00', '')
+        val = val.replace("\x00", "")
     return val
 
 
@@ -782,21 +792,65 @@ def upsert_accounts(df: pd.DataFrame):
     if not df.empty and "accountid" in df.columns:
         df = df.drop_duplicates(subset=["accountid"], keep="last")
     src_cols = [
-        "accountid", "is_test_account", "first_name", "last_name", "full_name",
-        "email", "gender", "customer_language", "country_iso", "campaign",
-        "campaign_code_legacy", "client_source", "original_affiliate",
-        "is_trading_active", "is_demo", "compliance_status", "accountstatus",
-        "sales_status", "retention_status", "kyc_workflow_status", "assigned_to",
-        "sales_rep_id", "sales_desk_id", "retention_rep_id", "retention_desk_id",
-        "first_sales_desk_id", "first_retention_rep_id", "compliance_agent",
-        "last_agent_assignment_time", "last_trade_opened_time", "has_notes",
-        "last_action_time", "source", "has_frd", "frd_time", "last_trade_date",
-        "first_deposit_date", "countdeposits", "last_deposit_date",
-        "last_interaction_date", "balance", "net_deposit", "first_trade_date",
-        "ftd_amount", "funded", "login_date", "total_deposit", "total_withdrawal",
-        "createdtime", "modifiedtime", "questionnaire_completed", "client_category",
-        "client_qualification_date", "segmentation", "google_uid", "birth_date",
-        "customer_id", "regulation", "sales_client_potential",
+        "accountid",
+        "is_test_account",
+        "first_name",
+        "last_name",
+        "full_name",
+        "email",
+        "gender",
+        "customer_language",
+        "country_iso",
+        "campaign",
+        "campaign_code_legacy",
+        "client_source",
+        "original_affiliate",
+        "is_trading_active",
+        "is_demo",
+        "compliance_status",
+        "accountstatus",
+        "sales_status",
+        "retention_status",
+        "kyc_workflow_status",
+        "assigned_to",
+        "sales_rep_id",
+        "sales_desk_id",
+        "retention_rep_id",
+        "retention_desk_id",
+        "first_sales_desk_id",
+        "first_retention_rep_id",
+        "compliance_agent",
+        "last_agent_assignment_time",
+        "last_trade_opened_time",
+        "has_notes",
+        "last_action_time",
+        "source",
+        "has_frd",
+        "frd_time",
+        "last_trade_date",
+        "first_deposit_date",
+        "countdeposits",
+        "last_deposit_date",
+        "last_interaction_date",
+        "balance",
+        "net_deposit",
+        "first_trade_date",
+        "ftd_amount",
+        "funded",
+        "login_date",
+        "total_deposit",
+        "total_withdrawal",
+        "createdtime",
+        "modifiedtime",
+        "questionnaire_completed",
+        "client_category",
+        "client_qualification_date",
+        "segmentation",
+        "google_uid",
+        "birth_date",
+        "customer_id",
+        "regulation",
+        "sales_client_potential",
     ]
     cols = src_cols + ["classification_int"]
     rows = [
@@ -808,11 +862,11 @@ def upsert_accounts(df: pd.DataFrame):
     # overwritten back to 0 by a subsequent MySQL sync that still has is_test=0.
     update_set = ", ".join(
         "is_test_account = GREATEST(EXCLUDED.is_test_account, accounts.is_test_account)"
-        if c == "is_test_account" else
+        if c == "is_test_account"
         # Keep age-based fallback: only overwrite classification_int if CRM provides a value
-        "classification_int = COALESCE(EXCLUDED.classification_int, accounts.classification_int)"
-        if c == "classification_int" else
-        f"{c} = EXCLUDED.{c}"
+        else "classification_int = COALESCE(EXCLUDED.classification_int, accounts.classification_int)"
+        if c == "classification_int"
+        else f"{c} = EXCLUDED.{c}"
         for c in update_cols
     )
     col_list = ", ".join(cols)
@@ -945,11 +999,14 @@ def upsert_bonus_transactions(df) -> int:
     if df is None or len(df) == 0:
         return 0
     import pandas as pd
+
     rows = [
-        (int(r["mttransactionsid"]),
-         int(r["login"]) if r["login"] is not None else None,
-         float(r["net_amount"]) if r["net_amount"] is not None else None,
-         None if pd.isnull(r["confirmation_time"]) else r["confirmation_time"])
+        (
+            int(r["mttransactionsid"]),
+            int(r["login"]) if r["login"] is not None else None,
+            float(r["net_amount"]) if r["net_amount"] is not None else None,
+            None if pd.isnull(r["confirmation_time"]) else r["confirmation_time"],
+        )
         for _, r in df.iterrows()
         if r["mttransactionsid"] is not None
     ]
@@ -958,7 +1015,9 @@ def upsert_bonus_transactions(df) -> int:
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            execute_values(cur, """
+            execute_values(
+                cur,
+                """
                 INSERT INTO bonus_transactions (mttransactionsid, login, net_amount, confirmation_time)
                 VALUES %s
                 ON CONFLICT (mttransactionsid) DO UPDATE SET
@@ -966,7 +1025,9 @@ def upsert_bonus_transactions(df) -> int:
                     net_amount        = CASE WHEN bonus_transactions.manual_override THEN bonus_transactions.net_amount ELSE EXCLUDED.net_amount END,
                     confirmation_time = EXCLUDED.confirmation_time,
                     synced_at         = NOW()
-            """, rows)
+            """,
+                rows,
+            )
         conn.commit()
         return len(rows)
     finally:
@@ -986,7 +1047,7 @@ def fetch_bonus_transactions_stats() -> dict:
             cur.execute(sql)
             row = cur.fetchone()
             return {
-                "total_records":  row[0] or 0,
+                "total_records": row[0] or 0,
                 "last_synced_at": str(row[1]) if row[1] else "Never",
             }
     except Exception:
@@ -1033,7 +1094,7 @@ def seed_admin_user(password_hash: str):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute(sql, ('admin@cmtrading.com', 'Administrator', password_hash, 'admin'))
+            cur.execute(sql, ("admin@cmtrading.com", "Administrator", password_hash, "admin"))
         conn.commit()
     finally:
         conn.close()
@@ -1068,9 +1129,14 @@ def get_auth_user_by_email(email: str) -> dict | None:
             if row is None:
                 return None
             return {
-                'id': row[0], 'crm_user_id': row[1], 'email': row[2],
-                'full_name': row[3], 'password_hash': row[4], 'role': row[5],
-                'is_active': row[6], 'force_password_change': row[7],
+                "id": row[0],
+                "crm_user_id": row[1],
+                "email": row[2],
+                "full_name": row[3],
+                "password_hash": row[4],
+                "role": row[5],
+                "is_active": row[6],
+                "force_password_change": row[7],
             }
     finally:
         conn.close()
@@ -1081,8 +1147,9 @@ _AUTH_CACHE_TTL = 60  # seconds
 
 
 def get_auth_user_by_id(user_id: int) -> dict | None:
-    import time as _time
     import json as _json
+    import time as _time
+
     now = _time.monotonic()
     cached = _auth_user_cache.get(user_id)
     if cached and cached[1] > now:
@@ -1118,13 +1185,18 @@ def get_auth_user_by_id(user_id: int) -> dict | None:
             else:
                 er_list = []
             result = {
-                'id': row[0], 'crm_user_id': row[1], 'email': row[2],
-                'full_name': row[3], 'password_hash': row[4], 'role': row[5],
-                'is_active': row[6], 'force_password_change': row[7],
-                'department_': row[8],
-                'allowed_pages': ap_raw,
-                'allowed_pages_list': ap_list,
-                'extra_roles': er_list,
+                "id": row[0],
+                "crm_user_id": row[1],
+                "email": row[2],
+                "full_name": row[3],
+                "password_hash": row[4],
+                "role": row[5],
+                "is_active": row[6],
+                "force_password_change": row[7],
+                "department_": row[8],
+                "allowed_pages": ap_raw,
+                "allowed_pages_list": ap_list,
+                "extra_roles": er_list,
             }
             _auth_user_cache[user_id] = (result, now + _AUTH_CACHE_TTL)
             return result
@@ -1159,13 +1231,18 @@ def list_auth_users() -> list:
             rows = cur.fetchall()
             return [
                 {
-                    'id': r[0], 'crm_user_id': r[1], 'email': r[2], 'full_name': r[3],
-                    'role': r[4], 'is_active': r[5], 'force_password_change': r[6],
-                    'created_at': r[7].strftime('%Y-%m-%d %H:%M') if r[7] else '',
-                    'last_login': r[8].strftime('%Y-%m-%d %H:%M') if r[8] else '',
-                    'crm_name': r[9] or '',
-                    'allowed_pages': r[10] or '',
-                    'extra_roles': __import__('json').dumps(r[11]) if isinstance(r[11], list) else (r[11] or ''),
+                    "id": r[0],
+                    "crm_user_id": r[1],
+                    "email": r[2],
+                    "full_name": r[3],
+                    "role": r[4],
+                    "is_active": r[5],
+                    "force_password_change": r[6],
+                    "created_at": r[7].strftime("%Y-%m-%d %H:%M") if r[7] else "",
+                    "last_login": r[8].strftime("%Y-%m-%d %H:%M") if r[8] else "",
+                    "crm_name": r[9] or "",
+                    "allowed_pages": r[10] or "",
+                    "extra_roles": __import__("json").dumps(r[11]) if isinstance(r[11], list) else (r[11] or ""),
                 }
                 for r in rows
             ]
@@ -1173,7 +1250,9 @@ def list_auth_users() -> list:
         conn.close()
 
 
-def create_auth_user(email: str, full_name: str, password_hash: str, role: str, crm_user_id, allowed_pages: str | None = None) -> int:
+def create_auth_user(
+    email: str, full_name: str, password_hash: str, role: str, crm_user_id, allowed_pages: str | None = None
+) -> int:
     sql = """
         INSERT INTO auth_users (email, full_name, password_hash, role, crm_user_id, force_password_change, allowed_pages)
         VALUES (%s, %s, %s, %s, %s, 1, %s)
@@ -1190,7 +1269,16 @@ def create_auth_user(email: str, full_name: str, password_hash: str, role: str, 
         conn.close()
 
 
-def update_auth_user(user_id: int, full_name: str, email: str, role: str, is_active: int, crm_user_id, allowed_pages: str | None = None, extra_roles: str | None = None):
+def update_auth_user(
+    user_id: int,
+    full_name: str,
+    email: str,
+    role: str,
+    is_active: int,
+    crm_user_id,
+    allowed_pages: str | None = None,
+    extra_roles: str | None = None,
+):
     sql = """
         UPDATE auth_users
         SET full_name = %s, email = %s, role = %s, is_active = %s, crm_user_id = %s,
@@ -1201,7 +1289,19 @@ def update_auth_user(user_id: int, full_name: str, email: str, role: str, is_act
     try:
         with conn.cursor() as cur:
             cur.execute("SET LOCAL lock_timeout = '5s'")
-            cur.execute(sql, (full_name, email, role, is_active, crm_user_id or None, allowed_pages or None, extra_roles or None, user_id))
+            cur.execute(
+                sql,
+                (
+                    full_name,
+                    email,
+                    role,
+                    is_active,
+                    crm_user_id or None,
+                    allowed_pages or None,
+                    extra_roles or None,
+                    user_id,
+                ),
+            )
         conn.commit()
     finally:
         conn.close()
@@ -1230,12 +1330,14 @@ def deactivate_auth_user(user_id: int):
 
 def sync_auth_users_from_crm():
     from app.auth.auth import hash_password  # local import to avoid circular import
-    default_hash = hash_password('Welcome1!')
+
+    default_hash = hash_password("Welcome1!")
     conn = get_connection()
     try:
         with conn.cursor() as cur:
             # Insert missing active CRM agents
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO auth_users (crm_user_id, email, full_name, password_hash, role, force_password_change)
                 SELECT
                     c.id,
@@ -1250,7 +1352,9 @@ def sync_auth_users_from_crm():
                       SELECT 1 FROM auth_users a WHERE a.crm_user_id = c.id
                   )
                 ON CONFLICT (email) DO NOTHING
-            """, (default_hash,))
+            """,
+                (default_hash,),
+            )
 
             # Deactivate auth users whose CRM user is no longer active
             cur.execute("""
@@ -1280,16 +1384,16 @@ def fetch_report_data(role_filter: dict = None) -> pd.DataFrame:
         GROUP BY agent_id, full_name
         ORDER BY total_net DESC
     """
-    if role_filter is None or role_filter.get('is_full_access'):
+    if role_filter is None or role_filter.get("is_full_access"):
         conn = get_connection()
         try:
             return pd.read_sql(base_sql, conn)
         finally:
             conn.close()
 
-    filter_type = role_filter.get('filter_type')
-    if filter_type == 'agent':
-        crm_user_id = role_filter['crm_params'][0]
+    filter_type = role_filter.get("filter_type")
+    if filter_type == "agent":
+        crm_user_id = role_filter["crm_params"][0]
         sql = """
             SELECT
                 agent_id,
@@ -1310,8 +1414,8 @@ def fetch_report_data(role_filter: dict = None) -> pd.DataFrame:
             conn.close()
 
     # filter_type == 'crm': join crm_users and apply where fragment
-    crm_where = role_filter['crm_where'].replace('u.', 'c.')
-    params = role_filter['crm_params']
+    crm_where = role_filter["crm_where"].replace("u.", "c.")
+    params = role_filter["crm_params"]
     sql = f"""
         SELECT
             ap.agent_id,
@@ -1345,8 +1449,11 @@ def fetch_last_sync() -> str:
         conn.close()
 
 
-def log_sync(table_name: str, cutoff_used, rows_affected: int, duration_ms: int, status: str, error_message: str = None):
+def log_sync(
+    table_name: str, cutoff_used, rows_affected: int, duration_ms: int, status: str, error_message: str = None
+):
     from datetime import datetime
+
     if cutoff_used is None:
         cutoff_used = datetime(1970, 1, 1)
     sql = """
@@ -1396,10 +1503,28 @@ def truncate_crm_users():
 
 def upsert_crm_users(df: pd.DataFrame):
     cols = [
-        "id", "email", "full_name", "status", "first_name", "last_name",
-        "role_id", "desk_id", "language", "last_logon_time", "last_update_time",
-        "desk_name", "team", "department", "desk", "type", "office_id", "office", "position",
-        "office_name", "agent_name", "department_",
+        "id",
+        "email",
+        "full_name",
+        "status",
+        "first_name",
+        "last_name",
+        "role_id",
+        "desk_id",
+        "language",
+        "last_logon_time",
+        "last_update_time",
+        "desk_name",
+        "team",
+        "department",
+        "desk",
+        "type",
+        "office_id",
+        "office",
+        "position",
+        "office_name",
+        "agent_name",
+        "department_",
     ]
     rows = [tuple(_clean(row.get(c)) for c in cols) for _, row in df.iterrows()]
     update_cols = [c for c in cols if c != "id"]
@@ -1457,9 +1582,18 @@ def fetch_crm_users_stats() -> dict:
 
 def upsert_campaigns(df: pd.DataFrame):
     cols = [
-        "crmid", "campaign_id", "campaign_name", "campaign_legacy_id",
-        "campaign_description", "campaign_channel", "campaign_sub_channel",
-        "website", "active", "start_date", "assigned_to", "disable_email_verification",
+        "crmid",
+        "campaign_id",
+        "campaign_name",
+        "campaign_legacy_id",
+        "campaign_description",
+        "campaign_channel",
+        "campaign_sub_channel",
+        "website",
+        "active",
+        "start_date",
+        "assigned_to",
+        "disable_email_verification",
     ]
     rows = [tuple(_clean(row.get(c)) for c in cols) for _, row in df.iterrows()]
     update_cols = [c for c in cols if c != "crmid"]
@@ -1494,8 +1628,8 @@ def fetch_campaigns_stats() -> dict:
             cur.execute(sql)
             row = cur.fetchone()
             return {
-                "total_records":    row[0] or 0,
-                "last_synced_at":   row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else "Never",
+                "total_records": row[0] or 0,
+                "last_synced_at": row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else "Never",
             }
     except Exception:
         return {"total_records": 0, "last_synced_at": "Unknown"}
@@ -1505,22 +1639,88 @@ def fetch_campaigns_stats() -> dict:
 
 def upsert_transactions(df: pd.DataFrame):
     cols = [
-        "mttransactionsid", "tradingaccountsid", "transaction_no", "vtigeraccountid",
-        "manualorauto", "paymenttype", "transactionapproval", "amount", "creditcardlast",
-        "transactiontype", "login", "platform", "cardtype", "cvv2pin", "expmon", "expyear",
-        "server", "comment", "transactionid", "receipt", "bank_name", "bank_acccount_holder",
-        "bank_acccount_number", "referencenum", "expiration", "actionok", "cleared_by",
-        "mtorder_id", "approved_by", "ewalletid", "transaction_source", "currency_id",
-        "bank_country_id", "bank_state", "bank_city", "bank_address", "swift", "need_revise",
-        "original_deposit_owner", "decline_reason", "ftd", "usdamount", "chb_type",
-        "chb_status", "chb_date", "cellexpert", "client_source", "iban", "deposifromip",
-        "cardownername", "server_id", "ticket", "payment_method_id", "confirmation_time",
-        "payment_processor", "withdrawal_reason", "deposit_ip", "expiration_card",
-        "original_owner_department", "dod", "granted_by", "destination_wallet",
-        "payment_method", "compliance_status", "ftd_owner", "email", "created_time",
-        "modifiedtime", "psp_transaction_id", "finance_status", "session_id", "gateway_name",
-        "payment_subtype", "legacy_mtt", "fee_type", "fee", "fee_included",
-        "transaction_promo", "assisted_by", "deleted", "is_frd", "transactiontypename",
+        "mttransactionsid",
+        "tradingaccountsid",
+        "transaction_no",
+        "vtigeraccountid",
+        "manualorauto",
+        "paymenttype",
+        "transactionapproval",
+        "amount",
+        "creditcardlast",
+        "transactiontype",
+        "login",
+        "platform",
+        "cardtype",
+        "cvv2pin",
+        "expmon",
+        "expyear",
+        "server",
+        "comment",
+        "transactionid",
+        "receipt",
+        "bank_name",
+        "bank_acccount_holder",
+        "bank_acccount_number",
+        "referencenum",
+        "expiration",
+        "actionok",
+        "cleared_by",
+        "mtorder_id",
+        "approved_by",
+        "ewalletid",
+        "transaction_source",
+        "currency_id",
+        "bank_country_id",
+        "bank_state",
+        "bank_city",
+        "bank_address",
+        "swift",
+        "need_revise",
+        "original_deposit_owner",
+        "decline_reason",
+        "ftd",
+        "usdamount",
+        "chb_type",
+        "chb_status",
+        "chb_date",
+        "cellexpert",
+        "client_source",
+        "iban",
+        "deposifromip",
+        "cardownername",
+        "server_id",
+        "ticket",
+        "payment_method_id",
+        "confirmation_time",
+        "payment_processor",
+        "withdrawal_reason",
+        "deposit_ip",
+        "expiration_card",
+        "original_owner_department",
+        "dod",
+        "granted_by",
+        "destination_wallet",
+        "payment_method",
+        "compliance_status",
+        "ftd_owner",
+        "email",
+        "created_time",
+        "modifiedtime",
+        "psp_transaction_id",
+        "finance_status",
+        "session_id",
+        "gateway_name",
+        "payment_subtype",
+        "legacy_mtt",
+        "fee_type",
+        "fee",
+        "fee_included",
+        "transaction_promo",
+        "assisted_by",
+        "deleted",
+        "is_frd",
+        "transactiontypename",
     ]
     rows = [tuple(_clean(row.get(c)) for c in cols) for _, row in df.iterrows()]
     update_cols = [c for c in cols if c != "mttransactionsid"]
@@ -1547,8 +1747,10 @@ def update_transactiontypename(df) -> int:
     if df is None or len(df) == 0:
         return 0
     rows = [
-        (str(r["transaction_type_name"]) if r["transaction_type_name"] is not None else None,
-         int(r["mttransactionsid"]))
+        (
+            str(r["transaction_type_name"]) if r["transaction_type_name"] is not None else None,
+            int(r["mttransactionsid"]),
+        )
         for _, r in df.iterrows()
         if r["mttransactionsid"] is not None
     ]
@@ -1557,11 +1759,16 @@ def update_transactiontypename(df) -> int:
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            execute_values(cur, """
+            execute_values(
+                cur,
+                """
                 UPDATE transactions SET transaction_type_name = data.ttn
                 FROM (VALUES %s) AS data(ttn, id)
                 WHERE transactions.mttransactionsid = data.id::bigint
-            """, rows, template="(%s, %s)")
+            """,
+                rows,
+                template="(%s, %s)",
+            )
         conn.commit()
         return len(rows)
     finally:
@@ -1570,7 +1777,7 @@ def update_transactiontypename(df) -> int:
 
 def _compute_type_name_batch(id_filter: str) -> int:
     """Run the transaction_type_name CASE UPDATE for a specific id_filter clause."""
-    sql = f"""
+    sql = rf"""
         UPDATE transactions t
         SET transaction_type_name = CASE
             -- IB Commission
@@ -1786,16 +1993,16 @@ def compute_transaction_type_name(ids: list = None) -> int:
         id_list = ",".join(str(int(i)) for i in ids)
         n = _compute_type_name_batch(f"WHERE t2.mttransactionsid IN ({id_list})")
         # broker_banking rows have NULL mttransactionsid — process those too
-        n += _compute_type_name_batch(
-            "WHERE t2.mttransactionsid IS NULL AND t2.transaction_type_name IS NULL"
-        )
+        n += _compute_type_name_batch("WHERE t2.mttransactionsid IS NULL AND t2.transaction_type_name IS NULL")
         return n
 
     # Full backfill — mttransactionsid-range chunks for non-NULL rows
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute("SELECT MIN(mttransactionsid), MAX(mttransactionsid) FROM transactions WHERE mttransactionsid IS NOT NULL")
+            cur.execute(
+                "SELECT MIN(mttransactionsid), MAX(mttransactionsid) FROM transactions WHERE mttransactionsid IS NOT NULL"
+            )
             min_id, max_id = cur.fetchone()
     finally:
         conn.close()
@@ -1807,9 +2014,7 @@ def compute_transaction_type_name(ids: list = None) -> int:
         current = min_id
         while current <= max_id:
             chunk_end = min(current + chunk_size - 1, max_id)
-            total += _compute_type_name_batch(
-                f"WHERE t2.mttransactionsid BETWEEN {current} AND {chunk_end}"
-            )
+            total += _compute_type_name_batch(f"WHERE t2.mttransactionsid BETWEEN {current} AND {chunk_end}")
             print(f"[transaction_type_name backfill] up to {chunk_end}/{max_id}, updated {total} rows")
             current = chunk_end + 1
 
@@ -1844,12 +2049,33 @@ def fetch_transactions_stats() -> dict:
 
 def upsert_trading_accounts(df: pd.DataFrame):
     cols = [
-        "trading_account_id", "trading_account_name", "vtigeraccountid", "trade_group",
-        "last_update", "equity", "open_pnl", "total_pnl", "commission",
-        "enable", "enable_read_only", "login", "currency", "serverid", "assigned_to",
-        "balance", "credit", "swaps", "total_taxes", "leverage", "margin",
-        "margin_level", "margin_free", "created_time", "trading_server_created_timestamp",
-        "platform", "deleted",
+        "trading_account_id",
+        "trading_account_name",
+        "vtigeraccountid",
+        "trade_group",
+        "last_update",
+        "equity",
+        "open_pnl",
+        "total_pnl",
+        "commission",
+        "enable",
+        "enable_read_only",
+        "login",
+        "currency",
+        "serverid",
+        "assigned_to",
+        "balance",
+        "credit",
+        "swaps",
+        "total_taxes",
+        "leverage",
+        "margin",
+        "margin_level",
+        "margin_free",
+        "created_time",
+        "trading_server_created_timestamp",
+        "platform",
+        "deleted",
     ]
     rows = [tuple(_clean(row.get(c)) for c in cols) for _, row in df.iterrows()]
     update_cols = [c for c in cols if c != "trading_account_id"]
@@ -1884,7 +2110,7 @@ def fetch_trading_accounts_stats() -> dict:
             cur.execute(sql)
             row = cur.fetchone()
             return {
-                "total_records":  row[0] or 0,
+                "total_records": row[0] or 0,
                 "last_synced_at": row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else "Never",
             }
     except Exception:
@@ -1926,7 +2152,7 @@ def fetch_targets_stats() -> dict:
             cur.execute(sql)
             row = cur.fetchone()
             return {
-                "total_records":  row[0] or 0,
+                "total_records": row[0] or 0,
                 "last_synced_at": row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else "Never",
             }
     finally:
@@ -2105,8 +2331,8 @@ def fetch_ftd100_stats() -> dict:
             cur.execute(sql)
             row = cur.fetchone()
             return {
-                "total_records":      row[0] or 0,
-                "last_synced_at":     row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else "Never",
+                "total_records": row[0] or 0,
+                "last_synced_at": row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else "Never",
             }
     except Exception:
         return {"total_records": 0, "last_synced_at": "Unknown"}
@@ -2137,12 +2363,12 @@ def upsert_client_classification(df: pd.DataFrame):
         try:
             v = int(val)
             if 1 <= v <= 5:
-                return 'Low Quality'
+                return "Low Quality"
             if 6 <= v <= 10:
-                return 'High Quality'
+                return "High Quality"
         except (TypeError, ValueError):
             pass
-        return 'No segmentation'
+        return "No segmentation"
 
     def _raw_value(val):
         try:
@@ -2152,10 +2378,10 @@ def upsert_client_classification(df: pd.DataFrame):
 
     rows = []
     for _, row in df.iterrows():
-        accountid = _clean(row.get('accountid'))
+        accountid = _clean(row.get("accountid"))
         if accountid is None:
             continue
-        raw_val = row.get('client_classification')
+        raw_val = row.get("client_classification")
         category = _category(raw_val)
         numeric_val = _raw_value(raw_val)
         rows.append((int(accountid), category, numeric_val))
@@ -2210,16 +2436,16 @@ def fetch_users_with_targets(role_filter: dict = None) -> pd.DataFrame:
         WHERE u.status = 'Active'
         ORDER BY total_net DESC
     """
-    if role_filter is None or role_filter.get('is_full_access'):
+    if role_filter is None or role_filter.get("is_full_access"):
         conn = get_connection()
         try:
             return pd.read_sql(base_sql, conn)
         finally:
             conn.close()
 
-    filter_type = role_filter.get('filter_type')
-    if filter_type == 'agent':
-        crm_user_id = role_filter['crm_params'][0]
+    filter_type = role_filter.get("filter_type")
+    if filter_type == "agent":
+        crm_user_id = role_filter["crm_params"][0]
         sql = """
             SELECT
                 u.id,
@@ -2257,8 +2483,8 @@ def fetch_users_with_targets(role_filter: dict = None) -> pd.DataFrame:
             conn.close()
 
     # filter_type == 'crm': rename users alias to uu, join crm_users as c
-    crm_where = role_filter['crm_where'].replace('u.', 'c.')
-    params = role_filter['crm_params']
+    crm_where = role_filter["crm_where"].replace("u.", "c.")
+    params = role_filter["crm_params"]
     sql = f"""
         SELECT
             uu.id,
@@ -2299,14 +2525,36 @@ def fetch_users_with_targets(role_filter: dict = None) -> pd.DataFrame:
 
 # ── Dealio Users (from dealio PG replica) ────────────────────────────────────
 
+
 def upsert_dealio_users(df: pd.DataFrame):
     import time as _time
+
     cols = [
-        "login", "sourceid", "sourcename", "sourcetype",
-        "groupname", "groupcurrency", "name", "email",
-        "country", "city", "zipcode", "address", "phone", "comment",
-        "balance", "credit", "compbalance", "compcredit", "leverage", "status",
-        "regdate", "lastdate", "lastupdate", "agentaccount", "isenabled",
+        "login",
+        "sourceid",
+        "sourcename",
+        "sourcetype",
+        "groupname",
+        "groupcurrency",
+        "name",
+        "email",
+        "country",
+        "city",
+        "zipcode",
+        "address",
+        "phone",
+        "comment",
+        "balance",
+        "credit",
+        "compbalance",
+        "compcredit",
+        "leverage",
+        "status",
+        "regdate",
+        "lastdate",
+        "lastupdate",
+        "agentaccount",
+        "isenabled",
     ]
     rows = [tuple(_clean(row.get(c)) for c in cols) for _, row in df.iterrows()]
     update_cols = [c for c in cols if c not in ("login", "sourceid")]
@@ -2349,8 +2597,8 @@ def fetch_dealio_users_stats() -> dict:
             cur.execute(sql)
             row = cur.fetchone()
             return {
-                "total_records":      row[0] or 0,
-                "last_synced_at":     row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else "Never",
+                "total_records": row[0] or 0,
+                "last_synced_at": row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else "Never",
             }
     except Exception:
         return {"total_records": 0, "last_synced_at": "Unknown"}
@@ -2360,15 +2608,38 @@ def fetch_dealio_users_stats() -> dict:
 
 # ── Dealio Trades MT4 (from dealio PG replica) ───────────────────────────────
 
+
 def upsert_dealio_trades_mt4(df: pd.DataFrame):
     import time as _time
+
     cols = [
-        "ticket", "source_id", "login", "cmd", "volume",
-        "open_time", "close_time", "last_modified", "profit", "computed_profit",
-        "symbol", "core_symbol", "book", "open_price", "close_price",
-        "commission", "swaps", "comment", "group_name", "group_currency",
-        "source_name", "source_type", "reason",
-        "notional_value", "computed_swap", "computed_commission", "spread",
+        "ticket",
+        "source_id",
+        "login",
+        "cmd",
+        "volume",
+        "open_time",
+        "close_time",
+        "last_modified",
+        "profit",
+        "computed_profit",
+        "symbol",
+        "core_symbol",
+        "book",
+        "open_price",
+        "close_price",
+        "commission",
+        "swaps",
+        "comment",
+        "group_name",
+        "group_currency",
+        "source_name",
+        "source_type",
+        "reason",
+        "notional_value",
+        "computed_swap",
+        "computed_commission",
+        "spread",
     ]
     rows = [tuple(_clean(row.get(c)) for c in cols) for _, row in df.iterrows()]
     update_cols = [c for c in cols if c not in ("ticket", "source_id")]
@@ -2410,14 +2681,41 @@ def truncate_dealio_trades_mt4():
 
 def upsert_dealio_trades_mt5(df: pd.DataFrame):
     import time as _time
+
     cols = [
-        "ticket", "source_id", "login", "symbol", "digit", "cmd", "volume",
-        "open_time", "open_price", "close_time", "close_price",
-        "reason", "commission", "agent_id", "swap", "profit", "comment",
-        "computed_profit", "computed_swap", "computed_commission",
-        "group_name", "group_currency", "book", "notional_value",
-        "source_name", "source_type", "position_id", "entry", "volume_closed",
-        "sync_time", "is_finalized", "spread", "conversion_rate",
+        "ticket",
+        "source_id",
+        "login",
+        "symbol",
+        "digit",
+        "cmd",
+        "volume",
+        "open_time",
+        "open_price",
+        "close_time",
+        "close_price",
+        "reason",
+        "commission",
+        "agent_id",
+        "swap",
+        "profit",
+        "comment",
+        "computed_profit",
+        "computed_swap",
+        "computed_commission",
+        "group_name",
+        "group_currency",
+        "book",
+        "notional_value",
+        "source_name",
+        "source_type",
+        "position_id",
+        "entry",
+        "volume_closed",
+        "sync_time",
+        "is_finalized",
+        "spread",
+        "conversion_rate",
     ]
     rows = [tuple(_clean(row.get(c)) for c in cols) for _, row in df.iterrows()]
     update_cols = [c for c in cols if c not in ("ticket", "source_id")]
@@ -2458,6 +2756,7 @@ def truncate_dealio_trades_mt5():
 
 
 # ── dealio_positions ──────────────────────────────────────────────────────────
+
 
 def ensure_dealio_positions_table():
     conn = get_connection()
@@ -2500,12 +2799,8 @@ def ensure_dealio_positions_table():
                     synced_at            TIMESTAMP DEFAULT NOW()
                 )
             """)
-            cur.execute(
-                "CREATE INDEX IF NOT EXISTS idx_dealio_positions_login ON dealio_positions(login)"
-            )
-            cur.execute(
-                "CREATE INDEX IF NOT EXISTS idx_dealio_positions_open_time ON dealio_positions(open_time)"
-            )
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_dealio_positions_login ON dealio_positions(login)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_dealio_positions_open_time ON dealio_positions(open_time)")
         conn.commit()
     finally:
         conn.close()
@@ -2519,16 +2814,41 @@ def truncate_and_insert_dealio_positions(df: pd.DataFrame) -> int:
     UPSERT only needs ROW EXCLUSIVE — never blocks concurrent reads.
     """
     cols = [
-        "id", "login", "cmd", "volume", "symbol", "core_symbol", "book",
-        "open_price", "close_price", "profit", "computed_profit",
-        "swap", "computed_swap", "commission", "computed_commission",
-        "comment", "group_name", "group_currency", "notional_value", "contract_size",
-        "source_name", "source_type", "source_id", "open_time", "last_update",
-        "reason", "conversion_rate", "calculation_currency",
-        "currency_base", "currency_profit", "exposure_base", "exposure_profit",
+        "id",
+        "login",
+        "cmd",
+        "volume",
+        "symbol",
+        "core_symbol",
+        "book",
+        "open_price",
+        "close_price",
+        "profit",
+        "computed_profit",
+        "swap",
+        "computed_swap",
+        "commission",
+        "computed_commission",
+        "comment",
+        "group_name",
+        "group_currency",
+        "notional_value",
+        "contract_size",
+        "source_name",
+        "source_type",
+        "source_id",
+        "open_time",
+        "last_update",
+        "reason",
+        "conversion_rate",
+        "calculation_currency",
+        "currency_base",
+        "currency_profit",
+        "exposure_base",
+        "exposure_profit",
     ]
     rows = [tuple(_clean(row.get(c)) for c in cols) for _, row in df.iterrows()]
-    col_list   = ", ".join(cols)
+    col_list = ", ".join(cols)
     update_set = ", ".join(f"{c} = EXCLUDED.{c}" for c in cols if c != "id")
     current_ids = [r[0] for r in rows] if rows else []
 
@@ -2544,10 +2864,7 @@ def truncate_and_insert_dealio_positions(df: pd.DataFrame) -> int:
                     rows,
                 )
             # 2. Delete positions no longer open (closed since last sync)
-            cur.execute(
-                "DELETE FROM dealio_positions WHERE id != ALL(%s)",
-                (current_ids,)
-            )
+            cur.execute("DELETE FROM dealio_positions WHERE id != ALL(%s)", (current_ids,))
         conn.commit()
         return len(rows)
     except Exception:
@@ -2570,7 +2887,7 @@ def fetch_dealio_trades_mt4_stats() -> dict:
             cur.execute(sql)
             row = cur.fetchone()
             return {
-                "total_records":  row[0] or 0,
+                "total_records": row[0] or 0,
                 "last_synced_at": row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else "Never",
             }
     except Exception:
@@ -2592,7 +2909,7 @@ def fetch_dealio_trades_mt5_stats() -> dict:
             cur.execute(sql)
             row = cur.fetchone()
             return {
-                "total_records":  row[0] or 0,
+                "total_records": row[0] or 0,
                 "last_synced_at": row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else "Never",
             }
     except Exception:
@@ -2603,14 +2920,32 @@ def fetch_dealio_trades_mt5_stats() -> dict:
 
 # ── Dealio Daily Profits (from dealio PG replica) ─────────────────────────────
 
+
 def upsert_dealio_daily_profits(df: pd.DataFrame):
     cols = [
-        "date", "login", "sourceid", "sourcename", "sourcetype", "book",
-        "closedpnl", "convertedclosedpnl", "calculationcurrency",
-        "floatingpnl", "convertedfloatingpnl", "netdeposit", "convertednetdeposit",
-        "equity", "convertedequity", "balance", "convertedbalance",
-        "groupcurrency", "conversionratio", "equityprevday", "groupname",
-        "deltafloatingpnl", "converteddeltafloatingpnl",
+        "date",
+        "login",
+        "sourceid",
+        "sourcename",
+        "sourcetype",
+        "book",
+        "closedpnl",
+        "convertedclosedpnl",
+        "calculationcurrency",
+        "floatingpnl",
+        "convertedfloatingpnl",
+        "netdeposit",
+        "convertednetdeposit",
+        "equity",
+        "convertedequity",
+        "balance",
+        "convertedbalance",
+        "groupcurrency",
+        "conversionratio",
+        "equityprevday",
+        "groupname",
+        "deltafloatingpnl",
+        "converteddeltafloatingpnl",
     ]
     rows = [tuple(_clean(row.get(c)) for c in cols) for _, row in df.iterrows()]
     # Reject rows with absurd convertedfloatingpnl (corrupt dealio data)
@@ -2633,7 +2968,7 @@ def upsert_dealio_daily_profits(df: pd.DataFrame):
         with conn.cursor() as cur:
             execute_values(cur, sql, rows)
         conn.commit()
-    except Exception as e:
+    except Exception:
         conn.rollback()
         raise
     finally:
@@ -2677,14 +3012,18 @@ def upsert_daily_equity_zeroed(rows: list[tuple], snapshot_date: str):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            execute_values(cur, """
+            execute_values(
+                cur,
+                """
                 INSERT INTO daily_equity_zeroed (login, day, end_equity_zeroed, start_equity_zeroed)
                 VALUES %s
                 ON CONFLICT (login, day) DO UPDATE
                     SET end_equity_zeroed   = EXCLUDED.end_equity_zeroed,
                         start_equity_zeroed = EXCLUDED.start_equity_zeroed,
                         created_at          = NOW()
-            """, [(login, snapshot_date, end_eez, start_eez) for login, end_eez, start_eez in rows])
+            """,
+                [(login, snapshot_date, end_eez, start_eez) for login, end_eez, start_eez in rows],
+            )
 
             conn.commit()
     finally:
@@ -2704,8 +3043,8 @@ def fetch_dealio_daily_profits_stats() -> dict:
             cur.execute(sql)
             row = cur.fetchone()
             return {
-                "total_records":    row[0] or 0,
-                "last_synced_at":   row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else "Never",
+                "total_records": row[0] or 0,
+                "last_synced_at": row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else "Never",
             }
     except Exception:
         return {"total_records": 0, "last_synced_at": "Unknown"}
@@ -2757,7 +3096,6 @@ _MV_SETUP_SQL = [
     "CREATE INDEX IF NOT EXISTS idx_mv_daily_kpis_tx_date     ON mv_daily_kpis (tx_date)",
     "CREATE INDEX IF NOT EXISTS idx_mv_daily_kpis_qual_date   ON mv_daily_kpis (qual_date) WHERE qual_date IS NOT NULL",
     "CREATE INDEX IF NOT EXISTS idx_mv_daily_kpis_agent       ON mv_daily_kpis (agent_id)",
-
     # ── mv_volume_stats (MT5 + open positions) ───────────────────────────────
     # Rename old MT4-based MV to backup (first deploy only — subsequent runs no-op via IF EXISTS)
     "ALTER MATERIALIZED VIEW IF EXISTS mv_volume_stats RENAME TO mv_volume_stats_mt4_backup",
@@ -2813,7 +3151,6 @@ _MV_SETUP_SQL = [
     "CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_volume_stats_u         ON mv_volume_stats (COALESCE(agent_id, -1), accountid, open_date)",
     "CREATE INDEX IF NOT EXISTS idx_mv_volume_stats_open_date        ON mv_volume_stats (open_date)",
     "CREATE INDEX IF NOT EXISTS idx_mv_volume_stats_agent            ON mv_volume_stats (agent_id)",
-
     # ── mv_sales_bonuses ───────────────────────────────────────────────────────────
     """
     CREATE MATERIALIZED VIEW IF NOT EXISTS mv_sales_bonuses AS
@@ -2837,7 +3174,6 @@ _MV_SETUP_SQL = [
     "CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_sales_bon_u    ON mv_sales_bonuses (agent_id, ftd_100_date)",
     "CREATE INDEX IF NOT EXISTS idx_mv_sales_bon_date        ON mv_sales_bonuses (ftd_100_date)",
     "CREATE INDEX IF NOT EXISTS idx_mv_sales_bon_agent       ON mv_sales_bonuses (agent_id)",
-
     # ── mv_run_rate  (depends on mv_daily_kpis — must come last) ─────────────
     """
     CREATE MATERIALIZED VIEW IF NOT EXISTS mv_run_rate AS
@@ -2876,7 +3212,6 @@ _MV_SETUP_SQL = [
     "CREATE INDEX IF NOT EXISTS idx_mv_run_rate_dept          ON mv_run_rate (dept_group)",
     "CREATE INDEX IF NOT EXISTS idx_mv_run_rate_tx_date       ON mv_run_rate (tx_date)",
     "CREATE INDEX IF NOT EXISTS idx_mv_run_rate_qual          ON mv_run_rate (qual_date) WHERE qual_date IS NOT NULL",
-
     # ── mv_account_stats  (new leads + live accounts — today and MTD) ─────────
     # Drop first so the definition can be updated on restart
     """
@@ -2894,7 +3229,6 @@ _MV_SETUP_SQL = [
       AND createdtime IS NOT NULL
     """,
     "CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_account_stats_u ON mv_account_stats (id)",
-
     # ── mv_std_clients  (STD — second deposit after running total hits $240) ───
     """
     CREATE MATERIALIZED VIEW IF NOT EXISTS mv_std_clients AS
@@ -2991,12 +3325,12 @@ def ensure_materialized_views() -> None:
 
 
 _MV_ORDER = [
-    "mv_daily_kpis",         # base — must be first
-    "mv_volume_stats",       # independent
-    "mv_sales_bonuses",      # independent
-    "mv_run_rate",           # depends on mv_daily_kpis — must be last
-    "mv_account_stats",      # independent — new leads + live accounts
-    "mv_std_clients",        # independent — STD (second deposit after $240 running total)
+    "mv_daily_kpis",  # base — must be first
+    "mv_volume_stats",  # independent
+    "mv_sales_bonuses",  # independent
+    "mv_run_rate",  # depends on mv_daily_kpis — must be last
+    "mv_account_stats",  # independent — new leads + live accounts
+    "mv_std_clients",  # independent — STD (second deposit after $240 running total)
     "mv_retention_traders",  # independent — total traders report
     # mv_mt5_resolved is NOT in this list — it has 8.7M rows and takes too long
     # to refresh concurrently every minute. It is refreshed on its own hourly
@@ -3035,13 +3369,16 @@ def _pg_update_mv_refresh(mv: str, ts: str, error: str | None) -> None:
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO mv_refresh_log (mv_name, last_refresh, last_error)
                 VALUES (%s, %s, %s)
                 ON CONFLICT (mv_name) DO UPDATE
                     SET last_refresh = EXCLUDED.last_refresh,
                         last_error   = EXCLUDED.last_error
-            """, (mv, ts, error))
+            """,
+                (mv, ts, error),
+            )
         conn.commit()
     except Exception:
         conn.rollback()
@@ -3055,8 +3392,9 @@ def _pg_read_mv_refresh() -> dict:
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT mv_name, last_refresh, last_error FROM mv_refresh_log")
-            return {r[0]: {"last_refresh": r[1].isoformat() if r[1] else None, "last_error": r[2]}
-                    for r in cur.fetchall()}
+            return {
+                r[0]: {"last_refresh": r[1].isoformat() if r[1] else None, "last_error": r[2]} for r in cur.fetchall()
+            }
     except Exception:
         return {}
     finally:
@@ -3066,7 +3404,8 @@ def _pg_read_mv_refresh() -> dict:
 def refresh_single_mv(mv_name: str) -> None:
     """Refresh a single MV by name. Uses advisory lock to avoid conflicts with full refresh.
     Reuses a single connection for both the lock and the refresh to avoid pool pressure."""
-    from datetime import datetime, timezone
+    from datetime import datetime
+
     if mv_name not in _MV_ORDER:
         return
     conn = get_connection()
@@ -3091,13 +3430,11 @@ def refresh_single_mv(mv_name: str) -> None:
                     cur.execute("SET lock_timeout = 0")
                     cur.execute(f"REFRESH MATERIALIZED VIEW {mv_name}")
                 conn.commit()
-            _mv_refresh_status[mv_name]["last_refresh"] = datetime.now(timezone.utc).isoformat()
+            _mv_refresh_status[mv_name]["last_refresh"] = datetime.now(UTC).isoformat()
             _mv_refresh_status[mv_name]["last_error"] = None
         except Exception as e:
-            try:
+            with contextlib.suppress(Exception):
                 conn.rollback()
-            except Exception:
-                pass
             _mv_refresh_status[mv_name]["last_error"] = str(e)
             print(f"[refresh_single_mv] {mv_name}: {e}")
         finally:
@@ -3113,7 +3450,8 @@ def refresh_single_mv(mv_name: str) -> None:
         try:
             conn.rollback()
             with conn.cursor() as cur:
-                cur.execute("RESET statement_timeout"); cur.execute("RESET lock_timeout")
+                cur.execute("RESET statement_timeout")
+                cur.execute("RESET lock_timeout")
             conn.commit()
         except Exception:
             pass
@@ -3125,7 +3463,8 @@ def refresh_mv_mt5_resolved() -> None:
     Uses a separate advisory lock so it never blocks the per-minute MV refresh cycle.
     Always uses non-concurrent refresh (CONCURRENTLY is too slow for 8.7M rows with ROW_NUMBER).
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
+
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -3140,16 +3479,14 @@ def refresh_mv_mt5_resolved() -> None:
                 cur.execute("SET lock_timeout = 0")
                 cur.execute("REFRESH MATERIALIZED VIEW mv_mt5_resolved")
             conn.commit()
-            ts = datetime.now(timezone.utc).isoformat()
+            ts = datetime.now(UTC).isoformat()
             _mv_refresh_status["mv_mt5_resolved"]["last_refresh"] = ts
-            _mv_refresh_status["mv_mt5_resolved"]["last_error"]   = None
+            _mv_refresh_status["mv_mt5_resolved"]["last_error"] = None
             _pg_update_mv_refresh("mv_mt5_resolved", ts, None)
             print(f"[refresh_mv_mt5_resolved] done at {ts}")
         except Exception as e:
-            try:
+            with contextlib.suppress(Exception):
                 conn.rollback()
-            except Exception:
-                pass
             err = str(e)
             _mv_refresh_status["mv_mt5_resolved"]["last_error"] = err
             _pg_update_mv_refresh("mv_mt5_resolved", _mv_refresh_status["mv_mt5_resolved"].get("last_refresh"), err)
@@ -3165,7 +3502,8 @@ def refresh_mv_mt5_resolved() -> None:
         try:
             conn.rollback()
             with conn.cursor() as cur:
-                cur.execute("RESET statement_timeout"); cur.execute("RESET lock_timeout")
+                cur.execute("RESET statement_timeout")
+                cur.execute("RESET lock_timeout")
             conn.commit()
         except Exception:
             pass
@@ -3178,7 +3516,8 @@ def refresh_materialized_views() -> None:
     Order matters: mv_daily_kpis before mv_run_rate.
     Uses a single connection for both lock and all MV refreshes to minimize pool pressure.
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
+
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -3203,15 +3542,13 @@ def refresh_materialized_views() -> None:
                             cur.execute("SET lock_timeout = 0")
                             cur.execute(f"REFRESH MATERIALIZED VIEW {mv}")
                         conn.commit()
-                    ts = datetime.now(timezone.utc).isoformat()
+                    ts = datetime.now(UTC).isoformat()
                     _mv_refresh_status[mv]["last_refresh"] = ts
-                    _mv_refresh_status[mv]["last_error"]   = None
+                    _mv_refresh_status[mv]["last_error"] = None
                     _pg_update_mv_refresh(mv, ts, None)
                 except Exception as e:
-                    try:
+                    with contextlib.suppress(Exception):
                         conn.rollback()
-                    except Exception:
-                        pass
                     err = str(e)
                     _mv_refresh_status[mv]["last_error"] = err
                     _pg_update_mv_refresh(mv, _mv_refresh_status[mv].get("last_refresh"), err)
@@ -3229,7 +3566,8 @@ def refresh_materialized_views() -> None:
         try:
             conn.rollback()
             with conn.cursor() as cur:
-                cur.execute("RESET statement_timeout"); cur.execute("RESET lock_timeout")
+                cur.execute("RESET statement_timeout")
+                cur.execute("RESET lock_timeout")
             conn.commit()
         except Exception:
             pass
@@ -3238,15 +3576,19 @@ def refresh_materialized_views() -> None:
 
 def get_mv_status() -> list:
     """Return status of each MV: last refresh time, error, and estimated row count."""
-    from datetime import datetime, timezone
+    from datetime import datetime
+
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT relname, reltuples::bigint
                 FROM pg_class
                 WHERE relname = ANY(%s) AND relkind = 'm'
-            """, ([mv for mv in _MV_ORDER],))
+            """,
+                ([mv for mv in _MV_ORDER],),
+            )
             row_counts = {row[0]: int(row[1]) for row in cur.fetchall()}
     except Exception:
         row_counts = {}
@@ -3256,7 +3598,7 @@ def get_mv_status() -> list:
     # Read authoritative timestamps from PG (shared across all workers)
     pg_status = _pg_read_mv_refresh()
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     result = []
     for mv in _MV_ORDER:
         # PG is source of truth; fall back to in-memory if PG has no entry yet
@@ -3269,18 +3611,21 @@ def get_mv_status() -> list:
                 age_seconds = int((now - ts).total_seconds())
             except Exception:
                 pass
-        result.append({
-            "name":         mv,
-            "last_refresh": last_refresh,
-            "age_seconds":  age_seconds,
-            "rows":         row_counts.get(mv),
-            "last_error":   status["last_error"],
-            "healthy":      status["last_error"] is None and age_seconds is not None and age_seconds < 300,
-        })
+        result.append(
+            {
+                "name": mv,
+                "last_refresh": last_refresh,
+                "age_seconds": age_seconds,
+                "rows": row_counts.get(mv),
+                "last_error": status["last_error"],
+                "healthy": status["last_error"] is None and age_seconds is not None and age_seconds < 300,
+            }
+        )
     return result
 
 
 # ── MSSQL dealio_mt5trades (from MSSQL report.dealio_mt5trades) ──────────────
+
 
 def ensure_mssql_dealio_mt5trades_table():
     conn = get_connection()
@@ -3343,16 +3688,45 @@ def ensure_mssql_dealio_mt5trades_table():
 
 def upsert_mssql_dealio_mt5trades(df: pd.DataFrame):
     import time as _time
+
     cols = [
-        "ticket", "source_id", "login", "symbol", "digit", "cmd", "volume",
-        "open_time", "open_price", "close_time",
-        "reason", "commission", "agent_id", "swap", "close_price",
-        "profit", "tax", "comment", "mssql_timestamp", "symbol_plain",
-        "computed_profit", "computed_swap", "computed_commission",
-        "group_name", "group_currency", "calculation_currency",
-        "book", "notional_value", "source_name", "source_type",
-        "position_id", "entry", "volume_closed",
-        "sync_time", "is_finalized", "spread", "conversion_rate",
+        "ticket",
+        "source_id",
+        "login",
+        "symbol",
+        "digit",
+        "cmd",
+        "volume",
+        "open_time",
+        "open_price",
+        "close_time",
+        "reason",
+        "commission",
+        "agent_id",
+        "swap",
+        "close_price",
+        "profit",
+        "tax",
+        "comment",
+        "mssql_timestamp",
+        "symbol_plain",
+        "computed_profit",
+        "computed_swap",
+        "computed_commission",
+        "group_name",
+        "group_currency",
+        "calculation_currency",
+        "book",
+        "notional_value",
+        "source_name",
+        "source_type",
+        "position_id",
+        "entry",
+        "volume_closed",
+        "sync_time",
+        "is_finalized",
+        "spread",
+        "conversion_rate",
         "calculation_currency_digits",
     ]
     rows = [tuple(_clean(row.get(c)) for c in cols) for _, row in df.iterrows()]
@@ -3369,7 +3743,7 @@ def upsert_mssql_dealio_mt5trades(df: pd.DataFrame):
     # Insert in sub-batches of 50K to reduce lock hold time
     _BATCH = 50000
     for batch_start in range(0, len(rows), _BATCH):
-        batch = rows[batch_start:batch_start + _BATCH]
+        batch = rows[batch_start : batch_start + _BATCH]
         for attempt in range(3):
             conn = get_connection()
             try:
@@ -3402,7 +3776,7 @@ def fetch_mssql_dealio_mt5trades_stats() -> dict:
             cur.execute(sql)
             row = cur.fetchone()
             return {
-                "total_records":  row[0] or 0,
+                "total_records": row[0] or 0,
                 "last_synced_at": row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else "Never",
             }
     except Exception:
@@ -3445,4 +3819,3 @@ def backfill_age_classification() -> int:
         return 0
     finally:
         conn.close()
-

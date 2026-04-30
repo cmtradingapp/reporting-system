@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+
+from app import cache
 from app.auth.dependencies import get_current_user
 from app.db.postgres_conn import get_connection
-from app import cache
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -17,26 +18,45 @@ async def debug_login(login: int, request: Request):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT date::date, convertedbalance, convertedfloatingpnl, convertedequity
                 FROM dealio_daily_profitss WHERE login = %s ORDER BY date DESC LIMIT 5
-            """, (login,))
-            old = [{"date": str(r[0]), "bal": float(r[1] or 0), "flt": float(r[2] or 0), "eq": float(r[3] or 0)} for r in cur.fetchall()]
-            cur.execute("""
+            """,
+                (login,),
+            )
+            old = [
+                {"date": str(r[0]), "bal": float(r[1] or 0), "flt": float(r[2] or 0), "eq": float(r[3] or 0)}
+                for r in cur.fetchall()
+            ]
+            cur.execute(
+                """
                 SELECT date::date, convertedbalance, convertedfloatingpnl, convertedequity
                 FROM dealio_daily_profitss WHERE login = %s ORDER BY date DESC LIMIT 5
-            """, (login,))
-            new = [{"date": str(r[0]), "bal": float(r[1] or 0), "flt": float(r[2] or 0), "eq": float(r[3] or 0)} for r in cur.fetchall()]
-            cur.execute("""
+            """,
+                (login,),
+            )
+            new = [
+                {"date": str(r[0]), "bal": float(r[1] or 0), "flt": float(r[2] or 0), "eq": float(r[3] or 0)}
+                for r in cur.fetchall()
+            ]
+            cur.execute(
+                """
                 SELECT transactiontype, usdamount, confirmation_time::date, transactionapproval, deleted
                 FROM transactions
                 WHERE login::bigint = %s
                   AND transactiontype IN ('FRF Commission','Bonus','FRF Commission Cancelled','BonusCancelled')
                 ORDER BY confirmation_time DESC
                 LIMIT 20
-            """, (login,))
-            bonus_txns = [{"type": r[0], "amount": float(r[1] or 0), "date": str(r[2]), "approval": r[3], "deleted": r[4]} for r in cur.fetchall()]
-            cur.execute("""
+            """,
+                (login,),
+            )
+            bonus_txns = [
+                {"type": r[0], "amount": float(r[1] or 0), "date": str(r[2]), "approval": r[3], "deleted": r[4]}
+                for r in cur.fetchall()
+            ]
+            cur.execute(
+                """
                 SELECT SUM(CASE WHEN transactiontype IN ('FRF Commission','Bonus') THEN usdamount ELSE 0 END)
                      - SUM(CASE WHEN transactiontype IN ('FRF Commission Cancelled','BonusCancelled') THEN usdamount ELSE 0 END)
                   AS bonus_total
@@ -45,28 +65,49 @@ async def debug_login(login: int, request: Request):
                   AND transactionapproval = 'Approved'
                   AND (deleted = 0 OR deleted IS NULL)
                   AND transactiontype IN ('FRF Commission','Bonus','FRF Commission Cancelled','BonusCancelled')
-            """, (login,))
+            """,
+                (login,),
+            )
             bonus_total = float(cur.fetchone()[0] or 0)
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT transactiontype, COUNT(*), SUM(usdamount)
                 FROM transactions
                 WHERE login::bigint = %s
                 GROUP BY transactiontype
                 ORDER BY COUNT(*) DESC
-            """, (login,))
+            """,
+                (login,),
+            )
             all_types = [{"type": r[0], "count": r[1], "total_usd": float(r[2] or 0)} for r in cur.fetchall()]
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT transactiontype, usdamount, confirmation_time::date, comment, transactionapproval
                 FROM transactions
                 WHERE login::bigint = %s
                   AND transactionapproval = 'Approved'
                 ORDER BY usdamount DESC
                 LIMIT 30
-            """, (login,))
-            deposits_with_comments = [{"type": r[0], "amount": float(r[1] or 0), "date": str(r[2]), "comment": r[3], "approval": r[4]} for r in cur.fetchall()]
+            """,
+                (login,),
+            )
+            deposits_with_comments = [
+                {"type": r[0], "amount": float(r[1] or 0), "date": str(r[2]), "comment": r[3], "approval": r[4]}
+                for r in cur.fetchall()
+            ]
     finally:
         conn.close()
-    return JSONResponse(content={"login": login, "old_table": old, "new_table": new, "bonus_transactions": bonus_txns, "bonus_total_applied": bonus_total, "all_transaction_types": all_types, "approved_deposits_with_comments": deposits_with_comments})
+    return JSONResponse(
+        content={
+            "login": login,
+            "old_table": old,
+            "new_table": new,
+            "bonus_transactions": bonus_txns,
+            "bonus_total_applied": bonus_total,
+            "all_transaction_types": all_types,
+            "approved_deposits_with_comments": deposits_with_comments,
+        }
+    )
 
 
 @router.get("/eez-old", response_class=HTMLResponse)
@@ -154,15 +195,17 @@ async def eez_old_api(request: Request):
     data = []
     total = 0.0
     for r in rows:
-        row = dict(zip(cols, r))
+        row = dict(zip(cols, r, strict=False))
         eez = float(row["eez"] or 0)
-        data.append({
-            "login":                  int(row["login"]) if row["login"] is not None else None,
-            "is_test":                int(row["is_test"]),
-            "eez":                    eez,
-            "daily_start_equity":     float(row["daily_start_equity"] or 0),
-            "daily_start_net_equity": float(row["daily_start_net_equity"] or 0),
-        })
+        data.append(
+            {
+                "login": int(row["login"]) if row["login"] is not None else None,
+                "is_test": int(row["is_test"]),
+                "eez": eez,
+                "daily_start_equity": float(row["daily_start_equity"] or 0),
+                "daily_start_net_equity": float(row["daily_start_net_equity"] or 0),
+            }
+        )
         total += eez
 
     result = {"rows": data, "total": round(total, 2)}

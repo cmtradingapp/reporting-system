@@ -1,23 +1,75 @@
 import time
+from datetime import UTC, datetime, timedelta
+
 import pandas as pd
-from datetime import datetime, timedelta, timezone
-from app.db.mysql_conn import get_operators, get_users, get_accounts, get_accounts_full, get_accounts_by_qual_date, get_accounts_by_created_date, get_crm_users, get_crm_users_full, get_transactions, get_transactions_full, get_transactions_by_confirmation_date, get_trading_accounts, get_trading_accounts_full, get_campaigns
-from app.db.mssql_conn import get_targets, get_vtiger_users, get_client_classification, get_bonus_transactions, get_bonus_transactions_full, get_mssql_dealio_mt5trades_full, get_mssql_test_account_ids
-from app.db.dealio_conn import get_dealio_users, get_dealio_users_full, get_dealio_trades_mt4, get_dealio_trades_mt4_full, get_dealio_trades_mt4_missing, get_dealio_trades_mt4_by_open_time, get_dealio_daily_profits, get_dealio_daily_profits_full, get_dealio_daily_profits_daterange, get_dealio_trades_mt5, get_dealio_trades_mt5_full, get_dealio_trades_mt5_missing, get_dealio_positions
+
+from app.db.dealio_conn import (
+    get_dealio_daily_profits,
+    get_dealio_daily_profits_daterange,
+    get_dealio_daily_profits_full,
+    get_dealio_positions,
+    get_dealio_trades_mt4,
+    get_dealio_trades_mt4_by_open_time,
+    get_dealio_trades_mt4_full,
+    get_dealio_trades_mt4_missing,
+    get_dealio_trades_mt5,
+    get_dealio_trades_mt5_full,
+    get_dealio_trades_mt5_missing,
+    get_dealio_users,
+    get_dealio_users_full,
+)
+from app.db.mssql_conn import (
+    get_bonus_transactions,
+    get_bonus_transactions_full,
+    get_client_classification,
+    get_mssql_dealio_mt5trades_full,
+    get_mssql_test_account_ids,
+    get_targets,
+    get_vtiger_users,
+)
+from app.db.mysql_conn import (
+    get_accounts,
+    get_accounts_by_created_date,
+    get_accounts_by_qual_date,
+    get_accounts_full,
+    get_campaigns,
+    get_operators,
+    get_trading_accounts,
+    get_trading_accounts_full,
+    get_transactions,
+    get_transactions_by_confirmation_date,
+    get_transactions_full,
+    get_users,
+)
 from app.db.postgres_conn import (
-    ensure_table, delete_all_performance, insert_records,
-    upsert_users, upsert_accounts, cleanup_accounts, upsert_crm_users, truncate_crm_users, upsert_transactions,
-    upsert_targets, upsert_trading_accounts, log_sync,
-    truncate_and_insert_ftd100, compute_transaction_type_name,
-    ensure_client_classification_table, upsert_client_classification,
-    upsert_dealio_users, upsert_dealio_trades_mt4, truncate_dealio_trades_mt4,
-    upsert_dealio_trades_mt5, truncate_dealio_trades_mt5,
-    upsert_dealio_daily_profits,
-    ensure_bonus_transactions_table, upsert_bonus_transactions,
-    ensure_daily_equity_zeroed_table, upsert_daily_equity_zeroed,
-    upsert_campaigns,
+    cleanup_accounts,
+    compute_transaction_type_name,
+    delete_all_performance,
+    ensure_bonus_transactions_table,
+    ensure_client_classification_table,
+    ensure_table,
+    insert_records,
+    log_sync,
     truncate_and_insert_dealio_positions,
+    truncate_and_insert_ftd100,
+    truncate_crm_users,
+    truncate_dealio_trades_mt4,
+    truncate_dealio_trades_mt5,
+    upsert_accounts,
+    upsert_bonus_transactions,
+    upsert_campaigns,
+    upsert_client_classification,
+    upsert_crm_users,
+    upsert_daily_equity_zeroed,
+    upsert_dealio_daily_profits,
+    upsert_dealio_trades_mt4,
+    upsert_dealio_trades_mt5,
+    upsert_dealio_users,
     upsert_mssql_dealio_mt5trades,
+    upsert_targets,
+    upsert_trading_accounts,
+    upsert_transactions,
+    upsert_users,
 )
 from app.db.postgres_conn import get_connection as _pg_conn
 
@@ -74,7 +126,7 @@ def run_etl() -> dict:
 
 def run_accounts_etl(hours: int = 24) -> dict:
     start = time.time()
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    cutoff = datetime.now(UTC) - timedelta(hours=hours)
     status = "success"
     error_msg = None
     rows = 0
@@ -187,7 +239,7 @@ def run_transactions_by_confirmation_date_etl(from_date: str) -> dict:
 
 def run_users_etl(hours: int = 24) -> dict:
     start = time.time()
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    cutoff = datetime.now(UTC) - timedelta(hours=hours)
     status = "success"
     error_msg = None
     rows = 0
@@ -196,6 +248,7 @@ def run_users_etl(hours: int = 24) -> dict:
         rows = len(df)
         upsert_crm_users(df)
         from app.db.postgres_conn import sync_auth_users_from_crm
+
         sync_auth_users_from_crm()
     except Exception as e:
         status = "error"
@@ -219,6 +272,7 @@ def run_users_full_etl() -> dict:
         truncate_crm_users()
         upsert_crm_users(df)
         from app.db.postgres_conn import sync_auth_users_from_crm
+
         sync_auth_users_from_crm()
     except Exception as e:
         status = "error"
@@ -232,7 +286,7 @@ def run_users_full_etl() -> dict:
 
 def run_transactions_etl(hours: int = 24) -> dict:
     start = time.time()
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    cutoff = datetime.now(UTC) - timedelta(hours=hours)
     status = "success"
     error_msg = None
     rows = 0
@@ -255,7 +309,7 @@ def run_transactions_etl(hours: int = 24) -> dict:
 
 def run_trading_accounts_etl(hours: int = 24) -> dict:
     start = time.time()
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    cutoff = datetime.now(UTC) - timedelta(hours=hours)
     status = "success"
     error_msg = None
     rows = 0
@@ -338,6 +392,7 @@ def _refresh_sales_bonuses_mv() -> None:
 def run_ftd100_etl() -> dict:
     """Full refresh — TRUNCATE + INSERT computed from transactions + accounts CTEs."""
     from app import cache
+
     start = time.time()
     cutoff = datetime(1970, 1, 1)  # full refresh marker
     status = "success"
@@ -420,7 +475,7 @@ def run_dealio_users_etl(hours: int = 24) -> dict:
     except Exception:
         since = None
     if since is None:
-        since = datetime.now(timezone.utc) - timedelta(hours=hours)
+        since = datetime.now(UTC) - timedelta(hours=hours)
     cutoff = since
     try:
         df = get_dealio_users(since=since, statement_timeout_ms=120000)
@@ -469,7 +524,7 @@ def run_dealio_trades_mt4_etl(hours: int = 24) -> dict:
     if _dealio_trades_mt4_rebuilding:
         return {"status": "skipped", "reason": "rebuild in progress"}
     start = time.time()
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    cutoff = datetime.now(UTC) - timedelta(hours=hours)
     status = "success"
     error_msg = None
     rows = 0
@@ -501,7 +556,9 @@ def run_dealio_trades_mt4_full_etl() -> dict:
             chunk_num += 1
             if chunk_num % 10 == 0:
                 elapsed = int((time.time() - start) * 1000)
-                log_sync("dealio_trades_mt4", cutoff, rows, elapsed, "running", f"chunk {chunk_num}, {rows} rows so far")
+                log_sync(
+                    "dealio_trades_mt4", cutoff, rows, elapsed, "running", f"chunk {chunk_num}, {rows} rows so far"
+                )
     except Exception as e:
         status = "error"
         error_msg = str(e)
@@ -515,6 +572,7 @@ def run_dealio_trades_mt4_full_etl() -> dict:
 def run_dealio_trades_mt4_missing_etl() -> dict:
     """Sync only rows with ticket > max(ticket) in local DB — adds missing rows without re-processing existing ones."""
     from app.db.postgres_conn import get_connection
+
     start = time.time()
     cutoff = datetime(1970, 1, 1)
     status = "success"
@@ -535,7 +593,14 @@ def run_dealio_trades_mt4_missing_etl() -> dict:
             chunk_num += 1
             if chunk_num % 10 == 0:
                 elapsed = int((time.time() - start) * 1000)
-                log_sync("dealio_trades_mt4", cutoff, rows, elapsed, "running", f"missing: chunk {chunk_num}, {rows} rows so far")
+                log_sync(
+                    "dealio_trades_mt4",
+                    cutoff,
+                    rows,
+                    elapsed,
+                    "running",
+                    f"missing: chunk {chunk_num}, {rows} rows so far",
+                )
     except Exception as e:
         status = "error"
         error_msg = str(e)
@@ -564,7 +629,14 @@ def run_dealio_trades_mt4_rebuild_etl() -> dict:
             chunk_num += 1
             if chunk_num % 10 == 0:
                 elapsed = int((time.time() - start) * 1000)
-                log_sync("dealio_trades_mt4", cutoff, rows, elapsed, "running", f"rebuild: chunk {chunk_num}, {rows} rows so far")
+                log_sync(
+                    "dealio_trades_mt4",
+                    cutoff,
+                    rows,
+                    elapsed,
+                    "running",
+                    f"rebuild: chunk {chunk_num}, {rows} rows so far",
+                )
     except Exception as e:
         status = "error"
         error_msg = str(e)
@@ -579,7 +651,7 @@ def run_dealio_trades_mt4_rebuild_etl() -> dict:
 def run_dealio_trades_mt4_refresh_notional_etl(hours: int = 2160) -> dict:
     """Re-sync last N hours of trades to populate notional_value on existing rows (default 90 days)."""
     start = time.time()
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    cutoff = datetime.now(UTC) - timedelta(hours=hours)
     status = "success"
     error_msg = None
     rows = 0
@@ -614,7 +686,14 @@ def run_dealio_trades_mt4_by_open_time_etl(from_date: str = "2026-01-01") -> Non
             chunk_num += 1
             if chunk_num % 10 == 0:
                 elapsed = int((time.time() - start) * 1000)
-                log_sync("dealio_trades_mt4", cutoff, rows, elapsed, "running", f"by_open_time: chunk {chunk_num}, {rows} rows so far")
+                log_sync(
+                    "dealio_trades_mt4",
+                    cutoff,
+                    rows,
+                    elapsed,
+                    "running",
+                    f"by_open_time: chunk {chunk_num}, {rows} rows so far",
+                )
     except Exception as e:
         status = "error"
         error_msg = str(e)
@@ -646,7 +725,7 @@ def run_client_classification_etl() -> dict:
 
 def run_dealio_daily_profits_etl(hours: int = 48) -> dict:
     start = time.time()
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    cutoff = datetime.now(UTC) - timedelta(hours=hours)
     status = "success"
     error_msg = None
     rows = 0
@@ -698,7 +777,9 @@ def run_dealio_daily_profits_full_etl() -> dict:
             chunk_num += 1
             if chunk_num % 10 == 0:
                 elapsed = int((time.time() - start) * 1000)
-                log_sync("dealio_daily_profits", cutoff, rows, elapsed, "running", f"chunk {chunk_num}, {rows} rows so far")
+                log_sync(
+                    "dealio_daily_profits", cutoff, rows, elapsed, "running", f"chunk {chunk_num}, {rows} rows so far"
+                )
     except Exception as e:
         status = "error"
         error_msg = str(e)
@@ -712,7 +793,7 @@ def run_dealio_daily_profits_full_etl() -> dict:
 def run_bonus_transactions_etl(hours: int = 24) -> dict:
     ensure_bonus_transactions_table()
     start = time.time()
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    cutoff = datetime.now(UTC) - timedelta(hours=hours)
     status = "success"
     error_msg = None
     rows = 0
@@ -757,7 +838,9 @@ def run_daily_equity_zeroed_snapshot(snapshot_date: str = None) -> dict:
     (independently calculated from snapshot_date - 1 using the same EEZ formula),
     then upsert both into daily_equity_zeroed.
     """
-    from datetime import date, timedelta, datetime as dt
+    from datetime import date, timedelta
+    from datetime import datetime as dt
+
     if snapshot_date is None:
         snapshot_date = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
 
@@ -822,7 +905,7 @@ def run_daily_equity_zeroed_snapshot(snapshot_date: str = None) -> dict:
 
 def run_dealio_trades_mt5_etl(hours: int = 24) -> dict:
     start = time.time()
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    cutoff = datetime.now(UTC) - timedelta(hours=hours)
     status = "success"
     error_msg = None
     rows = 0
@@ -854,7 +937,9 @@ def run_dealio_trades_mt5_full_etl() -> dict:
             chunk_num += 1
             if chunk_num % 10 == 0:
                 elapsed = int((time.time() - start) * 1000)
-                log_sync("dealio_trades_mt5", cutoff, rows, elapsed, "running", f"chunk {chunk_num}, {rows} rows so far")
+                log_sync(
+                    "dealio_trades_mt5", cutoff, rows, elapsed, "running", f"chunk {chunk_num}, {rows} rows so far"
+                )
     except Exception as e:
         status = "error"
         error_msg = str(e)
@@ -868,6 +953,7 @@ def run_dealio_trades_mt5_full_etl() -> dict:
 def run_dealio_trades_mt5_missing_etl() -> dict:
     """Sync only rows with ticket > max(ticket) in local DB."""
     from app.db.postgres_conn import get_connection
+
     start = time.time()
     cutoff = datetime(1970, 1, 1)
     status = "success"
@@ -889,7 +975,14 @@ def run_dealio_trades_mt5_missing_etl() -> dict:
             chunk_num += 1
             if chunk_num % 10 == 0:
                 elapsed = int((time.time() - start) * 1000)
-                log_sync("dealio_trades_mt5", cutoff, rows, elapsed, "running", f"missing: chunk {chunk_num}, {rows} rows so far")
+                log_sync(
+                    "dealio_trades_mt5",
+                    cutoff,
+                    rows,
+                    elapsed,
+                    "running",
+                    f"missing: chunk {chunk_num}, {rows} rows so far",
+                )
     except Exception as e:
         status = "error"
         error_msg = str(e)
@@ -916,7 +1009,14 @@ def run_dealio_trades_mt5_rebuild_etl() -> dict:
             chunk_num += 1
             if chunk_num % 10 == 0:
                 elapsed = int((time.time() - start) * 1000)
-                log_sync("dealio_trades_mt5", cutoff, rows, elapsed, "running", f"rebuild: chunk {chunk_num}, {rows} rows so far")
+                log_sync(
+                    "dealio_trades_mt5",
+                    cutoff,
+                    rows,
+                    elapsed,
+                    "running",
+                    f"rebuild: chunk {chunk_num}, {rows} rows so far",
+                )
     except Exception as e:
         status = "error"
         error_msg = str(e)
@@ -951,7 +1051,7 @@ def run_campaigns_etl() -> dict:
 def run_dealio_positions_etl() -> dict:
     """Full replace of dealio_positions — TRUNCATE + INSERT from live dealio.positions snapshot."""
     start = time.time()
-    cutoff = datetime.now(timezone.utc)
+    cutoff = datetime.now(UTC)
     status = "success"
     error_msg = None
     rows = 0
@@ -970,11 +1070,13 @@ def run_dealio_positions_etl() -> dict:
 
 _MSSQL_DMT5_LOCK_ID = 777555111  # advisory lock id for mt5trades sync
 
+
 def run_mssql_dealio_mt5trades_full_etl() -> dict:
     """Full sync of report.dealio_mt5trades from MSSQL into PostgreSQL.
     Resumes from the max ticket already in PG to avoid re-fetching.
     Uses PG advisory lock to prevent concurrent runs."""
     from app.db.postgres_conn import get_connection
+
     # Acquire advisory lock (non-blocking) to prevent concurrent syncs
     lock_conn = get_connection()
     try:
@@ -1028,7 +1130,9 @@ def _run_mssql_dmt5_inner(get_connection) -> dict:
             print(f"[mssql_dmt5] Chunk {chunk_num}: {rows} new rows (ticket > {start_ticket})")
             if chunk_num % 5 == 0:
                 elapsed = int((time.time() - start) * 1000)
-                log_sync("mssql_dealio_mt5trades", cutoff, rows, elapsed, "running", f"chunk {chunk_num}, {rows} rows so far")
+                log_sync(
+                    "mssql_dealio_mt5trades", cutoff, rows, elapsed, "running", f"chunk {chunk_num}, {rows} rows so far"
+                )
     except Exception as e:
         status = "error"
         error_msg = str(e)

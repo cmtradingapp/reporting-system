@@ -1,6 +1,7 @@
-import pymssql
 import pandas as pd
-from app.config import MSSQL_HOST, MSSQL_PORT, MSSQL_USER, MSSQL_PASSWORD, MSSQL_DB
+import pymssql
+
+from app.config import MSSQL_DB, MSSQL_HOST, MSSQL_PASSWORD, MSSQL_PORT, MSSQL_USER
 
 CHUNK_SIZE = 50000
 
@@ -37,9 +38,7 @@ def get_mssql_test_account_ids() -> set:
         conn = _get_mssql_connection(timeout=30)
         try:
             with conn.cursor() as cur:
-                cur.execute(
-                    "SELECT accountid FROM report.ant_acc WHERE is_test_account = 1"
-                )
+                cur.execute("SELECT accountid FROM report.ant_acc WHERE is_test_account = 1")
                 return {row[0] for row in cur.fetchall()}
         finally:
             conn.close()
@@ -137,7 +136,7 @@ def get_country_map() -> dict:
     try:
         query = "SELECT iso2code, name FROM report.countries WHERE iso2code IS NOT NULL AND iso2code <> ''"
         df = pd.read_sql(query, conn)
-        return {str(r['iso2code']).strip().upper(): str(r['name']).strip() for _, r in df.iterrows()}
+        return {str(r["iso2code"]).strip().upper(): str(r["name"]).strip() for _, r in df.iterrows()}
     except Exception:
         return {}
     finally:
@@ -150,7 +149,7 @@ def get_country_region_map() -> dict:
     try:
         query = "SELECT iso2code, region FROM report.countries WHERE iso2code IS NOT NULL AND iso2code <> '' AND region IS NOT NULL AND region <> ''"
         df = pd.read_sql(query, conn)
-        return {str(r['iso2code']).strip().upper(): str(r['region']).strip() for _, r in df.iterrows()}
+        return {str(r["iso2code"]).strip().upper(): str(r["region"]).strip() for _, r in df.iterrows()}
     except Exception:
         return {}
     finally:
@@ -162,7 +161,7 @@ def get_ret_status_map() -> dict:
     conn = _get_mssql_connection()
     try:
         df = pd.read_sql("SELECT status_key, value FROM report.ant_ret_status", conn)
-        return {str(int(r['status_key'])): str(r['value']).strip() for _, r in df.iterrows()}
+        return {str(int(r["status_key"])): str(r["value"]).strip() for _, r in df.iterrows()}
     except Exception:
         return {}
     finally:
@@ -174,7 +173,7 @@ def get_sales_status_map() -> dict:
     conn = _get_mssql_connection()
     try:
         df = pd.read_sql("SELECT status_key, value FROM report.ant_sales_status", conn)
-        return {str(int(r['status_key'])): str(r['value']).strip() for _, r in df.iterrows()}
+        return {str(int(r["status_key"])): str(r["value"]).strip() for _, r in df.iterrows()}
     except Exception:
         return {}
     finally:
@@ -317,7 +316,7 @@ def get_transaction_type_names_for_ids(ids: list) -> pd.DataFrame:
     # Split into chunks of 2000 to avoid SQL IN clause limits
     results = []
     for i in range(0, len(ids), 2000):
-        chunk_ids = ids[i:i + 2000]
+        chunk_ids = ids[i : i + 2000]
         id_str = ",".join(str(i) for i in chunk_ids)
         conn = _get_mssql_connection()
         try:
@@ -329,4 +328,8 @@ def get_transaction_type_names_for_ids(ids: list) -> pd.DataFrame:
             results.append(pd.read_sql(query, conn))
         finally:
             conn.close()
-    return pd.concat(results, ignore_index=True) if results else pd.DataFrame(columns=["mttransactionsid", "transaction_type_name"])
+    return (
+        pd.concat(results, ignore_index=True)
+        if results
+        else pd.DataFrame(columns=["mttransactionsid", "transaction_type_name"])
+    )

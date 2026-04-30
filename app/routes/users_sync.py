@@ -1,4 +1,5 @@
 from fastapi import APIRouter, BackgroundTasks
+
 from app.etl.fetch_and_store import run_users_etl, run_users_full_etl
 
 router = APIRouter()

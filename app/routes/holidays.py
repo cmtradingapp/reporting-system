@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+
 from app.auth.dependencies import get_current_user
 from app.db.postgres_conn import get_connection
 
@@ -18,9 +19,7 @@ async def holidays_page(request: Request):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute(
-                "SELECT holiday_date, description FROM public_holidays ORDER BY holiday_date"
-            )
+            cur.execute("SELECT holiday_date, description FROM public_holidays ORDER BY holiday_date")
             rows = cur.fetchall()
         holidays = [{"date": str(r[0]), "description": r[1] or ""} for r in rows]
         return templates.TemplateResponse(
@@ -32,7 +31,7 @@ async def holidays_page(request: Request):
 
 @router.post("/api/holidays")
 def add_holiday(payload: dict):
-    date_str    = payload.get("date", "").strip()
+    date_str = payload.get("date", "").strip()
     description = payload.get("description", "").strip()
     if not date_str:
         return JSONResponse(status_code=400, content={"detail": "date is required"})
@@ -60,9 +59,7 @@ def delete_holiday(date_str: str):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute(
-                "DELETE FROM public_holidays WHERE holiday_date = %s", (date_str,)
-            )
+            cur.execute("DELETE FROM public_holidays WHERE holiday_date = %s", (date_str,))
         conn.commit()
         return JSONResponse(content={"status": "ok"})
     except Exception as e:

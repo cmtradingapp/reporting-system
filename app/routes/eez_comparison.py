@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+
+from app import cache
 from app.auth.dependencies import get_current_user
 from app.db.postgres_conn import get_connection
-from app import cache
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -105,23 +106,25 @@ async def eez_comparison_api(request: Request):
     total_start = 0.0
     snapshot_date = None
     for r in rows:
-        row = dict(zip(cols, r))
-        end_eez   = float(row["end_equity_zeroed"] or 0)
+        row = dict(zip(cols, r, strict=False))
+        end_eez = float(row["end_equity_zeroed"] or 0)
         start_eez = float(row["start_equity_zeroed"] or 0)
         if snapshot_date is None and row["snapshot_date"]:
             snapshot_date = str(row["snapshot_date"])
-        data.append({
-            "login":               int(row["login"]) if row["login"] is not None else None,
-            "end_equity_zeroed":   end_eez,
-            "start_equity_zeroed": start_eez,
-        })
-        total_end   += end_eez
+        data.append(
+            {
+                "login": int(row["login"]) if row["login"] is not None else None,
+                "end_equity_zeroed": end_eez,
+                "start_equity_zeroed": start_eez,
+            }
+        )
+        total_end += end_eez
         total_start += start_eez
 
     result = {
-        "rows":          data,
-        "total_end":     round(total_end, 2),
-        "total_start":   round(total_start, 2),
+        "rows": data,
+        "total_end": round(total_end, 2),
+        "total_start": round(total_start, 2),
         "snapshot_date": snapshot_date,
     }
     cache.set(_ck, result)

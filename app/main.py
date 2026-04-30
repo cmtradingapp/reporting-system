@@ -1,64 +1,107 @@
-from fastapi import FastAPI, Request
-from fastapi.responses import RedirectResponse
-from contextlib import asynccontextmanager
-from apscheduler.schedulers.background import BackgroundScheduler
-from app.routes.accounts import router as accounts_router
-from app.routes.users_sync import router as users_sync_router
-from app.routes.transactions_sync import router as transactions_sync_router
-from app.routes.targets_sync import router as targets_sync_router
-from app.routes.trading_accounts_sync import router as trading_accounts_sync_router
-from app.routes.ftd100_sync import router as ftd100_sync_router
-from app.routes.scoreboard import router as scoreboard_router
-from app.routes.ftc_date import router as ftc_date_router
-from app.routes.total_traders import router as total_traders_router
-from app.routes.agent_bonuses import router as agent_bonuses_router
-from app.routes.data_sync import router as data_sync_router
-from app.routes.holidays import router as holidays_router
-from app.routes.auth import router as auth_router
-from app.routes.users_mgmt import router as users_mgmt_router
-from app.routes.dashboard import router as dashboard_router, _dashboard_calc
-from app.routes.data_sync import warm_data_sync_cache
-from app.routes.last_sync import router as last_sync_router
-from app.routes.client_classification_sync import router as client_classification_sync_router
-from app.routes.dealio_new_sync import router as dealio_new_sync_router
-from app.routes.dealio_daily_profits_sync import router as dealio_daily_profits_sync_router
-from app.routes.dealio_mt5trades_sync import router as dealio_mt5trades_sync_router
-from app.routes.live_equity import router as live_equity_router, _live_calc
-from app.routes.eez_comparison import router as eez_comparison_router
-from app.routes.eez_old import router as eez_old_router
-from app.routes.campaigns_sync import router as campaigns_sync_router
-from app.routes.campaign_performance import router as campaign_performance_router, _camp_kpi_calc, _camp_table_calc
-from app.routes.all_ftcs import router as all_ftcs_router
-from app.routes.transactions_report import router as transactions_report_router
-from app.routes.fsa_report import router as fsa_report_router
-from app.routes.mssql_dealio_mt5trades_sync import router as mssql_dealio_mt5trades_sync_router
-from app.routes.daily_monthly_performance import router as dmp_router
-from app.db.postgres_conn import ensure_table, ensure_auth_table, seed_admin_user, seed_company_targets, ensure_client_classification_table, ensure_bonus_transactions_table, ensure_daily_equity_zeroed_table, ensure_materialized_views, refresh_materialized_views, refresh_mv_mt5_resolved, backfill_classification_int, ensure_agent_dept_history_table, ensure_dealio_positions_table, ensure_mssql_dealio_mt5trades_table, ensure_mv_refresh_log, backfill_age_classification
-import threading
 import fcntl
-from app.auth.auth import hash_password
-from app.etl.fetch_and_store import run_accounts_etl, run_users_etl, run_transactions_etl, run_targets_etl, run_trading_accounts_etl, run_ftd100_etl, run_client_classification_etl, run_dealio_users_etl, run_dealio_trades_mt4_etl, run_dealio_daily_profits_etl, run_bonus_transactions_etl, run_daily_equity_zeroed_snapshot, run_campaigns_etl, run_dealio_trades_mt5_etl, run_dealio_trades_mt5_full_etl, run_dealio_positions_etl, run_mssql_dealio_mt5trades_full_etl
-from app import cache
 import os
+import threading
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+
+from apscheduler.schedulers.background import BackgroundScheduler
+from fastapi import FastAPI, Request
+from fastapi.responses import RedirectResponse
+
+from app import cache
+from app.auth.auth import hash_password
+from app.db.postgres_conn import (
+    backfill_age_classification,
+    backfill_classification_int,
+    ensure_agent_dept_history_table,
+    ensure_auth_table,
+    ensure_bonus_transactions_table,
+    ensure_client_classification_table,
+    ensure_daily_equity_zeroed_table,
+    ensure_dealio_positions_table,
+    ensure_materialized_views,
+    ensure_mssql_dealio_mt5trades_table,
+    ensure_mv_refresh_log,
+    ensure_table,
+    refresh_materialized_views,
+    refresh_mv_mt5_resolved,
+    seed_admin_user,
+    seed_company_targets,
+)
+from app.etl.fetch_and_store import (
+    run_accounts_etl,
+    run_bonus_transactions_etl,
+    run_campaigns_etl,
+    run_client_classification_etl,
+    run_daily_equity_zeroed_snapshot,
+    run_dealio_daily_profits_etl,
+    run_dealio_positions_etl,
+    run_dealio_trades_mt5_etl,
+    run_dealio_trades_mt5_full_etl,
+    run_dealio_users_etl,
+    run_ftd100_etl,
+    run_mssql_dealio_mt5trades_full_etl,
+    run_targets_etl,
+    run_trading_accounts_etl,
+    run_transactions_etl,
+    run_users_etl,
+)
+from app.routes.accounts import router as accounts_router
+from app.routes.agent_bonuses import router as agent_bonuses_router
+from app.routes.all_ftcs import router as all_ftcs_router
+from app.routes.auth import router as auth_router
+from app.routes.campaign_performance import _camp_kpi_calc, _camp_table_calc
+from app.routes.campaign_performance import router as campaign_performance_router
+from app.routes.campaigns_sync import router as campaigns_sync_router
+from app.routes.client_classification_sync import router as client_classification_sync_router
+from app.routes.daily_monthly_performance import router as dmp_router
+from app.routes.dashboard import _dashboard_calc
+from app.routes.dashboard import router as dashboard_router
+from app.routes.data_sync import router as data_sync_router
+from app.routes.data_sync import warm_data_sync_cache
+from app.routes.dealio_daily_profits_sync import router as dealio_daily_profits_sync_router
+from app.routes.dealio_mt5trades_sync import router as dealio_mt5trades_sync_router
+from app.routes.dealio_new_sync import router as dealio_new_sync_router
+from app.routes.eez_comparison import router as eez_comparison_router
+from app.routes.eez_old import router as eez_old_router
+from app.routes.fsa_report import router as fsa_report_router
+from app.routes.ftc_date import router as ftc_date_router
+from app.routes.ftd100_sync import router as ftd100_sync_router
+from app.routes.holidays import router as holidays_router
+from app.routes.last_sync import router as last_sync_router
+from app.routes.live_equity import _live_calc
+from app.routes.live_equity import router as live_equity_router
+from app.routes.mssql_dealio_mt5trades_sync import router as mssql_dealio_mt5trades_sync_router
+from app.routes.scoreboard import router as scoreboard_router
+from app.routes.targets_sync import router as targets_sync_router
+from app.routes.total_traders import router as total_traders_router
+from app.routes.trading_accounts_sync import router as trading_accounts_sync_router
+from app.routes.transactions_report import router as transactions_report_router
+from app.routes.transactions_sync import router as transactions_sync_router
+from app.routes.users_mgmt import router as users_mgmt_router
+from app.routes.users_sync import router as users_sync_router
 
 # File lock so only one worker process runs the APScheduler background jobs.
 # The other worker(s) only serve HTTP requests, keeping their connection pool free.
 _SCHED_LOCK_FILE = "/tmp/reporting_sched.lock"
 _sched_lock_fd = None
 
+
 def _acquire_scheduler_lock() -> bool:
     global _sched_lock_fd
     try:
-        _sched_lock_fd = open(_SCHED_LOCK_FILE, 'w')
+        # Lock file deliberately stays open for process lifetime (would release the
+        # flock if closed). Owns scheduler election across gunicorn workers.
+        _sched_lock_fd = open(_SCHED_LOCK_FILE, "w")  # noqa: SIM115
         fcntl.flock(_sched_lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         return True
-    except (IOError, OSError):
+    except OSError:
         if _sched_lock_fd:
             _sched_lock_fd.close()
         _sched_lock_fd = None
         return False
+
 
 _TZ = ZoneInfo("Europe/Nicosia")
 
@@ -67,7 +110,7 @@ def warm_cache():
     """Refresh cache for dashboard, live EEZ and campaign performance every minute."""
     today = datetime.now(_TZ).date()
     month_start = today.replace(day=1).isoformat()
-    today_iso   = today.isoformat()
+    today_iso = today.isoformat()
 
     _ck = f"dashboard_v9:{today.isoformat()}"
     try:
@@ -79,6 +122,7 @@ def warm_cache():
     _last_ck = f"live_eez_last_known_v1:{today}"
     try:
         from datetime import datetime as _dt
+
         result = _live_calc(today)
         result["computed_at"] = _dt.now(_TZ).isoformat(timespec="seconds")
         result["is_stale"] = False
@@ -114,17 +158,18 @@ def warm_cache():
     except Exception as e:
         print(f"[warm_cache] reports: {e}")
 
-SYNC_INTERVAL_MINUTES          = int(os.getenv("SYNC_INTERVAL_MINUTES", "1"))
+
+SYNC_INTERVAL_MINUTES = int(os.getenv("SYNC_INTERVAL_MINUTES", "1"))
 TRANSACTIONS_SYNC_INTERVAL_MINUTES = int(os.getenv("TRANSACTIONS_SYNC_INTERVAL_MINUTES", "1"))
-MV_REFRESH_INTERVAL_MINUTES    = int(os.getenv("MV_REFRESH_INTERVAL_MINUTES", "1"))
-ACCOUNTS_SYNC_HOURS            = int(os.getenv("ACCOUNTS_SYNC_HOURS", "6"))
-USERS_SYNC_HOURS               = int(os.getenv("USERS_SYNC_HOURS", "6"))
-TRANSACTIONS_SYNC_HOURS        = int(os.getenv("TRANSACTIONS_SYNC_HOURS", "6"))
-DEALIO_SYNC_HOURS              = int(os.getenv("DEALIO_SYNC_HOURS", "6"))
-DEALIO_USERS_SYNC_HOURS        = int(os.getenv("DEALIO_USERS_SYNC_HOURS", "6"))
-DEALIO_TRADES_MT4_SYNC_HOURS   = int(os.getenv("DEALIO_TRADES_MT4_SYNC_HOURS", "6"))
-DEALIO_TRADES_MT5_SYNC_HOURS   = int(os.getenv("DEALIO_TRADES_MT5_SYNC_HOURS", "6"))
-TRADING_ACCOUNTS_SYNC_HOURS    = int(os.getenv("TRADING_ACCOUNTS_SYNC_HOURS", "6"))
+MV_REFRESH_INTERVAL_MINUTES = int(os.getenv("MV_REFRESH_INTERVAL_MINUTES", "1"))
+ACCOUNTS_SYNC_HOURS = int(os.getenv("ACCOUNTS_SYNC_HOURS", "6"))
+USERS_SYNC_HOURS = int(os.getenv("USERS_SYNC_HOURS", "6"))
+TRANSACTIONS_SYNC_HOURS = int(os.getenv("TRANSACTIONS_SYNC_HOURS", "6"))
+DEALIO_SYNC_HOURS = int(os.getenv("DEALIO_SYNC_HOURS", "6"))
+DEALIO_USERS_SYNC_HOURS = int(os.getenv("DEALIO_USERS_SYNC_HOURS", "6"))
+DEALIO_TRADES_MT4_SYNC_HOURS = int(os.getenv("DEALIO_TRADES_MT4_SYNC_HOURS", "6"))
+DEALIO_TRADES_MT5_SYNC_HOURS = int(os.getenv("DEALIO_TRADES_MT5_SYNC_HOURS", "6"))
+TRADING_ACCOUNTS_SYNC_HOURS = int(os.getenv("TRADING_ACCOUNTS_SYNC_HOURS", "6"))
 DEALIO_DAILY_PROFIT_SYNC_HOURS = int(os.getenv("DEALIO_DAILY_PROFIT_SYNC_HOURS", "48"))
 DEALIO_DAILY_PROFITS_SYNC_HOURS = int(os.getenv("DEALIO_DAILY_PROFITS_SYNC_HOURS", "48"))
 
@@ -134,9 +179,11 @@ scheduler = BackgroundScheduler()
 def _auto_mt5_full_sync():
     """On startup, trigger MT5 full sync if no successful full sync has ever completed."""
     import time
+
     time.sleep(10)  # let scheduler settle first
     try:
         from app.db.postgres_conn import get_connection
+
         conn = get_connection()
         try:
             with conn.cursor() as cur:
@@ -163,9 +210,11 @@ def _auto_mt5_full_sync():
 def _auto_mssql_dmt5_sync():
     """On startup, auto-resume mssql_dealio_mt5trades sync if not yet completed."""
     import time
+
     time.sleep(15)
     try:
         from app.db.postgres_conn import get_connection
+
         conn = get_connection()
         try:
             with conn.cursor() as cur:
@@ -202,6 +251,7 @@ async def lifespan(app: FastAPI):
 
     # Only one worker runs schema migrations — others skip (idempotent DDL already done)
     from app.db.postgres_conn import get_connection as _pgconn
+
     _mc = _pgconn()
     try:
         with _mc.cursor() as _c:
@@ -221,7 +271,7 @@ async def lifespan(app: FastAPI):
         ensure_mssql_dealio_mt5trades_table()
         ensure_mv_refresh_log()
         ensure_materialized_views()
-        seed_admin_user(hash_password('Admin123!'))
+        seed_admin_user(hash_password("Admin123!"))
         seed_company_targets()
         threading.Thread(target=backfill_classification_int, daemon=True).start()
     _run_scheduler = _acquire_scheduler_lock()
@@ -408,7 +458,8 @@ async def lifespan(app: FastAPI):
     scheduler.add_job(
         backfill_age_classification,
         "cron",
-        hour=2, minute=0,
+        hour=2,
+        minute=0,
         id="age_classification_backfill",
         replace_existing=True,
         max_instances=1,
@@ -423,7 +474,9 @@ async def lifespan(app: FastAPI):
 def _warm_report_caches(date_from: str, date_to: str):
     """Pre-warm all report API caches for admin user via local HTTP calls."""
     import urllib.request
+
     from app.auth.auth import create_access_token
+
     token = create_access_token(1)  # admin user id=1
     endpoints = [
         f"/api/performance?date_from={date_from}&date_to={date_to}",
@@ -449,20 +502,25 @@ def _warm_report_caches(date_from: str, date_to: str):
 
 app = FastAPI(title="Agent Performance Report", lifespan=lifespan)
 
+import pathlib
+
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import Response
-import pathlib
+
 app.add_middleware(GZipMiddleware, minimum_size=500)
 
 _STATIC_DIR = pathlib.Path(__file__).parent / "static"
 _STATIC_TYPES = {".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon", ".webp": "image/webp"}
+
 
 @app.get("/static/{filename}")
 async def static_file(filename: str):
     path = _STATIC_DIR / filename
     if not path.exists() or not path.is_file():
         return Response(status_code=404)
-    return Response(content=path.read_bytes(), media_type=_STATIC_TYPES.get(path.suffix.lower(), "application/octet-stream"))
+    return Response(
+        content=path.read_bytes(), media_type=_STATIC_TYPES.get(path.suffix.lower(), "application/octet-stream")
+    )
 
 
 @app.get("/")

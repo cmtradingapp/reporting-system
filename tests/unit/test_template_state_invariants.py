@@ -63,9 +63,7 @@ def test_dailytradershq_in_ret_global_defaults(dmp_template_source: str) -> None
 
 @pytest.mark.unit
 @pytest.mark.parametrize(("const_name", "var_name"), _INVARIANTS)
-def test_defaults_cover_every_used_key(
-    dmp_template_source: str, const_name: str, var_name: str
-) -> None:
+def test_defaults_cover_every_used_key(dmp_template_source: str, const_name: str, var_name: str) -> None:
     """Generalized rule: every `varName.X` read must have `X` declared in the defaults."""
     declared = _extract_default_keys(dmp_template_source, const_name)
     assert declared, f"{const_name} declaration not found — was Object.freeze removed?"

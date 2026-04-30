@@ -1,12 +1,13 @@
-from fastapi import APIRouter, Request, Query
-from typing import List, Optional
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
-from app.auth.dependencies import get_current_user
-from app.db.postgres_conn import get_connection
-from app import cache
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
+
+from fastapi import APIRouter, Query, Request
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.templating import Jinja2Templates
+
+from app import cache
+from app.auth.dependencies import get_current_user
+from app.db.postgres_conn import get_connection
 
 _TZ = ZoneInfo("Europe/Nicosia")
 router = APIRouter()
@@ -25,68 +26,69 @@ _ACCT_FILTERS = (
     "     OR TRIM(COALESCE(agent_name, full_name, '')) ILIKE 'duplicated%%'))"
 )
 # Same but without the assigned_to check (for transaction queries where agent is already filtered via u)
-_TXN_ACCT_FILTERS = (
-    " AND a.accountid IS NOT NULL AND TRIM(a.accountid::text) != ''"
-)
+_TXN_ACCT_FILTERS = " AND a.accountid IS NOT NULL AND TRIM(a.accountid::text) != ''"
 
 VALID_GROUPS = {
-    "marketing_group":      "COALESCE(c.marketing_group, '(Unassigned)')",
-    "campaign_legacy_id":   "COALESCE(c.campaign_legacy_id, '(Unassigned)')",
-    "campaign_name":        "COALESCE(c.campaign_name, '(Unassigned)')",
-    "campaign_channel":     "COALESCE(c.campaign_channel, '(Unassigned)')",
+    "marketing_group": "COALESCE(c.marketing_group, '(Unassigned)')",
+    "campaign_legacy_id": "COALESCE(c.campaign_legacy_id, '(Unassigned)')",
+    "campaign_name": "COALESCE(c.campaign_name, '(Unassigned)')",
+    "campaign_channel": "COALESCE(c.campaign_channel, '(Unassigned)')",
     "campaign_sub_channel": "COALESCE(c.campaign_sub_channel, '(Unassigned)')",
-    "original_affiliate":   "COALESCE(a.original_affiliate, '(Unassigned)')",
-    "office_name":          "COALESCE(cu.office_name, '(Unassigned)')",
-    "agent_name":           "COALESCE(cu.agent_name, '(Unassigned)')",
-    "agent_team":           "COALESCE(cu.team, '(Unassigned)')",
-    "country":              "COALESCE(a.country_iso, '(Unassigned)')",
+    "original_affiliate": "COALESCE(a.original_affiliate, '(Unassigned)')",
+    "office_name": "COALESCE(cu.office_name, '(Unassigned)')",
+    "agent_name": "COALESCE(cu.agent_name, '(Unassigned)')",
+    "agent_team": "COALESCE(cu.team, '(Unassigned)')",
+    "country": "COALESCE(a.country_iso, '(Unassigned)')",
     "client_classification": "COALESCE(a.classification_int::text, '(Unassigned)')",
-    "segmentation":         ("CASE"
-                             " WHEN a.segmentation IN ('1','2','3','4') THEN"
-                             "   CASE a.segmentation WHEN '1' THEN 'A' WHEN '2' THEN 'B' WHEN '3' THEN 'C' WHEN '4' THEN 'A+' END"
-                             " WHEN (a.segmentation IS NULL OR a.segmentation IN ('0','17'))"
-                             "   AND (a.classification_int IS NULL OR a.classification_int NOT BETWEEN 1 AND 10)"
-                             "   AND a.birth_date IS NOT NULL THEN"
-                             "   CASE"
-                             "     WHEN DATE_PART('year', AGE(CURRENT_DATE, a.birth_date::date)) < 25 THEN 'C'"
-                             "     WHEN DATE_PART('year', AGE(CURRENT_DATE, a.birth_date::date)) BETWEEN 25 AND 34 THEN 'B'"
-                             "     WHEN DATE_PART('year', AGE(CURRENT_DATE, a.birth_date::date)) BETWEEN 35 AND 49 THEN 'A'"
-                             "     WHEN DATE_PART('year', AGE(CURRENT_DATE, a.birth_date::date)) >= 50 THEN 'A+'"
-                             "   END"
-                             " WHEN a.segmentation = '17' THEN 'Unverified'"
-                             " ELSE '(Unassigned)'"
-                             " END"),
-    "account_id":           "a.accountid::text",
+    "segmentation": (
+        "CASE"
+        " WHEN a.segmentation IN ('1','2','3','4') THEN"
+        "   CASE a.segmentation WHEN '1' THEN 'A' WHEN '2' THEN 'B' WHEN '3' THEN 'C' WHEN '4' THEN 'A+' END"
+        " WHEN (a.segmentation IS NULL OR a.segmentation IN ('0','17'))"
+        "   AND (a.classification_int IS NULL OR a.classification_int NOT BETWEEN 1 AND 10)"
+        "   AND a.birth_date IS NOT NULL THEN"
+        "   CASE"
+        "     WHEN DATE_PART('year', AGE(CURRENT_DATE, a.birth_date::date)) < 25 THEN 'C'"
+        "     WHEN DATE_PART('year', AGE(CURRENT_DATE, a.birth_date::date)) BETWEEN 25 AND 34 THEN 'B'"
+        "     WHEN DATE_PART('year', AGE(CURRENT_DATE, a.birth_date::date)) BETWEEN 35 AND 49 THEN 'A'"
+        "     WHEN DATE_PART('year', AGE(CURRENT_DATE, a.birth_date::date)) >= 50 THEN 'A+'"
+        "   END"
+        " WHEN a.segmentation = '17' THEN 'Unverified'"
+        " ELSE '(Unassigned)'"
+        " END"
+    ),
+    "account_id": "a.accountid::text",
 }
 GROUP_LABELS = {
-    "marketing_group":      "Marketing Group",
-    "campaign_legacy_id":   "Campaign Legacy ID",
-    "campaign_name":        "Campaign Name",
-    "campaign_channel":     "Campaign Channel",
+    "marketing_group": "Marketing Group",
+    "campaign_legacy_id": "Campaign Legacy ID",
+    "campaign_name": "Campaign Name",
+    "campaign_channel": "Campaign Channel",
     "campaign_sub_channel": "Campaign Sub-channel",
-    "original_affiliate":   "Original Affiliate",
-    "office_name":          "Office",
-    "agent_name":           "Agent",
-    "agent_team":           "Agent Team",
-    "country":              "Country",
+    "original_affiliate": "Original Affiliate",
+    "office_name": "Office",
+    "agent_name": "Agent",
+    "agent_team": "Agent Team",
+    "country": "Country",
     "client_classification": "Sales Client Potential",
-    "segmentation":         "Segmentation",
-    "account_id":           "Account ID",
-    "none":                 "",
+    "segmentation": "Segmentation",
+    "account_id": "Account ID",
+    "none": "",
 }
 
 FTC_GROUP_RANGES = {
-    "0 - 7 days":   "(%(date_to)s::date - a.client_qualification_date::date) BETWEEN 0 AND 7",
-    "8 - 14 days":  "(%(date_to)s::date - a.client_qualification_date::date) BETWEEN 8 AND 14",
+    "0 - 7 days": "(%(date_to)s::date - a.client_qualification_date::date) BETWEEN 0 AND 7",
+    "8 - 14 days": "(%(date_to)s::date - a.client_qualification_date::date) BETWEEN 8 AND 14",
     "15 - 30 days": "(%(date_to)s::date - a.client_qualification_date::date) BETWEEN 15 AND 30",
     "31 - 60 days": "(%(date_to)s::date - a.client_qualification_date::date) BETWEEN 31 AND 60",
     "61 - 90 days": "(%(date_to)s::date - a.client_qualification_date::date) BETWEEN 61 AND 90",
-    "91 - 120 days":"(%(date_to)s::date - a.client_qualification_date::date) BETWEEN 91 AND 120",
-    "120+ days":    "(%(date_to)s::date - a.client_qualification_date::date) > 120",
+    "91 - 120 days": "(%(date_to)s::date - a.client_qualification_date::date) BETWEEN 91 AND 120",
+    "120+ days": "(%(date_to)s::date - a.client_qualification_date::date) > 120",
 }
 
 # Lazy-loaded country map (iso2 → full name)
 _country_map_cache = None
+
 
 def _get_country_map() -> dict:
     global _country_map_cache
@@ -94,6 +96,7 @@ def _get_country_map() -> dict:
         return _country_map_cache
     try:
         from app.db.mssql_conn import get_country_map
+
         result = get_country_map()
         if result:
             _country_map_cache = result
@@ -112,13 +115,17 @@ async def campaign_performance_page(request: Request):
         return RedirectResponse(url="/performance", status_code=302)
     if ap is None and user.get("role") not in ("admin", "marketing", "general"):
         return RedirectResponse(url="/performance", status_code=302)
-    return templates.TemplateResponse("campaign_performance.html", {
-        "request": request,
-        "current_user": user,
-    })
+    return templates.TemplateResponse(
+        "campaign_performance.html",
+        {
+            "request": request,
+            "current_user": user,
+        },
+    )
 
 
 # ── Filter options ────────────────────────────────────────────────────────────
+
 
 def _camp_filter_options_calc() -> dict:
     conn = get_connection()
@@ -181,11 +188,7 @@ def _camp_filter_options_calc() -> dict:
                   AND is_test_account = 0
             """)
             _cmap = _get_country_map()
-            countries = sorted({
-                _cmap.get(r[0].upper(), r[0])
-                for r in cur.fetchall()
-                if r[0]
-            })
+            countries = sorted({_cmap.get(r[0].upper(), r[0]) for r in cur.fetchall() if r[0]})
 
             cur.execute("""
                 SELECT DISTINCT office_name
@@ -214,16 +217,16 @@ def _camp_filter_options_calc() -> dict:
             teams = [r[0] for r in cur.fetchall()]
 
         return {
-            "marketing_groups":      marketing_groups,
-            "campaign_legacy_ids":   legacy_ids,
-            "campaign_names":        campaign_names,
-            "campaign_channels":     channels,
+            "marketing_groups": marketing_groups,
+            "campaign_legacy_ids": legacy_ids,
+            "campaign_names": campaign_names,
+            "campaign_channels": channels,
             "campaign_sub_channels": sub_channels,
-            "original_affiliates":   affiliates,
-            "countries":             countries,
-            "offices":               offices,
-            "agents":                agents,
-            "teams":                 teams,
+            "original_affiliates": affiliates,
+            "countries": countries,
+            "offices": offices,
+            "agents": agents,
+            "teams": teams,
         }
     finally:
         conn.close()
@@ -250,12 +253,25 @@ async def campaign_filter_options(request: Request):
 
 # ── KPI cards ─────────────────────────────────────────────────────────────────
 
-def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
-                   q_date_from: str = None, q_date_to: str = None,
-                   f_mkt_group=None, f_legacy_id=None, f_campaign_name=None,
-                   f_channel=None, f_sub_channel=None, f_affiliate=None,
-                   f_country=None, f_office=None, f_agent=None, f_team=None,
-                   f_segmentation: str = None) -> dict:
+
+def _camp_kpi_calc(
+    date_from: str,
+    date_to: str,
+    f_classification: str = None,
+    q_date_from: str = None,
+    q_date_to: str = None,
+    f_mkt_group=None,
+    f_legacy_id=None,
+    f_campaign_name=None,
+    f_channel=None,
+    f_sub_channel=None,
+    f_affiliate=None,
+    f_country=None,
+    f_office=None,
+    f_agent=None,
+    f_team=None,
+    f_segmentation: str = None,
+) -> dict:
     dt_to = datetime.strptime(date_to, "%Y-%m-%d").date()
     date_to_exclusive = (dt_to + timedelta(days=1)).strftime("%Y-%m-%d")
 
@@ -268,31 +284,44 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
     else:
         class_where = ""
 
-    qual_where  = ""
+    qual_where = ""
     qual_params: dict = {}
-    ftc_date_from    = date_from
+    ftc_date_from = date_from
     ftc_date_to_excl = date_to_exclusive
-    ftc_date_daily   = date_to
+    ftc_date_daily = date_to
     if q_date_from and q_date_to:
         q_dt_to = datetime.strptime(q_date_to, "%Y-%m-%d").date()
         q_date_to_excl = (q_dt_to + timedelta(days=1)).strftime("%Y-%m-%d")
-        qual_where = ("AND a.client_qualification_date IS NOT NULL"
-                      " AND a.client_qualification_date >= %(q_date_from)s"
-                      " AND a.client_qualification_date < %(q_date_to_excl)s")
+        qual_where = (
+            "AND a.client_qualification_date IS NOT NULL"
+            " AND a.client_qualification_date >= %(q_date_from)s"
+            " AND a.client_qualification_date < %(q_date_to_excl)s"
+        )
         qual_params = {"q_date_from": q_date_from, "q_date_to_excl": q_date_to_excl}
-        ftc_date_from    = q_date_from
+        ftc_date_from = q_date_from
         ftc_date_to_excl = q_date_to_excl
-        ftc_date_daily   = q_date_to
+        ftc_date_daily = q_date_to
 
     extra_where = f"{class_where} {qual_where}".strip()
 
     # Marketing / campaign filters
     camp_filter_params: dict = {}
     camp_filter_where, _, kpi_needs_cu = _build_filter_clauses(
-        f_mkt_group, f_legacy_id, f_campaign_name, f_channel, f_sub_channel,
-        f_affiliate, None, None, date_to, camp_filter_params,
-        f_country=f_country, f_office=f_office, f_agent=f_agent, f_team=f_team,
-        f_segmentation=f_segmentation
+        f_mkt_group,
+        f_legacy_id,
+        f_campaign_name,
+        f_channel,
+        f_sub_channel,
+        f_affiliate,
+        None,
+        None,
+        date_to,
+        camp_filter_params,
+        f_country=f_country,
+        f_office=f_office,
+        f_agent=f_agent,
+        f_team=f_team,
+        f_segmentation=f_segmentation,
     )
     camp_filter_where = camp_filter_where.strip()
     needs_camp_join = bool(f_mkt_group or f_legacy_id or f_campaign_name or f_channel or f_sub_channel)
@@ -319,14 +348,23 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
                 row = cur.fetchone()
                 if row:
                     leads_today, leads_mtd, live_today, live_mtd = (
-                        int(row[0] or 0), int(row[1] or 0), int(row[2] or 0), int(row[3] or 0)
+                        int(row[0] or 0),
+                        int(row[1] or 0),
+                        int(row[2] or 0),
+                        int(row[3] or 0),
                     )
                 else:
                     leads_today = leads_mtd = live_today = live_mtd = 0
             else:
-                base_p = {"date_from": date_from, "date_to_excl": date_to_exclusive, "date_to": date_to,
-                          **qual_params, **camp_filter_params}
-                cur.execute(f"""
+                base_p = {
+                    "date_from": date_from,
+                    "date_to_excl": date_to_exclusive,
+                    "date_to": date_to,
+                    **qual_params,
+                    **camp_filter_params,
+                }
+                cur.execute(
+                    f"""
                     SELECT
                         COUNT(*) FILTER (WHERE a.createdtime >= %(date_to)s::date
                                            AND a.createdtime < %(date_to)s::date + INTERVAL '1 day') AS leads_today,
@@ -345,15 +383,18 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
                     {_ACCT_FILTERS}
                     {extra_where}
                     {camp_filter_where}
-                """, base_p)
+                """,
+                    base_p,
+                )
                 row = cur.fetchone()
                 leads_today, leads_mtd, live_today, live_mtd = (
-                    int(row[0] or 0), int(row[1] or 0), int(row[2] or 0), int(row[3] or 0)
-                ) if row else (0, 0, 0, 0)
+                    (int(row[0] or 0), int(row[1] or 0), int(row[2] or 0), int(row[3] or 0)) if row else (0, 0, 0, 0)
+                )
 
             if not all_extra:
                 # FTD + deposits from MV (join crm_users to exclude duplicated% agents, same as table)
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT
                         COALESCE(SUM(k.deposit_usd),    0)                                                      AS deposits,
                         COALESCE(SUM(k.withdrawal_usd), 0)                                                      AS withdrawals,
@@ -364,19 +405,22 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
                     LEFT JOIN crm_users u ON u.id = k.agent_id
                     WHERE k.tx_date >= %(date_from)s AND k.tx_date < %(date_to_excl)s
                       AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'
-                """, {"date_from": date_from, "date_to_excl": date_to_exclusive, "date_to": date_to})
+                """,
+                    {"date_from": date_from, "date_to_excl": date_to_exclusive, "date_to": date_to},
+                )
                 row = cur.fetchone()
                 if row:
-                    deposits_total    = float(row[0] or 0)
+                    deposits_total = float(row[0] or 0)
                     withdrawals_total = float(row[1] or 0)
-                    net_total         = float(row[2] or 0)
-                    ftd_mtd           = int(row[3] or 0)
-                    ftd_daily         = int(row[4] or 0)
+                    net_total = float(row[2] or 0)
+                    ftd_mtd = int(row[3] or 0)
+                    ftd_daily = int(row[4] or 0)
                 else:
                     deposits_total = withdrawals_total = net_total = ftd_mtd = ftd_daily = 0
 
                 # FTC from accounts table directly — same logic as the performance table
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT
                         COUNT(*) FILTER (WHERE a.client_qualification_date >= %(date_from)s
                                            AND a.client_qualification_date < %(date_to_excl)s) AS ftc_mtd,
@@ -386,15 +430,26 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
                     WHERE a.client_qualification_date IS NOT NULL
                       AND a.is_test_account = 0
                       AND (a.is_demo = 0 OR a.is_demo IS NULL)
-                """ + _ACCT_FILTERS, {"date_from": date_from, "date_to_excl": date_to_exclusive, "date_to": date_to})
+                """
+                    + _ACCT_FILTERS,
+                    {"date_from": date_from, "date_to_excl": date_to_exclusive, "date_to": date_to},
+                )
                 row = cur.fetchone()
-                ftc_mtd   = int(row[0] or 0) if row else 0
+                ftc_mtd = int(row[0] or 0) if row else 0
                 ftc_daily = int(row[1] or 0) if row else 0
             else:
-                base_p = {"date_from": date_from, "date_to_excl": date_to_exclusive, "date_to": date_to,
-                          "ftc_date_from": ftc_date_from, "ftc_date_to_excl": ftc_date_to_excl, "ftc_date_daily": ftc_date_daily,
-                          **qual_params, **camp_filter_params}
-                cur.execute(f"""
+                base_p = {
+                    "date_from": date_from,
+                    "date_to_excl": date_to_exclusive,
+                    "date_to": date_to,
+                    "ftc_date_from": ftc_date_from,
+                    "ftc_date_to_excl": ftc_date_to_excl,
+                    "ftc_date_daily": ftc_date_daily,
+                    **qual_params,
+                    **camp_filter_params,
+                }
+                cur.execute(
+                    f"""
                     SELECT
                         COALESCE(SUM(CASE WHEN t.transaction_type_name IN ('Deposit','Withdrawal Cancelled') THEN t.usdamount ELSE 0 END), 0) AS deposits,
                         COALESCE(SUM(CASE WHEN t.transaction_type_name IN ('Withdrawal','Deposit Cancelled') THEN t.usdamount ELSE 0 END), 0) AS withdrawals,
@@ -418,18 +473,21 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
                       AND t.confirmation_time <  %(date_to_excl)s
                     {extra_where}
                     {camp_filter_where}
-                """, base_p)
+                """,
+                    base_p,
+                )
                 row = cur.fetchone()
                 if row:
-                    deposits_total    = float(row[0] or 0)
+                    deposits_total = float(row[0] or 0)
                     withdrawals_total = float(row[1] or 0)
-                    net_total         = deposits_total - withdrawals_total
-                    ftd_mtd           = int(row[2] or 0)
-                    ftd_daily         = int(row[3] or 0)
+                    net_total = deposits_total - withdrawals_total
+                    ftd_mtd = int(row[2] or 0)
+                    ftd_daily = int(row[3] or 0)
                 else:
                     deposits_total = withdrawals_total = net_total = ftd_mtd = ftd_daily = 0
 
-                cur.execute(f"""
+                cur.execute(
+                    f"""
                     SELECT
                         COUNT(*) FILTER (WHERE a.client_qualification_date >= %(ftc_date_from)s
                                            AND a.client_qualification_date < %(ftc_date_to_excl)s) AS ftc_mtd,
@@ -444,15 +502,17 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
                     {_ACCT_FILTERS}
                     {class_where}
                     {camp_filter_where}
-                """, base_p)
+                """,
+                    base_p,
+                )
                 row = cur.fetchone()
-                ftc_mtd   = int(row[0] or 0) if row else 0
+                ftc_mtd = int(row[0] or 0) if row else 0
                 ftc_daily = int(row[1] or 0) if row else 0
 
-            base_p = {"date_from": date_from, "date_to_excl": date_to_exclusive,
-                      **qual_params, **camp_filter_params}
+            base_p = {"date_from": date_from, "date_to_excl": date_to_exclusive, **qual_params, **camp_filter_params}
             # Traders — exact same logic as Total Traders page
-            cur.execute(f"""
+            cur.execute(
+                """
                 SELECT COUNT(DISTINCT rt.accountid)
                 FROM mv_retention_traders rt
                 LEFT JOIN crm_users u ON u.id = rt.assigned_to
@@ -462,7 +522,9 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
                   AND u.department_ = 'Retention'
                   AND rt.day >= %(date_from)s
                   AND rt.day <  %(date_to_excl)s
-            """, base_p)
+            """,
+                base_p,
+            )
             row = cur.fetchone()
             traders_count = int(row[0] or 0) if row else 0
 
@@ -481,7 +543,8 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
             # Live AVG SCP — avg SCP of live accounts (birth_date not null) created in period
             live_avg_scp = None
             try:
-                cur.execute(f"""
+                cur.execute(
+                    f"""
                     SELECT ROUND(AVG(sub.score)::numeric, 1)
                     FROM (
                         SELECT DISTINCT a.accountid,
@@ -496,7 +559,9 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
                         {_ACCT_FILTERS}
                         {camp_filter_where}
                     ) sub WHERE sub.score IS NOT NULL
-                """, scp_p)
+                """,
+                    scp_p,
+                )
                 row = cur.fetchone()
                 live_avg_scp = round(float(row[0]), 1) if row and row[0] is not None else None
             except Exception:
@@ -505,7 +570,8 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
             # FTD AVG SCP — avg SCP of FTD clients in period
             ftd_avg_scp = None
             try:
-                cur.execute(f"""
+                cur.execute(
+                    f"""
                     SELECT ROUND(AVG(sub.score)::numeric, 1)
                     FROM (
                         SELECT DISTINCT a.accountid,
@@ -524,25 +590,27 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
                         {_TXN_ACCT_FILTERS}
                         {camp_filter_where}
                     ) sub WHERE sub.score IS NOT NULL
-                """, scp_p)
+                """,
+                    scp_p,
+                )
                 row = cur.fetchone()
                 ftd_avg_scp = round(float(row[0]), 1) if row and row[0] is not None else None
             except Exception:
                 conn.rollback()
 
         return {
-            "leads":         {"daily": leads_today, "mtd": leads_mtd},
-            "live_accounts": {"daily": live_today,  "mtd": live_mtd},
-            "ftd":           {"daily": ftd_daily,   "mtd": ftd_mtd},
-            "ftc":           {"daily": ftc_daily,   "mtd": ftc_mtd},
-            "deposits":      round(deposits_total, 2),
-            "withdrawals":   round(withdrawals_total, 2),
-            "net_deposits":  round(net_total, 2),
+            "leads": {"daily": leads_today, "mtd": leads_mtd},
+            "live_accounts": {"daily": live_today, "mtd": live_mtd},
+            "ftd": {"daily": ftd_daily, "mtd": ftd_mtd},
+            "ftc": {"daily": ftc_daily, "mtd": ftc_mtd},
+            "deposits": round(deposits_total, 2),
+            "withdrawals": round(withdrawals_total, 2),
+            "net_deposits": round(net_total, 2),
             "traders_count": traders_count,
-            "live_avg_scp":  live_avg_scp,
-            "ftd_avg_scp":   ftd_avg_scp,
-            "date_from":     date_from,
-            "date_to":       date_to,
+            "live_avg_scp": live_avg_scp,
+            "ftd_avg_scp": ftd_avg_scp,
+            "date_from": date_from,
+            "date_to": date_to,
         }
     finally:
         conn.close()
@@ -550,30 +618,38 @@ def _camp_kpi_calc(date_from: str, date_to: str, f_classification: str = None,
 
 @router.get("/api/campaign-performance")
 async def campaign_performance_api(
-    request: Request, date_from: str, date_to: str,
-    f_classification: str = None, q_date_from: str = None, q_date_to: str = None,
-    f_mkt_group: Optional[List[str]] = Query(default=None),
-    f_legacy_id: Optional[List[str]] = Query(default=None),
-    f_campaign_name: Optional[List[str]] = Query(default=None),
-    f_channel: Optional[List[str]] = Query(default=None),
-    f_sub_channel: Optional[List[str]] = Query(default=None),
-    f_affiliate: Optional[List[str]] = Query(default=None),
-    f_country: Optional[List[str]] = Query(default=None),
-    f_office: Optional[List[str]] = Query(default=None),
-    f_agent: Optional[List[str]] = Query(default=None),
-    f_team: Optional[List[str]] = Query(default=None),
+    request: Request,
+    date_from: str,
+    date_to: str,
+    f_classification: str = None,
+    q_date_from: str = None,
+    q_date_to: str = None,
+    f_mkt_group: list[str] | None = Query(default=None),
+    f_legacy_id: list[str] | None = Query(default=None),
+    f_campaign_name: list[str] | None = Query(default=None),
+    f_channel: list[str] | None = Query(default=None),
+    f_sub_channel: list[str] | None = Query(default=None),
+    f_affiliate: list[str] | None = Query(default=None),
+    f_country: list[str] | None = Query(default=None),
+    f_office: list[str] | None = Query(default=None),
+    f_agent: list[str] | None = Query(default=None),
+    f_team: list[str] | None = Query(default=None),
     f_segmentation: str = None,
 ):
     user = await get_current_user(request)
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
-    def _ck_part(v): return ','.join(sorted(v)) if v else ''
-    _ck = (f"camp_perf_v14:{date_from}:{date_to}:{f_classification}:{q_date_from}:{q_date_to}"
-           f":{_ck_part(f_mkt_group)}:{_ck_part(f_legacy_id)}:{_ck_part(f_campaign_name)}"
-           f":{_ck_part(f_channel)}:{_ck_part(f_sub_channel)}:{_ck_part(f_affiliate)}"
-           f":{_ck_part(f_country)}:{_ck_part(f_office)}:{_ck_part(f_agent)}:{_ck_part(f_team)}"
-           f":{f_segmentation}")
+    def _ck_part(v):
+        return ",".join(sorted(v)) if v else ""
+
+    _ck = (
+        f"camp_perf_v14:{date_from}:{date_to}:{f_classification}:{q_date_from}:{q_date_to}"
+        f":{_ck_part(f_mkt_group)}:{_ck_part(f_legacy_id)}:{_ck_part(f_campaign_name)}"
+        f":{_ck_part(f_channel)}:{_ck_part(f_sub_channel)}:{_ck_part(f_affiliate)}"
+        f":{_ck_part(f_country)}:{_ck_part(f_office)}:{_ck_part(f_agent)}:{_ck_part(f_team)}"
+        f":{f_segmentation}"
+    )
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -585,9 +661,22 @@ async def campaign_performance_api(
 
     try:
         _result = _camp_kpi_calc(
-            date_from, date_to, f_classification, q_date_from, q_date_to,
-            f_mkt_group, f_legacy_id, f_campaign_name, f_channel, f_sub_channel, f_affiliate,
-            f_country, f_office, f_agent, f_team, f_segmentation=f_segmentation
+            date_from,
+            date_to,
+            f_classification,
+            q_date_from,
+            q_date_to,
+            f_mkt_group,
+            f_legacy_id,
+            f_campaign_name,
+            f_channel,
+            f_sub_channel,
+            f_affiliate,
+            f_country,
+            f_office,
+            f_agent,
+            f_team,
+            f_segmentation=f_segmentation,
         )
         cache.set(_ck, _result)
         return JSONResponse(content=_result)
@@ -597,12 +686,25 @@ async def campaign_performance_api(
 
 # ── Table ─────────────────────────────────────────────────────────────────────
 
+
 def _build_filter_clauses(
-    f_mkt_group, f_legacy_id, f_campaign_name, f_channel, f_sub_channel,
-    f_affiliate, f_classification, ftc_groups_list, date_to, params,
-    q_date_from=None, q_date_to_excl=None,
-    f_country=None, f_office=None, f_agent=None, f_team=None,
-    f_segmentation=None
+    f_mkt_group,
+    f_legacy_id,
+    f_campaign_name,
+    f_channel,
+    f_sub_channel,
+    f_affiliate,
+    f_classification,
+    ftc_groups_list,
+    date_to,
+    params,
+    q_date_from=None,
+    q_date_to_excl=None,
+    f_country=None,
+    f_office=None,
+    f_agent=None,
+    f_team=None,
+    f_segmentation=None,
 ):
     """Returns (extra_where_str, needs_cc_join, needs_cu_join).
     Appends needed params to the `params` dict in-place."""
@@ -635,7 +737,7 @@ def _build_filter_clauses(
     if f_country:
         names = list(f_country) if not isinstance(f_country, str) else [f_country]
         _cmap = _get_country_map()
-        _rev  = {v.upper(): k for k, v in _cmap.items()}
+        _rev = {v.upper(): k for k, v in _cmap.items()}
         iso_vals = [_rev.get(n.upper(), n) for n in names]
         clauses.append("AND a.country_iso = ANY(%(f_country)s)")
         params["f_country"] = iso_vals
@@ -677,7 +779,7 @@ def _build_filter_clauses(
         clauses.append("AND a.client_qualification_date IS NOT NULL")
         clauses.append("AND a.client_qualification_date >= %(q_date_from)s")
         clauses.append("AND a.client_qualification_date < %(q_date_to_excl)s")
-        params["q_date_from"]    = q_date_from
+        params["q_date_from"] = q_date_from
         params["q_date_to_excl"] = q_date_to_excl
 
     if f_segmentation:
@@ -688,13 +790,25 @@ def _build_filter_clauses(
 
 
 def _camp_table_calc(
-    date_from: str, date_to: str,
-    group1: str = "none", group2: str = "none", period: str = "none",
-    f_mkt_group=None, f_legacy_id=None, f_campaign_name=None,
-    f_channel=None, f_sub_channel=None, f_affiliate=None,
-    f_classification: str = None, ftc_groups: str = None,
-    q_date_from: str = None, q_date_to: str = None,
-    f_country=None, f_office=None, f_agent=None, f_team=None,
+    date_from: str,
+    date_to: str,
+    group1: str = "none",
+    group2: str = "none",
+    period: str = "none",
+    f_mkt_group=None,
+    f_legacy_id=None,
+    f_campaign_name=None,
+    f_channel=None,
+    f_sub_channel=None,
+    f_affiliate=None,
+    f_classification: str = None,
+    ftc_groups: str = None,
+    q_date_from: str = None,
+    q_date_to: str = None,
+    f_country=None,
+    f_office=None,
+    f_agent=None,
+    f_team=None,
     f_segmentation: str = None,
 ) -> dict:
     dt_to = datetime.strptime(date_to, "%Y-%m-%d").date()
@@ -716,41 +830,65 @@ def _camp_table_calc(
     # Determine which extra JOINs are needed
     groups_needing_cu = {"office_name", "agent_name", "agent_team"}
     groups_needing_cc = set()
-    groups_needing_campaign = {"marketing_group", "campaign_legacy_id", "campaign_name", "campaign_channel", "campaign_sub_channel"}
+    groups_needing_campaign = {
+        "marketing_group",
+        "campaign_legacy_id",
+        "campaign_name",
+        "campaign_channel",
+        "campaign_sub_channel",
+    }
     needs_cu_join_for_group = group1 in groups_needing_cu or group2 in groups_needing_cu
     needs_cc_join_for_group = group1 in groups_needing_cc or group2 in groups_needing_cc
     needs_campaign_join = (
-        group1 in groups_needing_campaign or group2 in groups_needing_campaign or
-        bool(f_mkt_group or f_legacy_id or f_campaign_name or f_channel or f_sub_channel)
+        group1 in groups_needing_campaign
+        or group2 in groups_needing_campaign
+        or bool(f_mkt_group or f_legacy_id or f_campaign_name or f_channel or f_sub_channel)
     )
     campaign_join = " LEFT JOIN campaigns c ON SPLIT_PART(a.campaign, '.', 1) = c.crmid" if needs_campaign_join else ""
 
     # Period SQL
     if period == "day":
         acct_period_sql = "a.createdtime::date"
-        txn_period_sql  = "t.confirmation_time::date"
-        ftc_period_sql  = "a.client_qualification_date::date"
+        txn_period_sql = "t.confirmation_time::date"
+        ftc_period_sql = "a.client_qualification_date::date"
     elif period == "month":
         acct_period_sql = "date_trunc('month', a.createdtime)::date"
-        txn_period_sql  = "date_trunc('month', t.confirmation_time)::date"
-        ftc_period_sql  = "date_trunc('month', a.client_qualification_date)::date"
+        txn_period_sql = "date_trunc('month', t.confirmation_time)::date"
+        ftc_period_sql = "date_trunc('month', a.client_qualification_date)::date"
     elif period == "year":
         acct_period_sql = "date_trunc('year', a.createdtime)::date"
-        txn_period_sql  = "date_trunc('year', t.confirmation_time)::date"
-        ftc_period_sql  = "date_trunc('year', a.client_qualification_date)::date"
+        txn_period_sql = "date_trunc('year', t.confirmation_time)::date"
+        ftc_period_sql = "date_trunc('year', a.client_qualification_date)::date"
     else:
         acct_period_sql = txn_period_sql = ftc_period_sql = ""
 
     # Build filter clauses
-    ftc_from    = q_date_from    if q_date_from    else date_from
+    ftc_from = q_date_from if q_date_from else date_from
     ftc_to_excl = q_date_to_excl if q_date_to_excl else date_to_exclusive
-    acct_params = {"date_from": date_from, "date_to_excl": date_to_exclusive, "ftc_from": ftc_from, "ftc_to_excl": ftc_to_excl}
+    acct_params = {
+        "date_from": date_from,
+        "date_to_excl": date_to_exclusive,
+        "ftc_from": ftc_from,
+        "ftc_to_excl": ftc_to_excl,
+    }
     filter_where, needs_cc_join_for_filter, needs_cu_join_for_filter = _build_filter_clauses(
-        f_mkt_group, f_legacy_id, f_campaign_name, f_channel, f_sub_channel,
-        f_affiliate, f_classification, ftc_groups_list, date_to, acct_params,
-        q_date_from=q_date_from, q_date_to_excl=q_date_to_excl,
-        f_country=f_country, f_office=f_office, f_agent=f_agent, f_team=f_team,
-        f_segmentation=f_segmentation
+        f_mkt_group,
+        f_legacy_id,
+        f_campaign_name,
+        f_channel,
+        f_sub_channel,
+        f_affiliate,
+        f_classification,
+        ftc_groups_list,
+        date_to,
+        acct_params,
+        q_date_from=q_date_from,
+        q_date_to_excl=q_date_to_excl,
+        f_country=f_country,
+        f_office=f_office,
+        f_agent=f_agent,
+        f_team=f_team,
+        f_segmentation=f_segmentation,
     )
     needs_cu_join = needs_cu_join_for_group or needs_cu_join_for_filter
     needs_cc_join = needs_cc_join_for_group or needs_cc_join_for_filter
@@ -768,9 +906,18 @@ def _camp_table_calc(
             # ── Accounts query ─────────────────────────────────────────────
             acct_sel, acct_grp = [], []
             p = 1
-            if has_period: acct_sel.append(f"{acct_period_sql} AS period"); acct_grp.append(str(p)); p += 1
-            if has_g1: acct_sel.append(f"{g1_sql} AS g1"); acct_grp.append(str(p)); p += 1
-            if has_g2: acct_sel.append(f"{g2_sql} AS g2"); acct_grp.append(str(p)); p += 1
+            if has_period:
+                acct_sel.append(f"{acct_period_sql} AS period")
+                acct_grp.append(str(p))
+                p += 1
+            if has_g1:
+                acct_sel.append(f"{g1_sql} AS g1")
+                acct_grp.append(str(p))
+                p += 1
+            if has_g2:
+                acct_sel.append(f"{g2_sql} AS g2")
+                acct_grp.append(str(p))
+                p += 1
             _scp_case_tbl = (
                 "CASE WHEN a.classification_int IS NOT NULL AND a.classification_int > 0"
                 " THEN a.classification_int::numeric"
@@ -801,8 +948,8 @@ def _camp_table_calc(
                 f" FROM accounts a{campaign_join}"
                 f"{extra_joins}"
                 " WHERE a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)"
-                + _ACCT_FILTERS +
-                f"{acct_date_filter}"
+                + _ACCT_FILTERS
+                + f"{acct_date_filter}"
                 f"\n{filter_where}"
             )
             if acct_grp:
@@ -814,18 +961,39 @@ def _camp_table_calc(
             # ── Transactions query ─────────────────────────────────────────
             txn_params = {"date_from": date_from, "date_to_excl": date_to_exclusive}
             txn_filter_where, _, _ = _build_filter_clauses(
-                f_mkt_group, f_legacy_id, f_campaign_name, f_channel, f_sub_channel,
-                f_affiliate, f_classification, ftc_groups_list, date_to, txn_params,
-                q_date_from=q_date_from, q_date_to_excl=q_date_to_excl,
-                f_country=f_country, f_office=f_office, f_agent=f_agent, f_team=f_team,
-                f_segmentation=f_segmentation
+                f_mkt_group,
+                f_legacy_id,
+                f_campaign_name,
+                f_channel,
+                f_sub_channel,
+                f_affiliate,
+                f_classification,
+                ftc_groups_list,
+                date_to,
+                txn_params,
+                q_date_from=q_date_from,
+                q_date_to_excl=q_date_to_excl,
+                f_country=f_country,
+                f_office=f_office,
+                f_agent=f_agent,
+                f_team=f_team,
+                f_segmentation=f_segmentation,
             )
 
             txn_sel, txn_grp = [], []
             p = 1
-            if has_period: txn_sel.append(f"{txn_period_sql} AS period"); txn_grp.append(str(p)); p += 1
-            if has_g1: txn_sel.append(f"{g1_sql} AS g1"); txn_grp.append(str(p)); p += 1
-            if has_g2: txn_sel.append(f"{g2_sql} AS g2"); txn_grp.append(str(p)); p += 1
+            if has_period:
+                txn_sel.append(f"{txn_period_sql} AS period")
+                txn_grp.append(str(p))
+                p += 1
+            if has_g1:
+                txn_sel.append(f"{g1_sql} AS g1")
+                txn_grp.append(str(p))
+                p += 1
+            if has_g2:
+                txn_sel.append(f"{g2_sql} AS g2")
+                txn_grp.append(str(p))
+                p += 1
             txn_sel += [
                 "COALESCE(SUM(CASE WHEN t.ftd = 1 AND t.transaction_type_name = 'Deposit'"
                 " THEN 1 ELSE 0 END), 0) AS ftd",
@@ -849,8 +1017,8 @@ def _camp_table_calc(
                 "   AND LOWER(COALESCE(t.comment, '')) NOT LIKE '%%bonus%%'"
                 "   AND t.vtigeraccountid IS NOT NULL"
                 "   AND a.is_test_account = 0"
-                + _TXN_ACCT_FILTERS +
-                "   AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'"
+                + _TXN_ACCT_FILTERS
+                + "   AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'"
                 "   AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'"
                 "   AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'"
                 "   AND t.confirmation_time >= %(date_from)s"
@@ -866,17 +1034,38 @@ def _camp_table_calc(
             # ── FTC query (grouped by qualification date, not creation date) ─
             ftc_params = {"ftc_from": ftc_from, "ftc_to_excl": ftc_to_excl}
             ftc_filter_where, _, _ = _build_filter_clauses(
-                f_mkt_group, f_legacy_id, f_campaign_name, f_channel, f_sub_channel,
-                f_affiliate, f_classification, ftc_groups_list, date_to, ftc_params,
-                q_date_from=q_date_from, q_date_to_excl=q_date_to_excl,
-                f_country=f_country, f_office=f_office, f_agent=f_agent, f_team=f_team,
-                f_segmentation=f_segmentation
+                f_mkt_group,
+                f_legacy_id,
+                f_campaign_name,
+                f_channel,
+                f_sub_channel,
+                f_affiliate,
+                f_classification,
+                ftc_groups_list,
+                date_to,
+                ftc_params,
+                q_date_from=q_date_from,
+                q_date_to_excl=q_date_to_excl,
+                f_country=f_country,
+                f_office=f_office,
+                f_agent=f_agent,
+                f_team=f_team,
+                f_segmentation=f_segmentation,
             )
             ftc_sel, ftc_grp = [], []
             p = 1
-            if has_period: ftc_sel.append(f"{ftc_period_sql} AS period"); ftc_grp.append(str(p)); p += 1
-            if has_g1: ftc_sel.append(f"{g1_sql} AS g1"); ftc_grp.append(str(p)); p += 1
-            if has_g2: ftc_sel.append(f"{g2_sql} AS g2"); ftc_grp.append(str(p)); p += 1
+            if has_period:
+                ftc_sel.append(f"{ftc_period_sql} AS period")
+                ftc_grp.append(str(p))
+                p += 1
+            if has_g1:
+                ftc_sel.append(f"{g1_sql} AS g1")
+                ftc_grp.append(str(p))
+                p += 1
+            if has_g2:
+                ftc_sel.append(f"{g2_sql} AS g2")
+                ftc_grp.append(str(p))
+                p += 1
             ftc_sel.append("COUNT(*) AS ftc")
             ftc_sql = (
                 f"SELECT {', '.join(ftc_sel)}"
@@ -885,9 +1074,7 @@ def _camp_table_calc(
                 " WHERE a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)"
                 " AND a.client_qualification_date IS NOT NULL"
                 " AND a.client_qualification_date >= %(ftc_from)s"
-                " AND a.client_qualification_date < %(ftc_to_excl)s"
-                + _ACCT_FILTERS +
-                f"\n{ftc_filter_where}"
+                " AND a.client_qualification_date < %(ftc_to_excl)s" + _ACCT_FILTERS + f"\n{ftc_filter_where}"
             )
             if ftc_grp:
                 ftc_sql += f" GROUP BY {', '.join(ftc_grp)}"
@@ -897,11 +1084,23 @@ def _camp_table_calc(
             # ── Traders query (matches FTC Date logic: real trades) ───────
             traders_params = {"date_from": date_from, "date_to_excl": date_to_exclusive}
             traders_filter_where, _, _ = _build_filter_clauses(
-                f_mkt_group, f_legacy_id, f_campaign_name, f_channel, f_sub_channel,
-                f_affiliate, f_classification, ftc_groups_list, date_to, traders_params,
-                q_date_from=q_date_from, q_date_to_excl=q_date_to_excl,
-                f_country=f_country, f_office=f_office, f_agent=f_agent, f_team=f_team,
-                f_segmentation=f_segmentation
+                f_mkt_group,
+                f_legacy_id,
+                f_campaign_name,
+                f_channel,
+                f_sub_channel,
+                f_affiliate,
+                f_classification,
+                ftc_groups_list,
+                date_to,
+                traders_params,
+                q_date_from=q_date_from,
+                q_date_to_excl=q_date_to_excl,
+                f_country=f_country,
+                f_office=f_office,
+                f_agent=f_agent,
+                f_team=f_team,
+                f_segmentation=f_segmentation,
             )
             if period == "day":
                 tr_period_sql = "rt.day"
@@ -914,9 +1113,18 @@ def _camp_table_calc(
 
             tr_sel, tr_grp = [], []
             p = 1
-            if has_period: tr_sel.append(f"{tr_period_sql} AS period"); tr_grp.append(str(p)); p += 1
-            if has_g1: tr_sel.append(f"{g1_sql} AS g1"); tr_grp.append(str(p)); p += 1
-            if has_g2: tr_sel.append(f"{g2_sql} AS g2"); tr_grp.append(str(p)); p += 1
+            if has_period:
+                tr_sel.append(f"{tr_period_sql} AS period")
+                tr_grp.append(str(p))
+                p += 1
+            if has_g1:
+                tr_sel.append(f"{g1_sql} AS g1")
+                tr_grp.append(str(p))
+                p += 1
+            if has_g2:
+                tr_sel.append(f"{g2_sql} AS g2")
+                tr_grp.append(str(p))
+                p += 1
             tr_sel.append("COUNT(DISTINCT a.accountid) AS traders")
 
             traders_sql = (
@@ -942,17 +1150,38 @@ def _camp_table_calc(
             # ── RDP query (post-qualification deposits/withdrawals) ────────
             rdp_params = {"date_from": date_from, "date_to_excl": date_to_exclusive}
             rdp_filter_where, _, _ = _build_filter_clauses(
-                f_mkt_group, f_legacy_id, f_campaign_name, f_channel, f_sub_channel,
-                f_affiliate, f_classification, ftc_groups_list, date_to, rdp_params,
-                q_date_from=q_date_from, q_date_to_excl=q_date_to_excl,
-                f_country=f_country, f_office=f_office, f_agent=f_agent, f_team=f_team,
-                f_segmentation=f_segmentation
+                f_mkt_group,
+                f_legacy_id,
+                f_campaign_name,
+                f_channel,
+                f_sub_channel,
+                f_affiliate,
+                f_classification,
+                ftc_groups_list,
+                date_to,
+                rdp_params,
+                q_date_from=q_date_from,
+                q_date_to_excl=q_date_to_excl,
+                f_country=f_country,
+                f_office=f_office,
+                f_agent=f_agent,
+                f_team=f_team,
+                f_segmentation=f_segmentation,
             )
             rdp_sel, rdp_grp = [], []
             p = 1
-            if has_period: rdp_sel.append(f"{txn_period_sql} AS period"); rdp_grp.append(str(p)); p += 1
-            if has_g1: rdp_sel.append(f"{g1_sql} AS g1"); rdp_grp.append(str(p)); p += 1
-            if has_g2: rdp_sel.append(f"{g2_sql} AS g2"); rdp_grp.append(str(p)); p += 1
+            if has_period:
+                rdp_sel.append(f"{txn_period_sql} AS period")
+                rdp_grp.append(str(p))
+                p += 1
+            if has_g1:
+                rdp_sel.append(f"{g1_sql} AS g1")
+                rdp_grp.append(str(p))
+                p += 1
+            if has_g2:
+                rdp_sel.append(f"{g2_sql} AS g2")
+                rdp_grp.append(str(p))
+                p += 1
             rdp_sel += [
                 "COUNT(DISTINCT a.accountid) AS rdp_count",
                 "COALESCE(SUM(CASE WHEN t.transaction_type_name IN ('Deposit','Withdrawal Cancelled') THEN t.usdamount ELSE 0 END)"
@@ -991,72 +1220,100 @@ def _camp_table_calc(
             # Total = open + close, identical to FSA section 6 Query 2+3
             if period == "day":
                 vol_open_period = "open_time::date"
-                vol_cl_period   = "t.close_time::date"
+                vol_cl_period = "t.close_time::date"
             elif period == "month":
                 vol_open_period = "date_trunc('month', open_time)::date"
-                vol_cl_period   = "date_trunc('month', t.close_time)::date"
+                vol_cl_period = "date_trunc('month', t.close_time)::date"
             elif period == "year":
                 vol_open_period = "date_trunc('year', open_time)::date"
-                vol_cl_period   = "date_trunc('year', t.close_time)::date"
+                vol_cl_period = "date_trunc('year', t.close_time)::date"
             else:
                 vol_open_period = vol_cl_period = "NULL::date"
 
             vol_params = {"date_from": date_from, "date_to_excl": date_to_exclusive}
             vol_filter_where, _, _ = _build_filter_clauses(
-                f_mkt_group, f_legacy_id, f_campaign_name, f_channel, f_sub_channel,
-                f_affiliate, f_classification, ftc_groups_list, date_to, vol_params,
-                q_date_from=q_date_from, q_date_to_excl=q_date_to_excl,
-                f_country=f_country, f_office=f_office, f_agent=f_agent, f_team=f_team,
-                f_segmentation=f_segmentation
+                f_mkt_group,
+                f_legacy_id,
+                f_campaign_name,
+                f_channel,
+                f_sub_channel,
+                f_affiliate,
+                f_classification,
+                ftc_groups_list,
+                date_to,
+                vol_params,
+                q_date_from=q_date_from,
+                q_date_to_excl=q_date_to_excl,
+                f_country=f_country,
+                f_office=f_office,
+                f_agent=f_agent,
+                f_team=f_team,
+                f_segmentation=f_segmentation,
             )
 
             def _vol_inner(period_expr, notional_expr, from_clause, time_filter, extra_where=""):
                 sel, grp = [], []
                 p = 1
-                if has_period: sel.append(f"{period_expr} AS period"); grp.append(str(p)); p += 1
-                if has_g1: sel.append(f"{g1_sql} AS g1"); grp.append(str(p)); p += 1
-                if has_g2: sel.append(f"{g2_sql} AS g2"); grp.append(str(p)); p += 1
+                if has_period:
+                    sel.append(f"{period_expr} AS period")
+                    grp.append(str(p))
+                    p += 1
+                if has_g1:
+                    sel.append(f"{g1_sql} AS g1")
+                    grp.append(str(p))
+                    p += 1
+                if has_g2:
+                    sel.append(f"{g2_sql} AS g2")
+                    grp.append(str(p))
+                    p += 1
                 sel.append(f"COALESCE(SUM({notional_expr}), 0) AS vol")
                 grp_clause = f"GROUP BY {', '.join(grp)}" if grp else ""
-                return (f"SELECT {', '.join(sel)} FROM {from_clause}"
-                        f" WHERE {time_filter}"
-                        f" AND a.is_test_account = 0"
-                        f"{extra_where}"
-                        f"\n{vol_filter_where}\n{grp_clause}")
+                return (
+                    f"SELECT {', '.join(sel)} FROM {from_clause}"
+                    f" WHERE {time_filter}"
+                    f" AND a.is_test_account = 0"
+                    f"{extra_where}"
+                    f"\n{vol_filter_where}\n{grp_clause}"
+                )
 
             ta_join = " JOIN trading_accounts ta ON ta.login::bigint = {alias}.login"
             acct_join = " JOIN accounts a ON a.accountid = ta.vtigeraccountid"
 
-            pos_from = (f"dealio_positions p"
-                        + ta_join.format(alias="p") + acct_join
-                        + f"{campaign_join}{extra_joins}")
-            mv_from  = (f"mv_mt5_resolved m"
-                        + ta_join.format(alias="m") + acct_join
-                        + f"{campaign_join}{extra_joins}")
-            cl_from  = (f"dealio_trades_mt5 t"
-                        + ta_join.format(alias="t") + acct_join
-                        + f"{campaign_join}{extra_joins}")
+            pos_from = "dealio_positions p" + ta_join.format(alias="p") + acct_join + f"{campaign_join}{extra_joins}"
+            mv_from = "mv_mt5_resolved m" + ta_join.format(alias="m") + acct_join + f"{campaign_join}{extra_joins}"
+            cl_from = "dealio_trades_mt5 t" + ta_join.format(alias="t") + acct_join + f"{campaign_join}{extra_joins}"
 
             outer_vol_sel, outer_vol_grp = [], []
             ov = 1
-            if has_period: outer_vol_sel.append("period"); outer_vol_grp.append(str(ov)); ov += 1
-            if has_g1:     outer_vol_sel.append("g1");     outer_vol_grp.append(str(ov)); ov += 1
-            if has_g2:     outer_vol_sel.append("g2");     outer_vol_grp.append(str(ov)); ov += 1
+            if has_period:
+                outer_vol_sel.append("period")
+                outer_vol_grp.append(str(ov))
+                ov += 1
+            if has_g1:
+                outer_vol_sel.append("g1")
+                outer_vol_grp.append(str(ov))
+                ov += 1
+            if has_g2:
+                outer_vol_sel.append("g2")
+                outer_vol_grp.append(str(ov))
+                ov += 1
             outer_vol_sel.append("SUM(vol) AS volume_usd")
             outer_grp_clause = f"GROUP BY {', '.join(outer_vol_grp)}" if outer_vol_grp else ""
 
             open_time_filter = "p.open_time >= %(date_from)s AND p.open_time < %(date_to_excl)s"
-            mv_time_filter   = "m.open_time >= %(date_from)s AND m.open_time < %(date_to_excl)s"
-            cl_time_filter   = ("t.close_time >= %(date_from)s AND t.close_time < %(date_to_excl)s"
-                                " AND t.entry = 1 AND t.close_time > '1971-01-01'")
+            mv_time_filter = "m.open_time >= %(date_from)s AND m.open_time < %(date_to_excl)s"
+            cl_time_filter = (
+                "t.close_time >= %(date_from)s AND t.close_time < %(date_to_excl)s"
+                " AND t.entry = 1 AND t.close_time > '1971-01-01'"
+            )
 
             vol_sql = (
                 f"SELECT {', '.join(outer_vol_sel)} FROM ("
                 + _vol_inner(vol_open_period, "p.notional_value", pos_from, open_time_filter)
                 + " UNION ALL "
-                + _vol_inner(vol_open_period, "m.notional_value", mv_from,  mv_time_filter)
+                + _vol_inner(vol_open_period, "m.notional_value", mv_from, mv_time_filter)
                 + " UNION ALL "
-                + _vol_inner(vol_cl_period,   "t.notional_value", cl_from,  cl_time_filter)
+                + _vol_inner(vol_cl_period, "t.notional_value", cl_from, cl_time_filter)
                 + f") _vsub {outer_grp_clause}"
             )
             cur.execute(vol_sql, vol_params)
@@ -1065,52 +1322,86 @@ def _camp_table_calc(
         # ── Merge rows ────────────────────────────────────────────────────
         def _parse_acct(r):
             off = 0
-            per = str(r[off]) if has_period else None; off += int(has_period)
-            g1  = r[off] if has_g1 else None;          off += int(has_g1)
-            g2  = r[off] if has_g2 else None;          off += int(has_g2)
+            per = str(r[off]) if has_period else None
+            off += int(has_period)
+            g1 = r[off] if has_g1 else None
+            off += int(has_g1)
+            g2 = r[off] if has_g2 else None
+            off += int(has_g2)
             live_avg_scp = round(float(r[off + 2]), 1) if r[off + 2] is not None else None
             return per, g1, g2, int(r[off] or 0), int(r[off + 1] or 0), live_avg_scp
 
         def _parse_ftc(r):
             off = 0
-            per = str(r[off]) if has_period else None; off += int(has_period)
-            g1  = r[off] if has_g1 else None;          off += int(has_g1)
-            g2  = r[off] if has_g2 else None;          off += int(has_g2)
+            per = str(r[off]) if has_period else None
+            off += int(has_period)
+            g1 = r[off] if has_g1 else None
+            off += int(has_g1)
+            g2 = r[off] if has_g2 else None
+            off += int(has_g2)
             return per, g1, g2, int(r[off] or 0)
 
         def _parse_txn(r):
             off = 0
-            per = str(r[off]) if has_period else None; off += int(has_period)
-            g1  = r[off] if has_g1 else None;          off += int(has_g1)
-            g2  = r[off] if has_g2 else None;          off += int(has_g2)
+            per = str(r[off]) if has_period else None
+            off += int(has_period)
+            g1 = r[off] if has_g1 else None
+            off += int(has_g1)
+            g2 = r[off] if has_g2 else None
+            off += int(has_g2)
             ftd_avg_scp = round(float(r[off + 3]), 1) if r[off + 3] is not None else None
             return per, g1, g2, int(r[off] or 0), float(r[off + 1] or 0), float(r[off + 2] or 0), ftd_avg_scp
 
         def _parse_traders(r):
             off = 0
-            per = str(r[off]) if has_period else None; off += int(has_period)
-            g1  = r[off] if has_g1 else None;          off += int(has_g1)
-            g2  = r[off] if has_g2 else None;          off += int(has_g2)
+            per = str(r[off]) if has_period else None
+            off += int(has_period)
+            g1 = r[off] if has_g1 else None
+            off += int(has_g1)
+            g2 = r[off] if has_g2 else None
+            off += int(has_g2)
             return per, g1, g2, int(r[off] or 0)
 
         def _parse_rdp(r):
             off = 0
-            per = str(r[off]) if has_period else None; off += int(has_period)
-            g1  = r[off] if has_g1 else None;          off += int(has_g1)
-            g2  = r[off] if has_g2 else None;          off += int(has_g2)
+            per = str(r[off]) if has_period else None
+            off += int(has_period)
+            g1 = r[off] if has_g1 else None
+            off += int(has_g1)
+            g2 = r[off] if has_g2 else None
+            off += int(has_g2)
             return per, g1, g2, int(r[off] or 0), float(r[off + 1] or 0)
 
         def _parse_vol(r):
             off = 0
-            per = str(r[off]) if has_period else None; off += int(has_period)
-            g1  = r[off] if has_g1 else None;          off += int(has_g1)
-            g2  = r[off] if has_g2 else None;          off += int(has_g2)
+            per = str(r[off]) if has_period else None
+            off += int(has_period)
+            g1 = r[off] if has_g1 else None
+            off += int(has_g1)
+            g2 = r[off] if has_g2 else None
+            off += int(has_g2)
             return per, g1, g2, float(r[off] or 0)
 
-        _empty = lambda per, g1, g2: {"period": per, "g1": g1, "g2": g2, "leads": 0, "live_accounts": 0,
-                                      "live_avg_scp": None, "ftc": 0, "ftd": 0, "ftd_avg_scp": None,
-                                      "deposits": 0.0, "withdrawals": 0.0, "net_deposits": 0.0, "traders": 0,
-                                      "rdp_count": 0, "rdp_net": 0.0, "volume_usd": 0.0}
+        def _empty(per, g1, g2):
+            return {
+                "period": per,
+                "g1": g1,
+                "g2": g2,
+                "leads": 0,
+                "live_accounts": 0,
+                "live_avg_scp": None,
+                "ftc": 0,
+                "ftd": 0,
+                "ftd_avg_scp": None,
+                "deposits": 0.0,
+                "withdrawals": 0.0,
+                "net_deposits": 0.0,
+                "traders": 0,
+                "rdp_count": 0,
+                "rdp_net": 0.0,
+                "volume_usd": 0.0,
+            }
+
         merged: dict = {}
         for r in acct_rows:
             per, g1, g2, leads, live, live_avg_scp = _parse_acct(r)
@@ -1129,13 +1420,15 @@ def _camp_table_calc(
             k = (per, g1, g2)
             if k not in merged:
                 merged[k] = _empty(per, g1, g2)
-            merged[k].update({
-                "ftd": ftd,
-                "ftd_avg_scp": ftd_avg_scp,
-                "deposits": round(deps, 2),
-                "withdrawals": round(wds, 2),
-                "net_deposits": round(deps - wds, 2),
-            })
+            merged[k].update(
+                {
+                    "ftd": ftd,
+                    "ftd_avg_scp": ftd_avg_scp,
+                    "deposits": round(deps, 2),
+                    "withdrawals": round(wds, 2),
+                    "net_deposits": round(deps - wds, 2),
+                }
+            )
 
         for r in traders_rows:
             per, g1, g2, traders = _parse_traders(r)
@@ -1150,7 +1443,7 @@ def _camp_table_calc(
             if k not in merged:
                 merged[k] = _empty(per, g1, g2)
             merged[k]["rdp_count"] = rdp_count
-            merged[k]["rdp_net"]   = round(rdp_net, 2)
+            merged[k]["rdp_net"] = round(rdp_net, 2)
 
         for r in vol_rows:
             per, g1, g2, volume_usd = _parse_vol(r)
@@ -1173,9 +1466,9 @@ def _camp_table_calc(
 
         def _add_cr(row):
             row["cr_lead_to_live"] = _cr(row["live_accounts"], row["leads"])
-            row["cr_live_to_ftd"]  = _cr(row["ftd"],           row["live_accounts"])
-            row["ltv"]             = round(row["net_deposits"] / row["ftc"], 2)     if row["ftc"]     else 0.0
-            row["ltv_traders"]     = round(row["net_deposits"] / row["traders"], 2) if row["traders"] else 0.0
+            row["cr_live_to_ftd"] = _cr(row["ftd"], row["live_accounts"])
+            row["ltv"] = round(row["net_deposits"] / row["ftc"], 2) if row["ftc"] else 0.0
+            row["ltv_traders"] = round(row["net_deposits"] / row["traders"], 2) if row["traders"] else 0.0
             return row
 
         for row in merged.values():
@@ -1184,43 +1477,51 @@ def _camp_table_calc(
         if has_period:
             dt_from = datetime.strptime(date_from, "%Y-%m-%d").date()
             rows = sorted(
-                (r for r in merged.values()
-                 if r.get("period") and datetime.strptime(r["period"][:10], "%Y-%m-%d").date() >= dt_from
-                 and datetime.strptime(r["period"][:10], "%Y-%m-%d").date() <= dt_to),
-                key=lambda r: (r["g1"] or "", r["g2"] or "", r["period"] or "")
+                (
+                    r
+                    for r in merged.values()
+                    if r.get("period")
+                    and datetime.strptime(r["period"][:10], "%Y-%m-%d").date() >= dt_from
+                    and datetime.strptime(r["period"][:10], "%Y-%m-%d").date() <= dt_to
+                ),
+                key=lambda r: (r["g1"] or "", r["g2"] or "", r["period"] or ""),
             )
         else:
             rows = sorted(merged.values(), key=lambda r: r["deposits"], reverse=True)
 
         _lws = [r for r in rows if r.get("live_avg_scp") is not None and r["live_accounts"] > 0]
-        _fws = [r for r in rows if r.get("ftd_avg_scp")  is not None and r["ftd"] > 0]
+        _fws = [r for r in rows if r.get("ftd_avg_scp") is not None and r["ftd"] > 0]
         _tlive = sum(r["live_accounts"] for r in _lws)
-        _tftd  = sum(r["ftd"] for r in _fws)
-        totals = _add_cr({
-            "leads":         sum(r["leads"] for r in rows),
-            "live_accounts": sum(r["live_accounts"] for r in rows),
-            "live_avg_scp":  round(sum(r["live_avg_scp"] * r["live_accounts"] for r in _lws) / _tlive, 1) if _tlive else None,
-            "ftd":           sum(r["ftd"] for r in rows),
-            "ftd_avg_scp":   round(sum(r["ftd_avg_scp"] * r["ftd"] for r in _fws) / _tftd, 1) if _tftd else None,
-            "ftc":           sum(r["ftc"] for r in rows),
-            "deposits":      round(sum(r["deposits"] for r in rows), 2),
-            "withdrawals":   round(sum(r["withdrawals"] for r in rows), 2),
-            "net_deposits":  round(sum(r["net_deposits"] for r in rows), 2),
-            "traders":       sum(r["traders"] for r in rows),
-            "rdp_count":     sum(r["rdp_count"] for r in rows),
-            "rdp_net":       round(sum(r["rdp_net"] for r in rows), 2),
-            "volume_usd":    round(sum(r["volume_usd"] for r in rows), 2),
-        })
+        _tftd = sum(r["ftd"] for r in _fws)
+        totals = _add_cr(
+            {
+                "leads": sum(r["leads"] for r in rows),
+                "live_accounts": sum(r["live_accounts"] for r in rows),
+                "live_avg_scp": round(sum(r["live_avg_scp"] * r["live_accounts"] for r in _lws) / _tlive, 1)
+                if _tlive
+                else None,
+                "ftd": sum(r["ftd"] for r in rows),
+                "ftd_avg_scp": round(sum(r["ftd_avg_scp"] * r["ftd"] for r in _fws) / _tftd, 1) if _tftd else None,
+                "ftc": sum(r["ftc"] for r in rows),
+                "deposits": round(sum(r["deposits"] for r in rows), 2),
+                "withdrawals": round(sum(r["withdrawals"] for r in rows), 2),
+                "net_deposits": round(sum(r["net_deposits"] for r in rows), 2),
+                "traders": sum(r["traders"] for r in rows),
+                "rdp_count": sum(r["rdp_count"] for r in rows),
+                "rdp_net": round(sum(r["rdp_net"] for r in rows), 2),
+                "volume_usd": round(sum(r["volume_usd"] for r in rows), 2),
+            }
+        )
 
         return {
-            "rows":         rows,
-            "totals":       totals,
+            "rows": rows,
+            "totals": totals,
             "group1_label": GROUP_LABELS.get(group1, ""),
             "group2_label": GROUP_LABELS.get(group2, ""),
-            "period":       period,
+            "period": period,
             "period_label": PERIOD_LABELS.get(period, ""),
-            "date_from":    date_from,
-            "date_to":      date_to,
+            "date_from": date_from,
+            "date_to": date_to,
         }
     finally:
         conn.close()
@@ -1228,20 +1529,26 @@ def _camp_table_calc(
 
 @router.get("/api/campaign-performance/table")
 async def campaign_performance_table_api(
-    request: Request, date_from: str, date_to: str,
-    group1: str = "none", group2: str = "none", period: str = "none",
-    f_mkt_group: Optional[List[str]] = Query(default=None),
-    f_legacy_id: Optional[List[str]] = Query(default=None),
-    f_campaign_name: Optional[List[str]] = Query(default=None),
-    f_channel: Optional[List[str]] = Query(default=None),
-    f_sub_channel: Optional[List[str]] = Query(default=None),
-    f_affiliate: Optional[List[str]] = Query(default=None),
-    f_classification: str = None, ftc_groups: str = None,
-    q_date_from: str = None, q_date_to: str = None,
-    f_country: Optional[List[str]] = Query(default=None),
-    f_office: Optional[List[str]] = Query(default=None),
-    f_agent: Optional[List[str]] = Query(default=None),
-    f_team: Optional[List[str]] = Query(default=None),
+    request: Request,
+    date_from: str,
+    date_to: str,
+    group1: str = "none",
+    group2: str = "none",
+    period: str = "none",
+    f_mkt_group: list[str] | None = Query(default=None),
+    f_legacy_id: list[str] | None = Query(default=None),
+    f_campaign_name: list[str] | None = Query(default=None),
+    f_channel: list[str] | None = Query(default=None),
+    f_sub_channel: list[str] | None = Query(default=None),
+    f_affiliate: list[str] | None = Query(default=None),
+    f_classification: str = None,
+    ftc_groups: str = None,
+    q_date_from: str = None,
+    q_date_to: str = None,
+    f_country: list[str] | None = Query(default=None),
+    f_office: list[str] | None = Query(default=None),
+    f_agent: list[str] | None = Query(default=None),
+    f_team: list[str] | None = Query(default=None),
     f_segmentation: str = None,
 ):
     user = await get_current_user(request)
@@ -1255,12 +1562,16 @@ async def campaign_performance_table_api(
     if period not in VALID_PERIODS and period != "none":
         return JSONResponse(status_code=400, content={"detail": "Invalid period"})
 
-    def _ck_part(v): return ','.join(sorted(v)) if v else ''
-    _ck = (f"camp_tbl_v18:{date_from}:{date_to}:{group1}:{group2}:{period}"
-           f":{_ck_part(f_mkt_group)}:{_ck_part(f_legacy_id)}:{_ck_part(f_campaign_name)}:{_ck_part(f_channel)}"
-           f":{_ck_part(f_sub_channel)}:{_ck_part(f_affiliate)}:{f_classification}:{ftc_groups}"
-           f":{q_date_from}:{q_date_to}:{_ck_part(f_country)}:{_ck_part(f_office)}:{_ck_part(f_agent)}:{_ck_part(f_team)}"
-           f":{f_segmentation}")
+    def _ck_part(v):
+        return ",".join(sorted(v)) if v else ""
+
+    _ck = (
+        f"camp_tbl_v18:{date_from}:{date_to}:{group1}:{group2}:{period}"
+        f":{_ck_part(f_mkt_group)}:{_ck_part(f_legacy_id)}:{_ck_part(f_campaign_name)}:{_ck_part(f_channel)}"
+        f":{_ck_part(f_sub_channel)}:{_ck_part(f_affiliate)}:{f_classification}:{ftc_groups}"
+        f":{q_date_from}:{q_date_to}:{_ck_part(f_country)}:{_ck_part(f_office)}:{_ck_part(f_agent)}:{_ck_part(f_team)}"
+        f":{f_segmentation}"
+    )
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -1272,11 +1583,25 @@ async def campaign_performance_table_api(
 
     try:
         _result = _camp_table_calc(
-            date_from, date_to, group1, group2, period,
-            f_mkt_group, f_legacy_id, f_campaign_name, f_channel,
-            f_sub_channel, f_affiliate, f_classification, ftc_groups,
-            q_date_from, q_date_to,
-            f_country=f_country, f_office=f_office, f_agent=f_agent, f_team=f_team,
+            date_from,
+            date_to,
+            group1,
+            group2,
+            period,
+            f_mkt_group,
+            f_legacy_id,
+            f_campaign_name,
+            f_channel,
+            f_sub_channel,
+            f_affiliate,
+            f_classification,
+            ftc_groups,
+            q_date_from,
+            q_date_to,
+            f_country=f_country,
+            f_office=f_office,
+            f_agent=f_agent,
+            f_team=f_team,
             f_segmentation=f_segmentation,
         )
         cache.set(_ck, _result)

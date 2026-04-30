@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
+
 from app.etl.fetch_and_store import run_client_classification_etl
 
 router = APIRouter()

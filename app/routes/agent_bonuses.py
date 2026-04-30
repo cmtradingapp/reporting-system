@@ -1,90 +1,123 @@
+import calendar
+from datetime import date as date_type
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+
+from app import cache
 from app.auth.dependencies import get_current_user
 from app.auth.role_filters import get_role_filter
 from app.db.postgres_conn import get_connection
-from app import cache
-from datetime import datetime, timedelta, date as date_type
-from zoneinfo import ZoneInfo
-import calendar
 
 _TZ = ZoneInfo("Europe/Nicosia")
 _TARGETS_CUTOFF = date_type(2026, 5, 1)
 
 
 def _apply_role_filter(sql: str, params: dict, role_filter: dict) -> tuple[str, dict]:
-    if not role_filter['crm_where']:
-        return sql.replace('{role_filter}', ''), params
-    named_where = role_filter['crm_where']
+    if not role_filter["crm_where"]:
+        return sql.replace("{role_filter}", ""), params
+    named_where = role_filter["crm_where"]
     extra = {}
-    for i, val in enumerate(role_filter['crm_params']):
-        key = f'_rf{i}'
-        named_where = named_where.replace('%s', f'%({key})s', 1)
+    for i, val in enumerate(role_filter["crm_params"]):
+        key = f"_rf{i}"
+        named_where = named_where.replace("%s", f"%({key})s", 1)
         extra[key] = val
-    return sql.replace('{role_filter}', named_where), {**params, **extra}
+    return sql.replace("{role_filter}", named_where), {**params, **extra}
 
 
-OFFICE_GROUP_A = {'GMT', 'CY', 'BU'}
-OFFICE_GROUP_B = {'ABJ-NG', 'SA', 'LAG-NG'}
+OFFICE_GROUP_A = {"GMT", "CY", "BU"}
+OFFICE_GROUP_B = {"ABJ-NG", "SA", "LAG-NG"}
 
 
 def get_office_group(office: str) -> str:
     if office in OFFICE_GROUP_A:
-        return 'A'
+        return "A"
     if office in OFFICE_GROUP_B:
-        return 'B'
-    return 'other'
+        return "B"
+    return "other"
 
 
 def get_net_bonus_pct(net_usd: float, group: str) -> float:
     """Tiered bonus % on net USD."""
-    if group == 'A':
-        if net_usd >= 200_000: return 0.04
-        if net_usd >= 150_000: return 0.0375
-        if net_usd >= 100_000: return 0.035
-        if net_usd >= 75_000:  return 0.03
-        if net_usd >= 50_000:  return 0.02
-        if net_usd >= 20_000:  return 0.015
+    if group == "A":
+        if net_usd >= 200_000:
+            return 0.04
+        if net_usd >= 150_000:
+            return 0.0375
+        if net_usd >= 100_000:
+            return 0.035
+        if net_usd >= 75_000:
+            return 0.03
+        if net_usd >= 50_000:
+            return 0.02
+        if net_usd >= 20_000:
+            return 0.015
         return 0.0
-    if group == 'B':
-        if net_usd >= 100_000: return 0.035
-        if net_usd >= 80_000:  return 0.03
-        if net_usd >= 60_000:  return 0.028
-        if net_usd >= 50_000:  return 0.025
-        if net_usd >= 40_000:  return 0.02
-        if net_usd >= 30_000:  return 0.018
-        if net_usd >= 20_000:  return 0.015
-        if net_usd >= 10_000:  return 0.01
+    if group == "B":
+        if net_usd >= 100_000:
+            return 0.035
+        if net_usd >= 80_000:
+            return 0.03
+        if net_usd >= 60_000:
+            return 0.028
+        if net_usd >= 50_000:
+            return 0.025
+        if net_usd >= 40_000:
+            return 0.02
+        if net_usd >= 30_000:
+            return 0.018
+        if net_usd >= 20_000:
+            return 0.015
+        if net_usd >= 10_000:
+            return 0.01
         return 0.0
     return 0.0
 
 
 def get_vol_bonus_pct(vol_pct: float, group: str) -> float:
     """Tiered bonus % on volume.  vol_pct is ratio: open_vol / target_vol."""
-    if group == 'A':
-        if vol_pct >= 2.0:  return 0.015
-        if vol_pct >= 1.5:  return 0.0125
-        if vol_pct >= 1.0:  return 0.01
-        if vol_pct >= 0.75: return 0.005
-        if vol_pct >= 0.5:  return 0.002
+    if group == "A":
+        if vol_pct >= 2.0:
+            return 0.015
+        if vol_pct >= 1.5:
+            return 0.0125
+        if vol_pct >= 1.0:
+            return 0.01
+        if vol_pct >= 0.75:
+            return 0.005
+        if vol_pct >= 0.5:
+            return 0.002
         return 0.0
     return 0.0
 
 
 def get_sales_multiplier(ftd100: int) -> int:
     """Per-FTD100 $ amount based on count tier."""
-    if ftd100 >= 48: return 65
-    if ftd100 >= 44: return 60
-    if ftd100 >= 40: return 55
-    if ftd100 >= 36: return 50
-    if ftd100 >= 32: return 45
-    if ftd100 >= 28: return 40
-    if ftd100 >= 24: return 35
-    if ftd100 >= 20: return 30
-    if ftd100 >= 15: return 25
-    if ftd100 >= 10: return 20
-    if ftd100 >= 5:  return 15
+    if ftd100 >= 48:
+        return 65
+    if ftd100 >= 44:
+        return 60
+    if ftd100 >= 40:
+        return 55
+    if ftd100 >= 36:
+        return 50
+    if ftd100 >= 32:
+        return 45
+    if ftd100 >= 28:
+        return 40
+    if ftd100 >= 24:
+        return 35
+    if ftd100 >= 20:
+        return 30
+    if ftd100 >= 15:
+        return 25
+    if ftd100 >= 10:
+        return 20
+    if ftd100 >= 5:
+        return 15
     return 0
 
 
@@ -93,13 +126,20 @@ def get_sales_target_bonus(ftd100_actual: int, target_ftc: int) -> int:
     if target_ftc <= 0 or ftd100_actual < target_ftc:
         return 0
     n = ftd100_actual
-    if n >= 60: return 1500
-    if n >= 50: return 1000
-    if n >= 35: return 500
-    if n >= 30: return 300
-    if n >= 25: return 200
-    if n >= 20: return 150
-    if n >= 5:  return 100
+    if n >= 60:
+        return 1500
+    if n >= 50:
+        return 1000
+    if n >= 35:
+        return 500
+    if n >= 30:
+        return 300
+    if n >= 25:
+        return 200
+    if n >= 20:
+        return 150
+    if n >= 5:
+        return 100
     return 0
 
 
@@ -133,9 +173,14 @@ async def agent_bonuses_page(request: Request):
     if role == "marketing" and ap is None:
         return RedirectResponse(url="/campaign-performance", status_code=302)
     if ap is not None and "agent_bonuses" not in ap:
-        _page_urls = {"performance": "/performance", "marketing": "/campaign-performance",
-                       "dashboard": "/dashboard", "total_traders": "/total-traders",
-                       "agent_bonuses": "/agent-bonuses", "data_sync": "/data-sync"}
+        _page_urls = {
+            "performance": "/performance",
+            "marketing": "/campaign-performance",
+            "dashboard": "/dashboard",
+            "total_traders": "/total-traders",
+            "agent_bonuses": "/agent-bonuses",
+            "data_sync": "/data-sync",
+        }
         for p in ap:
             if p in _page_urls:
                 return RedirectResponse(url=_page_urls[p], status_code=302)
@@ -147,12 +192,15 @@ async def agent_bonuses_page(request: Request):
     else:
         show_sales = not role.startswith("retention_")
         show_retention = not role.startswith("sales_")
-    return templates.TemplateResponse("agent_bonuses.html", {
-        "request": request,
-        "current_user": user,
-        "show_sales": show_sales,
-        "show_retention": show_retention,
-    })
+    return templates.TemplateResponse(
+        "agent_bonuses.html",
+        {
+            "request": request,
+            "current_user": user,
+            "show_sales": show_sales,
+            "show_retention": show_retention,
+        },
+    )
 
 
 @router.get("/api/agent-bonuses/retention")
@@ -167,7 +215,7 @@ async def agent_bonuses_retention_api(request: Request, date_from: str, date_to:
         return JSONResponse(content=_hit)
     try:
         dt_from = datetime.strptime(date_from, "%Y-%m-%d").date()
-        dt_to   = datetime.strptime(date_to,   "%Y-%m-%d").date()
+        dt_to = datetime.strptime(date_to, "%Y-%m-%d").date()
         date_to_exclusive = (dt_to + timedelta(days=1)).strftime("%Y-%m-%d")
         last_day = last_day_of_month(dt_from).strftime("%Y-%m-%d")
     except ValueError:
@@ -233,73 +281,73 @@ async def agent_bonuses_retention_api(request: Request, date_from: str, date_to:
                     FROM targets
                     WHERE date = DATE_TRUNC('month', %(date_from)s::date)"""
             base_params = {
-                "date_from":    date_from,
+                "date_from": date_from,
                 "date_to_excl": date_to_exclusive,
-                "date_to":      date_to,
-                "last_day":     last_day,
-                "is_admin":     user.get("role") in ("admin", "general"),
+                "date_to": date_to,
+                "last_day": last_day,
+                "is_admin": user.get("role") in ("admin", "general"),
             }
-            final_sql, final_params = _apply_role_filter(sql.replace('{tgt_subq}', _tgt_subq), base_params, role_filter)
+            final_sql, final_params = _apply_role_filter(sql.replace("{tgt_subq}", _tgt_subq), base_params, role_filter)
             cur.execute(final_sql, final_params)
             rows = cur.fetchall()
 
-        today               = datetime.now(_TZ).date()
-        month_end           = last_day_of_month(dt_from)
-        working_days        = count_working_days(dt_from, month_end, holidays)
+        today = datetime.now(_TZ).date()
+        month_end = last_day_of_month(dt_from)
+        working_days = count_working_days(dt_from, month_end, holidays)
         working_days_passed = count_working_days(dt_from, min(dt_to, today), holidays)
-        working_days_left   = working_days - working_days_passed
+        working_days_left = working_days - working_days_passed
 
         data = []
         for r in rows:
-            office_name     = r[0]
-            dept_name       = r[1]
-            agent_name      = r[2]
-            office          = r[3]
-            target_net      = round(float(r[4]), 2)
-            net_usd         = round(float(r[5]), 2)
+            office_name = r[0]
+            dept_name = r[1]
+            agent_name = r[2]
+            office = r[3]
+            target_net = round(float(r[4]), 2)
+            net_usd = round(float(r[5]), 2)
             open_volume_usd = round(float(r[6]), 2)
-            status          = r[7] or ''
+            status = r[7] or ""
 
             target_vol = target_net * 1650
 
-            group          = get_office_group(office)
+            group = get_office_group(office)
             target_net_pct = net_usd / target_net if target_net > 0 else None
             target_vol_pct = open_volume_usd / target_vol if target_vol > 0 else None
 
-            pct_on_net        = get_net_bonus_pct(net_usd, group)
-            pct_on_target_net = 0.005 if (
-                group == 'A' and target_net_pct is not None and target_net_pct >= 1.0
-            ) else 0.0
-            pct_on_target_vol = (
-                get_vol_bonus_pct(target_vol_pct, group) if target_vol_pct is not None else 0.0
+            pct_on_net = get_net_bonus_pct(net_usd, group)
+            pct_on_target_net = (
+                0.005 if (group == "A" and target_net_pct is not None and target_net_pct >= 1.0) else 0.0
             )
+            pct_on_target_vol = get_vol_bonus_pct(target_vol_pct, group) if target_vol_pct is not None else 0.0
             total_bonus_pct = pct_on_net + pct_on_target_net + pct_on_target_vol
             basic_bonus_usd = round(total_bonus_pct * net_usd, 2)
 
-            data.append({
-                "office_name":       office_name,
-                "dept_name":         dept_name,
-                "agent_name":        agent_name,
-                "office":            office,
-                "target_net":        target_net,
-                "net_usd":           net_usd,
-                "target_net_pct":    round(target_net_pct, 6) if target_net_pct is not None else None,
-                "target_vol":        float(target_vol),
-                "open_volume_usd":   open_volume_usd,
-                "target_vol_pct":    round(target_vol_pct, 6) if target_vol_pct is not None else None,
-                "pct_on_net":        pct_on_net,
-                "pct_on_target_net": pct_on_target_net,
-                "pct_on_target_vol": pct_on_target_vol,
-                "total_bonus_pct":   total_bonus_pct,
-                "basic_bonus_usd":   basic_bonus_usd,
-                "status":            status,
-            })
+            data.append(
+                {
+                    "office_name": office_name,
+                    "dept_name": dept_name,
+                    "agent_name": agent_name,
+                    "office": office,
+                    "target_net": target_net,
+                    "net_usd": net_usd,
+                    "target_net_pct": round(target_net_pct, 6) if target_net_pct is not None else None,
+                    "target_vol": float(target_vol),
+                    "open_volume_usd": open_volume_usd,
+                    "target_vol_pct": round(target_vol_pct, 6) if target_vol_pct is not None else None,
+                    "pct_on_net": pct_on_net,
+                    "pct_on_target_net": pct_on_target_net,
+                    "pct_on_target_vol": pct_on_target_vol,
+                    "total_bonus_pct": total_bonus_pct,
+                    "basic_bonus_usd": basic_bonus_usd,
+                    "status": status,
+                }
+            )
 
         _result = {
-            "rows":                data,
-            "working_days":        working_days,
+            "rows": data,
+            "working_days": working_days,
             "working_days_passed": working_days_passed,
-            "working_days_left":   working_days_left,
+            "working_days_left": working_days_left,
         }
         cache.set(_ck, _result)
         return JSONResponse(content=_result)
@@ -320,8 +368,8 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
     if _hit is not None:
         return JSONResponse(content=_hit)
     try:
-        dt_from           = datetime.strptime(date_from, "%Y-%m-%d").date()
-        dt_to             = datetime.strptime(date_to, "%Y-%m-%d").date()
+        dt_from = datetime.strptime(date_from, "%Y-%m-%d").date()
+        dt_to = datetime.strptime(date_to, "%Y-%m-%d").date()
         date_to_exclusive = (dt_to + timedelta(days=1)).strftime("%Y-%m-%d")
     except ValueError:
         return JSONResponse(status_code=400, content={"detail": "Invalid date format"})
@@ -401,18 +449,19 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
                     FROM targets
                     WHERE date = DATE_TRUNC('month', %(date_from)s::date)"""
             base_params = {
-                "date_from":    date_from,
+                "date_from": date_from,
                 "date_to_excl": date_to_exclusive,
-                "is_admin":     user.get("role") in ("admin", "general"),
+                "is_admin": user.get("role") in ("admin", "general"),
             }
-            final_sql, final_params = _apply_role_filter(sql.replace('{tgt_subq}', _tgt_subq), base_params, role_filter)
+            final_sql, final_params = _apply_role_filter(sql.replace("{tgt_subq}", _tgt_subq), base_params, role_filter)
             cur.execute(final_sql, final_params)
             rows = cur.fetchall()
 
             # FTC net USD — separate query (transactions JOIN accounts is deadlock-prone)
             ftc_net_map = {}
             try:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT t.original_deposit_owner AS agent_id,
                            SUM(CASE WHEN t.transaction_type_name IN ('Deposit','Withdrawal Cancelled') THEN  t.usdamount
                                     WHEN t.transaction_type_name IN ('Withdrawal','Deposit Cancelled')  THEN -t.usdamount END)::float AS net_usd
@@ -428,32 +477,34 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
                       AND (a.client_qualification_date >= t.confirmation_time::date OR t.ftd = 1)
                       AND a.is_test_account = 0
                     GROUP BY t.original_deposit_owner
-                """, {"date_from": date_from, "date_to_excl": date_to_exclusive})
+                """,
+                    {"date_from": date_from, "date_to_excl": date_to_exclusive},
+                )
                 ftc_net_map = {int(r[0]): float(r[1] or 0) for r in cur.fetchall()}
             except Exception as _fn_err:
                 conn.rollback()
                 print(f"[bon_sales] ftc_net query failed (lock?): {_fn_err}")
 
-        today               = datetime.now(_TZ).date()
-        month_end           = last_day_of_month(dt_from)
-        working_days        = count_working_days(dt_from, month_end, holidays)
+        today = datetime.now(_TZ).date()
+        month_end = last_day_of_month(dt_from)
+        working_days = count_working_days(dt_from, month_end, holidays)
         working_days_passed = count_working_days(dt_from, min(dt_to, today), holidays)
-        working_days_left   = working_days - working_days_passed
+        working_days_left = working_days - working_days_passed
 
         data = []
         for r in rows:
-            office_name          = r[0]
-            agent_name           = r[1]
-            target_ftc           = int(r[2])
-            ftc_count            = int(r[3])
-            ftd100_count         = int(r[4])
-            ftd100_full_count    = int(r[5])
-            ftd100_half_count    = int(r[6])
-            total_sales_net      = round(float(r[7]), 2)
+            office_name = r[0]
+            agent_name = r[1]
+            target_ftc = int(r[2])
+            ftc_count = int(r[3])
+            ftd100_count = int(r[4])
+            ftd100_full_count = int(r[5])
+            ftd100_half_count = int(r[6])
+            total_sales_net = round(float(r[7]), 2)
             ftd_amount_bonus_raw = round(float(r[8]), 2)
-            status               = r[9] or ''
-            user_id              = int(r[10] or 0)
-            ftc_net_usd          = round(ftc_net_map.get(user_id, 0.0), 2)
+            status = r[9] or ""
+            user_id = int(r[10] or 0)
+            ftc_net_usd = round(ftc_net_map.get(user_id, 0.0), 2)
 
             target_ftc = max(target_ftc, 1)  # no target → treat as 1
 
@@ -461,36 +512,38 @@ async def agent_bonuses_sales_api(request: Request, date_from: str, date_to: str
 
             qualify = ftd100_count >= 0.50 * target_ftc
 
-            multiplier         = get_sales_multiplier(ftd100_count)
-            basic_bonus        = (ftd100_full_count * multiplier + ftd100_half_count * multiplier / 2) if qualify else 0
+            multiplier = get_sales_multiplier(ftd100_count)
+            basic_bonus = (ftd100_full_count * multiplier + ftd100_half_count * multiplier / 2) if qualify else 0
             sales_target_bonus = get_sales_target_bonus(ftd100_count, target_ftc) if qualify else 0
-            ftd_amount_bonus   = ftd_amount_bonus_raw if qualify else 0
-            total_sales_bonus  = basic_bonus + sales_target_bonus + ftd_amount_bonus
+            ftd_amount_bonus = ftd_amount_bonus_raw if qualify else 0
+            total_sales_bonus = basic_bonus + sales_target_bonus + ftd_amount_bonus
 
-            data.append({
-                "office_name":        office_name,
-                "agent_name":         agent_name,
-                "target_ftc":         target_ftc,
-                "ftc_count":          ftc_count,
-                "ftd100_count":       ftd100_count,
-                "ftd100_full_count":  ftd100_full_count,
-                "ftd100_half_count":  ftd100_half_count,
-                "ftc_net_usd":        ftc_net_usd,
-                "total_sales_net":    total_sales_net,
-                "basic_bonus":        round(basic_bonus, 2),
-                "sales_target_bonus": sales_target_bonus,
-                "ftd_amount_bonus":   ftd_amount_bonus,
-                "total_sales_bonus":  round(total_sales_bonus, 2),
-                "target_pct":         round(target_pct, 6),
-                "multiplier":         multiplier,
-                "status":             status,
-            })
+            data.append(
+                {
+                    "office_name": office_name,
+                    "agent_name": agent_name,
+                    "target_ftc": target_ftc,
+                    "ftc_count": ftc_count,
+                    "ftd100_count": ftd100_count,
+                    "ftd100_full_count": ftd100_full_count,
+                    "ftd100_half_count": ftd100_half_count,
+                    "ftc_net_usd": ftc_net_usd,
+                    "total_sales_net": total_sales_net,
+                    "basic_bonus": round(basic_bonus, 2),
+                    "sales_target_bonus": sales_target_bonus,
+                    "ftd_amount_bonus": ftd_amount_bonus,
+                    "total_sales_bonus": round(total_sales_bonus, 2),
+                    "target_pct": round(target_pct, 6),
+                    "multiplier": multiplier,
+                    "status": status,
+                }
+            )
 
         _result = {
-            "rows":                data,
-            "working_days":        working_days,
+            "rows": data,
+            "working_days": working_days,
             "working_days_passed": working_days_passed,
-            "working_days_left":   working_days_left,
+            "working_days_left": working_days_left,
         }
         # Don't cache if mv_sales_bonuses is empty/stale (all agents showing 0 FTD100s)
         if any(r["ftd100_count"] > 0 for r in data):
@@ -513,8 +566,8 @@ async def agent_bonuses_sales_accounts_api(request: Request, date_from: str, dat
     if _hit is not None:
         return JSONResponse(content=_hit)
     try:
-        dt_from           = datetime.strptime(date_from, "%Y-%m-%d").date()
-        dt_to             = datetime.strptime(date_to, "%Y-%m-%d").date()
+        dt_from = datetime.strptime(date_from, "%Y-%m-%d").date()
+        dt_to = datetime.strptime(date_to, "%Y-%m-%d").date()
         date_to_exclusive = (dt_to + timedelta(days=1)).strftime("%Y-%m-%d")
     except ValueError:
         return JSONResponse(status_code=400, content={"detail": "Invalid date format"})
@@ -640,50 +693,52 @@ async def agent_bonuses_sales_accounts_api(request: Request, date_from: str, dat
                     FROM targets
                     WHERE date = DATE_TRUNC('month', %(date_from)s::date)"""
             base_params = {
-                "date_from":    date_from,
+                "date_from": date_from,
                 "date_to_excl": date_to_exclusive,
-                "is_admin":     user.get("role") in ("admin", "general"),
+                "is_admin": user.get("role") in ("admin", "general"),
             }
-            final_sql, final_params = _apply_role_filter(sql.replace('{tgt_subq}', _tgt_subq), base_params, role_filter)
+            final_sql, final_params = _apply_role_filter(sql.replace("{tgt_subq}", _tgt_subq), base_params, role_filter)
             cur.execute(final_sql, final_params)
             rows = cur.fetchall()
 
         data = []
         for r in rows:
-            office_name          = r[0]
-            agent_name           = r[1]
-            accountid            = r[2]
-            is_ftc               = int(r[3])
-            is_ftd100            = int(r[4])
-            ftd100_type          = r[5]
-            ftc_net_usd          = round(float(r[6]), 2)
+            office_name = r[0]
+            agent_name = r[1]
+            accountid = r[2]
+            is_ftc = int(r[3])
+            is_ftd100 = int(r[4])
+            ftd100_type = r[5]
+            ftc_net_usd = round(float(r[6]), 2)
             ftd_amount_bonus_raw = round(float(r[7]), 2)
-            ftd100_total         = int(r[8])
-            target_ftc           = int(r[9])
-            status               = r[10] or ''
+            ftd100_total = int(r[8])
+            target_ftc = int(r[9])
+            status = r[10] or ""
 
             target_ftc = max(target_ftc, 1)  # no target → treat as 1
             qualify = ftd100_total >= 0.50 * target_ftc
             multiplier = get_sales_multiplier(ftd100_total)
 
             if is_ftd100 and qualify:
-                basic_bonus      = multiplier if ftd100_type == 'full' else round(multiplier / 2, 2)
+                basic_bonus = multiplier if ftd100_type == "full" else round(multiplier / 2, 2)
                 ftd_amount_bonus = ftd_amount_bonus_raw
             else:
-                basic_bonus      = 0
+                basic_bonus = 0
                 ftd_amount_bonus = 0
 
-            data.append({
-                "office_name":      office_name,
-                "agent_name":       agent_name,
-                "accountid":        accountid,
-                "is_ftc":           is_ftc,
-                "is_ftd100":        is_ftd100,
-                "ftc_net_usd":      ftc_net_usd,
-                "basic_bonus":      basic_bonus,
-                "ftd_amount_bonus": ftd_amount_bonus,
-                "status":           status,
-            })
+            data.append(
+                {
+                    "office_name": office_name,
+                    "agent_name": agent_name,
+                    "accountid": accountid,
+                    "is_ftc": is_ftc,
+                    "is_ftd100": is_ftd100,
+                    "ftc_net_usd": ftc_net_usd,
+                    "basic_bonus": basic_bonus,
+                    "ftd_amount_bonus": ftd_amount_bonus,
+                    "status": status,
+                }
+            )
 
         _result = {"rows": data}
         cache.set(_ck, _result)

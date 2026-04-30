@@ -1,12 +1,15 @@
+import calendar
+from datetime import date as date_type
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+
+from app import cache
 from app.auth.dependencies import get_current_user
 from app.db.postgres_conn import get_connection
-from app import cache
-from datetime import datetime, timedelta, date as date_type
-from zoneinfo import ZoneInfo
-import calendar
 
 _TZ = ZoneInfo("Europe/Nicosia")
 
@@ -50,8 +53,8 @@ def _dashboard_calc(today: date_type) -> dict:
     tomorrow = today + timedelta(days=1)
 
     month_start_str = month_start.strftime("%Y-%m-%d")
-    today_str       = today.strftime("%Y-%m-%d")
-    tomorrow_str    = tomorrow.strftime("%Y-%m-%d")
+    today_str = today.strftime("%Y-%m-%d")
+    tomorrow_str = tomorrow.strftime("%Y-%m-%d")
 
     conn = get_connection()
     try:
@@ -64,25 +67,29 @@ def _dashboard_calc(today: date_type) -> dict:
                 conn.rollback()
                 holidays = set()
 
-            wd_total  = count_working_days(month_start, month_end, holidays)
+            wd_total = count_working_days(month_start, month_end, holidays)
             wd_passed = count_working_days(month_start, today, holidays)
-            wd_left   = wd_total - wd_passed
-            safe_wdp  = wd_passed if wd_passed > 0 else 1
+            wd_left = wd_total - wd_passed
+            safe_wdp = wd_passed if wd_passed > 0 else 1
 
             # Get last_mtd date (for PnL cards) — range comparison instead of EXTRACT
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT MAX(date)::date
                 FROM dealio_daily_profits
                 WHERE date >= %(month_start)s AND date < %(month_start)s::date + INTERVAL '1 month'
-            """, {"month_start": month_start_str})
-            last_mtd_date      = cur.fetchone()[0] or (today - timedelta(days=1))
-            last_mtd_str       = last_mtd_date.strftime("%Y-%m-%d")
-            last_mtd_plus1_str = (last_mtd_date + timedelta(days=1)).strftime("%Y-%m-%d")
+            """,
+                {"month_start": month_start_str},
+            )
+            last_mtd_date = cur.fetchone()[0] or (today - timedelta(days=1))
+            last_mtd_str = last_mtd_date.strftime("%Y-%m-%d")
+            (last_mtd_date + timedelta(days=1)).strftime("%Y-%m-%d")
 
             p = {"month_start": month_start_str, "today": today_str, "tomorrow": tomorrow_str}
 
             # Combined Q1-Q4: NET + FTD per dept_group (single scan of mv_run_rate)
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT dept_group,
                     COALESCE(SUM(net_usd) FILTER (WHERE tx_date = %(today)s::date), 0),
                     COALESCE(SUM(net_usd), 0),
@@ -92,42 +99,51 @@ def _dashboard_calc(today: date_type) -> dict:
                 WHERE dept_group IN ('all', 'sales', 'retention')
                   AND tx_date >= %(month_start)s AND tx_date <= %(today)s
                 GROUP BY dept_group
-            """, p)
+            """,
+                p,
+            )
             _rr = {r[0]: r for r in cur.fetchall()}
-            _all = _rr.get('all', (None, 0, 0, 0, 0))
-            _sal = _rr.get('sales', (None, 0, 0, 0, 0))
-            _ret = _rr.get('retention', (None, 0, 0, 0, 0))
-            nd_daily, nd_monthly       = float(_all[1] or 0), float(_all[2] or 0)
+            _all = _rr.get("all", (None, 0, 0, 0, 0))
+            _sal = _rr.get("sales", (None, 0, 0, 0, 0))
+            _ret = _rr.get("retention", (None, 0, 0, 0, 0))
+            nd_daily, nd_monthly = float(_all[1] or 0), float(_all[2] or 0)
             nd_sales_daily, nd_sales_monthly = float(_sal[1] or 0), float(_sal[2] or 0)
-            nd_ret_daily, nd_ret_monthly     = float(_ret[1] or 0), float(_ret[2] or 0)
-            ftd_daily, ftd_monthly     = int(_all[3] or 0), int(_all[4] or 0)
+            nd_ret_daily, nd_ret_monthly = float(_ret[1] or 0), float(_ret[2] or 0)
+            ftd_daily, ftd_monthly = int(_all[3] or 0), int(_all[4] or 0)
 
             # Q5 — FTC count (separate: uses qual_date axis)
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT
                     COALESCE(SUM(ftc_count) FILTER (WHERE qual_date = %(today)s::date), 0),
                     COALESCE(SUM(ftc_count), 0)
                 FROM mv_run_rate
                 WHERE dept_group = 'all'
                   AND qual_date >= %(month_start)s AND qual_date <= %(today)s
-            """, p)
+            """,
+                p,
+            )
             row = cur.fetchone()
             ftc_daily, ftc_monthly = int(row[0] or 0), int(row[1] or 0)
 
             # Q6 — Open Volume  (mv_volume_stats — SUM notional_usd)
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT
                     COALESCE(SUM(notional_usd) FILTER (WHERE open_date = %(today)s::date), 0) AS daily,
                     COALESCE(SUM(notional_usd), 0)                                             AS monthly
                 FROM mv_volume_stats
                 WHERE open_date >= %(month_start)s AND open_date <= %(today)s
-            """, p)
+            """,
+                p,
+            )
             row = cur.fetchone()
             ov_daily, ov_monthly = float(row[0] or 0), float(row[1] or 0)
 
             # Q7 — Daily PnL  (live from dealio_daily_profits, deadlock-prone)
             try:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT COALESCE(SUM(
                         COALESCE(convertedclosedpnl, 0) + COALESCE(converteddeltafloatingpnl, 0)
                     ), 0)
@@ -137,7 +153,9 @@ def _dashboard_calc(today: date_type) -> dict:
                     WHERE d.date >= %(last_mtd)s::date
                       AND d.date <  %(last_mtd)s::date + INTERVAL '1 day'
                       AND a.is_test_account = 0
-                """, {"last_mtd": last_mtd_str})
+                """,
+                    {"last_mtd": last_mtd_str},
+                )
                 pnl_daily = round(float(cur.fetchone()[0] or 0), 2)
             except Exception:
                 conn.rollback()
@@ -152,7 +170,10 @@ def _dashboard_calc(today: date_type) -> dict:
             row = cur.fetchone()
             if row:
                 new_leads_today, new_leads_month, new_live_today, new_live_month = (
-                    int(row[0] or 0), int(row[1] or 0), int(row[2] or 0), int(row[3] or 0)
+                    int(row[0] or 0),
+                    int(row[1] or 0),
+                    int(row[2] or 0),
+                    int(row[3] or 0),
                 )
             else:
                 new_leads_today = new_leads_month = new_live_today = new_live_month = 0
@@ -164,23 +185,31 @@ def _dashboard_calc(today: date_type) -> dict:
             return round(val / safe_wdp * wd_total)
 
         return {
-            "date":                 today_str,
-            "month_start":          month_start_str,
-            "working_days":         wd_total,
-            "working_days_passed":  wd_passed,
-            "working_days_left":    wd_left,
-            "net_deposits":           {"daily": round(nd_daily, 2),       "monthly": round(nd_monthly, 2),       "rr": rr_money(nd_monthly)},
-            "net_deposits_sales":     {"daily": round(nd_sales_daily, 2), "monthly": round(nd_sales_monthly, 2), "rr": rr_money(nd_sales_monthly)},
-            "net_deposits_retention": {"daily": round(nd_ret_daily, 2),   "monthly": round(nd_ret_monthly, 2),   "rr": rr_money(nd_ret_monthly)},
-            "ftd":         {"daily": ftd_daily,  "monthly": ftd_monthly,  "rr": rr_int(ftd_monthly)},
-            "ftc":         {"daily": ftc_daily,  "monthly": ftc_monthly,  "rr": rr_int(ftc_monthly)},
+            "date": today_str,
+            "month_start": month_start_str,
+            "working_days": wd_total,
+            "working_days_passed": wd_passed,
+            "working_days_left": wd_left,
+            "net_deposits": {"daily": round(nd_daily, 2), "monthly": round(nd_monthly, 2), "rr": rr_money(nd_monthly)},
+            "net_deposits_sales": {
+                "daily": round(nd_sales_daily, 2),
+                "monthly": round(nd_sales_monthly, 2),
+                "rr": rr_money(nd_sales_monthly),
+            },
+            "net_deposits_retention": {
+                "daily": round(nd_ret_daily, 2),
+                "monthly": round(nd_ret_monthly, 2),
+                "rr": rr_money(nd_ret_monthly),
+            },
+            "ftd": {"daily": ftd_daily, "monthly": ftd_monthly, "rr": rr_int(ftd_monthly)},
+            "ftc": {"daily": ftc_daily, "monthly": ftc_monthly, "rr": rr_int(ftc_monthly)},
             "open_volume": {"daily": round(ov_daily, 2), "monthly": round(ov_monthly, 2), "rr": rr_money(ov_monthly)},
             "pnl_cash": {
-                "daily":    pnl_daily,
+                "daily": pnl_daily,
                 "pnl_date": last_mtd_str,
             },
             "new_leads": {"daily": new_leads_today, "monthly": new_leads_month},
-            "new_live":  {"daily": new_live_today,  "monthly": new_live_month},
+            "new_live": {"daily": new_live_today, "monthly": new_live_month},
         }
     finally:
         conn.close()

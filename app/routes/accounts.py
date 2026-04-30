@@ -1,5 +1,11 @@
 from fastapi import APIRouter, BackgroundTasks
-from app.etl.fetch_and_store import run_accounts_etl, run_accounts_full_etl, run_accounts_by_qual_date_etl, run_accounts_by_created_date_etl
+
+from app.etl.fetch_and_store import (
+    run_accounts_by_created_date_etl,
+    run_accounts_by_qual_date_etl,
+    run_accounts_etl,
+    run_accounts_full_etl,
+)
 
 router = APIRouter()
 

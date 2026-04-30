@@ -1,5 +1,6 @@
 from fastapi import APIRouter, BackgroundTasks
 from fastapi.responses import JSONResponse
+
 from app.etl.fetch_and_store import (
     run_dealio_trades_mt5_etl,
     run_dealio_trades_mt5_full_etl,

@@ -1,5 +1,6 @@
 from fastapi import APIRouter, BackgroundTasks
 from fastapi.responses import JSONResponse
+
 from app.etl.fetch_and_store import run_dealio_daily_profit_etl, run_dealio_daily_profit_full_etl
 
 router = APIRouter()

@@ -78,6 +78,13 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["B011"]
+# Legacy style suppressions for the existing app/ codebase. New tests/ code stays strict.
+# Drop these entries as files are touched and modernised.
+"app/**/*.py" = [
+    "E701",  # multiple statements on one line (colon) — pervasive `if x: return` style
+    "E702",  # multiple statements on one line (semicolon) — same legacy style
+    "E402",  # module-level import not at top — intentional in app/main.py for warm-cache helpers
+]
 
 [tool.mypy]
 python_version = "3.11"

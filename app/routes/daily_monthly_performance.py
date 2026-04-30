@@ -1,23 +1,33 @@
+from datetime import datetime, timedelta
+
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+
+from app import cache
 from app.auth.dependencies import get_current_user
 from app.auth.role_filters import get_role_filter
 from app.db.postgres_conn import get_connection
-from app import cache
-from datetime import datetime, timedelta, date as date_type
 from app.routes.scoreboard import (
-    _apply_role_filter, _build_cls_filter, count_working_days,
-    last_day_of_month, _CLS_KPIS_SQL, _TZ, _TARGETS_CUTOFF,
+    _CLS_KPIS_SQL,
+    _TARGETS_CUTOFF,
+    _TZ,
+    _apply_role_filter,
+    _build_cls_filter,
+    count_working_days,
+    last_day_of_month,
 )
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
 _PAGE_URLS = {
-    "performance": "/performance", "agent_bonuses": "/agent-bonuses",
-    "marketing": "/campaign-performance", "dashboard": "/dashboard",
-    "total_traders": "/total-traders", "data_sync": "/data-sync",
+    "performance": "/performance",
+    "agent_bonuses": "/agent-bonuses",
+    "marketing": "/campaign-performance",
+    "dashboard": "/dashboard",
+    "total_traders": "/total-traders",
+    "data_sync": "/data-sync",
 }
 
 
@@ -40,12 +50,15 @@ async def daily_monthly_page(request: Request):
     else:
         show_sales = not role.startswith("retention_")
         show_retention = not role.startswith("sales_")
-    return templates.TemplateResponse("daily_monthly_performance.html", {
-        "request": request,
-        "current_user": user,
-        "show_sales": show_sales,
-        "show_retention": show_retention,
-    })
+    return templates.TemplateResponse(
+        "daily_monthly_performance.html",
+        {
+            "request": request,
+            "current_user": user,
+            "show_sales": show_sales,
+            "show_retention": show_retention,
+        },
+    )
 
 
 @router.get("/api/daily-monthly/sales")
@@ -56,14 +69,14 @@ async def dmp_sales_api(request: Request, date_from: str, date_to: str):
     role_filter = get_role_filter(user)
     cls_where, cls_params, cls_suffix = _build_cls_filter(request)
     has_cls = bool(cls_where)
-    _er = ','.join(sorted(user.get('extra_roles') or []))
+    _er = ",".join(sorted(user.get("extra_roles") or []))
     _ck = f"dmp_sales_v2:{user.get('role','')}:{_er}:{date_from}:{date_to}{cls_suffix}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
     try:
         dt_from = datetime.strptime(date_from, "%Y-%m-%d").date()
-        dt_to   = datetime.strptime(date_to,   "%Y-%m-%d").date()
+        dt_to = datetime.strptime(date_to, "%Y-%m-%d").date()
         date_to_exclusive = (dt_to + timedelta(days=1)).strftime("%Y-%m-%d")
     except ValueError:
         return JSONResponse(status_code=400, content={"detail": "Invalid date format"})
@@ -229,47 +242,48 @@ async def dmp_sales_api(request: Request, date_from: str, date_to: str):
 
             _ftd100_join = "JOIN accounts a ON a.accountid = f.accountid" if has_cls else ""
             _ftd100_where = cls_where if has_cls else ""
-            _prepared_sql = (sql
-                .replace("{_kpi_tbl}", _kpi_tbl)
+            _prepared_sql = (
+                sql.replace("{_kpi_tbl}", _kpi_tbl)
                 .replace("{tgt_subq}", _tgt_subq)
                 .replace("{ftd100_cls_join}", _ftd100_join)
-                .replace("{ftd100_cls_where}", _ftd100_where))
+                .replace("{ftd100_cls_where}", _ftd100_where)
+            )
             final_sql, final_params = _apply_role_filter(_prepared_sql, {**base_params, **cls_params}, role_filter)
             cur.execute(final_sql, final_params)
             rows = cur.fetchall()
 
         data = [
             {
-                "office_name":  r[0],
-                "agent_name":   r[1],
-                "department":   r[2],
-                "ftc":          r[3],
-                "target_ftc":   r[4],
-                "ftd100":       r[5],
-                "net_deposits":        round(r[6], 2),
-                "ftd_count":           r[7],
-                "monthly_ftd_amount":  round(float(r[8] or 0), 2),
-                "daily_ftd":           int(r[9] or 0),
-                "daily_ftd_amount":    round(float(r[10] or 0), 2),
-                "daily_ftc":           int(r[11] or 0),
-                "daily_net":           round(float(r[12] or 0), 2),
-                "status":              r[13] or '',
-                "avg_scp":             round(float(r[14]), 1) if r[14] is not None else None,
-                "daily_avg_scp":       round(float(r[15]), 1) if r[15] is not None else None,
+                "office_name": r[0],
+                "agent_name": r[1],
+                "department": r[2],
+                "ftc": r[3],
+                "target_ftc": r[4],
+                "ftd100": r[5],
+                "net_deposits": round(r[6], 2),
+                "ftd_count": r[7],
+                "monthly_ftd_amount": round(float(r[8] or 0), 2),
+                "daily_ftd": int(r[9] or 0),
+                "daily_ftd_amount": round(float(r[10] or 0), 2),
+                "daily_ftc": int(r[11] or 0),
+                "daily_net": round(float(r[12] or 0), 2),
+                "status": r[13] or "",
+                "avg_scp": round(float(r[14]), 1) if r[14] is not None else None,
+                "daily_avg_scp": round(float(r[15]), 1) if r[15] is not None else None,
             }
             for r in rows
         ]
 
         today = datetime.now(_TZ).date()
-        month_end           = last_day_of_month(dt_from)
-        working_days        = count_working_days(dt_from, month_end, holidays)
+        month_end = last_day_of_month(dt_from)
+        working_days = count_working_days(dt_from, month_end, holidays)
         working_days_passed = count_working_days(dt_from, min(dt_to, today), holidays)
-        working_days_left   = working_days - working_days_passed
+        working_days_left = working_days - working_days_passed
 
-        month_start   = dt_from.replace(day=1)
+        month_start = dt_from.replace(day=1)
         wd_full_month = count_working_days(month_start, month_end, holidays)
-        wd_in_range   = count_working_days(dt_from, dt_to, holidays)
-        target_ratio  = 1.0 if dt_from.day == 1 or wd_full_month == 0 else round(wd_in_range / wd_full_month, 6)
+        wd_in_range = count_working_days(dt_from, dt_to, holidays)
+        target_ratio = 1.0 if dt_from.day == 1 or wd_full_month == 0 else round(wd_in_range / wd_full_month, 6)
 
         # ── General (Unassigned Sales Target) ───────────────────────
         with conn.cursor() as cur2:
@@ -283,28 +297,31 @@ async def dmp_sales_api(request: Request, date_from: str, date_to: str):
             agent_raw_sum = sum(r["target_ftc"] for r in data)
             gap = company_ftc - agent_raw_sum
             if gap > 0:
-                data.append({
-                    "office_name":  "General",
-                    "agent_name":   "General",
-                    "department":   "Sales",
-                    "ftc":          0,
-                    "target_ftc":   round(gap),
-                    "ftd100":       0,
-                    "net_deposits": 0,
-                    "ftd_count":    0,
-                    "daily_ftd":    0,
-                    "daily_ftc":    0,
-                    "daily_net":    0,
-                    "status":       "Active",
-                    "avg_scp":      None,
-                })
+                data.append(
+                    {
+                        "office_name": "General",
+                        "agent_name": "General",
+                        "department": "Sales",
+                        "ftc": 0,
+                        "target_ftc": round(gap),
+                        "ftd100": 0,
+                        "net_deposits": 0,
+                        "ftd_count": 0,
+                        "daily_ftd": 0,
+                        "daily_ftc": 0,
+                        "daily_net": 0,
+                        "status": "Active",
+                        "avg_scp": None,
+                    }
+                )
 
         # ── Global totals (all agents, all departments — for KPI cards) ──
         g_daily_ftd = g_monthly_ftd = g_daily_ftc = g_monthly_ftc = 0
         g_daily_net = g_monthly_net = 0.0
         try:
             with conn.cursor() as cur_g:
-                cur_g.execute("""
+                cur_g.execute(
+                    """
                     SELECT
                         COALESCE(SUM(CASE WHEN k.tx_date = %(date_to)s  THEN k.ftd_count ELSE 0 END), 0)::int,
                         COALESCE(SUM(CASE WHEN k.tx_date >= %(date_from)s AND k.tx_date < %(date_to_excl)s THEN k.ftd_count ELSE 0 END), 0)::int,
@@ -317,29 +334,36 @@ async def dmp_sales_api(request: Request, date_from: str, date_to: str):
                     WHERE TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'
                       AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
                       AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'duplicated%%'
-                """, {"date_from": date_from, "date_to_excl": date_to_exclusive, "date_to": date_to})
+                """,
+                    {"date_from": date_from, "date_to_excl": date_to_exclusive, "date_to": date_to},
+                )
                 gr = cur_g.fetchone()
                 if gr:
-                    g_daily_ftd, g_monthly_ftd, g_daily_ftc, g_monthly_ftc = int(gr[0]), int(gr[1]), int(gr[2]), int(gr[3])
+                    g_daily_ftd, g_monthly_ftd, g_daily_ftc, g_monthly_ftc = (
+                        int(gr[0]),
+                        int(gr[1]),
+                        int(gr[2]),
+                        int(gr[3]),
+                    )
                     g_daily_net, g_monthly_net = round(float(gr[4]), 2), round(float(gr[5]), 2)
         except Exception as _ge:
             print(f"[dmp_sales] global totals query failed: {_ge}")
 
         _result = {
-            "rows":                 data,
-            "working_days":         working_days,
-            "working_days_passed":  working_days_passed,
-            "working_days_left":    working_days_left,
-            "target_ratio":         target_ratio,
-            "wd_in_range":          wd_in_range,
-            "date_from":            date_from,
-            "date_to":              date_to,
-            "global_daily_ftd":     g_daily_ftd,
-            "global_monthly_ftd":   g_monthly_ftd,
-            "global_daily_ftc":     g_daily_ftc,
-            "global_monthly_ftc":   g_monthly_ftc,
-            "global_daily_net":     g_daily_net,
-            "global_monthly_net":   g_monthly_net,
+            "rows": data,
+            "working_days": working_days,
+            "working_days_passed": working_days_passed,
+            "working_days_left": working_days_left,
+            "target_ratio": target_ratio,
+            "wd_in_range": wd_in_range,
+            "date_from": date_from,
+            "date_to": date_to,
+            "global_daily_ftd": g_daily_ftd,
+            "global_monthly_ftd": g_monthly_ftd,
+            "global_daily_ftc": g_daily_ftc,
+            "global_monthly_ftc": g_monthly_ftc,
+            "global_daily_net": g_daily_net,
+            "global_monthly_net": g_monthly_net,
         }
         cache.set(_ck, _result)
         return JSONResponse(content=_result)
@@ -357,14 +381,14 @@ async def dmp_retention_api(request: Request, date_from: str, date_to: str):
     role_filter = get_role_filter(user)
     cls_where, cls_params, cls_suffix = _build_cls_filter(request)
     has_cls = bool(cls_where)
-    _er = ','.join(sorted(user.get('extra_roles') or []))
+    _er = ",".join(sorted(user.get("extra_roles") or []))
     _ck = f"dmp_ret_v4:{user.get('role','')}:{_er}:{date_from}:{date_to}{cls_suffix}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
     try:
         dt_from = datetime.strptime(date_from, "%Y-%m-%d").date()
-        dt_to   = datetime.strptime(date_to,   "%Y-%m-%d").date()
+        dt_to = datetime.strptime(date_to, "%Y-%m-%d").date()
         date_to_exclusive = (dt_to + timedelta(days=1)).strftime("%Y-%m-%d")
         last_day = last_day_of_month(dt_from).strftime("%Y-%m-%d")
     except ValueError:
@@ -565,10 +589,10 @@ async def dmp_retention_api(request: Request, date_from: str, date_to: str):
                     FROM targets
                     WHERE date = DATE_TRUNC('month', %(date_from)s::date)"""
             base_params = {
-                "date_from":    date_from,
+                "date_from": date_from,
                 "date_to_excl": date_to_exclusive,
-                "date_to":      date_to,
-                "last_day":     last_day,
+                "date_to": date_to,
+                "last_day": last_day,
             }
 
             if has_cls:
@@ -614,23 +638,23 @@ async def dmp_retention_api(request: Request, date_from: str, date_to: str):
 
         data = [
             {
-                "office_name":     r[0],
-                "dept_name":       r[1],
-                "agent_name":      r[2],
-                "target_net":      round(r[3], 2),
-                "net_usd":         round(r[4], 2),
-                "deposit_usd":     round(r[5], 2),
+                "office_name": r[0],
+                "dept_name": r[1],
+                "agent_name": r[2],
+                "target_net": round(r[3], 2),
+                "net_usd": round(r[4], 2),
+                "deposit_usd": round(r[5], 2),
                 "open_volume_usd": round(r[6], 2),
-                "daily_net_usd":   round(float(r[7] or 0), 2),
-                "status":          r[8] or '',
-                "std_count":       int(r[9] or 0),
-                "traders_count":   int(r[10] or 0),
-                "rdp_net":         round(rdp_map.get(int(r[11] or 0), 0.0), 2),
-                "daily_traders":   int(r[12] or 0),
-                "daily_loads":     int(r[13] or 0),
-                "daily_std":       int(r[14] or 0),
-                "monthly_loads":   int(r[15] or 0),
-                "daily_avg_scp":   round(float(r[16]), 1) if r[16] is not None else None,
+                "daily_net_usd": round(float(r[7] or 0), 2),
+                "status": r[8] or "",
+                "std_count": int(r[9] or 0),
+                "traders_count": int(r[10] or 0),
+                "rdp_net": round(rdp_map.get(int(r[11] or 0), 0.0), 2),
+                "daily_traders": int(r[12] or 0),
+                "daily_loads": int(r[13] or 0),
+                "daily_std": int(r[14] or 0),
+                "monthly_loads": int(r[15] or 0),
+                "daily_avg_scp": round(float(r[16]), 1) if r[16] is not None else None,
                 "monthly_avg_scp": round(float(r[17]), 1) if r[17] is not None else None,
                 "daily_traders_hq": int(r[18] or 0),
             }
@@ -646,7 +670,8 @@ async def dmp_retention_api(request: Request, date_from: str, date_to: str):
         """
         with conn.cursor() as cur2:
             # Daily traders (global distinct)
-            cur2.execute(f"""
+            cur2.execute(
+                f"""
                 SELECT COUNT(DISTINCT rt.accountid)
                 FROM mv_retention_traders rt
                 JOIN accounts a ON a.accountid = rt.accountid
@@ -654,11 +679,14 @@ async def dmp_retention_api(request: Request, date_from: str, date_to: str):
                 WHERE rt.day = %(date_to)s::date
                   AND a.is_test_account = 0 AND (a.is_demo = 0 OR a.is_demo IS NULL)
                   {_global_base}
-            """, _gp)
+            """,
+                _gp,
+            )
             _daily_traders_global = int(cur2.fetchone()[0] or 0)
 
             # Daily traders A,A+ (global distinct — classification score 6-10 with age fallback)
-            cur2.execute(f"""
+            cur2.execute(
+                f"""
                 SELECT COUNT(DISTINCT rt.accountid)
                 FROM mv_retention_traders rt
                 JOIN accounts a ON a.accountid = rt.accountid
@@ -675,11 +703,14 @@ async def dmp_retention_api(request: Request, date_from: str, date_to: str):
                               WHEN DATE_PART('year', AGE(%(date_to)s::date, a.birth_date::date)) >= 45 THEN 7
                               ELSE NULL END
                             ELSE NULL END) BETWEEN 6 AND 10
-            """, _gp)
+            """,
+                _gp,
+            )
             _daily_traders_hq_global = int(cur2.fetchone()[0] or 0)
 
             # Monthly depositors (global distinct)
-            cur2.execute(f"""
+            cur2.execute(
+                """
                 SELECT COUNT(DISTINCT a.accountid)
                 FROM transactions t
                 JOIN accounts a ON a.accountid = t.vtigeraccountid
@@ -696,11 +727,14 @@ async def dmp_retention_api(request: Request, date_from: str, date_to: str):
                   AND u.department_ = 'Retention'
                   AND t.confirmation_time >= %(date_from)s::timestamp
                   AND t.confirmation_time < %(date_to_excl)s::timestamp
-            """, _gp)
+            """,
+                _gp,
+            )
             _monthly_loads_global = int(cur2.fetchone()[0] or 0)
 
             # Daily depositors (global distinct)
-            cur2.execute(f"""
+            cur2.execute(
+                """
                 SELECT COUNT(DISTINCT a.accountid)
                 FROM transactions t
                 JOIN accounts a ON a.accountid = t.vtigeraccountid
@@ -717,31 +751,33 @@ async def dmp_retention_api(request: Request, date_from: str, date_to: str):
                   AND u.department_ = 'Retention'
                   AND t.confirmation_time >= %(date_to)s::timestamp
                   AND t.confirmation_time < (%(date_to)s::date + 1)::timestamp
-            """, _gp)
+            """,
+                _gp,
+            )
             _daily_loads_global = int(cur2.fetchone()[0] or 0)
 
-        today               = datetime.now(_TZ).date()
-        month_end           = last_day_of_month(dt_from)
-        working_days        = count_working_days(dt_from, month_end, holidays)
+        today = datetime.now(_TZ).date()
+        month_end = last_day_of_month(dt_from)
+        working_days = count_working_days(dt_from, month_end, holidays)
         working_days_passed = count_working_days(dt_from, min(dt_to, today), holidays)
-        working_days_left   = working_days - working_days_passed
+        working_days_left = working_days - working_days_passed
 
-        month_start   = dt_from.replace(day=1)
+        month_start = dt_from.replace(day=1)
         wd_full_month = count_working_days(month_start, month_end, holidays)
-        wd_in_range   = count_working_days(dt_from, dt_to, holidays)
-        target_ratio  = 1.0 if dt_from.day == 1 or wd_full_month == 0 else round(wd_in_range / wd_full_month, 6)
+        wd_in_range = count_working_days(dt_from, dt_to, holidays)
+        target_ratio = 1.0 if dt_from.day == 1 or wd_full_month == 0 else round(wd_in_range / wd_full_month, 6)
 
         _result = {
-            "rows":                    data,
-            "working_days":            working_days,
-            "working_days_passed":     working_days_passed,
-            "working_days_left":       working_days_left,
-            "target_ratio":            target_ratio,
-            "wd_in_range":             wd_in_range,
-            "global_daily_traders":    _daily_traders_global,
+            "rows": data,
+            "working_days": working_days,
+            "working_days_passed": working_days_passed,
+            "working_days_left": working_days_left,
+            "target_ratio": target_ratio,
+            "wd_in_range": wd_in_range,
+            "global_daily_traders": _daily_traders_global,
             "global_daily_traders_hq": _daily_traders_hq_global,
-            "global_monthly_loads":    _monthly_loads_global,
-            "global_daily_loads":      _daily_loads_global,
+            "global_monthly_loads": _monthly_loads_global,
+            "global_daily_loads": _daily_loads_global,
         }
         cache.set(_ck, _result)
         return JSONResponse(content=_result)
@@ -753,15 +789,15 @@ async def dmp_retention_api(request: Request, date_from: str, date_to: str):
 
 # ── Marketing table ────────────────────────────────────────────────────────────
 _MKT_G1_EXPRS = {
-    "marketing_group":     "COALESCE(c.marketing_group,     '(Unassigned)')",
-    "campaign_channel":    "COALESCE(c.campaign_channel,    '(Unassigned)')",
-    "campaign_sub_channel":"COALESCE(c.campaign_sub_channel,'(Unassigned)')",
-    "original_affiliate":  "COALESCE(a.original_affiliate,  '(Unassigned)')",
+    "marketing_group": "COALESCE(c.marketing_group,     '(Unassigned)')",
+    "campaign_channel": "COALESCE(c.campaign_channel,    '(Unassigned)')",
+    "campaign_sub_channel": "COALESCE(c.campaign_sub_channel,'(Unassigned)')",
+    "original_affiliate": "COALESCE(a.original_affiliate,  '(Unassigned)')",
 }
 _MKT_G2_EXPRS = {
-    "campaign_code_legacy":"COALESCE(c.campaign_legacy_id,  '(Unassigned)')",
-    "campaign_name":       "COALESCE(c.campaign_name,       '(Unassigned)')",
-    "none":                "''",
+    "campaign_code_legacy": "COALESCE(c.campaign_legacy_id,  '(Unassigned)')",
+    "campaign_name": "COALESCE(c.campaign_name,       '(Unassigned)')",
+    "none": "''",
 }
 
 
@@ -786,12 +822,12 @@ async def dmp_marketing_api(
         return JSONResponse(content=_hit)
 
     try:
-        dt_to         = datetime.strptime(date_to, "%Y-%m-%d").date()
-        daily_from    = dt_to.strftime("%Y-%m-%d")
+        dt_to = datetime.strptime(date_to, "%Y-%m-%d").date()
+        daily_from = dt_to.strftime("%Y-%m-%d")
         daily_to_excl = (dt_to + timedelta(days=1)).strftime("%Y-%m-%d")
-        ltv30_from  = (dt_to - timedelta(days=29)).strftime("%Y-%m-%d")
-        ltv60_from  = (dt_to - timedelta(days=59)).strftime("%Y-%m-%d")
-        ltv90_from  = (dt_to - timedelta(days=89)).strftime("%Y-%m-%d")
+        ltv30_from = (dt_to - timedelta(days=29)).strftime("%Y-%m-%d")
+        ltv60_from = (dt_to - timedelta(days=59)).strftime("%Y-%m-%d")
+        ltv90_from = (dt_to - timedelta(days=89)).strftime("%Y-%m-%d")
         ltv120_from = (dt_to - timedelta(days=119)).strftime("%Y-%m-%d")
     except ValueError:
         return JSONResponse(status_code=400, content={"detail": "Invalid date format"})
@@ -899,35 +935,57 @@ async def dmp_marketing_api(
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute(sql, {
-                "df": daily_from, "dt": daily_to_excl,
-                "ltv30_from": ltv30_from, "ltv60_from": ltv60_from,
-                "ltv90_from": ltv90_from, "ltv120_from": ltv120_from,
-            })
+            cur.execute(
+                sql,
+                {
+                    "df": daily_from,
+                    "dt": daily_to_excl,
+                    "ltv30_from": ltv30_from,
+                    "ltv60_from": ltv60_from,
+                    "ltv90_from": ltv90_from,
+                    "ltv120_from": ltv120_from,
+                },
+            )
             rows = []
             for r in cur.fetchall():
-                dl = int(r[2] or 0); dv = int(r[3] or 0); df2 = int(r[5] or 0)
-                net30=float(r[9] or 0);  ftc30=int(r[10] or 0)
-                net60=float(r[11] or 0); ftc60=int(r[12] or 0)
-                net90=float(r[13] or 0); ftc90=int(r[14] or 0)
-                net120=float(r[15] or 0);ftc120=int(r[16] or 0)
-                rows.append({
-                    "g1":               r[0] or "(Unassigned)",
-                    "g2":               r[1] or "(Unassigned)",
-                    "daily_leads":      dl,
-                    "daily_live":       dv,
-                    "live_avg_scp":     round(float(r[4]), 1) if r[4] is not None else None,
-                    "daily_ftd":        df2,
-                    "daily_ftd_amount": round(float(r[6] or 0), 2),
-                    "ftd_avg_scp":      round(float(r[7]), 1) if r[7] is not None else None,
-                    "daily_ftc":        int(r[8] or 0),
-                    "cr_lead_live":     round(dv / dl * 100, 1) if dl > 0 else None,
-                    "cr_live_ftd":      round(df2 / dv * 100, 1) if dv > 0 else None,
-                    "net30":  round(net30,2),  "ftc30":  ftc30,  "ltv30":  round(net30/ftc30,2)   if ftc30  > 0 else None,
-                    "net60":  round(net60,2),  "ftc60":  ftc60,  "ltv60":  round(net60/ftc60,2)   if ftc60  > 0 else None,
-                    "net90":  round(net90,2),  "ftc90":  ftc90,  "ltv90":  round(net90/ftc90,2)   if ftc90  > 0 else None,
-                    "net120": round(net120,2), "ftc120": ftc120, "ltv120": round(net120/ftc120,2) if ftc120 > 0 else None,
-                })
+                dl = int(r[2] or 0)
+                dv = int(r[3] or 0)
+                df2 = int(r[5] or 0)
+                net30 = float(r[9] or 0)
+                ftc30 = int(r[10] or 0)
+                net60 = float(r[11] or 0)
+                ftc60 = int(r[12] or 0)
+                net90 = float(r[13] or 0)
+                ftc90 = int(r[14] or 0)
+                net120 = float(r[15] or 0)
+                ftc120 = int(r[16] or 0)
+                rows.append(
+                    {
+                        "g1": r[0] or "(Unassigned)",
+                        "g2": r[1] or "(Unassigned)",
+                        "daily_leads": dl,
+                        "daily_live": dv,
+                        "live_avg_scp": round(float(r[4]), 1) if r[4] is not None else None,
+                        "daily_ftd": df2,
+                        "daily_ftd_amount": round(float(r[6] or 0), 2),
+                        "ftd_avg_scp": round(float(r[7]), 1) if r[7] is not None else None,
+                        "daily_ftc": int(r[8] or 0),
+                        "cr_lead_live": round(dv / dl * 100, 1) if dl > 0 else None,
+                        "cr_live_ftd": round(df2 / dv * 100, 1) if dv > 0 else None,
+                        "net30": round(net30, 2),
+                        "ftc30": ftc30,
+                        "ltv30": round(net30 / ftc30, 2) if ftc30 > 0 else None,
+                        "net60": round(net60, 2),
+                        "ftc60": ftc60,
+                        "ltv60": round(net60 / ftc60, 2) if ftc60 > 0 else None,
+                        "net90": round(net90, 2),
+                        "ftc90": ftc90,
+                        "ltv90": round(net90 / ftc90, 2) if ftc90 > 0 else None,
+                        "net120": round(net120, 2),
+                        "ftc120": ftc120,
+                        "ltv120": round(net120 / ftc120, 2) if ftc120 > 0 else None,
+                    }
+                )
         _result = {"rows": rows, "date": daily_from, "group1": group1, "group2": group2}
         cache.set(_ck, _result, ttl=120)
         return JSONResponse(content=_result)

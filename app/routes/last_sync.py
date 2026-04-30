@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, RedirectResponse
+
 from app.auth.dependencies import get_current_user
 from app.db.postgres_conn import get_last_sync_times, get_mv_status
 

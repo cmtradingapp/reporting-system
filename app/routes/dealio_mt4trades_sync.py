@@ -1,9 +1,12 @@
 from fastapi import APIRouter, BackgroundTasks
 from fastapi.responses import JSONResponse
+
 from app.etl.fetch_and_store import (
-    run_dealio_mt4trades_etl, run_dealio_mt4trades_full_etl,
-    run_dealio_trades_mt4_missing_etl, run_dealio_trades_mt4_refresh_notional_etl,
+    run_dealio_mt4trades_etl,
+    run_dealio_mt4trades_full_etl,
+    run_dealio_trades_mt4_missing_etl,
     run_dealio_trades_mt4_rebuild_etl,
+    run_dealio_trades_mt4_refresh_notional_etl,
 )
 
 router = APIRouter()
@@ -39,4 +42,6 @@ def sync_dealio_trades_mt4_refresh_notional(background_tasks: BackgroundTasks, h
 @router.post("/sync/dealio-trades-mt4/rebuild")
 def sync_dealio_trades_mt4_rebuild(background_tasks: BackgroundTasks):
     background_tasks.add_task(run_dealio_trades_mt4_rebuild_etl)
-    return JSONResponse(content={"status": "started", "info": "truncating and re-syncing all rows, incremental scheduler paused"})
+    return JSONResponse(
+        content={"status": "started", "info": "truncating and re-syncing all rows, incremental scheduler paused"}
+    )

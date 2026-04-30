@@ -1,8 +1,10 @@
+import time
+
+import pandas as pd
 import pymysql
 import pymysql.cursors
-import pandas as pd
-import time
-from app.config import MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DB
+
+from app.config import MYSQL_DB, MYSQL_HOST, MYSQL_PASSWORD, MYSQL_PORT, MYSQL_USER
 
 CHUNK_SIZE = 50_000
 
@@ -1037,9 +1039,12 @@ _TRADING_ACCOUNTS_SELECT = """
 def get_trading_accounts(hours: int = 24) -> pd.DataFrame:
     conn = _get_connection()
     try:
-        query = _TRADING_ACCOUNTS_SELECT + f"""
+        query = (
+            _TRADING_ACCOUNTS_SELECT
+            + f"""
           AND bu.last_update_time >= DATE_ADD(UTC_TIMESTAMP(), INTERVAL -{hours} HOUR)
         """
+        )
         return pd.read_sql(query, conn)
     finally:
         conn.close()

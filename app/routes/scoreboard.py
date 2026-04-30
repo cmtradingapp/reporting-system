@@ -1,28 +1,31 @@
+import calendar
+from datetime import date as date_type
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+
+from app import cache
 from app.auth.dependencies import get_current_user
 from app.auth.role_filters import get_role_filter
 from app.db.postgres_conn import get_connection
-from app import cache
-from datetime import datetime, timedelta, date as date_type
-from zoneinfo import ZoneInfo
-import calendar
 
 _TZ = ZoneInfo("Europe/Nicosia")
 _TARGETS_CUTOFF = date_type(2026, 5, 1)
 
 
 def _apply_role_filter(sql: str, params: dict, role_filter: dict) -> tuple[str, dict]:
-    if not role_filter['crm_where']:
-        return sql.replace('{role_filter}', ''), params
-    named_where = role_filter['crm_where']
+    if not role_filter["crm_where"]:
+        return sql.replace("{role_filter}", ""), params
+    named_where = role_filter["crm_where"]
     extra = {}
-    for i, val in enumerate(role_filter['crm_params']):
-        key = f'_rf{i}'
-        named_where = named_where.replace('%s', f'%({key})s', 1)
+    for i, val in enumerate(role_filter["crm_params"]):
+        key = f"_rf{i}"
+        named_where = named_where.replace("%s", f"%({key})s", 1)
         extra[key] = val
-    return sql.replace('{role_filter}', named_where), {**params, **extra}
+    return sql.replace("{role_filter}", named_where), {**params, **extra}
 
 
 def _build_cls_filter(request: Request) -> tuple[str, dict, str]:
@@ -126,9 +129,14 @@ async def scoreboard_page(request: Request):
         # Prefer daily_monthly as first fallback (renamed to "Performance")
         if "daily_monthly" in ap:
             return RedirectResponse(url="/daily-monthly", status_code=302)
-        _page_urls = {"agent_bonuses": "/agent-bonuses", "marketing": "/campaign-performance",
-                       "dashboard": "/dashboard", "total_traders": "/total-traders",
-                       "performance": "/performance", "data_sync": "/data-sync"}
+        _page_urls = {
+            "agent_bonuses": "/agent-bonuses",
+            "marketing": "/campaign-performance",
+            "dashboard": "/dashboard",
+            "total_traders": "/total-traders",
+            "performance": "/performance",
+            "data_sync": "/data-sync",
+        }
         for p in ap:
             if p in _page_urls:
                 return RedirectResponse(url=_page_urls[p], status_code=302)
@@ -138,29 +146,34 @@ async def scoreboard_page(request: Request):
 
     if role == "agent":
         dept = user.get("department_") or ""
-        show_sales     = dept != "Retention" or "perf_sales"     in _ap
-        show_retention = dept != "Sales"     or "perf_retention" in _ap
+        show_sales = dept != "Retention" or "perf_sales" in _ap
+        show_retention = dept != "Sales" or "perf_retention" in _ap
     else:
-        show_sales     = (not role.startswith("retention_")) or "perf_sales"     in _ap
-        show_retention = (not role.startswith("sales_"))     or "perf_retention" in _ap
+        show_sales = (not role.startswith("retention_")) or "perf_sales" in _ap
+        show_retention = (not role.startswith("sales_")) or "perf_retention" in _ap
 
     # Allow explicit per-user grants via allowed_pages
-    if "perf_sales"     in _ap: show_sales     = True
-    if "perf_retention" in _ap: show_retention = True
+    if "perf_sales" in _ap:
+        show_sales = True
+    if "perf_retention" in _ap:
+        show_retention = True
 
     # CRO view: admin@cmtrading.com sees both; sales_all sees sales CRO; retention_all sees retention CRO
     # Individual users can also get access via "cro_sales" / "cro_retention" in allowed_pages
-    show_cro_sales     = _is_cro_admin or role == "sales_all"     or "cro_sales"     in _ap
+    show_cro_sales = _is_cro_admin or role == "sales_all" or "cro_sales" in _ap
     show_cro_retention = _is_cro_admin or role == "retention_all" or "cro_retention" in _ap
 
-    return templates.TemplateResponse("scoreboard.html", {
-        "request": request,
-        "current_user": user,
-        "show_sales": show_sales,
-        "show_retention": show_retention,
-        "show_cro_sales": show_cro_sales,
-        "show_cro_retention": show_cro_retention,
-    })
+    return templates.TemplateResponse(
+        "scoreboard.html",
+        {
+            "request": request,
+            "current_user": user,
+            "show_sales": show_sales,
+            "show_retention": show_retention,
+            "show_cro_sales": show_cro_sales,
+            "show_cro_retention": show_cro_retention,
+        },
+    )
 
 
 @router.get("/api/performance")
@@ -171,14 +184,14 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
     role_filter = get_role_filter(user)
     cls_where, cls_params, cls_suffix = _build_cls_filter(request)
     has_cls = bool(cls_where)
-    _er = ','.join(sorted(user.get('extra_roles') or []))
+    _er = ",".join(sorted(user.get("extra_roles") or []))
     _ck = f"perf_v26:{user.get('role','')}:{_er}:{date_from}:{date_to}{cls_suffix}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
     try:
         dt_from = datetime.strptime(date_from, "%Y-%m-%d").date()
-        dt_to   = datetime.strptime(date_to,   "%Y-%m-%d").date()
+        dt_to = datetime.strptime(date_to, "%Y-%m-%d").date()
         date_to_exclusive = (dt_to + timedelta(days=1)).strftime("%Y-%m-%d")
     except ValueError:
         return JSONResponse(status_code=400, content={"detail": "Invalid date format"})
@@ -282,11 +295,12 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
 
             _ftd100_join = "JOIN accounts a ON a.accountid = f.accountid" if has_cls else ""
             _ftd100_where = cls_where if has_cls else ""
-            _prepared_sql = (sql
-                .replace("{_kpi_tbl}", _kpi_tbl)
+            _prepared_sql = (
+                sql.replace("{_kpi_tbl}", _kpi_tbl)
                 .replace("{tgt_subq}", _tgt_subq)
                 .replace("{ftd100_cls_join}", _ftd100_join)
-                .replace("{ftd100_cls_where}", _ftd100_where))
+                .replace("{ftd100_cls_where}", _ftd100_where)
+            )
             final_sql, final_params = _apply_role_filter(_prepared_sql, {**base_params, **cls_params}, role_filter)
             cur.execute(final_sql, final_params)
             rows = cur.fetchall()
@@ -294,7 +308,8 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
             _gp = {**base_params, **cls_params}
 
             # ── Combined KPI aggregates (replaces 6 separate queries) ──
-            cur.execute(f"""
+            cur.execute(
+                f"""
                 SELECT
                     COALESCE(SUM(CASE WHEN qual_date >= %(date_from)s AND qual_date < %(date_to_excl)s
                                       THEN ftc_count ELSE 0 END), 0)::int,
@@ -310,7 +325,9 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
                    OR (tx_date  >= %(date_from)s AND tx_date  < %(date_to_excl)s)
                    OR  tx_date  = %(date_to)s
                    OR  qual_date = %(date_to)s
-            """, _gp)
+            """,
+                _gp,
+            )
             _kpi = cur.fetchone()
             grand_ftc = int(_kpi[0])
             grand_ftd = int(_kpi[1])
@@ -321,7 +338,8 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
                 daily_net = float(_kpi[5])
             else:
                 # NET from mv_run_rate (pre-aggregated by dept_group)
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT
                         COALESCE(SUM(CASE WHEN tx_date >= %(date_from)s AND tx_date < %(date_to_excl)s
                                           THEN net_usd ELSE 0 END), 0),
@@ -329,22 +347,28 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
                     FROM mv_run_rate
                     WHERE dept_group = 'all'
                       AND ((tx_date >= %(date_from)s AND tx_date < %(date_to_excl)s) OR tx_date = %(date_to)s)
-                """, _gp)
+                """,
+                    _gp,
+                )
                 _net = cur.fetchone()
                 grand_net = float(_net[0])
                 daily_net = float(_net[1])
 
             # Open Volume — from mv_volume_stats
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT COALESCE(SUM(notional_usd), 0)
                 FROM mv_volume_stats
                 WHERE open_date >= %(date_from)s AND open_date <= %(date_to)s
-            """, {"date_from": date_from, "date_to": date_to})
+            """,
+                {"date_from": date_from, "date_to": date_to},
+            )
             open_volume = float(cur.fetchone()[0] or 0)
 
             # End Equity Zeroed — heavy CTE (deadlock-prone during MV refresh)
             try:
-                cur.execute("""
+                cur.execute(
+                    """
                     WITH latest_equity AS (
                         SELECT DISTINCT ON (login)
                             login, convertedbalance, convertedfloatingpnl
@@ -376,7 +400,9 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
                     LEFT JOIN old_bonus_balance ob ON ob.login::bigint = d.login
                     WHERE a.is_test_account = 0
                       AND (ta.deleted = 0 OR ta.deleted IS NULL)
-                """, {"date_to": date_to})
+                """,
+                    {"date_to": date_to},
+                )
                 end_equity_zeroed = float(cur.fetchone()[0] or 0)
             except Exception as _eez_err:
                 conn.rollback()
@@ -392,87 +418,90 @@ async def scoreboard_api(request: Request, date_from: str, date_to: str):
             row = cur.fetchone()
             if row:
                 new_leads_today, new_leads_month, new_live_today, new_live_month = (
-                    int(row[0] or 0), int(row[1] or 0), int(row[2] or 0), int(row[3] or 0)
+                    int(row[0] or 0),
+                    int(row[1] or 0),
+                    int(row[2] or 0),
+                    int(row[3] or 0),
                 )
             else:
                 new_leads_today = new_leads_month = new_live_today = new_live_month = 0
 
         data = [
             {
-                "office_name":  r[0],
-                "agent_name":   r[1],
-                "department":   r[2],
-                "ftc":          r[3],
-                "target_ftc":   r[4],
-                "ftd100":       r[5],
+                "office_name": r[0],
+                "agent_name": r[1],
+                "department": r[2],
+                "ftc": r[3],
+                "target_ftc": r[4],
+                "ftd100": r[5],
                 "net_deposits": round(r[6], 2),
-                "ftd_count":    r[7],
-                "daily_ftd":    int(r[8] or 0),
-                "daily_ftc":    int(r[9] or 0),
-                "daily_net":    round(float(r[10] or 0), 2),
-                "status":       r[11] or '',
+                "ftd_count": r[7],
+                "daily_ftd": int(r[8] or 0),
+                "daily_ftc": int(r[9] or 0),
+                "daily_net": round(float(r[10] or 0), 2),
+                "status": r[11] or "",
             }
             for r in rows
         ]
 
         # For restricted users, derive card values from filtered rows
-        if not role_filter['is_full_access']:
-            grand_ftc  = sum(r["ftc"] for r in data)
-            grand_net  = sum(r["net_deposits"] for r in data)
-            grand_ftd  = sum(r["ftd_count"] for r in data)
-            daily_ftd  = sum(r["daily_ftd"] for r in data)
-            daily_ftc  = sum(r["daily_ftc"] for r in data)
-            daily_net  = sum(r["daily_net"] for r in data)
+        if not role_filter["is_full_access"]:
+            grand_ftc = sum(r["ftc"] for r in data)
+            grand_net = sum(r["net_deposits"] for r in data)
+            grand_ftd = sum(r["ftd_count"] for r in data)
+            daily_ftd = sum(r["daily_ftd"] for r in data)
+            daily_ftc = sum(r["daily_ftc"] for r in data)
+            daily_net = sum(r["daily_net"] for r in data)
             open_volume = 0.0
             end_equity_zeroed = 0.0
             new_leads_today = new_leads_month = new_live_today = new_live_month = 0
 
         today = datetime.now(_TZ).date()
-        month_end           = last_day_of_month(dt_from)
-        working_days        = count_working_days(dt_from, month_end, holidays)
+        month_end = last_day_of_month(dt_from)
+        working_days = count_working_days(dt_from, month_end, holidays)
         working_days_passed = count_working_days(dt_from, min(dt_to, today), holidays)
-        working_days_left   = working_days - working_days_passed
+        working_days_left = working_days - working_days_passed
 
         # Pro-rate targets for sub-month ranges
-        month_start   = dt_from.replace(day=1)
+        month_start = dt_from.replace(day=1)
         wd_full_month = count_working_days(month_start, month_end, holidays)
-        wd_in_range   = count_working_days(dt_from, dt_to, holidays)
-        target_ratio  = 1.0 if dt_from.day == 1 or wd_full_month == 0 else round(wd_in_range / wd_full_month, 6)
+        wd_in_range = count_working_days(dt_from, dt_to, holidays)
+        target_ratio = 1.0 if dt_from.day == 1 or wd_full_month == 0 else round(wd_in_range / wd_full_month, 6)
 
-        safe_wdp        = working_days_passed if working_days_passed > 0 else 1
-        grand_ftc_rr    = round(grand_ftc  / safe_wdp * working_days)
-        grand_ftd_rr    = round(grand_ftd  / safe_wdp * working_days)
-        grand_net_rr    = round(grand_net  / safe_wdp * working_days, 2)
-        open_volume_rr  = round(open_volume / safe_wdp * working_days) if open_volume > 0 else round(open_volume)
+        safe_wdp = working_days_passed if working_days_passed > 0 else 1
+        grand_ftc_rr = round(grand_ftc / safe_wdp * working_days)
+        grand_ftd_rr = round(grand_ftd / safe_wdp * working_days)
+        grand_net_rr = round(grand_net / safe_wdp * working_days, 2)
+        open_volume_rr = round(open_volume / safe_wdp * working_days) if open_volume > 0 else round(open_volume)
 
         _result = {
-            "rows":                 data,
-            "total_ftc":            sum(r["ftc"] for r in data),
-            "total_target_ftc":     sum(r["target_ftc"] for r in data),
-            "total_ftd100":         sum(r["ftd100"] for r in data),
-            "total_net_deposits":   round(sum(r["net_deposits"] for r in data), 2),
-            "total_ftd_count":      sum(r["ftd_count"] for r in data),
-            "grand_ftc":            grand_ftc,
-            "grand_ftc_rr":         grand_ftc_rr,
-            "grand_ftd_rr":         grand_ftd_rr,
-            "grand_net":            round(grand_net, 2),
-            "grand_net_rr":         grand_net_rr,
-            "open_volume":          round(open_volume, 2),
-            "open_volume_rr":       open_volume_rr,
-            "end_equity_zeroed":    round(end_equity_zeroed, 2),
-            "grand_ftd":            grand_ftd,
-            "daily_net":            round(daily_net, 2),
-            "daily_ftd":            daily_ftd,
-            "daily_ftc":            daily_ftc,
-            "new_leads":            {"daily": new_leads_today, "monthly": new_leads_month},
-            "new_live":             {"daily": new_live_today,  "monthly": new_live_month},
-            "working_days":         working_days,
-            "working_days_passed":  working_days_passed,
-            "working_days_left":    working_days_left,
-            "target_ratio":         target_ratio,
-            "wd_in_range":          wd_in_range,
-            "date_from":            date_from,
-            "date_to":              date_to,
+            "rows": data,
+            "total_ftc": sum(r["ftc"] for r in data),
+            "total_target_ftc": sum(r["target_ftc"] for r in data),
+            "total_ftd100": sum(r["ftd100"] for r in data),
+            "total_net_deposits": round(sum(r["net_deposits"] for r in data), 2),
+            "total_ftd_count": sum(r["ftd_count"] for r in data),
+            "grand_ftc": grand_ftc,
+            "grand_ftc_rr": grand_ftc_rr,
+            "grand_ftd_rr": grand_ftd_rr,
+            "grand_net": round(grand_net, 2),
+            "grand_net_rr": grand_net_rr,
+            "open_volume": round(open_volume, 2),
+            "open_volume_rr": open_volume_rr,
+            "end_equity_zeroed": round(end_equity_zeroed, 2),
+            "grand_ftd": grand_ftd,
+            "daily_net": round(daily_net, 2),
+            "daily_ftd": daily_ftd,
+            "daily_ftc": daily_ftc,
+            "new_leads": {"daily": new_leads_today, "monthly": new_leads_month},
+            "new_live": {"daily": new_live_today, "monthly": new_live_month},
+            "working_days": working_days,
+            "working_days_passed": working_days_passed,
+            "working_days_left": working_days_left,
+            "target_ratio": target_ratio,
+            "wd_in_range": wd_in_range,
+            "date_from": date_from,
+            "date_to": date_to,
         }
         cache.set(_ck, _result)
         return JSONResponse(content=_result)
@@ -490,14 +519,14 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
     role_filter = get_role_filter(user)
     cls_where, cls_params, cls_suffix = _build_cls_filter(request)
     has_cls = bool(cls_where)
-    _er = ','.join(sorted(user.get('extra_roles') or []))
+    _er = ",".join(sorted(user.get("extra_roles") or []))
     _ck = f"perf_ret_v21:{user.get('role','')}:{_er}:{date_from}:{date_to}{cls_suffix}"
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
     try:
         dt_from = datetime.strptime(date_from, "%Y-%m-%d").date()
-        dt_to   = datetime.strptime(date_to,   "%Y-%m-%d").date()
+        dt_to = datetime.strptime(date_to, "%Y-%m-%d").date()
         date_to_exclusive = (dt_to + timedelta(days=1)).strftime("%Y-%m-%d")
         last_day = last_day_of_month(dt_from).strftime("%Y-%m-%d")
     except ValueError:
@@ -600,10 +629,10 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
                     FROM targets
                     WHERE date = DATE_TRUNC('month', %(date_from)s::date)"""
             base_params = {
-                "date_from":    date_from,
+                "date_from": date_from,
                 "date_to_excl": date_to_exclusive,
-                "date_to":      date_to,
-                "last_day":     last_day,
+                "date_to": date_to,
+                "last_day": last_day,
             }
 
             # When classification filter is active, create a temp table
@@ -621,7 +650,8 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
             _gp = {**base_params, **cls_params}
 
             # ── Combined KPI aggregates (replaces 9 separate queries) ──
-            cur.execute(f"""
+            cur.execute(
+                f"""
                 SELECT
                     COALESCE(SUM(CASE WHEN qual_date >= %(date_from)s AND qual_date < %(date_to_excl)s
                                       THEN ftc_count ELSE 0 END), 0)::int,
@@ -637,7 +667,9 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
                    OR (tx_date  >= %(date_from)s AND tx_date  < %(date_to_excl)s)
                    OR  tx_date  = %(date_to)s
                    OR  qual_date = %(date_to)s
-            """, _gp)
+            """,
+                _gp,
+            )
             _kpi = cur.fetchone()
             grand_ftc = int(_kpi[0])
             grand_ftd = int(_kpi[1])
@@ -649,7 +681,8 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
                 daily_net_retention = daily_net  # same table, no dept split
             else:
                 # NET from mv_run_rate (with dept_group split for retention daily)
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT
                         COALESCE(SUM(CASE WHEN dept_group = 'all' AND tx_date >= %(date_from)s AND tx_date < %(date_to_excl)s
                                           THEN net_usd ELSE 0 END), 0),
@@ -660,17 +693,22 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
                     FROM mv_run_rate
                     WHERE dept_group IN ('all', 'retention')
                       AND ((tx_date >= %(date_from)s AND tx_date < %(date_to_excl)s) OR tx_date = %(date_to)s)
-                """, _gp)
+                """,
+                    _gp,
+                )
                 _net = cur.fetchone()
                 grand_net = float(_net[0])
                 daily_net = float(_net[1])
                 daily_net_retention = float(_net[2])
 
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT COALESCE(SUM(notional_usd), 0)
                 FROM mv_volume_stats
                 WHERE open_date >= %(date_from)s AND open_date <= %(date_to)s
-            """, _gp)
+            """,
+                _gp,
+            )
             open_volume = float(cur.fetchone()[0] or 0)
 
             # New Leads + Live Accounts
@@ -681,7 +719,10 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
             row = cur.fetchone()
             if row:
                 new_leads_today, new_leads_month, new_live_today, new_live_month = (
-                    int(row[0] or 0), int(row[1] or 0), int(row[2] or 0), int(row[3] or 0)
+                    int(row[0] or 0),
+                    int(row[1] or 0),
+                    int(row[2] or 0),
+                    int(row[3] or 0),
                 )
             else:
                 new_leads_today = new_leads_month = new_live_today = new_live_month = 0
@@ -716,74 +757,74 @@ async def scoreboard_retention_api(request: Request, date_from: str, date_to: st
 
         data = [
             {
-                "office_name":     r[0],
-                "dept_name":       r[1],
-                "agent_name":      r[2],
-                "target_net":      round(r[3], 2),
-                "net_usd":         round(r[4], 2),
-                "deposit_usd":     round(r[5], 2),
+                "office_name": r[0],
+                "dept_name": r[1],
+                "agent_name": r[2],
+                "target_net": round(r[3], 2),
+                "net_usd": round(r[4], 2),
+                "deposit_usd": round(r[5], 2),
                 "open_volume_usd": round(r[6], 2),
-                "daily_net_usd":   round(float(r[7] or 0), 2),
-                "status":          r[8] or '',
-                "std_count":       int(r[9] or 0),
-                "traders_count":   int(r[10] or 0),
-                "rdp_net":         round(rdp_map.get(int(r[11] or 0), 0.0), 2),
+                "daily_net_usd": round(float(r[7] or 0), 2),
+                "status": r[8] or "",
+                "std_count": int(r[9] or 0),
+                "traders_count": int(r[10] or 0),
+                "rdp_net": round(rdp_map.get(int(r[11] or 0), 0.0), 2),
             }
             for r in rows
         ]
 
         # For restricted users, derive card values from filtered rows
-        if not role_filter['is_full_access']:
-            grand_net  = sum(r["net_usd"] for r in data)
-            grand_ftc  = 0
-            grand_ftd  = 0
-            daily_net  = sum(r["daily_net_usd"] for r in data)
+        if not role_filter["is_full_access"]:
+            grand_net = sum(r["net_usd"] for r in data)
+            grand_ftc = 0
+            grand_ftd = 0
+            daily_net = sum(r["daily_net_usd"] for r in data)
             daily_net_retention = daily_net
-            daily_ftd  = 0
-            daily_ftc  = 0
+            daily_ftd = 0
+            daily_ftc = 0
             open_volume = sum(r["open_volume_usd"] for r in data)
             new_leads_today = new_leads_month = new_live_today = new_live_month = 0
 
-        today               = datetime.now(_TZ).date()
-        month_end           = last_day_of_month(dt_from)
-        working_days        = count_working_days(dt_from, month_end, holidays)
+        today = datetime.now(_TZ).date()
+        month_end = last_day_of_month(dt_from)
+        working_days = count_working_days(dt_from, month_end, holidays)
         working_days_passed = count_working_days(dt_from, min(dt_to, today), holidays)
-        working_days_left   = working_days - working_days_passed
+        working_days_left = working_days - working_days_passed
 
         # Pro-rate targets for sub-month ranges
-        month_start   = dt_from.replace(day=1)
+        month_start = dt_from.replace(day=1)
         wd_full_month = count_working_days(month_start, month_end, holidays)
-        wd_in_range   = count_working_days(dt_from, dt_to, holidays)
-        target_ratio  = 1.0 if dt_from.day == 1 or wd_full_month == 0 else round(wd_in_range / wd_full_month, 6)
+        wd_in_range = count_working_days(dt_from, dt_to, holidays)
+        target_ratio = 1.0 if dt_from.day == 1 or wd_full_month == 0 else round(wd_in_range / wd_full_month, 6)
 
-        safe_wdp       = working_days_passed if working_days_passed > 0 else 1
-        grand_ftc_rr   = round(grand_ftc   / safe_wdp * working_days)
-        grand_ftd_rr   = round(grand_ftd   / safe_wdp * working_days)
-        grand_net_rr   = round(grand_net   / safe_wdp * working_days, 2)
+        safe_wdp = working_days_passed if working_days_passed > 0 else 1
+        grand_ftc_rr = round(grand_ftc / safe_wdp * working_days)
+        grand_ftd_rr = round(grand_ftd / safe_wdp * working_days)
+        grand_net_rr = round(grand_net / safe_wdp * working_days, 2)
         open_volume_rr = round(open_volume / safe_wdp * working_days) if open_volume > 0 else round(open_volume)
 
         _result = {
-            "rows":                    data,
-            "daily_net_retention":     round(daily_net_retention, 2),
-            "working_days":            working_days,
-            "working_days_passed":     working_days_passed,
-            "working_days_left":       working_days_left,
-            "target_ratio":            target_ratio,
-            "wd_in_range":             wd_in_range,
+            "rows": data,
+            "daily_net_retention": round(daily_net_retention, 2),
+            "working_days": working_days,
+            "working_days_passed": working_days_passed,
+            "working_days_left": working_days_left,
+            "target_ratio": target_ratio,
+            "wd_in_range": wd_in_range,
             # Global KPI stats (for retention-only users who don't call /api/performance)
-            "grand_ftc":               grand_ftc,
-            "grand_ftc_rr":            grand_ftc_rr,
-            "grand_ftd":               grand_ftd,
-            "grand_ftd_rr":            grand_ftd_rr,
-            "grand_net":               round(grand_net, 2),
-            "grand_net_rr":            grand_net_rr,
-            "open_volume":             round(open_volume, 2),
-            "open_volume_rr":          open_volume_rr,
-            "daily_ftd":               daily_ftd,
-            "daily_ftc":               daily_ftc,
-            "daily_net":               round(daily_net, 2),
-            "new_leads":               {"daily": new_leads_today, "monthly": new_leads_month},
-            "new_live":                {"daily": new_live_today,  "monthly": new_live_month},
+            "grand_ftc": grand_ftc,
+            "grand_ftc_rr": grand_ftc_rr,
+            "grand_ftd": grand_ftd,
+            "grand_ftd_rr": grand_ftd_rr,
+            "grand_net": round(grand_net, 2),
+            "grand_net_rr": grand_net_rr,
+            "open_volume": round(open_volume, 2),
+            "open_volume_rr": open_volume_rr,
+            "daily_ftd": daily_ftd,
+            "daily_ftc": daily_ftc,
+            "daily_net": round(daily_net, 2),
+            "new_leads": {"daily": new_leads_today, "monthly": new_leads_month},
+            "new_live": {"daily": new_live_today, "monthly": new_live_month},
         }
         cache.set(_ck, _result)
         return JSONResponse(content=_result)

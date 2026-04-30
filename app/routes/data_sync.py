@@ -1,15 +1,33 @@
+import logging
 import os
 import time as _time
-import logging
 from collections import defaultdict
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeoutError
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+
 from app.auth.dependencies import get_current_user
-from app.db.postgres_conn import fetch_accounts_stats, fetch_crm_users_stats, fetch_transactions_stats, fetch_targets_stats, fetch_trading_accounts_stats, fetch_ftd100_stats, fetch_sync_log, fetch_dealio_users_stats, fetch_dealio_trades_mt4_stats, fetch_dealio_trades_mt5_stats, fetch_dealio_daily_profits_stats, fetch_bonus_transactions_stats, fetch_campaigns_stats, fetch_mssql_dealio_mt5trades_stats
-from datetime import datetime, timezone, timedelta
-from zoneinfo import ZoneInfo
+from app.db.postgres_conn import (
+    fetch_accounts_stats,
+    fetch_bonus_transactions_stats,
+    fetch_campaigns_stats,
+    fetch_crm_users_stats,
+    fetch_dealio_daily_profits_stats,
+    fetch_dealio_trades_mt4_stats,
+    fetch_dealio_trades_mt5_stats,
+    fetch_dealio_users_stats,
+    fetch_ftd100_stats,
+    fetch_mssql_dealio_mt5trades_stats,
+    fetch_sync_log,
+    fetch_targets_stats,
+    fetch_trading_accounts_stats,
+    fetch_transactions_stats,
+)
 
 _stats_cache: dict = {}
 _CACHE_TTL = 90  # seconds
@@ -24,6 +42,7 @@ def _cached(key: str, fn):
     val = fn()
     _stats_cache[key] = (val, now)
     return val
+
 
 _TZ = ZoneInfo("Europe/Nicosia")
 
@@ -64,32 +83,32 @@ def _is_healthy(sync_log: list, interval_hours: int) -> bool:
 
 def warm_data_sync_cache():
     """Pre-heat all stats and log caches for the data sync page."""
-    _cached("accounts_stats",  fetch_accounts_stats)
-    _cached("users_stats",     fetch_crm_users_stats)
-    _cached("tx_stats",        fetch_transactions_stats)
-    _cached("targets_stats",   fetch_targets_stats)
-    _cached("ta_stats",        fetch_trading_accounts_stats)
-    _cached("ftd100_stats",    fetch_ftd100_stats)
-    _cached("du_stats",        fetch_dealio_users_stats)
-    _cached("dtm4_stats",      fetch_dealio_trades_mt4_stats)
-    _cached("dtm5_stats",      fetch_dealio_trades_mt5_stats)
-    _cached("ddps_stats",      fetch_dealio_daily_profits_stats)
-    _cached("bonus_stats",     fetch_bonus_transactions_stats)
+    _cached("accounts_stats", fetch_accounts_stats)
+    _cached("users_stats", fetch_crm_users_stats)
+    _cached("tx_stats", fetch_transactions_stats)
+    _cached("targets_stats", fetch_targets_stats)
+    _cached("ta_stats", fetch_trading_accounts_stats)
+    _cached("ftd100_stats", fetch_ftd100_stats)
+    _cached("du_stats", fetch_dealio_users_stats)
+    _cached("dtm4_stats", fetch_dealio_trades_mt4_stats)
+    _cached("dtm5_stats", fetch_dealio_trades_mt5_stats)
+    _cached("ddps_stats", fetch_dealio_daily_profits_stats)
+    _cached("bonus_stats", fetch_bonus_transactions_stats)
     _cached("campaigns_stats", fetch_campaigns_stats)
     _cached("mssql_dmt5_stats", fetch_mssql_dealio_mt5trades_stats)
-    _cached("accounts_log",    lambda: fetch_sync_log("crm_accounts",         limit=20))
-    _cached("users_log",       lambda: fetch_sync_log("crm_users",            limit=20))
-    _cached("tx_log",          lambda: fetch_sync_log("transactions",         limit=20))
-    _cached("targets_log",     lambda: fetch_sync_log("targets",              limit=20))
-    _cached("ta_log",          lambda: fetch_sync_log("trading_accounts",     limit=20))
-    _cached("ftd100_log",      lambda: fetch_sync_log("ftd100_clients",       limit=20))
-    _cached("du_log",          lambda: fetch_sync_log("dealio_users",         limit=20))
-    _cached("dtm4_log",        lambda: fetch_sync_log("dealio_trades_mt4",    limit=20))
-    _cached("dtm5_log",        lambda: fetch_sync_log("dealio_trades_mt5",    limit=20))
-    _cached("ddps_log",        lambda: fetch_sync_log("dealio_daily_profits", limit=20))
-    _cached("bonus_log",       lambda: fetch_sync_log("bonus_transactions",   limit=20))
-    _cached("campaigns_log",   lambda: fetch_sync_log("campaigns",            limit=20))
-    _cached("mssql_dmt5_log",  lambda: fetch_sync_log("mssql_dealio_mt5trades", limit=20))
+    _cached("accounts_log", lambda: fetch_sync_log("crm_accounts", limit=20))
+    _cached("users_log", lambda: fetch_sync_log("crm_users", limit=20))
+    _cached("tx_log", lambda: fetch_sync_log("transactions", limit=20))
+    _cached("targets_log", lambda: fetch_sync_log("targets", limit=20))
+    _cached("ta_log", lambda: fetch_sync_log("trading_accounts", limit=20))
+    _cached("ftd100_log", lambda: fetch_sync_log("ftd100_clients", limit=20))
+    _cached("du_log", lambda: fetch_sync_log("dealio_users", limit=20))
+    _cached("dtm4_log", lambda: fetch_sync_log("dealio_trades_mt4", limit=20))
+    _cached("dtm5_log", lambda: fetch_sync_log("dealio_trades_mt5", limit=20))
+    _cached("ddps_log", lambda: fetch_sync_log("dealio_daily_profits", limit=20))
+    _cached("bonus_log", lambda: fetch_sync_log("bonus_transactions", limit=20))
+    _cached("campaigns_log", lambda: fetch_sync_log("campaigns", limit=20))
+    _cached("mssql_dmt5_log", lambda: fetch_sync_log("mssql_dealio_mt5trades", limit=20))
 
 
 @router.get("/data-sync", response_class=HTMLResponse)
@@ -100,32 +119,32 @@ async def data_sync_page(request: Request):
     if user.get("role") != "admin" and "data_sync" not in (user.get("allowed_pages_list") or []):
         return RedirectResponse(url="/performance", status_code=302)
     jobs = {
-        "accounts_stats":  lambda: _cached("accounts_stats",  fetch_accounts_stats),
-        "users_stats":     lambda: _cached("users_stats",     fetch_crm_users_stats),
-        "tx_stats":        lambda: _cached("tx_stats",        fetch_transactions_stats),
-        "targets_stats":   lambda: _cached("targets_stats",   fetch_targets_stats),
-        "ta_stats":        lambda: _cached("ta_stats",        fetch_trading_accounts_stats),
-        "ftd100_stats":    lambda: _cached("ftd100_stats",    fetch_ftd100_stats),
-        "du_stats":        lambda: _cached("du_stats",        fetch_dealio_users_stats),
-        "dtm4_stats":      lambda: _cached("dtm4_stats",      fetch_dealio_trades_mt4_stats),
-        "dtm5_stats":      lambda: _cached("dtm5_stats",      fetch_dealio_trades_mt5_stats),
-        "ddps_stats":      lambda: _cached("ddps_stats",      fetch_dealio_daily_profits_stats),
-        "bonus_stats":     lambda: _cached("bonus_stats",     fetch_bonus_transactions_stats),
+        "accounts_stats": lambda: _cached("accounts_stats", fetch_accounts_stats),
+        "users_stats": lambda: _cached("users_stats", fetch_crm_users_stats),
+        "tx_stats": lambda: _cached("tx_stats", fetch_transactions_stats),
+        "targets_stats": lambda: _cached("targets_stats", fetch_targets_stats),
+        "ta_stats": lambda: _cached("ta_stats", fetch_trading_accounts_stats),
+        "ftd100_stats": lambda: _cached("ftd100_stats", fetch_ftd100_stats),
+        "du_stats": lambda: _cached("du_stats", fetch_dealio_users_stats),
+        "dtm4_stats": lambda: _cached("dtm4_stats", fetch_dealio_trades_mt4_stats),
+        "dtm5_stats": lambda: _cached("dtm5_stats", fetch_dealio_trades_mt5_stats),
+        "ddps_stats": lambda: _cached("ddps_stats", fetch_dealio_daily_profits_stats),
+        "bonus_stats": lambda: _cached("bonus_stats", fetch_bonus_transactions_stats),
         "campaigns_stats": lambda: _cached("campaigns_stats", fetch_campaigns_stats),
         "mssql_dmt5_stats": lambda: _cached("mssql_dmt5_stats", fetch_mssql_dealio_mt5trades_stats),
-        "accounts_log":    lambda: _cached("accounts_log",    lambda: fetch_sync_log("crm_accounts",         limit=20)),
-        "users_log":       lambda: _cached("users_log",       lambda: fetch_sync_log("crm_users",            limit=20)),
-        "tx_log":          lambda: _cached("tx_log",          lambda: fetch_sync_log("transactions",         limit=20)),
-        "targets_log":     lambda: _cached("targets_log",     lambda: fetch_sync_log("targets",              limit=20)),
-        "ta_log":          lambda: _cached("ta_log",          lambda: fetch_sync_log("trading_accounts",     limit=20)),
-        "ftd100_log":      lambda: _cached("ftd100_log",      lambda: fetch_sync_log("ftd100_clients",       limit=20)),
-        "du_log":          lambda: _cached("du_log",          lambda: fetch_sync_log("dealio_users",         limit=20)),
-        "dtm4_log":        lambda: _cached("dtm4_log",        lambda: fetch_sync_log("dealio_trades_mt4",    limit=20)),
-        "dtm5_log":        lambda: _cached("dtm5_log",        lambda: fetch_sync_log("dealio_trades_mt5",    limit=20)),
-        "ddps_log":        lambda: _cached("ddps_log",        lambda: fetch_sync_log("dealio_daily_profits", limit=20)),
-        "bonus_log":       lambda: _cached("bonus_log",       lambda: fetch_sync_log("bonus_transactions",   limit=20)),
-        "campaigns_log":   lambda: _cached("campaigns_log",   lambda: fetch_sync_log("campaigns",            limit=20)),
-        "mssql_dmt5_log":  lambda: _cached("mssql_dmt5_log",  lambda: fetch_sync_log("mssql_dealio_mt5trades", limit=20)),
+        "accounts_log": lambda: _cached("accounts_log", lambda: fetch_sync_log("crm_accounts", limit=20)),
+        "users_log": lambda: _cached("users_log", lambda: fetch_sync_log("crm_users", limit=20)),
+        "tx_log": lambda: _cached("tx_log", lambda: fetch_sync_log("transactions", limit=20)),
+        "targets_log": lambda: _cached("targets_log", lambda: fetch_sync_log("targets", limit=20)),
+        "ta_log": lambda: _cached("ta_log", lambda: fetch_sync_log("trading_accounts", limit=20)),
+        "ftd100_log": lambda: _cached("ftd100_log", lambda: fetch_sync_log("ftd100_clients", limit=20)),
+        "du_log": lambda: _cached("du_log", lambda: fetch_sync_log("dealio_users", limit=20)),
+        "dtm4_log": lambda: _cached("dtm4_log", lambda: fetch_sync_log("dealio_trades_mt4", limit=20)),
+        "dtm5_log": lambda: _cached("dtm5_log", lambda: fetch_sync_log("dealio_trades_mt5", limit=20)),
+        "ddps_log": lambda: _cached("ddps_log", lambda: fetch_sync_log("dealio_daily_profits", limit=20)),
+        "bonus_log": lambda: _cached("bonus_log", lambda: fetch_sync_log("bonus_transactions", limit=20)),
+        "campaigns_log": lambda: _cached("campaigns_log", lambda: fetch_sync_log("campaigns", limit=20)),
+        "mssql_dmt5_log": lambda: _cached("mssql_dmt5_log", lambda: fetch_sync_log("mssql_dealio_mt5trades", limit=20)),
     }
 
     def _err_stats():
@@ -148,31 +167,31 @@ async def data_sync_page(request: Request):
                 results[key] = [] if key.endswith("_log") else _err_stats()
 
     accounts_stats = results["accounts_stats"]
-    accounts_log   = results["accounts_log"]
-    users_stats    = results["users_stats"]
-    users_log      = results["users_log"]
-    tx_stats       = results["tx_stats"]
-    tx_log         = results["tx_log"]
-    targets_stats  = results["targets_stats"]
-    targets_log    = results["targets_log"]
-    ta_stats       = results["ta_stats"]
-    ta_log         = results["ta_log"]
-    ftd100_stats   = results["ftd100_stats"]
-    ftd100_log     = results["ftd100_log"]
-    du_stats       = results["du_stats"]
-    du_log         = results["du_log"]
-    dtm4_stats     = results["dtm4_stats"]
-    dtm4_log       = results["dtm4_log"]
-    dtm5_stats     = results["dtm5_stats"]
-    dtm5_log       = results["dtm5_log"]
-    ddps_stats     = results["ddps_stats"]
-    ddps_log       = results["ddps_log"]
-    bonus_stats      = results["bonus_stats"]
-    bonus_log        = results["bonus_log"]
-    campaigns_stats  = results["campaigns_stats"]
-    campaigns_log    = results["campaigns_log"]
+    accounts_log = results["accounts_log"]
+    users_stats = results["users_stats"]
+    users_log = results["users_log"]
+    tx_stats = results["tx_stats"]
+    tx_log = results["tx_log"]
+    targets_stats = results["targets_stats"]
+    targets_log = results["targets_log"]
+    ta_stats = results["ta_stats"]
+    ta_log = results["ta_log"]
+    ftd100_stats = results["ftd100_stats"]
+    ftd100_log = results["ftd100_log"]
+    du_stats = results["du_stats"]
+    du_log = results["du_log"]
+    dtm4_stats = results["dtm4_stats"]
+    dtm4_log = results["dtm4_log"]
+    dtm5_stats = results["dtm5_stats"]
+    dtm5_log = results["dtm5_log"]
+    ddps_stats = results["ddps_stats"]
+    ddps_log = results["ddps_log"]
+    bonus_stats = results["bonus_stats"]
+    bonus_log = results["bonus_log"]
+    campaigns_stats = results["campaigns_stats"]
+    campaigns_log = results["campaigns_log"]
     mssql_dmt5_stats = results["mssql_dmt5_stats"]
-    mssql_dmt5_log   = results["mssql_dmt5_log"]
+    mssql_dmt5_log = results["mssql_dmt5_log"]
 
     tables = [
         {
@@ -180,7 +199,12 @@ async def data_sync_page(request: Request):
             "label": "crm_accounts",
             "last_synced_at": accounts_stats["last_synced_at"],
             "stat_cards": [
-                {"label": "Total Records", "value": accounts_stats["total_records"], "color": "text-info", "icon": "bi-database"},
+                {
+                    "label": "Total Records",
+                    "value": accounts_stats["total_records"],
+                    "color": "text-info",
+                    "icon": "bi-database",
+                },
             ],
             "sync_log": accounts_log,
             "healthy": _is_healthy(accounts_log, ACCOUNTS_SYNC_INTERVAL_HOURS),
@@ -195,7 +219,12 @@ async def data_sync_page(request: Request):
             "label": "crm_users",
             "last_synced_at": users_stats["last_synced_at"],
             "stat_cards": [
-                {"label": "Total Records", "value": users_stats["total_records"], "color": "text-info", "icon": "bi-database"},
+                {
+                    "label": "Total Records",
+                    "value": users_stats["total_records"],
+                    "color": "text-info",
+                    "icon": "bi-database",
+                },
             ],
             "sync_log": users_log,
             "healthy": _is_healthy(users_log, USERS_SYNC_INTERVAL_HOURS),
@@ -210,7 +239,12 @@ async def data_sync_page(request: Request):
             "label": "transactions",
             "last_synced_at": tx_stats["last_synced_at"],
             "stat_cards": [
-                {"label": "Total Records", "value": tx_stats["total_records"], "color": "text-info", "icon": "bi-database"},
+                {
+                    "label": "Total Records",
+                    "value": tx_stats["total_records"],
+                    "color": "text-info",
+                    "icon": "bi-database",
+                },
             ],
             "sync_log": tx_log,
             "healthy": _is_healthy(tx_log, TRANSACTIONS_SYNC_INTERVAL_HOURS),
@@ -225,7 +259,12 @@ async def data_sync_page(request: Request):
             "label": "trading_accounts",
             "last_synced_at": ta_stats["last_synced_at"],
             "stat_cards": [
-                {"label": "Total Records", "value": ta_stats["total_records"], "color": "text-info", "icon": "bi-database"},
+                {
+                    "label": "Total Records",
+                    "value": ta_stats["total_records"],
+                    "color": "text-info",
+                    "icon": "bi-database",
+                },
             ],
             "sync_log": ta_log,
             "healthy": _is_healthy(ta_log, TRADING_ACCOUNTS_SYNC_INTERVAL_HOURS),
@@ -240,7 +279,12 @@ async def data_sync_page(request: Request):
             "label": "ftd100_clients",
             "last_synced_at": ftd100_stats["last_synced_at"],
             "stat_cards": [
-                {"label": "Total Records", "value": ftd100_stats["total_records"], "color": "text-info", "icon": "bi-database"},
+                {
+                    "label": "Total Records",
+                    "value": ftd100_stats["total_records"],
+                    "color": "text-info",
+                    "icon": "bi-database",
+                },
             ],
             "sync_log": ftd100_log,
             "healthy": _is_healthy(ftd100_log, FTD100_SYNC_INTERVAL_HOURS),
@@ -255,7 +299,12 @@ async def data_sync_page(request: Request):
             "label": "targets",
             "last_synced_at": targets_stats["last_synced_at"],
             "stat_cards": [
-                {"label": "Total Records", "value": targets_stats["total_records"], "color": "text-info", "icon": "bi-database"},
+                {
+                    "label": "Total Records",
+                    "value": targets_stats["total_records"],
+                    "color": "text-info",
+                    "icon": "bi-database",
+                },
             ],
             "sync_log": targets_log,
             "healthy": _is_healthy(targets_log, TARGETS_SYNC_INTERVAL_HOURS),
@@ -270,7 +319,12 @@ async def data_sync_page(request: Request):
             "label": "dealio_users",
             "last_synced_at": du_stats["last_synced_at"],
             "stat_cards": [
-                {"label": "Total Records", "value": du_stats["total_records"], "color": "text-info", "icon": "bi-database"},
+                {
+                    "label": "Total Records",
+                    "value": du_stats["total_records"],
+                    "color": "text-info",
+                    "icon": "bi-database",
+                },
             ],
             "sync_log": du_log,
             "healthy": _is_healthy(du_log, DEALIO_USERS_SYNC_INTERVAL_HOURS),
@@ -285,7 +339,12 @@ async def data_sync_page(request: Request):
             "label": "dealio_trades_mt4",
             "last_synced_at": dtm4_stats["last_synced_at"],
             "stat_cards": [
-                {"label": "Total Records", "value": dtm4_stats["total_records"], "color": "text-info", "icon": "bi-database"},
+                {
+                    "label": "Total Records",
+                    "value": dtm4_stats["total_records"],
+                    "color": "text-info",
+                    "icon": "bi-database",
+                },
             ],
             "sync_log": dtm4_log,
             "healthy": _is_healthy(dtm4_log, DEALIO_TRADES_MT4_SYNC_INTERVAL_HOURS),
@@ -300,7 +359,12 @@ async def data_sync_page(request: Request):
             "label": "dealio_trades_mt5",
             "last_synced_at": dtm5_stats["last_synced_at"],
             "stat_cards": [
-                {"label": "Total Records", "value": dtm5_stats["total_records"], "color": "text-info", "icon": "bi-database"},
+                {
+                    "label": "Total Records",
+                    "value": dtm5_stats["total_records"],
+                    "color": "text-info",
+                    "icon": "bi-database",
+                },
             ],
             "sync_log": dtm5_log,
             "healthy": _is_healthy(dtm5_log, DEALIO_TRADES_MT5_SYNC_INTERVAL_HOURS),
@@ -315,7 +379,12 @@ async def data_sync_page(request: Request):
             "label": "bonus_transactions",
             "last_synced_at": bonus_stats["last_synced_at"],
             "stat_cards": [
-                {"label": "Total Records", "value": bonus_stats["total_records"], "color": "text-info", "icon": "bi-database"},
+                {
+                    "label": "Total Records",
+                    "value": bonus_stats["total_records"],
+                    "color": "text-info",
+                    "icon": "bi-database",
+                },
             ],
             "sync_log": bonus_log,
             "healthy": bonus_stats["total_records"] > 0,
@@ -330,7 +399,12 @@ async def data_sync_page(request: Request):
             "label": "dealio_daily_profits",
             "last_synced_at": ddps_stats["last_synced_at"],
             "stat_cards": [
-                {"label": "Total Records", "value": ddps_stats["total_records"], "color": "text-info", "icon": "bi-database"},
+                {
+                    "label": "Total Records",
+                    "value": ddps_stats["total_records"],
+                    "color": "text-info",
+                    "icon": "bi-database",
+                },
             ],
             "sync_log": ddps_log,
             "healthy": _is_healthy(ddps_log, DEALIO_DAILY_PROFITS_SYNC_INTERVAL_HOURS),
@@ -345,7 +419,12 @@ async def data_sync_page(request: Request):
             "label": "campaigns",
             "last_synced_at": campaigns_stats["last_synced_at"],
             "stat_cards": [
-                {"label": "Total Records", "value": campaigns_stats["total_records"], "color": "text-info", "icon": "bi-database"},
+                {
+                    "label": "Total Records",
+                    "value": campaigns_stats["total_records"],
+                    "color": "text-info",
+                    "icon": "bi-database",
+                },
             ],
             "sync_log": campaigns_log,
             "healthy": _is_healthy(campaigns_log, 1),
@@ -361,7 +440,12 @@ async def data_sync_page(request: Request):
             "label": "mssql_dealio_mt5trades",
             "last_synced_at": mssql_dmt5_stats["last_synced_at"],
             "stat_cards": [
-                {"label": "Total Records",  "value": mssql_dmt5_stats["total_records"],  "color": "text-info",    "icon": "bi-database"},
+                {
+                    "label": "Total Records",
+                    "value": mssql_dmt5_stats["total_records"],
+                    "color": "text-info",
+                    "icon": "bi-database",
+                },
             ],
             "sync_log": mssql_dmt5_log,
             "healthy": mssql_dmt5_stats["total_records"] > 0,
@@ -373,8 +457,11 @@ async def data_sync_page(request: Request):
         },
     ]
 
-    return templates.TemplateResponse("data_sync.html", {
-        "request": request,
-        "current_user": user,
-        "tables": tables,
-    })
+    return templates.TemplateResponse(
+        "data_sync.html",
+        {
+            "request": request,
+            "current_user": user,
+            "tables": tables,
+        },
+    )

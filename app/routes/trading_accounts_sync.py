@@ -1,5 +1,6 @@
 from fastapi import APIRouter, BackgroundTasks
 from fastapi.responses import JSONResponse
+
 from app.etl.fetch_and_store import run_trading_accounts_etl, run_trading_accounts_full_etl
 
 router = APIRouter()

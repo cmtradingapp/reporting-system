@@ -13,26 +13,56 @@ Tables fetched into local warehouse:
 Live (no local copy):
   - dealio.positions    (open trades — queried directly via get_dealio_connection())
 """
+
+from datetime import UTC, datetime, timedelta
+
 import pandas as pd
 import psycopg2
-from datetime import datetime, timedelta, timezone
 
 from app.config import (
-    DEALIO_PG_HOST, DEALIO_PG_PORT, DEALIO_PG_USER,
-    DEALIO_PG_PASSWORD, DEALIO_PG_DB,
-    DEALIO_PG_SSLCERT, DEALIO_PG_SSLKEY, DEALIO_PG_SSLROOTCERT,
+    DEALIO_PG_DB,
+    DEALIO_PG_HOST,
+    DEALIO_PG_PASSWORD,
+    DEALIO_PG_PORT,
+    DEALIO_PG_SSLCERT,
+    DEALIO_PG_SSLKEY,
+    DEALIO_PG_SSLROOTCERT,
+    DEALIO_PG_USER,
 )
 
 # ── Symbols to exclude from trades_mt4 ──────────────────────────────────────
 _EXCLUDED_SYMBOLS = {
-    "Cashback", "CFDRollover", "CommEUR", "CommUSD",
-    "CorrectiEUR", "CorrectiGBP", "CorrectiJPY", "Correction",
-    "CredExp", "CredExpEUR", "CredExpGBP", "CredExpJPY",
-    "Dividend", "DividendEUR", "DividendGBP", "DividendJPY",
-    "Dormant", "EarnedCr", "EarnedCrEUR", "FEE", "INACT-FEE",
-    "Inactivity", "Rollover", "SPREAD",
-    "ZeroingEUR", "ZeroingGBP", "ZeroingJPY", "ZeroingKES",
-    "ZeroingNGN", "ZeroingUSD", "ZeroingZAR",
+    "Cashback",
+    "CFDRollover",
+    "CommEUR",
+    "CommUSD",
+    "CorrectiEUR",
+    "CorrectiGBP",
+    "CorrectiJPY",
+    "Correction",
+    "CredExp",
+    "CredExpEUR",
+    "CredExpGBP",
+    "CredExpJPY",
+    "Dividend",
+    "DividendEUR",
+    "DividendGBP",
+    "DividendJPY",
+    "Dormant",
+    "EarnedCr",
+    "EarnedCrEUR",
+    "FEE",
+    "INACT-FEE",
+    "Inactivity",
+    "Rollover",
+    "SPREAD",
+    "ZeroingEUR",
+    "ZeroingGBP",
+    "ZeroingJPY",
+    "ZeroingKES",
+    "ZeroingNGN",
+    "ZeroingUSD",
+    "ZeroingZAR",
 }
 
 _EXCLUDED_SYMBOLS_TUPLE = tuple(_EXCLUDED_SYMBOLS)
@@ -90,15 +120,15 @@ _USERS_COLS = """
     isenabled
 """
 
-def get_dealio_users(hours: int = 24, since: datetime | None = None,
-                     statement_timeout_ms: int = 60000) -> pd.DataFrame:
+
+def get_dealio_users(hours: int = 24, since: datetime | None = None, statement_timeout_ms: int = 60000) -> pd.DataFrame:
     """Fetch dealio.users updated since a cutoff.
 
     If `since` is provided, uses it directly (incremental sync). Otherwise
     falls back to `now - hours`. `statement_timeout_ms` overrides the
     connection default so ETL backfills don't get killed at 10s.
     """
-    cutoff = since if since is not None else (datetime.now(timezone.utc) - timedelta(hours=hours))
+    cutoff = since if since is not None else (datetime.now(UTC) - timedelta(hours=hours))
     sql = f"""
         SELECT {_USERS_COLS}
         FROM dealio.users
@@ -171,9 +201,10 @@ _TRADES_COLS = """
     spread
 """
 
+
 def get_dealio_trades_mt4(hours: int = 24) -> pd.DataFrame:
     """Fetch dealio.trades_mt4 updated within the last N hours (cmd 0/1, filtered symbols)."""
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    cutoff = datetime.now(UTC) - timedelta(hours=hours)
     sql = f"""
         SELECT {_TRADES_COLS}
         FROM dealio.trades_mt4
@@ -205,10 +236,14 @@ def get_dealio_trades_mt4_missing(start_ticket: int):
         """
         conn = get_dealio_connection()
         try:
-            df = pd.read_sql(sql, conn, params={
-                "last_ticket": last_ticket,
-                "excluded": _EXCLUDED_SYMBOLS_TUPLE,
-            })
+            df = pd.read_sql(
+                sql,
+                conn,
+                params={
+                    "last_ticket": last_ticket,
+                    "excluded": _EXCLUDED_SYMBOLS_TUPLE,
+                },
+            )
         finally:
             conn.close()
         if df.empty:
@@ -235,10 +270,14 @@ def get_dealio_trades_mt4_full():
         """
         conn = get_dealio_connection()
         try:
-            df = pd.read_sql(sql, conn, params={
-                "last_ticket": last_ticket,
-                "excluded": _EXCLUDED_SYMBOLS_TUPLE,
-            })
+            df = pd.read_sql(
+                sql,
+                conn,
+                params={
+                    "last_ticket": last_ticket,
+                    "excluded": _EXCLUDED_SYMBOLS_TUPLE,
+                },
+            )
         finally:
             conn.close()
         if df.empty:
@@ -266,11 +305,15 @@ def get_dealio_trades_mt4_by_open_time(from_date: str):
         """
         conn = get_dealio_connection()
         try:
-            df = pd.read_sql(sql, conn, params={
-                "last_ticket": last_ticket,
-                "from_date": from_date,
-                "excluded": _EXCLUDED_SYMBOLS_TUPLE,
-            })
+            df = pd.read_sql(
+                sql,
+                conn,
+                params={
+                    "last_ticket": last_ticket,
+                    "from_date": from_date,
+                    "excluded": _EXCLUDED_SYMBOLS_TUPLE,
+                },
+            )
         finally:
             conn.close()
         if df.empty:
@@ -312,7 +355,7 @@ _DAILY_PROFITS_COLS = """
 
 def get_dealio_daily_profits(hours: int = 48) -> pd.DataFrame:
     """Fetch dealio.daily_profits rows with date >= NOW() - N hours."""
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    cutoff = datetime.now(UTC) - timedelta(hours=hours)
     sql = f"""
         SELECT {_DAILY_PROFITS_COLS}
         FROM dealio.daily_profits
@@ -344,13 +387,17 @@ def get_dealio_daily_profits_daterange(date_from: str, date_to: str):
         """
         conn = get_dealio_connection()
         try:
-            df = pd.read_sql(sql, conn, params={
-                "date_from": date_from,
-                "date_to": date_to,
-                "last_date": last_date,
-                "last_login": last_login,
-                "last_sourceid": last_sourceid,
-            })
+            df = pd.read_sql(
+                sql,
+                conn,
+                params={
+                    "date_from": date_from,
+                    "date_to": date_to,
+                    "last_date": last_date,
+                    "last_login": last_login,
+                    "last_sourceid": last_sourceid,
+                },
+            )
         finally:
             conn.close()
         if df.empty:
@@ -380,11 +427,15 @@ def get_dealio_daily_profits_full():
         """
         conn = get_dealio_connection()
         try:
-            df = pd.read_sql(sql, conn, params={
-                "last_date": last_date,
-                "last_login": last_login,
-                "last_sourceid": last_sourceid,
-            })
+            df = pd.read_sql(
+                sql,
+                conn,
+                params={
+                    "last_date": last_date,
+                    "last_login": last_login,
+                    "last_sourceid": last_sourceid,
+                },
+            )
         finally:
             conn.close()
         if df.empty:
@@ -438,7 +489,7 @@ _TRADES_MT5_COLS = """
 
 def get_dealio_trades_mt5(hours: int = 24) -> pd.DataFrame:
     """Fetch dealio.trades_mt5 updated within the last N hours (cmd 0/1, filtered symbols)."""
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    cutoff = datetime.now(UTC) - timedelta(hours=hours)
     sql = f"""
         SELECT {_TRADES_MT5_COLS}
         FROM dealio.trades_mt5
@@ -459,6 +510,7 @@ def get_dealio_trades_mt5_full():
     """Full fetch of dealio.trades_mt5 in chunks (cmd 0/1, filtered symbols).
     Reconnects per chunk and retries up to 3 times on SSL errors."""
     import time
+
     last_ticket = 0
     while True:
         sql = f"""
@@ -520,6 +572,7 @@ def get_dealio_trades_mt5_missing(start_ticket: int):
 
 # ── Live equity helpers ───────────────────────────────────────────────────────
 
+
 def get_dealio_users_comp():
     """Fetch login, compprevequity, compcredit for users with compprevequity > 0."""
     sql = """
@@ -557,10 +610,7 @@ def get_dealio_equity_credit_for_logins(logins: list):
     conn = get_dealio_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute(
-                "SELECT login, compprevequity, compcredit FROM dealio.users WHERE login = ANY(%s)",
-                (logins,)
-            )
+            cur.execute("SELECT login, compprevequity, compcredit FROM dealio.users WHERE login = ANY(%s)", (logins,))
             return cur.fetchall()
     finally:
         conn.close()
@@ -571,10 +621,7 @@ def get_dealio_balance_for_logins(logins: list):
     conn = get_dealio_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute(
-                "SELECT login, compprevbalance FROM dealio.users WHERE login = ANY(%s)",
-                (logins,)
-            )
+            cur.execute("SELECT login, compprevbalance FROM dealio.users WHERE login = ANY(%s)", (logins,))
             return cur.fetchall()
     finally:
         conn.close()
@@ -585,10 +632,7 @@ def get_dealio_compbalance_for_logins(logins: list):
     conn = get_dealio_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute(
-                "SELECT login, compbalance FROM dealio.users WHERE login = ANY(%s)",
-                (logins,)
-            )
+            cur.execute("SELECT login, compbalance FROM dealio.users WHERE login = ANY(%s)", (logins,))
             return cur.fetchall()
     finally:
         conn.close()
@@ -599,10 +643,7 @@ def get_dealio_compbalance_credit_for_logins(logins: list):
     conn = get_dealio_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute(
-                "SELECT login, compbalance, compcredit FROM dealio.users WHERE login = ANY(%s)",
-                (logins,)
-            )
+            cur.execute("SELECT login, compbalance, compcredit FROM dealio.users WHERE login = ANY(%s)", (logins,))
             return cur.fetchall()
     finally:
         conn.close()
@@ -613,7 +654,8 @@ def get_dealio_closed_pnl_for_logins_date(logins: list, date: str):
     conn = get_dealio_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT login,
                        SUM(COALESCE(computed_commission, 0)
                          + COALESCE(computed_profit, 0)
@@ -624,7 +666,9 @@ def get_dealio_closed_pnl_for_logins_date(logins: list, date: str):
                   AND cmd < 2
                   AND symbol NOT IN %s
                 GROUP BY login
-            """, (logins, date, _EXCLUDED_SYMBOLS_TUPLE))
+            """,
+                (logins, date, _EXCLUDED_SYMBOLS_TUPLE),
+            )
             return cur.fetchall()
     finally:
         conn.close()
@@ -635,7 +679,8 @@ def get_dealio_floating_pnl_for_logins(logins: list):
     conn = get_dealio_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT login,
                        SUM(COALESCE(computedcommission, 0)
                          + COALESCE(computedprofit, 0)
@@ -645,13 +690,16 @@ def get_dealio_floating_pnl_for_logins(logins: list):
                   AND cmd < 2
                   AND symbol NOT IN %s
                 GROUP BY login
-            """, (logins, _EXCLUDED_SYMBOLS_TUPLE))
+            """,
+                (logins, _EXCLUDED_SYMBOLS_TUPLE),
+            )
             return cur.fetchall()
     finally:
         conn.close()
 
 
 # ── dealio.positions ──────────────────────────────────────────────────────────
+
 
 def get_dealio_positions() -> pd.DataFrame:
     """Fetch all open positions from dealio.positions (live snapshot, full replace)."""

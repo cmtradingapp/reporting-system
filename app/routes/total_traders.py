@@ -14,17 +14,18 @@ Trader definition (same as FTC Date / Marketing Performance):
 Depositor definition:
   accounts with at least one Approved Deposit transaction in the period.
 """
-from fastapi import APIRouter, Request, Query
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
-from typing import Optional, List
+
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
+from fastapi import APIRouter, Query, Request
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.templating import Jinja2Templates
+
+from app import cache
 from app.auth.dependencies import get_current_user
 from app.auth.role_filters import get_role_filter
 from app.db.postgres_conn import get_connection
-from app import cache
 
 _TZ = ZoneInfo("Europe/Nicosia")
 router = APIRouter()
@@ -32,13 +33,13 @@ templates = Jinja2Templates(directory="app/templates")
 
 
 _FTC_GROUP_SQL = {
-    "0 - 7 days":    "(%(ref_date)s::date - a.client_qualification_date::date) BETWEEN 0 AND 7",
-    "8 - 14 days":   "(%(ref_date)s::date - a.client_qualification_date::date) BETWEEN 8 AND 14",
-    "15 - 30 days":  "(%(ref_date)s::date - a.client_qualification_date::date) BETWEEN 15 AND 30",
-    "31 - 60 days":  "(%(ref_date)s::date - a.client_qualification_date::date) BETWEEN 31 AND 60",
-    "61 - 90 days":  "(%(ref_date)s::date - a.client_qualification_date::date) BETWEEN 61 AND 90",
+    "0 - 7 days": "(%(ref_date)s::date - a.client_qualification_date::date) BETWEEN 0 AND 7",
+    "8 - 14 days": "(%(ref_date)s::date - a.client_qualification_date::date) BETWEEN 8 AND 14",
+    "15 - 30 days": "(%(ref_date)s::date - a.client_qualification_date::date) BETWEEN 15 AND 30",
+    "31 - 60 days": "(%(ref_date)s::date - a.client_qualification_date::date) BETWEEN 31 AND 60",
+    "61 - 90 days": "(%(ref_date)s::date - a.client_qualification_date::date) BETWEEN 61 AND 90",
     "91 - 120 days": "(%(ref_date)s::date - a.client_qualification_date::date) BETWEEN 91 AND 120",
-    "120+ days":     "(%(ref_date)s::date - a.client_qualification_date::date) > 120",
+    "120+ days": "(%(ref_date)s::date - a.client_qualification_date::date) > 120",
 }
 _ALL_FTC_GROUPS = set(_FTC_GROUP_SQL.keys())
 
@@ -57,11 +58,14 @@ async def total_traders_page(request: Request):
         return user
     if not _has_access(user):
         return RedirectResponse(url="/performance", status_code=302)
-    return templates.TemplateResponse("total_traders.html", {
-        "request": request,
-        "current_user": user,
-        "is_admin": user.get("role") == "admin",
-    })
+    return templates.TemplateResponse(
+        "total_traders.html",
+        {
+            "request": request,
+            "current_user": user,
+            "is_admin": user.get("role") == "admin",
+        },
+    )
 
 
 @router.get("/api/total-traders/options")
@@ -91,7 +95,7 @@ async def total_traders_options(request: Request):
             cur.execute(sql)
             rows = cur.fetchall()
         offices = sorted({r[0] for r in rows if r[0]})
-        teams   = sorted({r[1] for r in rows if r[1]})
+        teams = sorted({r[1] for r in rows if r[1]})
         result = {"offices": offices, "teams": teams}
         cache.set(_ck, result)
         return JSONResponse(content=result)
@@ -134,8 +138,8 @@ async def total_traders_api(
     date_to: str = None,
     end_date: str = None,
     days_back: int = None,
-    f_office: Optional[List[str]] = Query(default=None),
-    f_team: Optional[List[str]] = Query(default=None),
+    f_office: list[str] | None = Query(default=None),
+    f_team: list[str] | None = Query(default=None),
     f_classification: str = None,
     ftc_groups: str = None,
 ):
@@ -148,7 +152,7 @@ async def total_traders_api(
     try:
         if date_from and date_to:
             dt_from = datetime.strptime(date_from, "%Y-%m-%d").date()
-            dt_end  = datetime.strptime(date_to,   "%Y-%m-%d").date()
+            dt_end = datetime.strptime(date_to, "%Y-%m-%d").date()
             if dt_from > dt_end:
                 dt_from, dt_end = dt_end, dt_from
         else:
@@ -171,8 +175,8 @@ async def total_traders_api(
             pass
 
     dt_excl = dt_end + timedelta(days=1)
-    date_from    = dt_from.strftime("%Y-%m-%d")
-    end_date     = dt_end.strftime("%Y-%m-%d")
+    date_from = dt_from.strftime("%Y-%m-%d")
+    end_date = dt_end.strftime("%Y-%m-%d")
     date_to_excl = dt_excl.strftime("%Y-%m-%d")
 
     ftc_groups_list = None
@@ -182,10 +186,14 @@ async def total_traders_api(
         if parsed_set and parsed_set != _ALL_FTC_GROUPS:
             ftc_groups_list = parsed
 
-    def _ck_part(v): return ",".join(sorted(v)) if v else ""
+    def _ck_part(v):
+        return ",".join(sorted(v)) if v else ""
+
     _user_role = user.get("role", "")
-    _ck = (f"total_traders_v9:{date_from}:{end_date}:{_ck_part(f_office)}:{_ck_part(f_team)}"
-           f":{f_classification}:{ftc_groups}:{_user_role}")
+    _ck = (
+        f"total_traders_v9:{date_from}:{end_date}:{_ck_part(f_office)}:{_ck_part(f_team)}"
+        f":{f_classification}:{ftc_groups}:{_user_role}"
+    )
     _hit = cache.get(_ck)
     if _hit is not None:
         return JSONResponse(content=_hit)
@@ -200,20 +208,13 @@ async def total_traders_api(
     # Apply role-based filter (e.g. retention_cy sees only Cyprus office)
     rf = get_role_filter(user)
     role_sql = ""
-    if rf['crm_where']:
-        role_sql = rf['crm_where']
-        for i, val in enumerate(rf['crm_params']):
-            key = f'_rf{i}'
-            role_sql = role_sql.replace('%s', f'%({key})s', 1)
+    if rf["crm_where"]:
+        role_sql = rf["crm_where"]
+        for i, val in enumerate(rf["crm_params"]):
+            key = f"_rf{i}"
+            role_sql = role_sql.replace("%s", f"%({key})s", 1)
             params[key] = val
     # Always join crm_users so we can apply the standard "test agent" exclusion used on other pages
-    cu_join = "LEFT JOIN crm_users u ON u.id = a.assigned_to"
-    base_excl = (
-        "AND a.accountid IS NOT NULL AND a.accountid::text != ''\n          "
-        "AND TRIM(COALESCE(u.agent_name, u.full_name, '')) NOT ILIKE 'test%%'\n          "
-        "AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'\n          "
-        "AND u.department_ = 'Retention'"
-    )
 
     # ── Shared SQL fragments ──
     _score_case = (
@@ -251,13 +252,12 @@ async def total_traders_api(
              WHEN t.transaction_type_name IN ('Withdrawal','Deposit Cancelled') THEN -t.usdamount
            END), 0)::float"""
 
-    is_admin = user.get("role") == "admin"
-
     conn = get_connection()
     try:
         with conn.cursor() as cur:
             # Q1: Traders daily + avg score daily + high quality traders daily
-            cur.execute(f"""
+            cur.execute(
+                f"""
                 SELECT rt.day, COUNT(DISTINCT rt.accountid),
                        ROUND(AVG({_score_case.format(ref='rt.day')}), 2),
                        COUNT(DISTINCT CASE WHEN a.classification_int BETWEEN 6 AND 10 THEN rt.accountid END)
@@ -266,27 +266,33 @@ async def total_traders_api(
                 LEFT JOIN crm_users u ON u.id = rt.assigned_to
                 WHERE {_rt_where}
                 GROUP BY 1
-            """, params)
+            """,
+                params,
+            )
             _rows = cur.fetchall()
-            traders_map    = {r[0].strftime("%Y-%m-%d"): int(r[1]) for r in _rows}
-            avg_score_map  = {r[0].strftime("%Y-%m-%d"): float(r[2]) for r in _rows if r[2] is not None}
+            traders_map = {r[0].strftime("%Y-%m-%d"): int(r[1]) for r in _rows}
+            avg_score_map = {r[0].strftime("%Y-%m-%d"): float(r[2]) for r in _rows if r[2] is not None}
             high_traders_map = {r[0].strftime("%Y-%m-%d"): int(r[3]) for r in _rows}
 
             # Q2: Traders total + avg score total (combined, was 2 queries)
-            cur.execute(f"""
+            cur.execute(
+                f"""
                 SELECT COUNT(DISTINCT rt.accountid),
                        ROUND(AVG({_score_case.format(ref="%(ref_date)s::date")}), 2)
                 FROM mv_retention_traders rt
                 JOIN accounts a ON a.accountid = rt.accountid
                 LEFT JOIN crm_users u ON u.id = rt.assigned_to
                 WHERE {_rt_where}
-            """, params)
+            """,
+                params,
+            )
             row = cur.fetchone()
             traders_total = int(row[0] or 0)
             avg_score_total = float(row[1]) if row[1] is not None else 0.0
 
             # Q3: Depositors daily + NET daily (combined, was 2 queries)
-            cur.execute(f"""
+            cur.execute(
+                f"""
                 SELECT t.confirmation_time::date AS day,
                        COUNT(DISTINCT a.accountid) FILTER (WHERE t.transaction_type_name = 'Deposit'),
                        {_net_agg}
@@ -295,13 +301,16 @@ async def total_traders_api(
                 LEFT JOIN crm_users u ON u.id = t.original_deposit_owner
                 WHERE {_txn_where}
                 GROUP BY 1
-            """, params)
+            """,
+                params,
+            )
             _rows = cur.fetchall()
             deps_map = {r[0].strftime("%Y-%m-%d"): int(r[1]) for r in _rows}
             net_map = {r[0].strftime("%Y-%m-%d"): round(float(r[2]), 2) for r in _rows}
 
             # Q4: Depositors total (COUNT DISTINCT across all days)
-            cur.execute(f"""
+            cur.execute(
+                f"""
                 SELECT COUNT(DISTINCT a.accountid)
                 FROM transactions t
                 JOIN accounts a ON a.accountid = t.vtigeraccountid
@@ -319,11 +328,14 @@ async def total_traders_api(
                   AND t.confirmation_time < %(date_to_excl)s
                   {filters_sql}
                   {role_sql}
-            """, params)
+            """,
+                params,
+            )
             deps_total = int(cur.fetchone()[0] or 0)
 
             # Q5: Matrix agents (separate table — crm_users)
-            cur.execute(f"""
+            cur.execute(
+                f"""
                 SELECT u.id, COALESCE(u.office_name, 'N/A'),
                        COALESCE(u.department, 'N/A'),
                        COALESCE(u.agent_name, u.full_name, 'N/A')
@@ -333,12 +345,14 @@ async def total_traders_api(
                   AND TRIM(COALESCE(u.full_name, '')) NOT ILIKE 'test%%'
                   {role_sql}
                 ORDER BY u.office_name, u.department, u.agent_name
-            """, params)
-            agents = [{"id": r[0], "office_name": r[1], "dept_name": r[2], "agent_name": r[3]}
-                      for r in cur.fetchall()]
+            """,
+                params,
+            )
+            agents = [{"id": r[0], "office_name": r[1], "dept_name": r[2], "agent_name": r[3]} for r in cur.fetchall()]
 
             # Q6: Matrix traders + avg score per agent/day (combined, was 2 queries)
-            cur.execute(f"""
+            cur.execute(
+                f"""
                 SELECT rt.assigned_to, rt.day, COUNT(DISTINCT rt.accountid),
                        ROUND(AVG({_score_case.format(ref='rt.day')}), 2)
                 FROM mv_retention_traders rt
@@ -346,7 +360,9 @@ async def total_traders_api(
                 LEFT JOIN crm_users u ON u.id = rt.assigned_to
                 WHERE {_rt_where}
                 GROUP BY 1, 2
-            """, params)
+            """,
+                params,
+            )
             m_traders, m_avg_score = {}, {}
             for r in cur.fetchall():
                 aid = int(r[0])
@@ -356,7 +372,8 @@ async def total_traders_api(
                     m_avg_score.setdefault(aid, {})[day_str] = float(r[3])
 
             # Q7: Matrix traders total + avg score total per agent (combined, was 2 queries)
-            cur.execute(f"""
+            cur.execute(
+                f"""
                 SELECT rt.assigned_to, COUNT(DISTINCT rt.accountid),
                        ROUND(AVG({_score_case.format(ref="%(ref_date)s::date")}), 2)
                 FROM mv_retention_traders rt
@@ -364,7 +381,9 @@ async def total_traders_api(
                 LEFT JOIN crm_users u ON u.id = rt.assigned_to
                 WHERE {_rt_where}
                 GROUP BY 1
-            """, params)
+            """,
+                params,
+            )
             m_traders_total, m_avg_score_total = {}, {}
             for r in cur.fetchall():
                 aid = int(r[0])
@@ -373,7 +392,8 @@ async def total_traders_api(
                     m_avg_score_total[aid] = float(r[2])
 
             # Q8: Matrix depositors + NET per agent/day (combined, was 2 queries)
-            cur.execute(f"""
+            cur.execute(
+                f"""
                 SELECT t.original_deposit_owner, t.confirmation_time::date,
                        COUNT(DISTINCT a.accountid) FILTER (WHERE t.transaction_type_name = 'Deposit'),
                        {_net_agg}
@@ -382,7 +402,9 @@ async def total_traders_api(
                 LEFT JOIN crm_users u ON u.id = t.original_deposit_owner
                 WHERE {_txn_where}
                 GROUP BY 1, 2
-            """, params)
+            """,
+                params,
+            )
             m_deps, m_net = {}, {}
             for r in cur.fetchall():
                 aid = int(r[0])
@@ -392,7 +414,8 @@ async def total_traders_api(
                 m_net.setdefault(aid, {})[day_str] = round(float(r[3]), 2)
 
             # Q9: Matrix depositors total + NET total per agent (combined, was 2 queries)
-            cur.execute(f"""
+            cur.execute(
+                f"""
                 SELECT t.original_deposit_owner,
                        COUNT(DISTINCT a.accountid) FILTER (WHERE t.transaction_type_name = 'Deposit'),
                        {_net_agg}
@@ -401,7 +424,9 @@ async def total_traders_api(
                 LEFT JOIN crm_users u ON u.id = t.original_deposit_owner
                 WHERE {_txn_where}
                 GROUP BY 1
-            """, params)
+            """,
+                params,
+            )
             m_deps_total, m_net_total = {}, {}
             for r in cur.fetchall():
                 aid = int(r[0])
@@ -447,8 +472,8 @@ async def total_traders_api(
             "depositor_pct": round((deps_total / traders_total * 100), 2) if traders_total else 0.0,
             "avg_score": avg_score_total,
             "net": round(sum(net_map.values()), 2),
-            "ltv_traders":    round(sum(net_map.values()) / traders_total, 2) if traders_total else 0.0,
-            "ltv_depositors": round(sum(net_map.values()) / deps_total,    2) if deps_total    else 0.0,
+            "ltv_traders": round(sum(net_map.values()) / traders_total, 2) if traders_total else 0.0,
+            "ltv_depositors": round(sum(net_map.values()) / deps_total, 2) if deps_total else 0.0,
         },
         "series": {
             "labels": labels,

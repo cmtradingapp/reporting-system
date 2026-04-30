@@ -1,9 +1,12 @@
 from fastapi import APIRouter, BackgroundTasks
 from fastapi.responses import JSONResponse
+
 from app.etl.fetch_and_store import (
-    run_dealio_users_etl, run_dealio_users_full_etl,
-    run_dealio_trades_mt4_etl, run_dealio_trades_mt4_full_etl,
     run_dealio_trades_mt4_by_open_time_etl,
+    run_dealio_trades_mt4_etl,
+    run_dealio_trades_mt4_full_etl,
+    run_dealio_users_etl,
+    run_dealio_users_full_etl,
 )
 
 router = APIRouter()
