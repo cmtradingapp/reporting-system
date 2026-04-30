@@ -2,7 +2,8 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # test-coverage included while the TDD foundation lands; remove once merged into main.
+    branches: [main, test-coverage]
   pull_request:
 
 concurrency:
