@@ -1980,7 +1980,14 @@ def get_last_sync_times() -> dict:
 
 
 def truncate_and_insert_ftd100() -> int:
-    """Full refresh: TRUNCATE ftd100_clients then INSERT from CTE computed entirely within PostgreSQL."""
+    """Full refresh via swap pattern — does not block dashboard reads.
+
+    Builds the new state into a side table, then atomically DROP+RENAME inside
+    a single transaction. Reader-blocking window collapses from "full CTE load"
+    (seconds) to just the DROP+RENAME (sub-second). Previous TRUNCATE+INSERT
+    held AccessExclusiveLock on ftd100_clients for the entire load and made
+    Sales-report queries time out with 'lock timeout LINE 48: FROM ftd100_clients'.
+    """
     cte_sql = """
         WITH ordered_tx AS (
             SELECT
@@ -2057,7 +2064,7 @@ def truncate_and_insert_ftd100() -> int:
             ) x
             WHERE rn = 1
         )
-        INSERT INTO ftd100_clients (
+        INSERT INTO ftd100_clients_new (
             accountid, accountstatus, client_qualification_date, assigned_to,
             ftd_100_date, ftd_100_amount, original_deposit_owner,
             net_deposits_current, net_until_qualification, synced_at
@@ -2083,9 +2090,17 @@ def truncate_and_insert_ftd100() -> int:
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute("TRUNCATE TABLE ftd100_clients")
+            # In case a previous run was interrupted between CREATE and the swap.
+            cur.execute("DROP TABLE IF EXISTS ftd100_clients_new")
+            # Copy all indexes, defaults, NOT NULLs from the live table.
+            cur.execute("CREATE TABLE ftd100_clients_new (LIKE ftd100_clients INCLUDING ALL)")
             cur.execute(cte_sql)
             rows = cur.rowcount
+            # All of the above is in one psycopg2-managed transaction. Either the
+            # DROP+RENAME below commits atomically with the CREATE+INSERT, or
+            # everything rolls back together — no half-state risk.
+            cur.execute("DROP TABLE ftd100_clients")
+            cur.execute("ALTER TABLE ftd100_clients_new RENAME TO ftd100_clients")
         conn.commit()
         return rows
     finally:
@@ -2759,8 +2774,12 @@ _MV_SETUP_SQL = [
     "CREATE INDEX IF NOT EXISTS idx_mv_daily_kpis_agent       ON mv_daily_kpis (agent_id)",
 
     # ── mv_volume_stats (MT5 + open positions) ───────────────────────────────
-    # Rename old MT4-based MV to backup (first deploy only — subsequent runs no-op via IF EXISTS)
-    "ALTER MATERIALIZED VIEW IF EXISTS mv_volume_stats RENAME TO mv_volume_stats_mt4_backup",
+    # NOTE: there used to be an "ALTER MATERIALIZED VIEW IF EXISTS mv_volume_stats
+    # RENAME TO mv_volume_stats_mt4_backup" here as a one-time historical migration.
+    # IF EXISTS only guards on whether the source name exists, so it kept firing on
+    # every startup, queuing for AccessExclusiveLock behind the in-flight CONCURRENT
+    # refresh and stalling all reads of mv_volume_stats behind it. Removed — the
+    # rename has long since happened on every environment that needs it.
     """
     CREATE MATERIALIZED VIEW IF NOT EXISTS mv_volume_stats AS
     SELECT
