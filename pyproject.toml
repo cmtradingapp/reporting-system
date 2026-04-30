@@ -32,6 +32,10 @@ filterwarnings = [
     # pytest-asyncio plugin uses several asyncio APIs deprecated in Python 3.14+.
     # CI target is 3.11 where these don't fire; this keeps local dev on 3.14 green.
     "ignore:'asyncio\\..+' is deprecated:DeprecationWarning",
+    # `datetime.utcnow()` is deprecated on 3.14, used in app/auth/auth.py + app/main.py.
+    # Migration to `datetime.now(UTC)` requires timezone-correctness review (server TZ vs
+    # JWT exp encoding) and is tracked as a Phase 1+ follow-up.
+    "ignore:datetime.datetime.utcnow.. is deprecated:DeprecationWarning",
 ]
 
 [tool.coverage.run]
