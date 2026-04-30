@@ -49,7 +49,15 @@ def test_schema_seeded(test_database_url: str | None) -> None:
             """)
             tables = {row[0] for row in cur.fetchall()}
         # Tables defined in tests/fixtures/schema.sql
-        expected = {"auth_users", "crm_users", "accounts", "transactions", "sync_log", "holidays", "company_targets"}
+        expected = {
+            "auth_users",
+            "crm_users",
+            "accounts",
+            "transactions",
+            "sync_log",
+            "public_holidays",
+            "company_targets",
+        }
         missing = expected - tables
         assert not missing, f"schema.sql tables missing: {missing}. Did the seed step run?"
     finally:

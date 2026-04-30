@@ -55,17 +55,25 @@ CREATE TABLE IF NOT EXISTS transactions (
     amount_usd             NUMERIC(18, 2)
 );
 
+-- Mirrors app/db/postgres_conn.py::ensure_table sync_log block.
 CREATE TABLE IF NOT EXISTS sync_log (
-    id           SERIAL PRIMARY KEY,
-    table_name   TEXT NOT NULL,
-    status       TEXT NOT NULL,
-    cutoff_time  TIMESTAMP,
-    finished_at  TIMESTAMP DEFAULT NOW()
+    id            SERIAL       PRIMARY KEY,
+    table_name    VARCHAR(100) NOT NULL,
+    cutoff_used   TIMESTAMP    NOT NULL,
+    rows_affected INT          DEFAULT 0,
+    duration_ms   INT          DEFAULT 0,
+    status        VARCHAR(20)  DEFAULT 'success',
+    error_message TEXT,
+    ran_at        TIMESTAMP    NOT NULL DEFAULT NOW()
 );
+CREATE INDEX IF NOT EXISTS idx_sync_log_table_name ON sync_log (table_name);
+CREATE INDEX IF NOT EXISTS idx_sync_log_ran_at ON sync_log (ran_at);
 
-CREATE TABLE IF NOT EXISTS holidays (
-    holiday_date DATE PRIMARY KEY,
-    label        TEXT
+-- Mirrors the public_holidays DDL in postgres_conn.py.
+CREATE TABLE IF NOT EXISTS public_holidays (
+    holiday_date DATE         NOT NULL,
+    description  VARCHAR(255),
+    CONSTRAINT pk_public_holidays PRIMARY KEY (holiday_date)
 );
 
 CREATE TABLE IF NOT EXISTS company_targets (
